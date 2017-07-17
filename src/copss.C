@@ -428,7 +428,8 @@ void Copss::create_domain_mesh()
   }
   mesh = new SerialMesh(comm_in);
   //mesh = std::unique_ptr<SerialMesh> (new SerialMesh (comm_in));
-  if(generate_mesh and wall_type == "slit"){      
+  if(generate_mesh){
+    if (wall_type == "slit"){      
         const Real meshsize_x   = (wall_params[1] - wall_params[0])/Real( n_mesh[0] );
         const Real meshsize_y   = (wall_params[3] - wall_params[2])/Real( n_mesh[1] );
         const Real meshsize_z   = (wall_params[5] - wall_params[4])/Real( n_mesh[2] );
@@ -457,8 +458,14 @@ void Copss::create_domain_mesh()
           MeshTools::Generation::build_cube (*mesh, n_mesh[0], n_mesh[1], n_mesh[2],
                                             wall_params[0], wall_params[1], wall_params[2], wall_params[3], wall_params[4], wall_params[5], HEX20);  // HEX20/27
         }
-    }// end if (generate_mesh)
-    else if(domain_mesh_file != "nothing"){
+    } // end wall_type = "slit"
+    else if (wall_type == "sphere"){
+      cout << "create_domain_mesh () does not support sphere mesh so far ! " << endl;
+      libmesh_error (); 
+    }
+  }// end if (generate_mesh)
+  else{
+    if(domain_mesh_file != "nothing"){
           mesh->read(domain_mesh_file);    
           mesh->all_second_order();
           mesh->prepare_for_use();
@@ -477,23 +484,34 @@ void Copss::create_domain_mesh()
         cout <<"********************************************************************************"<<endl;    
         libmesh_error();
     } 
-    mesh -> print_info();
+  } // end else (generate mesh)
+  // print mesh info
+  mesh -> print_info();
 } // end function
 
 //============================================================================
 void Copss::create_periodic_boundary(){
-  if(wall_type != "slit"){
-    error_msg = "Copss::create_periodic_boundary() only works for wall_type = 'slit'";
-    PMToolBox::output_message(error_msg, comm_in);
-    libmesh_error();
+  if (wall_type == "slit"){
+    const Point bbox_pmin(wall_params[0], wall_params[2], wall_params[4]);
+    const Point bbox_pmax(wall_params[1], wall_params[3], wall_params[5]);
+    // construct PMPeriodicBoundary class using info above  
+    pm_periodic_boundary = new PMPeriodicBoundary(bbox_pmin, bbox_pmax, periodicity, inlet, inlet_pressure);
   }
-  const Point bbox_pmin(wall_params[0], wall_params[2], wall_params[4]);
-  const Point bbox_pmax(wall_params[1], wall_params[3], wall_params[5]);
-  // construct PMPeriodicBoundary class using info above
-  
-  pm_periodic_boundary = new PMPeriodicBoundary(bbox_pmin, bbox_pmax, periodicity, inlet, inlet_pressure);
-  //pm_periodic_boundary = std::unique_ptr<PMPeriodicBoundary> 
-    //                    (new PMPeriodicBoundary(bbox_pmin, bbox_pmax, periodicity, inlet, inlet_pressure));
+  else if (wall_type == "sphere"){
+    // check: No PBC, No inlet/outlet
+    if (periodicity[0] or periodicity[1] or periodicity [2] or inlet[0] or inlet[1] or inlet[2]){
+      cout << "spherical domain cannot have PBC or inlet/outlet, check control file" << endl;
+      libmesh_error();
+    }
+    cout << "spherical domain cannot have PBC, but we need to create a PBC object using a non-existed cubic box to keep COPSS running !" << endl; 
+    const Point bbox_pmin(-Real(wall_params[0]/2.),-Real(wall_params[0]/2.),-Real(wall_params[0]/2.));
+    const Point bbox_pmax(Real(wall_params[0]/2.),Real(wall_params[0]/2.),Real(wall_params[0]/2.));
+    // construct PMPeriodicBoundary class using info above  
+    pm_periodic_boundary = new PMPeriodicBoundary(bbox_pmin, bbox_pmax, periodicity, inlet, inlet_pressure);    
+  }
+  else{
+    cout << "COPSS::create_periodic_boundary() only support 'slit' or 'sphere' wall_type for now !" << endl;
+  }
 } // end function
 
 
@@ -675,6 +693,9 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   reinit_stokes = true;
   system.solve_stokes("undisturbed",reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
+  if (print_info) {
+    if (comm_in.rank() == 0) point_mesh -> print_point_info();
+  }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    write out the equation systems if write_es = true at Step 0 (undisturbed field)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

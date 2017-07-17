@@ -86,6 +86,7 @@ public:
   // PI constant
   const Real  PI      = libMesh::pi;
   const Real  sqrt_pi = std::sqrt(PI);
+  const Real pi_23 = std::pow(PI, 3./2.);
   const Real  r_eps   = 1E-6;         // a small value
   
   

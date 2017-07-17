@@ -66,7 +66,8 @@ source $LIBMESH_DIR/examples/run_common.sh
 
 echo ------------------------------------------------------------------
 echo ------------------------ Use 1 processors ------------------------
-mpirun -n 4 ./example-opt                   \
+mpirun -n 50 ./example-opt                   \
+--disable-perflog                          \
 -ksp_type preonly                           \
 -pc_type lu                                 \
 -pc_factor_mat_solver_package superlu_dist  \

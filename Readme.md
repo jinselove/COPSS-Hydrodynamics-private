@@ -106,22 +106,23 @@ If you meet any trouble, please refer to [SLEPC installation](http://slepc.upv.e
 
 	 `git clone https://bitbucket.org/COPSS/copss-hydrodynamics-public.git`
 
- - Compile the codes
+ - Compile the codes	 
  
-	 `cd /path/to/copss/src/` 
+	 `cp /path/to/copss/tools/Makefile /path/to/copss/example/general_point_particle` 
+	 
+	 `cd /path/to/copss/example/general_point_particle/` 
 	 
 	 `make`
 
  - Run the system
-	 `cd /path/to/copss/examples/general_point_particle/`
 
-	`cp /path/to/copss/src/example-opt $PWD`	 
+         `cp /path/to/copss/src/example-opt $PWD`	 
 
 	 `cp /path/to/copss/tools/run.sh $PWD` 
 
-	`bash run.sh` (You can define how many cores you want to run on in **run.sh**)
+         `bash run.sh` (You can define how many cores you want to run on in **run.sh**)
 	
-	You need to set up your system in **polymer_control.in** and **datafile (e.g., point_particle_data.in)**. More details can be found in our documentation.
+	You need to set up your system in **point_particle_control.in** and **datafile (e.g., point_particle_data.in)**. More details can be found in our documentation.
 
 
 **Build documentation**

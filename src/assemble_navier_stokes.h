@@ -175,6 +175,9 @@ private:
  
   // system dimension
   unsigned int _dim;
+
+  // mesh
+  MeshBase& _mesh;
   // the particle-mesh (linear implicit) system
 
   // Boundary ids - build_square(): (2D);  build_cube(): (3D)

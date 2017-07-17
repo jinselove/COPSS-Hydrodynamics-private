@@ -51,7 +51,9 @@
 
 // ==================================================================================
 AssembleNS::AssembleNS(EquationSystems& es)
-: _eqn_sys(es)
+: _eqn_sys(es),
+_mesh(es.get_mesh())
+
 {
   // do nothing
   _dim  = es.get_mesh().mesh_dimension();
@@ -80,7 +82,7 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
   
   */
   libmesh_assert_equal_to (system_name, "Stokes");
-  const MeshBase& _mesh = _eqn_sys.get_mesh();
+//  const MeshBase& _mesh = _eqn_sys.get_mesh();
   PMLinearImplicitSystem& _pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> (system_name);
   // Numeric ids corresponding to each variable in the system
   const unsigned int  u_var = _pm_system.variable_number ("u");      // u_var = 0
@@ -316,7 +318,7 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
 {
   // It is a good idea to make sure we are assembling the proper system.
   libmesh_assert_equal_to (system_name, "Stokes");
-  const MeshBase& _mesh = _eqn_sys.get_mesh();
+//  const MeshBase& _mesh = _eqn_sys.get_mesh();
   PMLinearImplicitSystem& _pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> (system_name);
   
   // Numeric ids corresponding to each variable in the system
@@ -444,15 +446,17 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
   START_LOG("compute_element_rhs()", "AssembleNS");  // libMesh log
   
   libmesh_assert_equal_to (system_name, "Stokes");
-  const MeshBase& _mesh = _eqn_sys.get_mesh();
+//  const MeshBase& _mesh = _eqn_sys.get_mesh();
   PMLinearImplicitSystem& _pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
-  const std::vector<bool>& _inlet_direction = _pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
-  const std::vector<Real>& _inlet_pressure = _pm_system.point_mesh()->pm_periodic_boundary()->inlet_pressure();
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Get a reference to the Particle-Mesh linear implicit system.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  PointMesh<3>* point_mesh = _pm_system.point_mesh();
-  // The element Jacobian * quadrature weight at each quad pt(high order Qgauss).
+  PointMesh<3>* _point_mesh = _pm_system.point_mesh();
+  PMPeriodicBoundary* _pm_periodic_boundary = _point_mesh -> pm_periodic_boundary();
+  const std::vector<bool>& _inlet_direction = _pm_periodic_boundary -> inlet_direction();
+  const std::vector<Real>& _inlet_pressure = _pm_periodic_boundary->inlet_pressure();
+  std::vector<PointParticle*> _particles = _point_mesh->particles();
+ // The element Jacobian * quadrature weight at each quad pt(high order Qgauss).
   const std::vector<Real>& JxW                = fe_v.get_JxW();
   const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
   const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords of quad pts
@@ -468,36 +472,31 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
     // get the location of points in the neighbor list
     GGEMSystem ggem_sys;
     const std::size_t n_pts = n_list.size();
-    std::vector<Point> force_points(n_pts);
-    for (std::size_t i=0; i<n_pts; ++i){
-      force_points[i] = point_mesh->particles()[n_list[i]]->point();
-    }
-    
-    
     // Now we will build the element RHS using high order gauss quadrature.
     // first loop over all neighboring particles near this element
+    Point np_pos(0.);
+    std::vector<Real> np_force(_dim, 0.);
+    Real r = 0. , force_val = 0.;
+    std::vector<Real> fvalues(_dim,0.);
     for(unsigned int np=0; np<n_pts; ++np)
     {
       // force vector on each particle(note they are different!)
-      std::vector<Real> pf(_dim,0.0);    // point force vector of the current particle
-      pf = point_mesh->particles()[n_list[np]]->particle_force();
-   //   std::cout <<"======================================================================" <<std::endl
- //         <<"--->test: point force = (" << pf[0] << ", " << pf[1] << ", " << pf[2] << std::endl
-//          <<"======================================================================" <<std::endl;
+     // std::vector<Real> pf(_dim,0.0);    // point force vector of the current particle
+     np_force = _particles[n_list[np]]->particle_force();
+     np_pos = _particles[n_list[np]]->point();  
 
-      // Next loop over gauss points
+    // Next loop over gauss points
       for (unsigned int qp=0; qp<q_xyz.size(); qp++)
       {
         // distance from Gaussian point to the force point
-        const Real r = point_mesh->pm_periodic_boundary()->point_distance(q_xyz[qp],force_points[np]);
+        r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
         
         // evaluate the value of gauss force at this quad pt.
-        const Real force_val = ggem_sys.smoothed_force_exp(r, alpha);
+        force_val = ggem_sys.smoothed_force_exp(r, alpha);
         
         // force magnitudes on each particle(note they are different!)
-        std::vector<Real> fvalues(_dim,0.0);
         for (unsigned int j=0; j<_dim; ++j) {
-          fvalues[j] = pf[j]*force_val;
+          fvalues[j] = np_force[j]*force_val;
         }
         
         // compute the element rhs vector
@@ -648,7 +647,7 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
   
   // Get a reference to the Particle-Mesh linear implicit system object.
   PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
-  const MeshBase& mesh   = pm_system.get_mesh();
+//  const MeshBase& mesh   = pm_system.get_mesh();
   const Real penalty     = 1E10;    // The penalty value.
   const Real tol         = 1E-6;   // The tolerence value.
   const unsigned int n_nodes = elem->n_nodes();
@@ -668,8 +667,8 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
       for (int i = 0; i < _dim; i++)
       {
         if(periodicity[i] or inlet_direction[i]){
-          if (mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
-              mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
+          if (_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
+              _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
           { _continue = true; }
         }
       }   

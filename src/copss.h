@@ -45,8 +45,8 @@
 #include "libmesh/periodic_boundary.h"
 #include "libmesh/sparse_matrix.h"
 #include "libmesh/numeric_vector.h"
-
 #include "libmesh/slepc_macro.h"
+#include "libmesh/perf_log.h"
 
 // User defined includes
 #include "point_particle.h"

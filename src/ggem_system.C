@@ -96,7 +96,7 @@ Real GGEMSystem::smoothed_force_exp(const Real& r,
   const Real a2   = alpha*alpha,  a3 = a2*alpha;
   const Real r2   = r*r;
   const Real a2r2 = a2*r2;
-  Real  force = ( a3/(PI*sqrt_pi) )*(2.5 - a2r2)*std::exp( -a2r2 );
+  Real  force = ( a3/(pi_23) )*(2.5 - a2r2)*std::exp( -a2r2 );
   
   STOP_LOG ("smoothed_force_exp()", "GGEMSystem");
   

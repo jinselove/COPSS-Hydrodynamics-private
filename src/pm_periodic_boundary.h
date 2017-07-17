@@ -201,6 +201,10 @@ private:
   // inlet pressure
   std::vector<Real> _inlet_pressure;
 
+  std::size_t _dim;
+  
+  Point _box_length;
+
 }; // end of class
   
 

@@ -122,10 +122,7 @@ void PolymerChain::read_data(const std::string& filename)
 
   
 // ======================================================================
-void PolymerChain::read_data_pizza(const std::string& filename,
-                                   const unsigned int& num_beads,
-                                   const unsigned int& num_bonds,
-                                   unsigned int comm_in_rank)
+void PolymerChain::read_data_pizza(const std::string& filename)
 {
   START_LOG ("read_data_pizza()", "PolymerChain");
   
@@ -155,27 +152,6 @@ void PolymerChain::read_data_pizza(const std::string& filename,
   infile >> _n_bonds >> line_str; // 2. # of bonds
   infile >> _n_bead_types >> line_str >> str_tmpt; // 3. # of bead types
   infile >> _n_bond_types >> line_str >> str_tmpt; // 4. # of bond types
-  if(_n_beads != num_beads or _n_bonds != num_bonds){
-    if (comm_in_rank == 0){
-      printf("Warning: number of beads/bonds in current data file and control file does not match\n");
-    }
-    libmesh_error();
-  }
-
-  // An alternative way to read line info
-//  std::getline(infile, line_str); // 1. # of beads
-//  std::istringstream iss1(line_str);
-//  iss1 >> _n_beads;
-//  std::getline(infile, line_str); // 2. # of bonds
-//  std::istringstream iss2(line_str);
-//  iss2 >> _n_bonds;
-//  std::getline(infile, line_str); // 3. # of bead types
-//  std::istringstream iss3(line_str);
-//  iss3 >> _n_bead_types;
-//  std::getline(infile, line_str); // 4. # of bead types
-//  std::istringstream iss4(line_str);
-//  iss4 >> _n_bond_types;
-  
   // init
   _mass.resize(_n_bead_types);
   _beads.resize(_n_beads);
@@ -327,6 +303,9 @@ void PolymerChain::read_data_vtk(const std::string& filename)
     _beads[i]->set_parent_id(chain_id);
     //printf("---> chain id = %d\n",chain_id);
   }
+  // Use id of the last chain to set number of chains, and initialize vector
+  _n_chains = chain_id + 1; // chain ID start from 0 in .vtk
+  _n_beads_per_chain.resize(_n_chains, 0);
   
   // Finish and close the file
   infile.close();
@@ -336,6 +315,58 @@ void PolymerChain::read_data_vtk(const std::string& filename)
   STOP_LOG ("read_data_vtk()", "PolymerChain");
 }
 
+//=======================================================================
+void PolymerChain::read_data_csv(const std::string& filename)
+{
+  START_LOG ("read_data_csv()", "PolymerChain");
+  
+  // Open the local file and check the existance
+  std::cout <<"\n###Read bead with csv format"<<std::endl;
+  std::cout <<"   filename = "<<filename <<std::endl;
+  std::ifstream infile;
+  infile.open (filename, std::ios_base::in);
+  if( !infile.good() )
+  {
+    printf("***warning: read_data_csv() can NOT read the bead data!");
+    libmesh_error();
+  }
+  
+  // init variables:
+  // point_type:  0 - polymer bead point; 1 - tracking point; or user-defined type
+  const PointType point_type = POLYMER_BEAD;
+  Real x=0., y=0., z=0.;            // initialize bead coords
+  int bead_id, chain_id, bead_type; //
+  std::vector<Real> rot_vec(4); // rotation vector (a,b,c) + theta.
+  _n_chains = 1;
+  // Read file line by line
+  std::string line_str, str_tmpt;
+  std::getline(infile, line_str); // 0. Header line
+  // Read beads data
+  std::cout << line_str << std::endl;
+  int i = 0;
+  int bead_old = 0;
+  while (!infile.eof()) {
+    infile >> bead_id >> x >> y >> z;
+    // create PointParticle
+    Point pt(x,y,z);
+    bead_type = 0;    // bead type = 0 for polymer chain.
+    if (bead_id == 0 or !(bead_id == bead_old)){
+      PointParticle* particle = new PointParticle(pt, i, point_type, rot_vec);
+      // add to the beads list
+      particle->set_parent_id(0);
+      _beads.push_back(particle);
+    }
+    bead_old = bead_id; // avoid repeating last line
+    i+=1;
+  }
+  _n_beads = bead_id + 1; // number of beads = bead id of last bead read from csv
+  _beads.resize(_n_beads);
+  // Finish and close the file
+  infile.close();
+  std::cout << "Reading bead data from "<<filename<<" is completed!\n\n";
+  STOP_LOG ("read_data_csv()", "PolymerChain");
+
+}
   
   
 // ======================================================================
@@ -737,18 +768,17 @@ void PolymerChain::write_bead(const std::string& filename) const
   
   // write out the csv file
   // POINT data
-  outfile <<"x_coord y_coord z_coord scalar\n";
+  outfile <<"scalar x_coord y_coord z_coord\n";
   for(std::size_t i=0; i<n_beads; ++i)
   {
+    outfile << i << " ";
     for(std::size_t j=0; j<3; ++j){
       outfile << _beads[i]->center()(j) << " ";
     }
-    outfile <<i+1<< "\n";
+    outfile <<"\n";
   }
   outfile << "\n";
   outfile.close();
-
-  
   STOP_LOG ("write_bead()", "PolymerChain");
 }
   

@@ -1,28 +1,32 @@
-#include "../../src/copss_point_particle_system.h"
+#include "copss_point_particle_system.h"
 
-// this is just for test
 int main (int argc, char **argv){
 
+  // Init COPSS and libmesh
   CopssInit init(argc, argv);
   CopssPointParticleSystem system(init);
- // CopssRigidParticleSystem system(init);
-// 
+
   // Print out the current date and time 
   time_t rawtime;
   struct tm * timeinfo;
   time ( &rawtime );
   timeinfo = localtime ( &rawtime );
   system.start_time(timeinfo);
+
+  // Init equation_systems
   EquationSystems equation_systems = system.init_system("point_particle_control.in");
+
+  // Run simulation
   system.run(equation_systems);
 
-
+  // Destroy equation_systems and objects generated during simulation
   system.destroy();
- 
 
-
+  // Print end time
   time ( &rawtime );
   timeinfo = localtime ( &rawtime );
   system.end_time(timeinfo);
+
+  // Return 0
   return 0;
 }

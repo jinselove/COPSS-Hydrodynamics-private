@@ -1096,13 +1096,12 @@ std::vector<Point> BrownianSystem::center_of_mass(Vec R0) const
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Allgather the distributed vector R0 to local vector lvec on all processors
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
   this->vector_transform(lvec,&R0,"backward"); // R0->lvec
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    loop over each particle
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  
-
   for(std::size_t i = 0; i < this->num_chains(); i++){
      for(std::size_t j = 0; j < _n_points/_n_chains; j++){
           center[i](0) += lvec[(_n_points/_n_chains*i + j )* 3 + 0];
@@ -1372,13 +1371,13 @@ void BrownianSystem::output_statistics_stepi(bool out_msd_flag, bool out_stretch
   std::vector<Real> Rg1 = this->radius_of_gyration(ROUT, center1);
   std::ofstream out_file;
   int o_width = 10, o_precision = 9; 
- // if(this->comm().rank()==0){
+  if(this->comm().rank()==0){
     // output mean square displacement
     out_file.open("output_statistics.dat", std::ios_base::app);
-    out_file.setf(std::ios::right); out_file.setf(std::ios::fixed);
+    out_file.setf(std::ios::left); out_file.setf(std::ios::fixed);
     out_file.precision(o_precision); out_file.width(o_width);
     //step, real_time
-    out_file << i+1 << " "<<real_time <<" ";
+    out_file << i << " "<<real_time <<" ";
 
     //msd_x, msd_y, msd_z
     if (out_msd_flag){
@@ -1411,7 +1410,7 @@ void BrownianSystem::output_statistics_stepi(bool out_msd_flag, bool out_stretch
     }
     out_file <<"\n";
     out_file.close();
- // }// end this->comm().rank() == 0
+  }// end this->comm().rank() == 0
 }
 
 

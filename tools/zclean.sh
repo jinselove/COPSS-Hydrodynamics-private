@@ -21,9 +21,9 @@ rm particle_surface_mesh.*
 rm *.vtu*
 rm *.vtk
 rm *.pvtu*
-rm *.csv.*
+rm *.csv
 rm *.txt
-
+rm *.dat
 
 rm binaryoutput*
 rm vector_RIN.* vector_ROUT.*

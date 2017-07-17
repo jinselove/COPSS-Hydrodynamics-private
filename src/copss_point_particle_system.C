@@ -30,64 +30,18 @@ void CopssPointParticleSystem::read_particle_info(){
 	}
 	point_particle_model	= input_file("point_particle_model", "other");
 	if(point_particle_model == "bead"){
-		Nb = input_file("Nb",21); // total # of point particles
-		Ns = Nb - 1;//we can look at these beads as a single chain without spring force. Just for development convinence
-		nBonds = Ns;
 	}
 	else if(point_particle_model == "polymer_chain"){
-		Nb = input_file("Nb", 21);// total # of beads
-		Ns = input_file("Ns", 20);// # of springs per Chain
-		nChains = Nb / (Ns+1);
-		nBonds = nChains * Ns;
 		bk = input_file("bk", 1E-6);//Kuhn length(um)
 		Nks = input_file("Nks", 1E-6);// # of Kuhn length per spring
 		Ss2 = Nks*bk*bk/6.; // (um^2)
 		q0 = Nks * bk;// maximum spring length (um)
-		chain_length = Ns * q0; // contour length of the spring (um)
-		Dc = Db / Real(Nb); // Diffusivity of the chain (um^2/s)
     max_spring_len = q0/Rb;     // non-dimensional max spring length
 	}
 	else{
 		error_msg = "	Invalid point_particle_model !!!";
 		PMToolBox::output_message(error_msg, comm_in);
 		libmesh_error();
-	}
-	//make sure we have the right combination of Nb and Ns
-	if((Nb % (Ns + 1)) != 0){
-		error_msg = "	Incorrect combination of Nb (number of beads) and Ns (number of springs per chain)";
-		PMToolBox::output_message(error_msg, comm_in);
-		libmesh_error();     
-	}
-
-	cout<<"##########################################################\n"
-	         <<"#                  Particle Parameters                    \n"
-	         <<"##########################################################\n\n"
-	         <<"   Particle type             : " << particle_type.c_str() << endl
-	  	     <<"   Point Particle model      : " << point_particle_model.c_str() << endl
-	 	       <<"   number of beads       Nb  = " << Nb << endl;
-	  // for particular models
-	if(point_particle_model == "polymer_chain"){
-	cout<<"   number of springs per Chain       Ns  = " << Ns << endl
-				   <<"   number of Chains              nChains = " << nChains << endl
-				   <<"   Kuhn length                      bk  = " <<bk <<" (um)\n"
-				   <<"   # of Kuhn segment per spring      Nks = " << Nks << "\n"
-				   <<"   second moment of polymer chain    Ss2 = " << Ss2 << " (um^2)\n"
-				   <<"   maximum spring length             q0  = " << q0  << " (um)\n"
-				   <<"   chain length of polymer           Lc  = " << chain_length <<" (um)\n"
-				   <<"   chain diffusivity                 Dc  = " << Dc <<" (um^2/s)\n";
-	}
-
-	cout << "------------> The non-dimensional variables:\n";
-
-
-	cout<<"   non-dimensional bead radius      a0     = " << 1.0 << "\n"
-		  	   <<"   non-dimensional ksi = sqrt(PI)/(3a0)    = " << std::sqrt(PI) / 3. <<"\n";
-	if(point_particle_model == "polymer_chain"){
-		cout <<"   non-dimensional Kuhn length    bk/a     = " <<bk/Rb <<"\n"
-		  		    <<"   non-dimensional spring length  q0/a     = " <<q0/Rb <<"\n"
-		  		    <<"   non-dimensional contour length Lc/a     = " <<chain_length/Rb <<"\n"
-		  		    <<"   non-dimensional Ss/a = sqrt(Ss2/a^2)    = " <<std::sqrt(Ss2/Rb/Rb) <<"\n"
-		  		    <<"   non-dimensional ksi = sqrt(PI)/(3a0)    = " <<std::sqrt(PI)/(3.) <<"\n";
 	}
 }// end read_particle_parameter()
 
@@ -96,21 +50,69 @@ void CopssPointParticleSystem::read_particle_info(){
 void CopssPointParticleSystem::create_object(){
   const unsigned int chain_id = 0;
   polymer_chain = new PolymerChain(chain_id, *pm_periodic_boundary);
-  //polymer_chain = std::unique_ptr<PolymerChain> (new PolymerChain (chain_id, *pm_periodic_boundary));
   std::ostringstream pfilename;
   if(restart)
   {
-  	pfilename << point_particle_model<<"_data_restart_"<< restart_step << ".vtk";
-    cout <<"-------------> read "<<point_particle_model<<" data from "<<pfilename.str()<< "in restart mode"<<endl;
-    polymer_chain->read_data_vtk(pfilename.str());
+    if(point_particle_model == "polymer_chain"){
+    	pfilename << "output_polymer_"<< restart_step << ".vtk";
+      polymer_chain->read_data_vtk(pfilename.str());
+    }
+    else if (point_particle_model == "bead"){
+      pfilename << "output_bead_" << restart_step << ".csv";
+      polymer_chain->read_data_csv(pfilename.str());
+    }
+    cout <<"-------------> read "<< point_particle_model << "data from " << pfilename.str() << " in restart mode" << endl;
+
   } 
   else
   {
   	pfilename << "point_particle_data.in";
     cout<<"--------------> skip generating datafile, will read in existed pizza file: "<<pfilename.str()<<endl;
-  	polymer_chain->read_data_pizza(pfilename.str(), Nb, nBonds, comm_in.rank());
+    polymer_chain->read_data_pizza(pfilename.str());
     cout<<"--------------> Polymer_chain class is built!\n";
-  	comm_in.barrier();
+  }
+  // output data read from file
+  if(point_particle_model == "bead"){
+    Nb = polymer_chain -> n_beads();
+    Ns = Nb - 1;
+  }
+  else if (point_particle_model == "polymer_chain"){
+    Nb = polymer_chain -> n_beads();
+    nChains = polymer_chain -> n_chains();
+    nBonds = polymer_chain -> n_bonds();
+    Ns = nBonds / nChains;
+    chain_length = Ns * q0; // contour length of the spring (um)
+    Dc = Db / Real(Nb); // Diffusivity of the chain (um^2/s)
+  }
+  // for particular models
+  cout<<"##########################################################\n"
+           <<"#                  Particle Parameters                    \n"
+           <<"##########################################################\n\n"
+           <<"   particle type             : " << particle_type.c_str() << endl
+           <<"   point Particle model      : " << point_particle_model.c_str() << endl
+           <<"   number of point particles Nb = " << Nb << endl;
+  if(point_particle_model == "polymer_chain"){
+  cout<<"   number of springs per Chain       Ns  = " << Ns << endl
+           <<"   number of Chains              nChains = " << nChains << endl
+           <<"   Kuhn length                      bk  = " <<bk <<" (um)\n"
+           <<"   # of Kuhn segment per spring      Nks = " << Nks << "\n"
+           <<"   second moment of polymer chain    Ss2 = " << Ss2 << " (um^2)\n"
+           <<"   maximum spring length             q0  = " << q0  << " (um)\n"
+           <<"   chain length of polymer           Lc  = " << chain_length <<" (um)\n"
+           <<"   chain diffusivity                 Dc  = " << Dc <<" (um^2/s)\n";
+  }
+
+  cout << "------------> The non-dimensional variables:\n";
+
+
+  cout<<"   non-dimensional bead radius      a0     = " << 1.0 << "\n"
+           <<"   non-dimensional ksi = sqrt(PI)/(3a0)    = " << std::sqrt(PI) / 3. <<"\n";
+  if(point_particle_model == "polymer_chain"){
+    cout <<"   non-dimensional Kuhn length    bk/a     = " <<bk/Rb <<"\n"
+              <<"   non-dimensional spring length  q0/a     = " <<q0/Rb <<"\n"
+              <<"   non-dimensional contour length Lc/a     = " <<chain_length/Rb <<"\n"
+              <<"   non-dimensional Ss/a = sqrt(Ss2/a^2)    = " <<std::sqrt(Ss2/Rb/Rb) <<"\n"
+              <<"   non-dimensional ksi = sqrt(PI)/(3a0)    = " <<std::sqrt(PI)/(3.) <<"\n";
   }
   pfilename.str(""); pfilename.clear();
   comm_in.barrier();
@@ -206,6 +208,7 @@ void CopssPointParticleSystem::update_object(std::string stage)
 
 
 void CopssPointParticleSystem::run(EquationSystems& equation_systems){
+  PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
   // get stokes system from equation systems
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
@@ -225,8 +228,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   NOTE: We MUST re-init particle-mesh before solving Stokes
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   cout<<"==>(1/3) Compute the undisturbed velocity field"<<endl;
+  perf_log.push ("solve undisturbed_system");
   this -> solve_undisturbed_system(equation_systems); 
-  
+  perf_log.pop ("solve undisturbed_system");
   /* output particle data at the 0-th step in the VTK format */
   if(restart==false)
   {
@@ -262,6 +266,8 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
 
 
   //start integration
+
+  perf_log.push ("integration");
   for(unsigned int i=istart; i<=iend; ++i)
   {
     cout << "\nStarting Fixman Mid-Point algorithm at step "<< i << endl;
@@ -270,7 +276,6 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
     // Update the time
     if(i%write_interval==0){
       if(comm_in.rank()==0){
-
         /*---------------------------------------------------------------------------------------
          * output polymer chain / bead data in the VTK format at step i
         -----------------------------------------------------------------------------------------*/
@@ -296,16 +301,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
       VecView(ROUT,viewer);
     }
 
-  }
-
-
-
-
-
-
-
-
-
+  } // end step integration
+  
+  perf_log.pop ("integration");
 }
 
 } // end of namespace

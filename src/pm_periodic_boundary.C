@@ -36,7 +36,8 @@ PMPeriodicBoundary::PMPeriodicBoundary(const std::pair<Point, Point> &bbox_pts,
 : _bbox(bbox_pts),
   _periodic_directions(periodic_directions)
 {
-  // do nothing
+  _box_length = _bbox.max() - _bbox.min();
+  _dim = _periodic_directions.size();
 }
 
 
@@ -47,7 +48,9 @@ PMPeriodicBoundary::PMPeriodicBoundary(const BoundingBox& bbox,
 : _bbox(bbox),
   _periodic_directions(periodic_directions)
 {
-  // do nothing
+  _box_length = _bbox.max() - _bbox.min();
+  _dim = _periodic_directions.size();
+
 }
 
 
@@ -59,7 +62,9 @@ PMPeriodicBoundary::PMPeriodicBoundary(const Point &bbox_pmin,
 : _bbox(bbox_pmin, bbox_pmax),
   _periodic_directions(periodic_directions)
 {
-  // do nothing
+  _box_length = _bbox.max() - _bbox.min();
+  _dim = _periodic_directions.size();
+
 }
 
 // ======================================================================
@@ -73,7 +78,9 @@ PMPeriodicBoundary::PMPeriodicBoundary(const Point &bbox_pmin,
   _inlet_directions(inlet_directions),
   _inlet_pressure(inlet_pressure)
 {
-  // do nothing
+  _box_length = _bbox.max() - _bbox.min();
+  _dim = _periodic_directions.size();
+
 }
  
 
@@ -82,6 +89,10 @@ PMPeriodicBoundary::PMPeriodicBoundary(const PMPeriodicBoundary & pb)
 {
   _bbox = pb._bbox;
   _periodic_directions = pb._periodic_directions;
+
+  _box_length = _bbox.max() - _bbox.min();
+  _dim = _periodic_directions.size();
+
 }
 
 
@@ -135,7 +146,7 @@ const std::vector<Real>& PMPeriodicBoundary::inlet_pressure() const
 // ======================================================================
 Real PMPeriodicBoundary::box_length(const std::size_t i) const
 {
-  return _bbox.max()(i) - _bbox.min()(i);
+  return _box_length(i);
 }
 
 
@@ -143,7 +154,7 @@ Real PMPeriodicBoundary::box_length(const std::size_t i) const
 // ======================================================================
 Point PMPeriodicBoundary::box_length() const
 {
-  return _bbox.max() - _bbox.min();
+  return _box_length;
 }
 
 
@@ -186,8 +197,7 @@ bool PMPeriodicBoundary::get_image_point(const Point& pt0,
   START_LOG ("get_image_point()", "PMPeriodicBoundary");
   
   bool  has_image = false;
-  const std::size_t dim = _periodic_directions.size();
-  libmesh_example_requires(2 <= dim, "2D/3D support for PMPeriodicBoundary");
+  libmesh_example_requires(2 <= _dim, "2D/3D support for PMPeriodicBoundary");
   
   // first need to check if the point is in the bounding domain
   // If this is true, and there is also periodic boundary in the i-th direction,
@@ -210,7 +220,7 @@ bool PMPeriodicBoundary::get_image_point(const Point& pt0,
     const Point& box_size   = this->box_length();
     
     // first, check the image along the i-th direction.
-    if ( (i<dim) && _periodic_directions[i] )
+    if ( (i<_dim) && _periodic_directions[i] )
     {
       if (pt0(i)-box_min(i) <= search_radius)
       { im_pt(i) += box_size(i);  has_image = true; }
@@ -218,7 +228,7 @@ bool PMPeriodicBoundary::get_image_point(const Point& pt0,
       { im_pt(i) -= box_size(i);  has_image = true; }
     }
     // check the image along the i-j corner direction
-    else if( i==dim && _periodic_directions[0] && _periodic_directions[1] ) // xy direction
+    else if( i==_dim && _periodic_directions[0] && _periodic_directions[1] ) // xy direction
     {
       // check x-dir
       bool xclose = false, yclose = false;
@@ -235,7 +245,7 @@ bool PMPeriodicBoundary::get_image_point(const Point& pt0,
       
       if ( xclose && yclose ) has_image = true;
     }
-    else if( i==dim+1 && _periodic_directions[0] && _periodic_directions[2] ) // xz direction
+    else if( i==_dim+1 && _periodic_directions[0] && _periodic_directions[2] ) // xz direction
     {
       // check x-dir
       bool xclose = false, zclose = false;
@@ -252,7 +262,7 @@ bool PMPeriodicBoundary::get_image_point(const Point& pt0,
       
       if ( xclose && zclose ) has_image = true;
     }
-    else if( i==dim+2 && _periodic_directions[2] && _periodic_directions[1] ) // yz direction
+    else if( i==_dim+2 && _periodic_directions[2] && _periodic_directions[1] ) // yz direction
     {
       // check z-dir
       bool zclose = false, yclose = false;
@@ -269,7 +279,7 @@ bool PMPeriodicBoundary::get_image_point(const Point& pt0,
       
       if ( zclose && yclose ) has_image = true;
     }
-    else if( i==dim+3 &&                                        // xyz direction
+    else if( i==_dim+3 &&                                        // xyz direction
             _periodic_directions[0] && _periodic_directions[1] && _periodic_directions[2] )
     {
       // check x-dir
@@ -339,14 +349,14 @@ Real PMPeriodicBoundary::point_distance(const Point& pt0,
   // the distance vector
   const Point x = this->point_vector(pt0,pt1);
   
-  Real dist = 0.0;
-  for(std::size_t i=0; i<3; ++i) {
-    dist += x(i)*x(i);
-  }
+//  Real dist = 0.0;
+//  for(std::size_t i=0; i<3; ++i) {
+//    dist += x(i)*x(i);
+//  }
   
   STOP_LOG ("point_distance()", "PMPeriodicBoundary");
   
-  return std::sqrt(dist);
+  return x.norm();
 }
 
 
@@ -360,7 +370,7 @@ Point PMPeriodicBoundary::point_vector(const Point& pt0,
   Point dpt = pt1 - pt0;
   
   // Modify the value due to periodic boundaries.
-  for(std::size_t i=0; i<_periodic_directions.size(); ++i)
+  for(std::size_t i=0; i<_dim; ++i)
   {
     if(_periodic_directions[i])
     {
@@ -390,9 +400,8 @@ std::vector<bool> PMPeriodicBoundary::image_elem(const Elem* elem) const
   
 
   // Loop over each direction
-  const std::size_t dim = _periodic_directions.size();
-  std::vector<bool> direction_flag(dim,false);
-  for(std::size_t i=0; i<dim; ++i)
+  std::vector<bool> direction_flag(_dim,false);
+  for(std::size_t i=0; i<_dim; ++i)
   {
     if( _periodic_directions[i] && (hmax>box_size(i)/2.) ){
       direction_flag[i] = true;

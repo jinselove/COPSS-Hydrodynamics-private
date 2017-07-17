@@ -27,13 +27,6 @@ viscosity = 1.018E-15
 # temperature # (K)
 temperature = 297
 
-
-# Number of beads 
-Nb = 11
-
-# Number of springs per chain => Number of beads then is Nb = Ns+1
-Ns = 10
-
 # Kuhn length (um)
 bk  = 0.106
 
@@ -151,10 +144,11 @@ tol_eigen = 0.01
 #############################################
 with_brownian  = true
 adaptive_dt    = true
+max_dr_coeff   = 0.1
 write_interval = 1
 restart        = false
 restart_step   = 10
 restart_time   = 1.438907510
 random_seed    = 123456789
-nstep          = 5
+nstep          = 1
 

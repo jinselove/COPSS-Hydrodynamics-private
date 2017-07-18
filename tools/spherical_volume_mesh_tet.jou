@@ -4,26 +4,24 @@
 # Parameters to tune:
 #			radius (default 1)
 # 			mesh_size (default 0.2)
-# 			HEX20 or HEX27 (default HEX20)
+# 			element type (default TETRA10)
 
 # mesh size
-mesh_size = 2
+mesh_size = 0.8
 
 cubit.cmd('reset')
 
 # create the sphere and its center location is (0,0,0)
-cubit.cmd('create sphere radius 14.4')
+cubit.cmd('create sphere radius 10')
 
 cubit.cmd('volume 1 size '+str(mesh_size)+'')
-cubit.cmd('volume 1 scheme auto')
+cubit.cmd('volume 1 scheme TetMesh')
 cubit.cmd('mesh volume 1')
 cubit.cmd('block 1 volume 1')
 
 # write out the Exodus file
-cubit.cmd('block all element type tet')
+cubit.cmd('block all element type TETRA10')
 cubit.cmd('set large exodus file off')
-cubit.cmd('export Genesis  "./spherical_cavity_R14.e.e" dimension 3 block all overwrite')
-
-
+cubit.cmd('export Genesis  "./spherical_cavity_0.8.e" dimension 3 block all overwrite')
 
 

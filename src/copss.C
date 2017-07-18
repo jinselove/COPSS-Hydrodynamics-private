@@ -750,7 +750,8 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 //==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
 {
-
+  PerfLog perf_log("fixman_integrate");
+  perf_log.push("init_system");
   // get stokes system from equation systems
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -766,7 +767,12 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     // compute undisturbed velocity of points 
     system.compute_point_velocity("undisturbed", vel0);
     reinit_stokes = false;
+  perf_log.pop("init_system");
+  perf_log.push("solve_stokes(before bd)");
+
     system.solve_stokes("disturbed",reinit_stokes); // Using StokesSolver
+  perf_log.pop("solve_stokes(before bd)");
+
     // compute distrubed velocity of points
     system.compute_point_velocity("disturbed", vel1);
     // add up undistrubed and disturbed velocity of points
@@ -849,6 +855,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
     if (with_brownian)
     {
+      perf_log.push("bd");
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
        petsc_random_vector generates a uniform distribution [0 1] whose
@@ -888,7 +895,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
           PetscPrintf(PETSC_COMM_WORLD,
                      "--->Recomputed eigen values and magnify the range by a factor eig_factor = %f: eig_min = %f, eig_max = %f, tol_cheb = %f, max_n_cheb = %d\n",
                      eig_factor,eig_min,eig_max,tol_cheb,max_n_cheb);   
-}
+        }
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          Compute the Brownian displacement B^-1 * dw using Chebyshev approximation.
          Here dw is both input and output variables, so it will be changed.
@@ -972,6 +979,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
       VecAXPY(ROUT,2.0*coef,dw_mid);  // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
+  perf_log.push("bd");  
     } // end if Brownian
     
     else{ // if without Brownian

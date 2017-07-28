@@ -155,13 +155,13 @@ public:
   std::size_t random_seed;
   bool adaptive_dt; // if use adaptive time step (essential for brownian systems)
   Real dt0; // timestep when brownian system starts (step1)
-  Real max_dr_coeff = 0.1; // max displacement per step
+  Real max_dr_coeff; // max displacement per step
   bool restart; // if restart
   std::size_t restart_step; // restart step
   Real restart_time; // real time at restart step
   unsigned int nstep; // totol number of steps to run
   unsigned int write_interval; // output file write interval
-  bool write_es, out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag;
+  bool debug_info, write_es, out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag;
   std::ostringstream oss;
 
   // mesh

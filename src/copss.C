@@ -353,6 +353,12 @@ void Copss::read_stokes_solver_info(){
  * read Chebyshev info
  */
 void Copss::read_chebyshev_info(){
+  // Initialize compute_eigen
+  compute_eigen = input_file("compute_eigen", true);
+  if (compute_eigen == false){
+    eig_min = input_file ("eig_min", 0.);
+    eig_max = input_file ("eig_max", 0.);
+  }
   max_n_cheb = input_file("max_n_cheb", 10);
   tol_cheb = input_file("tol_cheb", 0.1);
   eig_factor = input_file("eig_factor", 1.05);
@@ -362,6 +368,7 @@ void Copss::read_chebyshev_info(){
          << "#   Chebyshev information (only for brownian System)            " <<endl
          << "##########################################################"<<endl<<endl;  
     cout << "-----------> compute eigen values  = " <<std::boolalpha << compute_eigen <<endl;
+    cout << "-----------> initial eigen value range = ( " << eig_min << ", " << eig_max << " )" << endl;
     cout << "-----------> max number of chebyshev polynomial = " <<max_n_cheb <<endl;
     cout << "-----------> tolerance of chebyshev polynomial = " <<tol_cheb <<endl;
     cout << "-----------> factor of eigenvalues range = " <<eig_factor <<endl;
@@ -384,6 +391,7 @@ void Copss::read_run_info(){
     dt0 = input_file("dt0", 1.e-3);
     random_seed   = input_file("random_seed",111);
   }
+  max_dr_coeff   = input_file("max_dr_coeff", 0.1);
   adaptive_dt    = input_file("adaptive_dt", true);  
   restart       = input_file("restart", false);  
   restart_step  = input_file("restart_step", 0);
@@ -400,7 +408,7 @@ void Copss::read_run_info(){
 
   nstep = input_file("nstep", 1);
   write_interval = input_file("write_interval", 1);
-
+  debug_info   = input_file("debug_info", false);
   write_es      = input_file("write_es", true);
   out_msd_flag      = input_file("out_msd_flag", true);
   out_stretch_flag  = input_file("out_stretch_flag", false);
@@ -409,13 +417,17 @@ void Copss::read_run_info(){
   cout <<"\n##########################################################\n"
        << "#                 Run information                      \n"
        << "##########################################################\n\n"
-       << "-----------> with_brownian: " <<std::boolalpha<<with_brownian <<endl
        << "-----------> adaptive_dt: " << std::boolalpha << adaptive_dt << endl
        << "-----------> dt0: " << dt0 << endl
+       << "-----------> max_dr_coeff: " << max_dr_coeff << endl
        << "-----------> write interval: " <<write_interval <<endl
        << "-----------> Restart mode: "<<std::boolalpha << restart <<"; restart step: "<<restart_step <<"; restart time: "<<restart_time <<endl
-       << "-----------> random seed: " <<random_seed <<endl
-       << "-----------> nstep = " <<nstep <<endl;
+       << "-----------> nstep: " <<nstep <<endl
+       << "-----------> print_debug_info: " << std::boolalpha << debug_info << endl; 
+  if (with_brownian){
+	cout << "-----------> with_brownian: " <<std::boolalpha<<with_brownian <<endl
+             << "-----------> random seed: " <<random_seed <<endl;
+  }
 } // end read_run_info()
 
 //============================================================================
@@ -750,7 +762,8 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 //==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
 {
-
+//  PerfLog perf_log("fixman_integrate");
+//  perf_log.push("init_system");
   // get stokes system from equation systems
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -766,7 +779,12 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     // compute undisturbed velocity of points 
     system.compute_point_velocity("undisturbed", vel0);
     reinit_stokes = false;
+//  perf_log.pop("init_system");
+//  perf_log.push("solve_stokes(before bd)");
+
     system.solve_stokes("disturbed",reinit_stokes); // Using StokesSolver
+//  perf_log.pop("solve_stokes(before bd)");
+
     // compute distrubed velocity of points
     system.compute_point_velocity("disturbed", vel1);
     // add up undistrubed and disturbed velocity of points
@@ -821,7 +839,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
              << "       # minimum fluid mesh size = " << hmin << endl
              << "       # The adaptive time increment at step "<< i << " is dt = " << dt<<endl
              << "       # max_dr_coeff = " << max_dr_coeff <<endl 
-       << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
+             << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
              << "       # (without Brownian) adapting_time_step = max_dr_coeff * fluid_mesh_size_min / (max_bead_velocity at t_i) "<<endl      
              << "       ##############################################################################################################" << endl;
       } // end if (i% write_interval)  
@@ -836,8 +854,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       if(i % write_interval == 0){
         cout << "       ##############################################################################################################" << endl
              << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl
-             << " # max_dr_coeff = " << max_dr_coeff << endl
-       << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
+             << "       # max_dr_coeff = " << max_dr_coeff << endl
+       	     << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
              << "       # (Without Brownian) fixed_time_step = max_dr_coeff * fluid_mesh_size_min / 1.0 "<<endl
              << "       ##############################################################################################################" << endl;
       } // end if (i % write_interval == 0)
@@ -849,6 +867,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
     if (with_brownian)
     {
+   //   perf_log.push("bd");
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
        petsc_random_vector generates a uniform distribution [0 1] whose
@@ -884,11 +903,11 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
           //cout << "Compute the max & min eigenvalues for Chebyshev polynomial at step "<<i+1<<endl;
           brownian_sys->compute_eigenvalues(eig_min,eig_max,tol_eigen);
           // Magnify the spectral range by a factor (1.05 by default).
-      eig_max *= eig_factor; eig_min /= eig_factor;
+  	  eig_max *= eig_factor; eig_min /= eig_factor;
           PetscPrintf(PETSC_COMM_WORLD,
                      "--->Recomputed eigen values and magnify the range by a factor eig_factor = %f: eig_min = %f, eig_max = %f, tol_cheb = %f, max_n_cheb = %d\n",
                      eig_factor,eig_min,eig_max,tol_cheb,max_n_cheb);   
-}
+        }
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          Compute the Brownian displacement B^-1 * dw using Chebyshev approximation.
          Here dw is both input and output variables, so it will be changed.
@@ -972,6 +991,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
       VecAXPY(ROUT,2.0*coef,dw_mid);  // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
+//  perf_log.pop("bd");  
     } // end if Brownian
     
     else{ // if without Brownian

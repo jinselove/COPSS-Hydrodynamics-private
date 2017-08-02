@@ -17,7 +17,7 @@ phi = 0.05;
 
 ############## calculated parameters
 # number of particles
-num = round(phi / pow(particleRadius/cellRadius,3))
+num = int(round(phi / pow(particleRadius/cellRadius,3)))
 
 
 ###################generate random particles within cell using packmol
@@ -30,8 +30,8 @@ packmol_input.write("output tmp.xyz\n")
 packmol_input.write("filetype xyz\n")
 packmol_input.write("structure spheres.xyz\n")
 packmol_input.write("  number "+ str(num) +"\n")
-packmol_input.write("  inside sphere 0. 0. 0. "+str(cellRadius-2)+"\n")
-packmol_input.write("  radius "+str(particleRadius)+"\n")
+packmol_input.write("  inside sphere 0. 0. 0. "+str(cellRadius-1.5)+"\n")
+packmol_input.write("  radius "+str(particleRadius*1.3)+"\n")
 packmol_input.write("end structure\n")
 packmol_input.close()
 ####build sphere.xyz
@@ -45,7 +45,7 @@ packmol_input.close()
 os.system("./packmol < cell"+str(num)+".inp")
 
 ##################convert tmp.xyz(from packmol) to bead_data_num_beads.in(pizza format)
-datafile=open("bead_data_"+str(num)+"_beads.in", 'w');
+datafile=open("point_particle_data.in", 'w');
 datafile.write("LAMMPS FENE chain data file\n");
 datafile.write(str(num)+" atoms\n");
 datafile.write(str(num-1)+" bonds\n");

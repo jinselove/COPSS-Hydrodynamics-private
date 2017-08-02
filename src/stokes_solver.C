@@ -196,8 +196,8 @@ void StokesSolver::solve()
   int ierr;
   PetscInt      its     = 0;
   PetscReal final_resid = 0.;
-  Real t1, t2;
-  t1 = MPI_Wtime();
+//  Real t1, t2;
+//  t1 = MPI_Wtime();
   //PetscPrintf(this->comm().get(), "--->test in StokesSolver::solve(): ");
   //PetscPrintf(this->comm().get(), "Start the KSP solve... \n");
   
@@ -238,7 +238,7 @@ void StokesSolver::solve()
   
   // Update the system after the solve
   system.update();
-  t2 = MPI_Wtime();
+//  t2 = MPI_Wtime();
   this->comm().barrier();
   //PetscPrintf(this->comm().get(),"   Time used to solve the linear equation Ax=b is %f\n",t2-t1);
   //std::cout << "\nTime used to solve the linear equation Ax=b is " <<t2-t1<<" s\n\n";

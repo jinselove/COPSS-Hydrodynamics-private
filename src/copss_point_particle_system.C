@@ -259,8 +259,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   o_step = restart_step;  // output step
   vel0.resize(n_vec);
   vel1.resize(n_vec);
-  // Initialize compute_eigen to true
-  compute_eigen = true;
+ 
   real_time = restart_time;
   if (adaptive_dt == true and point_particle_model == "polymer_chain") max_dr_coeff = 0.1 * Ss2 / Rb / Rb;
 

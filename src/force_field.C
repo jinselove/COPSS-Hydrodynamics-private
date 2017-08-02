@@ -1511,7 +1511,7 @@ void ForceField::check_wall(const std::size_t& p_id)
         // Move particle back into spherical cavity
         if( pt0_norm > cavity_radius ){ 
           pt0 = pt0_unit * (2.*cavity_radius) - pt0;  _out_domain_counter += 1;
-          std::cout << "*** Warning: " << p_id << "-th bead is out of domain. Out of domain occurs "
+          std::cout << "*** Warning: " << p_id << "-th bead ("<< pt0(0) << "," << pt0(1) << "," <<pt0(2) <<") is out of domain. Out of domain occurs "
                     << _out_domain_counter << " times in total." << std::endl;
         }
   }

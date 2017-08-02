@@ -17,8 +17,8 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #pragma once
 
-#include "copss.h"
-#include "polymer_chain.h"
+#include "../copss.h"
+#include "../polymer_chain.h"
 
 using std::cout;
 using std::endl;

@@ -353,6 +353,12 @@ void Copss::read_stokes_solver_info(){
  * read Chebyshev info
  */
 void Copss::read_chebyshev_info(){
+  // Initialize compute_eigen
+  compute_eigen = input_file("compute_eigen", true);
+  if (compute_eigen == false){
+    eig_min = input_file ("eig_min", 0.);
+    eig_max = input_file ("eig_max", 0.);
+  }
   max_n_cheb = input_file("max_n_cheb", 10);
   tol_cheb = input_file("tol_cheb", 0.1);
   eig_factor = input_file("eig_factor", 1.05);
@@ -362,6 +368,7 @@ void Copss::read_chebyshev_info(){
          << "#   Chebyshev information (only for brownian System)            " <<endl
          << "##########################################################"<<endl<<endl;  
     cout << "-----------> compute eigen values  = " <<std::boolalpha << compute_eigen <<endl;
+    cout << "-----------> initial eigen value range = ( " << eig_min << ", " << eig_max << " )" << endl;
     cout << "-----------> max number of chebyshev polynomial = " <<max_n_cheb <<endl;
     cout << "-----------> tolerance of chebyshev polynomial = " <<tol_cheb <<endl;
     cout << "-----------> factor of eigenvalues range = " <<eig_factor <<endl;
@@ -896,7 +903,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
           //cout << "Compute the max & min eigenvalues for Chebyshev polynomial at step "<<i+1<<endl;
           brownian_sys->compute_eigenvalues(eig_min,eig_max,tol_eigen);
           // Magnify the spectral range by a factor (1.05 by default).
-      eig_max *= eig_factor; eig_min /= eig_factor;
+  	  eig_max *= eig_factor; eig_min /= eig_factor;
           PetscPrintf(PETSC_COMM_WORLD,
                      "--->Recomputed eigen values and magnify the range by a factor eig_factor = %f: eig_min = %f, eig_max = %f, tol_cheb = %f, max_n_cheb = %d\n",
                      eig_factor,eig_min,eig_max,tol_cheb,max_n_cheb);   

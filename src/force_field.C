@@ -64,6 +64,8 @@ ForceField::ForceField(PMLinearImplicitSystem& pm_sys,
   
   _inlet = _point_mesh->pm_periodic_boundary()->inlet_direction();
 
+  this -> check_force_field();
+
 }
 
 
@@ -84,65 +86,25 @@ ForceField::ForceField(PMLinearImplicitSystem& pm_sys)
 
   _wall_params = _pm_system->get_equation_systems().parameters.get<std::vector<Real>>(_wall_type);
 
+  _bead_r   = pm_sys.get_equation_systems().parameters.get<Real>("bead radius");
+
+  _kBT      = pm_sys.get_equation_systems().parameters.get<Real>("kBT");
+
   if(_particle_type == "rigid_particle"){
     _particle_mesh = _pm_system->particle_mesh();
     _num_particles = _particle_mesh -> num_particles();
   }
   else{
     _point_particle_model = _pm_system->get_equation_systems().parameters.get<std::string>("point_particle_model");
+    if(_point_particle_model == "polymer_chain"){
+        _Ss2      = pm_sys.get_equation_systems().parameters.get<Real>("Ss2");
+        _bk       = pm_sys.get_equation_systems().parameters.get<Real>("bk");
+        _Nks      = pm_sys.get_equation_systems().parameters.get<Real>("Nks");
+    }  
   }
- 
+
   _num_points = _point_mesh -> num_particles();
-
-  _pp_force_types = _pm_system->get_equation_systems().parameters.get<std::vector<std::string>>("pp_force_types");
   
-  _num_pp_force_types = _pp_force_types.size();
-  
-  _pw_force_types = _pm_system->get_equation_systems().parameters.get<std::vector<std::string>>("pw_force_types");
-  
-  _num_pw_force_types = _pw_force_types.size();
-  
-  for (unsigned int i = 0; i < _num_pp_force_types + _num_pw_force_types; i++ ){
-   (i < _num_pp_force_types) ? (forceTypeMap[_pp_force_types[i]]= -1) : (forceTypeMap[_pw_force_types[i-_num_pp_force_types]] = -1) ;
-  }
-  // particle-particle force
-  forceTypeMap["pp_ev_gaussian"]=pp_ev_gaussian;
-
-  forceTypeMap["pp_ev_gaussian_polymerChain"]=pp_ev_gaussian_polymerChain;
-  
-  forceTypeMap["pp_ev_lj_cut"]=pp_ev_lj_cut;
-
-  forceTypeMap["pp_ev_lj_repulsive"]= pp_ev_lj_repulsive;
-  
-  forceTypeMap["pp_ev_harmonic_repulsive"]=pp_ev_harmonic_repulsive;
-  
-  forceTypeMap["pp_wormLike_spring"]=pp_wormLike_spring;
-
-  forceTypeMap["p_constant"]=p_constant;
-  
- // forceTypeMap["pp_friction"]=pp_friction;
-
-  // particle-wall force
-  forceTypeMap["pw_ev_empirical_polymerChain"]=pw_ev_empirical_polymerChain;
-  
-  forceTypeMap["pw_ev_lj_cut"]=pw_ev_lj_cut;
-
-  forceTypeMap["pw_ev_lj_repulsive"]=pw_ev_lj_repulsive;
-  
-  forceTypeMap["pw_ev_harmonic_repulsive"]=pw_ev_harmonic_repulsive;
-  
-
-  
-  // bead radius is needed for both "polymer_chain" and "points"
-  _bead_r   = pm_sys.get_equation_systems().parameters.get<Real>("bead radius");
-  _kBT      = pm_sys.get_equation_systems().parameters.get<Real>("kBT");
-  // update _Ss2, _bk, _Nks for polymer_chain system
-  if(_point_particle_model == "polymer_chain"){
-    	_Ss2      = pm_sys.get_equation_systems().parameters.get<Real>("Ss2");
-    	_bk       = pm_sys.get_equation_systems().parameters.get<Real>("bk");
-    	_Nks      = pm_sys.get_equation_systems().parameters.get<Real>("Nks");
-  }
-
   //box info
   _box_min = _point_mesh->pm_periodic_boundary()->box_min();
   
@@ -153,7 +115,9 @@ ForceField::ForceField(PMLinearImplicitSystem& pm_sys)
   _periodic = _point_mesh->pm_periodic_boundary()->periodic_direction();
   
   _inlet = _point_mesh->pm_periodic_boundary()->inlet_direction();
- }
+
+  this -> check_force_field();
+}
 
 
 
@@ -164,123 +128,224 @@ ForceField::~ForceField()
 }
 
 
+
+
+// ======================================================================
+void ForceField::check_force_field()
+{
+START_LOG("check_force_field()", "ForceField");
+_pp_force_types = _pm_system->get_equation_systems().parameters.get<std::vector<std::string>>("pp_force_types");
+
+_num_pp_force_types = _pp_force_types.size();
+
+_pw_force_types = _pm_system->get_equation_systems().parameters.get<std::vector<std::string>>("pw_force_types");
+
+_num_pw_force_types = _pw_force_types.size();
+
+for (unsigned int i = 0; i < _num_pp_force_types + _num_pw_force_types; i++ ){
+ (i < _num_pp_force_types) ? (forceTypeMap[_pp_force_types[i]]= -1) : (forceTypeMap[_pw_force_types[i-_num_pp_force_types]] = -1) ;
+}
+// particle-particle force
+forceTypeMap["pp_ev_gaussian"]=pp_ev_gaussian;
+
+forceTypeMap["pp_ev_gaussian_polymerChain"]=pp_ev_gaussian_polymerChain;
+
+forceTypeMap["pp_ev_lj_cut"]=pp_ev_lj_cut;
+
+forceTypeMap["pp_ev_lj_repulsive"]= pp_ev_lj_repulsive;
+
+forceTypeMap["pp_ev_harmonic_repulsive"]=pp_ev_harmonic_repulsive;
+
+forceTypeMap["pp_wormLike_spring"]=pp_wormLike_spring;
+
+forceTypeMap["p_constant"]=p_constant;
+
+forceTypeMap["p_gravity"]=p_gravity;
+
+forceTypeMap["p_surface_constraint"]=p_surface_constraint;
+
+// particle-wall force
+forceTypeMap["pw_ev_empirical_polymerChain"]=pw_ev_empirical_polymerChain;
+
+forceTypeMap["pw_ev_lj_cut"]=pw_ev_lj_cut;
+
+forceTypeMap["pw_ev_lj_repulsive"]=pw_ev_lj_repulsive;
+
+forceTypeMap["pw_ev_harmonic_repulsive"]=pw_ev_harmonic_repulsive;  
+
+// Attach particle-particle forces
+for(int i = 0; i < _num_pp_force_types; i++){
+  std::vector<Real> params = _pm_system->get_equation_systems().parameters.get<std::vector<Real>> (_pp_force_types[i]);
+  switch (forceTypeMap[_pp_force_types[i]]){
+    case pp_ev_gaussian:
+      if(_particle_type !="point_particle" or _point_particle_model != "bead"){
+          std::cout << std::endl << "*******************Error message*********************" << std::endl
+                  << "The force field 'pw_ev_gaussian' is for 'bead' models, but not for 'polymer_chain' model" <<std::endl
+                  << "Try force field 'pw_ev_gaussian_polymerChain' instead!!!!" <<std::endl
+                  << "****************************************" << std::endl;    
+          libmesh_error();
+      }
+      if(params.size() != 2){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'pp_ev_gaussian' requires 2 parameter (c1,c2)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error(); 
+      }
+      break;
+    case pp_ev_gaussian_polymerChain:
+      if(_particle_type != "point_particle" or _point_particle_model != "polymer_chain"){
+          std::cout << std::endl << "*******************Error message*********************" << std::endl
+                  << "The force field 'pw_ev_gaussian_polymerChain' is for 'polymer_chain' models, but not for 'bead' models" <<std::endl
+                  << "Try force field 'pw_ev_gaussian' instead!!!!" <<std::endl
+                  << "****************************************" << std::endl;    
+          libmesh_error();
+      }  
+      Real ev, c1, c2;
+      if (params.size()!=1)
+      {
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'pp_ev_gaussian_polymerChain' requires 1 parameter (ev)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error();        
+      }
+      break;
+    case pp_ev_lj_cut:
+      if(params.size()!=3){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'pp_ev_lj_cut' requires 3 parameter (epsilon, sigma, rcut) (dimensionless form)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error();    
+      }
+      break;
+    case pp_ev_lj_repulsive:
+      if(params.size()!=2){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'pp_ev_lj_cut_repulsive' requires 2 parameter (epsilon, sigma, rcut) (dimensionless form)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error();    
+      }
+      break;
+    case pp_ev_harmonic_repulsive:
+      if(params.size() != 2){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'pp_ev_harmonic_repulsive' requires 2 parameter (k, r0) (dimensionless form)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error();    
+      } 
+      break;
+    case pp_wormLike_spring:
+      if(_particle_type != "point_particle" or _point_particle_model != "polymer_chain"){
+          std::cout << std::endl << "*******************Error message*********************" << std::endl
+          << "The force field 'pp_wormLike_spring' is for 'polymer_chain' models, but not for 'bead' models" <<std::endl
+          << "*********************************************" << std::endl;    
+          libmesh_error();
+      }  
+      break;
+    case p_constant:
+      if(params.size() != 3){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+          << "---------------> The force type 'p_constant' requires 3 parameter (fx,fy,fz)" << std::endl
+          << "****************************************" << std::endl;
+        libmesh_error();    
+      }
+
+    //  attach_p_constant(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("p_constant"));
+    //  std::cout << "attached p_constant force" << std::endl; 
+      break;
+    case p_gravity:
+      if(params.size() != 3)
+      {
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'p_gravity' requires 3 parameter (body force density) (fx,fy,fz)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error();    
+      }
+      break;
+    case p_surface_constraint:
+      if(_particle_type != "rigid_particle"){
+        std::cout << std::endl << "*******************Error message*********************" << std::endl
+            << "p_surface_constraint (surface spring force) only applies to rigid particle" << std::endl
+            << "****************************************" << std::endl;    
+        libmesh_error();
+      }
+      if(params.size() != 1){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+            << "---------------> The force type 'p_surface_constraint' requires 1 parameter (k0)" << std::endl
+            << "****************************************" << std::endl;
+        libmesh_error();   
+      }
+      break;
+    default:
+     std::cout << std::endl << "********************Error message********************" << std::endl
+            << "---------------> The force type '"<< _pp_force_types[i] << "' cannot be found!!!" << std::endl
+            << "****************************************" << std::endl;
+     libmesh_error();
+     break;
+  }
+}
+// Attach particle-wall forces
+for (int i = 0; i < _num_pw_force_types; i++){
+  std::vector<Real> params = _pm_system->get_equation_systems().parameters.get<std::vector<Real>> (_pw_force_types[i]);
+  switch(forceTypeMap[_pw_force_types[i]]){
+    case pw_ev_empirical_polymerChain:
+      if(_particle_type != "point_particle" or _point_particle_model != "polymer_chain"){
+        std::cout << std::endl << "*******************Error message*********************" << std::endl
+                << "The force field 'pp_wormLike_spring' is for 'polymer_chain' models, but not for 'bead' models" <<std::endl
+                << "*********************************************" << std::endl;    
+        libmesh_error();
+      }    
+      break;
+    case pw_ev_lj_cut:
+      if(params.size() != 3){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'pw_ev_lj_cut' requires 3 parameter (epsilon, sigma, rcut) (dimensionless form)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error();    
+      }
+      break;
+    case pw_ev_lj_repulsive:
+      if(params.size() != 2){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'pw_ev_lj_repulsive' requires 3 parameter (epsilon, sigma) (dimensionless form)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error();    
+      }        
+      break;
+    case pw_ev_harmonic_repulsive:
+      if (params.size() != 2){
+        std::cout << std::endl << "********************Error message********************" << std::endl
+                  << "---------------> The force type 'pw_ev_harmonic_repulsive' requires 2 parameter (k, r0) (dimensionless form)" << std::endl
+                  << "****************************************" << std::endl;
+        libmesh_error();    
+      }     
+      break;
+    default:
+      std::cout << std::endl << "********************Error message********************" << std::endl
+            << "---------------> The force type '"<< _pw_force_types[i] << "' cannot be found!!!" << std::endl
+            << "****************************************" << std::endl;
+      libmesh_error();
+      break;
+  }
+}
+
+STOP_LOG("check_force_field()", "ForceField");
+}
+
+
 // ======================================================================
 void ForceField::reinit_force_field()
 {
   START_LOG ("reinit_force_field()", "ForceField");
-  std::size_t  point_start_id     = 0;
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    0. zero the force vectors on all the points.
    This has been done in point_mesh->reinit()
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   //this->reinit_point_force_zeros();
-
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    1. Apply the stiff spring force for nodes on each rigid particle.
    Each node on the surface is connected with its neighboring nodes by
    stiff springs.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if(_particle_type=="rigid_particle")
-  {
-    /* - - - - - - - - - - - - - - - TEST - - - - - - - - - - - - - - - -
-     Compute force density at each node due to gravity (in x-direction)
-     * - - - - - - - - - - - -- - - - - - - - - - - - - - - - - - - - - */
-    const std::string& mesh_type =
-          _pm_system->get_equation_systems().parameters.get<std::string>("particle_mesh_type");
-    std::vector<Real> force_density = 
-          _pm_system->get_equation_systems().parameters.get<std::vector<Real>>("force_density");
-
-    if(mesh_type == "surface_mesh")
-    {
-      const Real particle_radius = _particle_mesh->particles()[0]->radius();
-      const Real VS_Ratio = particle_radius/3.0;  // volume to area ratio = R/3
-      for(std::size_t k=0; k<3; ++k){
-        force_density[k] *= VS_Ratio;
-      }
-    }
-    const Real k0 = _pm_system->get_equation_systems().parameters.get<Real>("spring_constant");
- 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Loop over each particle, and add the body force to each node.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    for(std::size_t i=0; i < _num_particles; ++i)
-    {
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Check if this particle is on the periodic boundary. If so, move the nodes
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-      const bool on_pb = _particle_mesh->particles()[i]->on_the_periodic_boundary();
- 
-      if( on_pb )
-      {
-        if(_pm_system->comm().rank()==0){
-          printf("--->TEST in ForceField::reinit_force_field() \n");
-          printf("         The particle %lu is on the periodic boundary!\n",i);
-        }
-        _particle_mesh->particles()[i]->rebuild_periodic_mesh();
-      }
-      
-      
-      // compute the rigid constraint force on each node
-      std::vector<Point> rigid_nodal_force;
-      this->rigid_constraint_force(i,k0,rigid_nodal_force);
-      
-      
-      std::vector<Point> nodal_force;
-      _particle_mesh->particles()[i]->build_nodal_force(force_density,nodal_force);
-      
-      /*
-       * Loop over each node through node iterator
-       * Compute the gravitational force vector on each node
-       */
-      const std::size_t n_nodes = _particle_mesh->particles()[i]->num_mesh_nodes();
-      MeshBase& p_mesh = _particle_mesh->particles()[i]->mesh();
-      MeshBase::node_iterator       nd     = p_mesh.active_nodes_begin();
-      const MeshBase::node_iterator end_nd = p_mesh.active_nodes_end();
-      for ( ; nd != end_nd; ++nd)
-      {
-        // Store a pointer to the element we are currently working on.
-        Node* node = *nd;
-        const dof_id_type node_id = node->id();
-        
-        // get the dof numbers at this node (only for force vector)
-        std::vector<Real> gforce(_dim,0.);
-        for(std::size_t k=0; k<_dim; ++k){
-          gforce[k] = nodal_force[node_id](k) + rigid_nodal_force[node_id](k);
-        } // end k-loop
-        
-        // ------------------ TEST: print out the nodal force ----------------------
-        // if(_pm_system->comm().rank()==0){
-        //   printf("--->TEST:reinit_force_field() gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
-        //   printf("         nodal force = (%f,%f,%f)\n",
-        //          nodal_force[node_id](0),nodal_force[node_id](1),nodal_force[node_id](2));
-        //   printf("         rigid_nodal_force = (%f,%f,%f)\n",
-        //          rigid_nodal_force[node_id](0),rigid_nodal_force[node_id](1),rigid_nodal_force[node_id](2));
-        // }
-        // -------------------------------------------------------------------------
-        
-        _point_mesh->particles()[point_start_id+node_id]->add_particle_force(gforce);
-        
-      } // end for nd-loop
-      
-      
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Move back the mesh nodes.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-      if( on_pb ) _particle_mesh->particles()[i]->restore_periodic_mesh();
-      
-      
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       update the point start id
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-      point_start_id += n_nodes;
-      
-    } // end for i-loop
-    
-  } // end if
-  
-  else if (_particle_type == "point_particle")
-  {
     // Attach particle-particle forces
     for(int i = 0; i < _num_pp_force_types; i++){
       switch (forceTypeMap[_pp_force_types[i]]){
@@ -311,6 +376,12 @@ void ForceField::reinit_force_field()
         case p_constant:
           attach_p_constant(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("p_constant"));
         //  std::cout << "attached p_constant force" << std::endl; 
+          break;
+        case p_gravity:
+          attach_p_gravity(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("p_gravity"));
+          break;
+        case p_surface_constraint:
+          attach_p_surface_constraint(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("p_surface_constraint"));
           break;
         default:
          std::cout << std::endl << "********************Error message********************" << std::endl
@@ -347,232 +418,15 @@ void ForceField::reinit_force_field()
           break;
       }
     }
-  } // end if-else (_particle_type == "point_particle")
-  else {
-    std::cout << std::endl << "********************Error message********************" << std::endl
-                  << "  Unable to reinit force field because undefined particle type : '"
-                  << _particle_type <<"'" << std::endl
-                  << "****************************************" << std::endl;
-  }
   STOP_LOG ("reinit_force_field()", "ForceField");
 }
-
-// // ======================================================================
-// void ForceField::reinit_force_field(const std::vector<Real>& v_beads)
-// {
-//   START_LOG ("reinit_force_field(&v_beads)", "ForceField");
-//   std::size_t  point_start_id     = 0;
- 
-//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//    0. zero the force vectors on all the points.
-//    This has been done in point_mesh->reinit()
-//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//    1. Apply the stiff spring force for nodes on each rigid particle.
-//    Each node on the surface is connected with its neighboring nodes by
-//    stiff springs.
-//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//   if(_particle_type=="rigid_particle")
-//   {
-//     /* - - - - - - - - - - - - - - - TEST - - - - - - - - - - - - - - - -
-//      Compute force density at each node due to gravity (in x-direction)
-//      * - - - - - - - - - - - -- - - - - - - - - - - - - - - - - - - - - */
-//     const std::string& mesh_type =
-//           _pm_system->get_equation_systems().parameters.get<std::string>("particle_mesh_type");
-//     std::vector<Real> force_density = 
-//           _pm_system->get_equation_systems().parameters.get<std::vector<Real>>("force_density");
-
-//     if(mesh_type == "surface_mesh")
-//     {
-//       const Real particle_radius = _particle_mesh->particles()[0]->radius();
-//       const Real VS_Ratio = particle_radius/3.0;  // volume to area ratio = R/3
-//       for(std::size_t k=0; k<3; ++k){
-//         force_density[k] *= VS_Ratio;
-//       }
-//     }
-//     const Real k0 = _pm_system->get_equation_systems().parameters.get<Real>("spring_constant");
-
- 
-//     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//      Loop over each particle, and add the body force to each node.
-//      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-//     for(std::size_t i=0; i < _num_particles; ++i)
-//     {
-//       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//        Check if this particle is on the periodic boundary. If so, move the nodes
-//        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-//       const bool on_pb = _particle_mesh->particles()[i]->on_the_periodic_boundary();
- 
-//       if( on_pb )
-//       {
-//         if(_pm_system->comm().rank()==0){
-//           printf("--->TEST in ForceField::reinit_force_field() \n");
-//           printf("         The particle %lu is on the periodic boundary!\n",i);
-//         }
-//         _particle_mesh->particles()[i]->rebuild_periodic_mesh();
-//       }
-  
-//       // compute the rigid constraint force on each node
-//       std::vector<Point> rigid_nodal_force;
-//       this->rigid_constraint_force(i,k0,rigid_nodal_force);
-          
-//       std::vector<Point> nodal_force;
-//       _particle_mesh->particles()[i]->build_nodal_force(force_density,nodal_force);
-      
-//       /*
-//        * Loop over each node through node iterator
-//        * Compute the gravitational force vector on each node
-//        */
-//       const std::size_t n_nodes = _particle_mesh->particles()[i]->num_mesh_nodes();
-//       MeshBase& p_mesh = _particle_mesh->particles()[i]->mesh();
-//       MeshBase::node_iterator       nd     = p_mesh.active_nodes_begin();
-//       const MeshBase::node_iterator end_nd = p_mesh.active_nodes_end();
-//       for ( ; nd != end_nd; ++nd)
-//       {
-//         // Store a pointer to the element we are currently working on.
-//         Node* node = *nd;
-//         const dof_id_type node_id = node->id();
-        
-//         // get the dof numbers at this node (only for force vector)
-//         std::vector<Real> gforce(_dim,0.);
-//         for(std::size_t k=0; k<_dim; ++k){
-//           gforce[k] = nodal_force[node_id](k) + rigid_nodal_force[node_id](k);
-//         } // end k-loop
-        
-//         // ------------------ TEST: print out the nodal force ----------------------
-//         // if(_pm_system->comm().rank()==0){
-//         //   printf("--->TEST:reinit_force_field() gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
-//         //   printf("         nodal force = (%f,%f,%f)\n",
-//         //          nodal_force[node_id](0),nodal_force[node_id](1),nodal_force[node_id](2));
-//         //   printf("         rigid_nodal_force = (%f,%f,%f)\n",
-//         //          rigid_nodal_force[node_id](0),rigid_nodal_force[node_id](1),rigid_nodal_force[node_id](2));
-//         // }
-//         // -------------------------------------------------------------------------
-        
-//         _point_mesh->particles()[point_start_id+node_id]->add_particle_force(gforce);
-        
-//       } // end for nd-loop
-      
-      
-//       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//        Move back the mesh nodes.
-//        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-//       if( on_pb ) _particle_mesh->particles()[i]->restore_periodic_mesh();
-      
-      
-//       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//        update the point start id
-//        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-//       point_start_id += n_nodes;
-      
-//     } // end for i-loop
-    
-//   } // end if
-  
-//    else if (_particle_type == "point_particle")
-//   {
-//     // Attach particle-particle forces
-//     for(int i = 0; i < _num_pp_force_types; i++){
-//       switch (forceTypeMap[_pp_force_types[i]]){
-//         case pp_ev_gaussian:
-//           //attach_pp_ev_gaussian(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("pp_ev_gaussian"));
-//           std::cout << "attached pp_ev_gaussian force" << std::endl;
-//           break;
-
-//         case pp_ev_gaussian_polymerChain:
-//           //attach_pp_ev_gaussian_polymerChain(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("pp_ev_gaussian_polymerChain"));
-//           std::cout << "attached pp_ev_gaussian_polymerChain force" << std::endl;
-//           break;
-
-//         case pp_ev_lj_cut:
-// //        attach_pp_ev_lj_cut(_pm_system ->get_equation_systems().parameters.get<std::vector<Real>>("pp_ev_lj_cut"));
-//           std::cout << "attached pp_ev_lj_cut force" << std::endl;
-//           break;
-//         case pp_ev_harmonic:
-//           //attach_pp_ev_harmonic(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("pp_ev_harmonic"));
-//           std::cout << "attached pp_ev_harmonic force" << std::endl;  
-//           break;
-//         case pp_wormLike_spring:
-//           //attach_pp_wormLike_spring();
-//           std::cout << "attached pp_wormLike_spring force" << std::endl;
-//           break;
-//         case p_constant:
-//           //attach_p_constant(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("p_constant"));
-//           std::cout << "attached p_constant force" << std::endl; 
-//           break;
-//         // case pp_friction:
-//         //   //attach_pp_friction(v_beads);
-//         //   std::cout << "attached pp_friction force" << std::endl;
-//         //   break;
-//         default:
-//          std::cout << std::endl << "********************Error message********************" << std::endl
-//                 << "---------------> The force type '"<< _pp_force_types[i] << "' cannot be found!!!" << std::endl
-//                 << "****************************************" << std::endl;
-//          libmesh_error();
-//          break;
-//       }
-//     }
-//     // Attach particle-wall forces
-//     for (int i = 0; i < _num_pw_force_types; i++){
-//       switch(forceTypeMap[_pw_force_types[i]]){
-//         case pw_ev_empirical_polymerChain:
-//           //attach_pw_ev_empirical_polymerChain();
-//           std::cout << "attached pw_ev_polymer_empirical force" << std::endl;         
-//           break;
-//         case pw_ev_lj_cut:
-// //        attach_pw_ev_lj_cut(_pm_system ->get_equation_systems().parameters.get<std::vector<Real>>("pw_ev_lj_cut"));
-//           std::cout << "attached pw_ev_lj_cut force" << std::endl;         
-//           break;
-//         case pw_ev_harmonic:
-//           //attach_pw_ev_harmonic(_pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("pw_ev_harmonic"));
-//           std::cout << "attached pw_ev_harmonic force" << std::endl;        
-//           break;
-//         default:
-//           std::cout << std::endl << "********************Error message********************" << std::endl
-//                 << "---------------> The force type '"<< _pw_force_types[i][0] << "' cannot be found!!!" << std::endl
-//                 << "****************************************" << std::endl;
-//           libmesh_error();
-//           break;
-//       }
-//     }
-//   } // end if-else (_particle_type == "point_particle")
-//   else {
-//     std::cout << std::endl << "********************Error message********************" << std::endl
-//                   << "  Unable to reinit force field because undefined particle type : '"
-//                   << _particle_type <<"'" << std::endl
-//                   << "****************************************" << std::endl;
-//   }
-//   STOP_LOG ("reinit_force_field(&v_beads)", "ForceField");
-// }
-
-
 
 // ======================================================================
 void ForceField::attach_pp_ev_gaussian(const std::vector<Real>& params)
 {
   START_LOG("attach_pp_ev_gaussian(&params)", "ForceField");
-   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Loop each point and apply forces
-  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if(_particle_type=="point_particle" and _point_particle_model == "polymer_chain"){
-      std::cout << std::endl << "*******************Error message*********************" << std::endl
-              << "The force field 'pw_ev_gaussian' is for 'bead' models, but not for 'polymer_chain' model" <<std::endl
-              << "Try force field 'pw_ev_gaussian_polymerChain' instead!!!!" <<std::endl
-              << "****************************************" << std::endl;    
-      libmesh_error();
-  }
-  Real c1, c2;
-  if(params.size()==2){
-    c1 = params[0];
-    c2 = params[1];
-  }
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'pp_ev_gaussian' requires 2 parameter (c1,c2)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();    
-  } 
+  Real c1 = params[0];
+  Real c2 = params[1];
   for(std::size_t i=0; i<_num_points; ++i)
   {  
     // apply the excluded volume force to each particle i
@@ -589,27 +443,10 @@ void ForceField::attach_pp_ev_gaussian_polymerChain(const std::vector<Real>& par
   START_LOG("attach_pp_ev_gaussian_polymerChain(&params)", "ForceField");
    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop each point and apply forces
-  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if(_particle_type=="point_particle" and _point_particle_model == "bead"){
-      std::cout << std::endl << "*******************Error message*********************" << std::endl
-              << "The force field 'pw_ev_gaussian_polymerChain' is for 'polymer_chain' models, but not for 'bead' models" <<std::endl
-              << "Try force field 'pw_ev_gaussian' instead!!!!" <<std::endl
-              << "****************************************" << std::endl;    
-      libmesh_error();
-  }  
-  Real ev, c1, c2;
-  if (params.size()==1)
-  {
-    ev = params[0] * _bead_r * _bead_r * _bead_r;
-  }
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'pp_ev_gaussian_polymerChain' requires 1 parameter (ev)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();        
-  }
-  c1   = ev*_Nks*_Nks*std::pow( 3./(4.*PI*_Ss2),1.5 ); //changed the sign of c1
-  c2   = 3.*_bead_r*_bead_r/(4.*_Ss2);   
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */ 
+  Real ev = params[0] * _bead_r * _bead_r * _bead_r;
+  Real c1   = ev*_Nks*_Nks*std::pow( 3./(4.*PI*_Ss2),1.5 ); //changed the sign of c1
+  Real c2   = 3.*_bead_r*_bead_r/(4.*_Ss2);   
 
   for(std::size_t i=0; i<_num_points; ++i)
   {  
@@ -627,7 +464,7 @@ void ForceField::attach_pp_ev_gaussian_polymerChain(const std::vector<Real>& par
 void ForceField::compute_pp_ev_gaussian(Real& c1,
                                         Real& c2,
                                         const std::size_t&  p_id,
-                                        std::vector<Real>& pforce ) const
+                                        std::vector<Real>& pforce )
 {
   START_LOG ("compute_pp_ev_gaussian(c1,c2,p_id, &p_force)", "ForceField");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -660,19 +497,10 @@ void ForceField::compute_pp_ev_gaussian(Real& c1,
 void ForceField::attach_pp_ev_lj_cut(const std::vector<Real>& params)
 {
   START_LOG("attach_pp_ev_lj_cut(&params)", "ForceField");
-  Real epsilon, sigma, rcut;
-  if(params.size()==3){
-    epsilon = params[0];
-    sigma = params[1];
-    rcut = params[2];
-    //std::cout << "pp_ev_lj_cut parameters: epsilon = "<<epsilon << "; sigma = "<<sigma << "; rcut = "<<rcut <<std::endl;  
-  }
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'pp_ev_lj_cut' requires 3 parameter (epsilon, sigma, rcut) (dimensionless form)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();    
-  }
+
+  Real   epsilon = params[0];
+  Real   sigma = params[1];
+  Real   rcut = params[2];
   for(std::size_t i=0; i<_num_points; ++i)
   {  
     // apply lj force on particle i
@@ -688,18 +516,8 @@ void ForceField::attach_pp_ev_lj_cut(const std::vector<Real>& params)
 void ForceField::attach_pp_ev_lj_repulsive(const std::vector<Real>& params)
 {
   START_LOG("attach_pp_ev_lj_repulsive(&params)", "ForceField");
-  Real epsilon, sigma;
-  if(params.size()==2){
-    epsilon = params[0];
-    sigma = params[1];
-  }
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'pp_ev_lj_repulsive' requires 2 parameter (epsilon, sigma) (dimensionless form)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();    
-  }
-  // when r > sigma * 2^(1/6), pp_ev_lj_repulsive force = 0;
+  Real epsilon = params[0];
+  Real sigma = params[1];
   Real rcut = sigma * std::pow(2.,1./6.);
   for(std::size_t i=0; i<_num_points; ++i)
   {  
@@ -747,25 +565,11 @@ void ForceField::compute_pp_ev_lj_cut(const Real& epsilon,
 // ======================================================================
 void ForceField::attach_pp_ev_harmonic_repulsive(const std::vector<Real>& params){
   START_LOG("attach_pp_ev_harmonic_repulsive(&params)", "ForceField");
-
-  // where k is energy coefficient
-  // r0 is equilibrium distance
-  Real k,r0;
-  if(params.size()==2){
-    k = params[0];
-    r0 = params[1];
-  }
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'pp_ev_harmonic_repulsive' requires 2 parameter (k, r0) (dimensionless form)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();    
-  }
   // when r > sigma,e.g. sigma = 2*bead radius, pp_ev_harmonic_repulsive force = 0;
   for(std::size_t i=0; i<_num_points; ++i)
   {  
     std::vector<Real> pforce(_dim);
-    this->compute_pp_ev_harmonic_repulsive(k,r0,i,pforce);
+    this->compute_pp_ev_harmonic_repulsive(params[0],params[1],i,pforce);
     _point_mesh->particles()[i]->add_particle_force(pforce);
   }  
 
@@ -805,12 +609,12 @@ void ForceField::compute_pp_ev_harmonic_repulsive(const Real& k,
 void ForceField::attach_pp_wormLike_spring()
 {
   START_LOG ("attach_wormLike_spring_force()", "ForceField");
-  if(_particle_type != "point_particle" or _point_particle_model != "polymer_chain"){
-    std::cout << std::endl << "*******************Error message*********************" << std::endl
-            << "The force field 'pp_wormLike_spring' is for 'polymer_chain' models, but not for 'bead' models" <<std::endl
-            << "*********************************************" << std::endl;    
-    libmesh_error();
-  }  
+  // if(_particle_type != "point_particle" or _point_particle_model != "polymer_chain"){
+  //   std::cout << std::endl << "*******************Error message*********************" << std::endl
+  //           << "The force field 'pp_wormLike_spring' is for 'polymer_chain' models, but not for 'bead' models" <<std::endl
+  //           << "*********************************************" << std::endl;    
+  //   libmesh_error();
+  // }  
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     Get the PointMesh objects
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -851,100 +655,6 @@ void ForceField::attach_pp_wormLike_spring()
 }
 
 
-// // ======================================================================
-// void ForceField::compute_pp_wormLike_spring(const std::size_t  p_id,
-//   std::vector<Real>& pforce ) const
-//   {
-//   START_LOG ("compute_wormLike_spring_force(p_id)", "ForceField");
-
-//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//    c1 = a/(2bk), and c2 = q0/a = Nks*bk/a
-//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//   const Real c1  = _bead_r/(2.0*_bk);
-//   const Real c2  = _Nks*_bk/_bead_r;
-
-
-//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//    Wormlike spring model: force between connected beads
-//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//   pforce.resize(_dim,0.0);
-//   const Point pti   = _point_mesh->particles()[p_id]->point();
-//   if (p_id==0)  // the head bead with only one connection
-//   {
-//     const Point ptj   = _point_mesh->particles()[p_id+1]->point();
-//     const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-//     const std::vector<Real> F_ij = this->spring_force_wls(R_ij,c1,c2);
-//     for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
-//   }
-//   else if ( p_id==(_num_points-1) ) // the end bead with one connection
-//   {
-//     const Point ptj   = _point_mesh->particles()[p_id-1]->point();
-//     const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-//     const std::vector<Real> F_ij = this->spring_force_wls(R_ij,c1,c2);
-//     for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
-//   }
-//   else          // normal bead with two connected neighboring springs
-//   {
-//     for (std::size_t i=0; i<2; ++i)
-//     {
-//       // i=0, j=2*i-1 = -1;   i=1,j=2*i-1 = +1
-//       const Point ptj   = _point_mesh->particles()[p_id+2*i-1]->point();
-//       const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-//       const std::vector<Real> F_ij = this->spring_force_wls(R_ij,c1,c2);
-//       for (std::size_t j=0; j<_dim; ++j) pforce[j] += F_ij[j];
-//     } // end for i-loop
-//   } // end if-else
-
-//   STOP_LOG ("compute_wormLike_spring_force(p_id)", "ForceField");
-// }
-
-// // ======================================================================
-// void ForceField::compute_pp_fene_spring(const std::size_t  p_id,
-//                                            std::vector<Real>& pforce ) const
-// {
-//   START_LOG ("compute_fene_spring_force()", "ForceField");
-  
-//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//    In normalize formulation: c1 = 3a/(bk), and c2 = q0/a = Nks*bk/a
-//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//   const Real c1  =  3.0*_bead_r/_bk;
-//   const Real c2  = _Nks*_bk/_bead_r;  // Ls: maximum spring length
-  
-  
-//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//    FENE spring model: force between connected beads
-//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//   pforce.resize(_dim,0.0);
-//   const Point pti   = _point_mesh->particles()[p_id]->point();
-//   if (p_id==0)  // the head bead with only one connection
-//   {
-//     const Point ptj   = _point_mesh->particles()[p_id+1]->point();
-//     const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-//     const std::vector<Real> F_ij = this->spring_force_fene(R_ij,c1,c2);
-//     for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
-//   }
-//   else if ( p_id==(_num_points-1) ) // the end bead with one connection
-//   {
-//     const Point ptj   = _point_mesh->particles()[p_id-1]->point();
-//     const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-//     const std::vector<Real> F_ij = this->spring_force_fene(R_ij,c1,c2);
-//     for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
-//   }
-//   else          // normal bead with two connected neighboring springs
-//   {
-//     for (std::size_t i=0; i<2; ++i)
-//     {
-//       // i=0, j=2*i-1 = -1;   i=1,j=2*i-1 = +1
-//       const Point ptj   = _point_mesh->particles()[p_id+2*i-1]->point();
-//       const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-//       const std::vector<Real> F_ij = this->spring_force_fene(R_ij,c1,c2);
-//       for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
-//     } // end for i-loop
-//   } // end if-else
-  
-  
-//   STOP_LOG ("compute_fene_spring_force()", "ForceField");
-// }
 
 
 
@@ -952,24 +662,241 @@ void ForceField::attach_pp_wormLike_spring()
 void ForceField::attach_p_constant(const std::vector<Real>& params)
 {
   START_LOG ("attach_p_constant()", "ForceField");
-  if(params.size()==3){
-    for(std::size_t i=0; i<_num_points; ++i)
-    {
-     _point_mesh->particles()[i]->add_particle_force(params);   
-    } // end for i-loop
-  } // end if
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'p_constant' requires 3 parameter (fx,fy,fz)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();    
-  }
+  for(std::size_t i=0; i<_num_points; ++i)
+  {
+   _point_mesh->particles()[i]->add_particle_force(params);   
+  } // end for i-loop
   STOP_LOG ("attach_p_constant()", "ForceField");  
 }
 
+// ======================================================================
+void ForceField::attach_p_gravity(const std::vector<Real>& params)
+{
+  START_LOG ("attach_p_gravity()", "ForceField");
 
+  for(std::size_t i=0; i<_num_points; ++i)
+  {
+//     _point_mesh->particles()[i]->add_particle_force(params * );   
+  } // end for i-loop
 
+  STOP_LOG ("attach_p_gravity()", "ForceField");  
+}
 
+void ForceField::attach_p_surface_constraint(const std::vector<Real>& params)
+{
+  START_LOG("attach_surface_constraint()", "ForceField");
+
+  Real k0 = params[0];
+  std::size_t  point_start_id     = 0;
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Loop over each particle, and add the body force to each node.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+  for(std::size_t i=0; i < _num_particles; ++i)
+  {
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Check if this particle is on the periodic boundary. If so, move the nodes
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    const bool on_pb = _particle_mesh->particles()[i]->on_the_periodic_boundary();
+
+    if( on_pb )
+    {
+      if(_pm_system->comm().rank()==0){
+        printf("--->TEST in ForceField::attach_surface_constraint() \n");
+        printf("         The particle %lu is on the periodic boundary!\n",i);
+      }
+      _particle_mesh->particles()[i]->rebuild_periodic_mesh();
+    }
+    
+    
+    // compute the rigid constraint force on each node
+    std::vector<Point> surface_constraint_force;
+    this->compute_surface_constraint_force(i,k0,surface_constraint_force);
+  
+    /*
+     * Loop over each node through node iterator
+     */
+    const std::size_t n_nodes = _particle_mesh->particles()[i]->num_mesh_nodes();
+    MeshBase& p_mesh = _particle_mesh->particles()[i]->mesh();
+    MeshBase::node_iterator       nd     = p_mesh.active_nodes_begin();
+    const MeshBase::node_iterator end_nd = p_mesh.active_nodes_end();
+    for ( ; nd != end_nd; ++nd)
+    {
+      // Store a pointer to the element we are currently working on.
+      Node* node = *nd;
+      const dof_id_type node_id = node->id();
+      
+      // get the dof numbers at this node (only for force vector)
+      std::vector<Real> gforce(_dim,0.);
+      for(std::size_t k=0; k<_dim; ++k){
+        gforce[k] = surface_constraint_force[node_id](k);
+      } // end k-loop
+      
+      // ------------------ TEST: print out the surface constraint force ----------------------
+      if(_pm_system->comm().rank()==0){
+        printf("--->TEST:attach_surface_constraint() gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
+        printf("         surface_constraint_force = (%f,%f,%f)\n",
+               surface_constraint_force[node_id](0),surface_constraint_force[node_id](1),surface_constraint_force[node_id](2));
+      }
+      // -------------------------------------------------------------------------
+      _point_mesh->particles()[point_start_id+node_id]->add_particle_force(gforce);
+    } // end for nd-loop
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Move back the mesh nodes.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    if( on_pb ) _particle_mesh->particles()[i]->restore_periodic_mesh();
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     update the point start id
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    point_start_id += n_nodes;
+    
+  } // end for i-loop
+  STOP_LOG("attach_surface_constraint()", "ForceField");  
+}
+
+// ======================================================================
+void ForceField::compute_surface_constraint_force(const std::size_t& i, // the i-th particle
+                                        const Real& k0,
+                                        std::vector<Point>& nodal_force)
+{
+  START_LOG ("compute_surface_constraint_force()", "ForceField");
+  
+  
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   find the partilce center and number of tracking points on the surface.
+   We need this center position to construct springs in the radial direction.
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  MeshSpringNetwork* mesh_spring  = _particle_mesh->particles()[i]->mesh_spring_network();
+  const std::size_t n_nodes = _particle_mesh->particles()[i]->num_mesh_nodes();
+  const Point      p_center = _particle_mesh->particles()[i]->compute_centroid();
+  // if(_pm_system->comm().rank()==0){
+  //   printf("--->TEST in rigid_constraint_force() center of the %lu-th particle is (%f,%f,%f)\n",
+  //          i,p_center(0),p_center(1),p_center(2));
+  // }
+  
+
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   loop over each tracking point(node), and compute spring forces
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  nodal_force.resize(n_nodes);
+  for(std::size_t j=0; j<n_nodes; ++j)
+  {
+    // 1. Get the coords and neighboring nodes of the j-th node
+    std::vector< std::pair<std::size_t, Real> > node_neighbors;
+    node_neighbors    = mesh_spring->nodes_neighbors(j);
+    const Point& pt0  = _particle_mesh->particles()[i]->mesh_point(j);
+    
+    // 2. Loop over each neighboring nodes and compute the SPRING forces
+    std::vector<Real> spring_f(_dim,0.);
+    for(std::size_t k=0; k<node_neighbors.size(); ++k)
+    {
+      const std::size_t& neigh_id = node_neighbors[k].first;
+      const Real&        neigh_l0 = node_neighbors[k].second;
+      const Point& ptk = _particle_mesh->particles()[i]->mesh_point(neigh_id);
+      const Point R_ij = _particle_mesh->pm_periodic_boundary()->point_vector(pt0,ptk);
+      
+      std::vector<Real> sf  = this->spring_force_lhs(R_ij,neigh_l0,k0);
+      for(std::size_t l=0; l<_dim; ++l) spring_f[l] += sf[l];
+    } // end for k-loop
+    
+    // 3. compute the Spring force between the node the the particle center
+    const Real  lc0    = mesh_spring->node_center_equilibrium_dist(j);
+    const Point Rc_ij  = _particle_mesh->pm_periodic_boundary()->point_vector(pt0,p_center);
+    std::vector<Real> sfc  = this->spring_force_lhs(Rc_ij,lc0,k0);
+    for(std::size_t k=0; k<_dim; ++k) spring_f[k] += sfc[k];
+    
+    // 4. convert the point local id to the global id, and apply forces.
+    for(std::size_t k=0; k<_dim; ++k) nodal_force[j](k) = spring_f[k];
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     * test: print out the spring force on each node.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+//    if(_pm_system->comm().rank()==0)
+//    {
+//      printf("--->test in ForceField::rigid_constraint_force(), Particle %lu\n",i);
+//      printf("--->Spring force (surface+center=total) on node %lu is fs = (%f,%f,%f)\n",
+//             j,spring_f[0],spring_f[1],spring_f[2]);
+//      printf("--->Spring force (center) on node %lu is               fs = (%f,%f,%f)\n",
+//             j,sfc[0],sfc[1],sfc[2]);
+//    }
+    
+  } // end for j-loop
+  
+  
+  STOP_LOG ("compute_surface_constraint_force()", "ForceField");
+}
+
+void ForceField::attach_nodal(const std::vector<Real>& nodal_force_density)
+{
+  START_LOG("attach_nodal()", "ForceField");
+  std::size_t  point_start_id     = 0;
+   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Loop over each particle, and add the body force to each node.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+  for(std::size_t i=0; i < _num_particles; ++i)
+  {
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Check if this particle is on the periodic boundary. If so, move the nodes
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    const bool on_pb = _particle_mesh->particles()[i]->on_the_periodic_boundary();
+
+    if( on_pb )
+    {
+      if(_pm_system->comm().rank()==0){
+        printf("--->TEST in ForceField::attach_nodal() \n");
+        printf("         The particle %lu is on the periodic boundary!\n",i);
+      }
+      _particle_mesh->particles()[i]->rebuild_periodic_mesh();
+    }
+
+    std::vector<Point> nodal_force;
+    _particle_mesh->particles()[i]->build_nodal_force(nodal_force_density,nodal_force);
+    
+    /*
+     * Loop over each node through node iterator
+     * Compute the gravitational force vector on each node
+     */
+    const std::size_t n_nodes = _particle_mesh->particles()[i]->num_mesh_nodes();
+    MeshBase& p_mesh = _particle_mesh->particles()[i]->mesh();
+    MeshBase::node_iterator       nd     = p_mesh.active_nodes_begin();
+    const MeshBase::node_iterator end_nd = p_mesh.active_nodes_end();
+    for ( ; nd != end_nd; ++nd)
+    {
+      // Store a pointer to the element we are currently working on.
+      Node* node = *nd;
+      const dof_id_type node_id = node->id();
+      
+      // get the dof numbers at this node (only for force vector)
+      std::vector<Real> gforce(_dim,0.);
+      for(std::size_t k=0; k<_dim; ++k){
+        gforce[k] = nodal_force[node_id](k);
+      } // end k-loop
+      
+      // ------------------ TEST: print out the nodal force ----------------------
+      // if(_pm_system->comm().rank()==0){
+      //   printf("--->TEST:reinit_force_field() gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
+      //   printf("         nodal force = (%f,%f,%f)\n",
+      //          nodal_force[node_id](0),nodal_force[node_id](1),nodal_force[node_id](2));
+      //   printf("         rigid_nodal_force = (%f,%f,%f)\n",
+      //          rigid_nodal_force[node_id](0),rigid_nodal_force[node_id](1),rigid_nodal_force[node_id](2));
+      // }
+      // -------------------------------------------------------------------------
+      
+      _point_mesh->particles()[point_start_id+node_id]->add_particle_force(gforce);
+      
+    } // end for nd-loop
+    
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Move back the mesh nodes.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    if( on_pb ) _particle_mesh->particles()[i]->restore_periodic_mesh();
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     update the point start id
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    point_start_id += n_nodes;
+  } // end for i-loop
+  STOP_LOG("attach_nodal_force()", "ForceField");
+}
 
 // // ======================================================================
 // void ForceField::attach_pp_friction(const std::vector<Real>& v_beads)
@@ -1054,12 +981,6 @@ void ForceField::attach_pw_ev_empirical_polymerChain()
   START_LOG("attach_pw_ev_empirical_polymerChain()", "ForceField");
 
   // this particle-wall force field only works for polymer_chain model
-  if(_particle_type != "point_particle" or _point_particle_model != "polymer_chain"){
-    std::cout << std::endl << "*******************Error message*********************" << std::endl
-            << "The force field 'pp_wormLike_spring' is for 'polymer_chain' models, but not for 'bead' models" <<std::endl
-            << "*********************************************" << std::endl;    
-    libmesh_error();
-  }    
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop each point and apply forces
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -1125,18 +1046,9 @@ void ForceField::attach_pw_ev_lj_cut(const std::vector<Real>& params)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop each point and apply forces
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  Real epsilon, sigma, rcut;
-  if(params.size()==3){
-    epsilon = params[0];
-    sigma = params[1];
-    rcut = params[2];
-  }
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'pw_ev_lj_cut' requires 3 parameter (epsilon, sigma, rcut) (dimensionless form)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();    
-  }
+  Real  epsilon = params[0];
+  Real  sigma = params[1];
+  Real  rcut = params[2];
   for(std::size_t i=0; i<_num_points; ++i)
   {
     std::vector<Real> pforce(_dim);
@@ -1154,17 +1066,8 @@ void ForceField::attach_pw_ev_lj_repulsive(const std::vector<Real>& params)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop each point and apply forces
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  Real epsilon, sigma;
-  if(params.size()==2){
-    epsilon = params[0];
-    sigma = params[1];
-  }
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'pw_ev_lj_repulsive' requires 2 parameter (epsilon, sigma) (dimensionless form)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();    
-  }
+  Real epsilon = params[0];
+  Real sigma = params[1];
   Real rcut = sigma * std::pow(2., 1./6.);
   for(std::size_t i=0; i<_num_points; ++i)
   {
@@ -1227,21 +1130,10 @@ void ForceField::attach_pw_ev_harmonic_repulsive(const std::vector<Real>& params
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop each point and apply forces
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  Real k, r0;
-  if(params.size()==2){
-    k = params[0];
-    r0 = params[1];
-  }
-  else{
-    std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'pw_ev_harmonic_repulsive' requires 2 parameter (k, r0) (dimensionless form)" << std::endl
-              << "****************************************" << std::endl;
-    libmesh_error();    
-  }
   for(std::size_t i=0; i<_num_points; ++i)
   {
     std::vector<Real> pforce(_dim,0.);
-    this->compute_pw_ev_harmonic_repulsive(k,r0,i,pforce);
+    this->compute_pw_ev_harmonic_repulsive(params[0],params[1],i,pforce);
     _point_mesh->particles()[i]->add_particle_force(pforce);    
   } // end for i-loop
 
@@ -1392,80 +1284,6 @@ void ForceField::reinit_point_force_zeros()
 
 
 
-// ======================================================================
-void ForceField::rigid_constraint_force(const std::size_t& i, // the i-th particle
-                                        const Real& k0,
-                                        std::vector<Point>& nodal_force)
-{
-  START_LOG ("rigid_constraint_force()", "ForceField");
-  
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   find the partilce center and number of tracking points on the surface.
-   We need this center position to construct springs in the radial direction.
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  MeshSpringNetwork* mesh_spring  = _particle_mesh->particles()[i]->mesh_spring_network();
-  const std::size_t n_nodes = _particle_mesh->particles()[i]->num_mesh_nodes();
-  const Point      p_center = _particle_mesh->particles()[i]->compute_centroid();
-  // if(_pm_system->comm().rank()==0){
-  //   printf("--->TEST in rigid_constraint_force() center of the %lu-th particle is (%f,%f,%f)\n",
-  //          i,p_center(0),p_center(1),p_center(2));
-  // }
-  
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   loop over each tracking point(node), and compute spring forces
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  nodal_force.resize(n_nodes);
-  for(std::size_t j=0; j<n_nodes; ++j)
-  {
-    // 1. Get the coords and neighboring nodes of the j-th node
-    std::vector< std::pair<std::size_t, Real> > node_neighbors;
-    node_neighbors    = mesh_spring->nodes_neighbors(j);
-    const Point& pt0  = _particle_mesh->particles()[i]->mesh_point(j);
-    
-    // 2. Loop over each neighboring nodes and compute the SPRING forces
-    std::vector<Real> spring_f(_dim,0.);
-    for(std::size_t k=0; k<node_neighbors.size(); ++k)
-    {
-      const std::size_t& neigh_id = node_neighbors[k].first;
-      const Real&        neigh_l0 = node_neighbors[k].second;
-      const Point& ptk = _particle_mesh->particles()[i]->mesh_point(neigh_id);
-      const Point R_ij = _particle_mesh->pm_periodic_boundary()->point_vector(pt0,ptk);
-      
-      std::vector<Real> sf  = this->spring_force_lhs(R_ij,neigh_l0,k0);
-      for(std::size_t l=0; l<_dim; ++l) spring_f[l] += sf[l];
-    } // end for k-loop
-    
-    // 3. compute the Spring force between the node the the particle center
-    const Real  lc0    = mesh_spring->node_center_equilibrium_dist(j);
-    const Point Rc_ij  = _particle_mesh->pm_periodic_boundary()->point_vector(pt0,p_center);
-    std::vector<Real> sfc  = this->spring_force_lhs(Rc_ij,lc0,k0);
-    for(std::size_t k=0; k<_dim; ++k) spring_f[k] += sfc[k];
-    
-    // 4. convert the point local id to the global id, and apply forces.
-    for(std::size_t k=0; k<_dim; ++k) nodal_force[j](k) = spring_f[k];
-    
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     * test: print out the spring force on each node.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//    if(_pm_system->comm().rank()==0)
-//    {
-//      printf("--->test in ForceField::rigid_constraint_force(), Particle %lu\n",i);
-//      printf("--->Spring force (surface+center=total) on node %lu is fs = (%f,%f,%f)\n",
-//             j,spring_f[0],spring_f[1],spring_f[2]);
-//      printf("--->Spring force (center) on node %lu is               fs = (%f,%f,%f)\n",
-//             j,sfc[0],sfc[1],sfc[2]);
-//    }
-    
-  } // end for j-loop
-  
-  
-  STOP_LOG ("rigid_constraint_force()", "ForceField");
-}
-
-
-
 
 // ======================================================================
 void ForceField::check_wall(const std::size_t& p_id)
@@ -1545,6 +1363,100 @@ void ForceField::check_walls()
 }
 
 
+// // ======================================================================
+// void ForceField::compute_pp_wormLike_spring(const std::size_t  p_id,
+//   std::vector<Real>& pforce ) const
+//   {
+//   START_LOG ("compute_wormLike_spring_force(p_id)", "ForceField");
+
+//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//    c1 = a/(2bk), and c2 = q0/a = Nks*bk/a
+//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+//   const Real c1  = _bead_r/(2.0*_bk);
+//   const Real c2  = _Nks*_bk/_bead_r;
+
+
+//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//    Wormlike spring model: force between connected beads
+//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+//   pforce.resize(_dim,0.0);
+//   const Point pti   = _point_mesh->particles()[p_id]->point();
+//   if (p_id==0)  // the head bead with only one connection
+//   {
+//     const Point ptj   = _point_mesh->particles()[p_id+1]->point();
+//     const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
+//     const std::vector<Real> F_ij = this->spring_force_wls(R_ij,c1,c2);
+//     for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
+//   }
+//   else if ( p_id==(_num_points-1) ) // the end bead with one connection
+//   {
+//     const Point ptj   = _point_mesh->particles()[p_id-1]->point();
+//     const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
+//     const std::vector<Real> F_ij = this->spring_force_wls(R_ij,c1,c2);
+//     for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
+//   }
+//   else          // normal bead with two connected neighboring springs
+//   {
+//     for (std::size_t i=0; i<2; ++i)
+//     {
+//       // i=0, j=2*i-1 = -1;   i=1,j=2*i-1 = +1
+//       const Point ptj   = _point_mesh->particles()[p_id+2*i-1]->point();
+//       const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
+//       const std::vector<Real> F_ij = this->spring_force_wls(R_ij,c1,c2);
+//       for (std::size_t j=0; j<_dim; ++j) pforce[j] += F_ij[j];
+//     } // end for i-loop
+//   } // end if-else
+
+//   STOP_LOG ("compute_wormLike_spring_force(p_id)", "ForceField");
+// }
+
+// // ======================================================================
+// void ForceField::compute_pp_fene_spring(const std::size_t  p_id,
+//                                            std::vector<Real>& pforce ) const
+// {
+//   START_LOG ("compute_fene_spring_force()", "ForceField");
+  
+//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//    In normalize formulation: c1 = 3a/(bk), and c2 = q0/a = Nks*bk/a
+//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+//   const Real c1  =  3.0*_bead_r/_bk;
+//   const Real c2  = _Nks*_bk/_bead_r;  // Ls: maximum spring length
+  
+  
+//   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//    FENE spring model: force between connected beads
+//    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+//   pforce.resize(_dim,0.0);
+//   const Point pti   = _point_mesh->particles()[p_id]->point();
+//   if (p_id==0)  // the head bead with only one connection
+//   {
+//     const Point ptj   = _point_mesh->particles()[p_id+1]->point();
+//     const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
+//     const std::vector<Real> F_ij = this->spring_force_fene(R_ij,c1,c2);
+//     for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
+//   }
+//   else if ( p_id==(_num_points-1) ) // the end bead with one connection
+//   {
+//     const Point ptj   = _point_mesh->particles()[p_id-1]->point();
+//     const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
+//     const std::vector<Real> F_ij = this->spring_force_fene(R_ij,c1,c2);
+//     for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
+//   }
+//   else          // normal bead with two connected neighboring springs
+//   {
+//     for (std::size_t i=0; i<2; ++i)
+//     {
+//       // i=0, j=2*i-1 = -1;   i=1,j=2*i-1 = +1
+//       const Point ptj   = _point_mesh->particles()[p_id+2*i-1]->point();
+//       const Point R_ij  = _point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
+//       const std::vector<Real> F_ij = this->spring_force_fene(R_ij,c1,c2);
+//       for (std::size_t j=0; j<_dim; ++j) pforce[j] = F_ij[j];
+//     } // end for i-loop
+//   } // end if-else
+  
+  
+//   STOP_LOG ("compute_fene_spring_force()", "ForceField");
+// }
 
 // // ======================================================================
 // void ForceField::constant_force(std::vector<Real>& pforce ) const

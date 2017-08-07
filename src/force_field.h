@@ -68,7 +68,18 @@ public:
   
   typedef ForceFieldBase Parent;
   
-  
+  /*
+   * Check force field parameters when build force field classes.
+   * This function is only evaluated once at the beginning of a simulation
+   * check the following things:
+   * 1) if this "force field" is supported;
+   * 2) if this "force field" is applicable to this "particle type"
+   * 3) if correct number of parameters are assigned to this "force field"
+  */
+
+  void check_force_field(); 
+
+
   /* 
    * User-defined function for reinitializing the force field
    * at each time step
@@ -85,7 +96,25 @@ public:
    */
   void reinit_force_field() override;
 
+
+   /* 
+   * Attach surface spring force
+   * spring constant k0 is needed
+   */  
+  void attach_p_surface_constraint(const std::vector<Real>& params);
+
+  /*
+   * compute the constraint forces for the i-th rigid particle
+   * This is achieved by applying large stiff spring forces.
+   * k0 is a large number for the stiffness constant.
+   */
+  void compute_surface_constraint_force(const std::size_t& i, // the i-th particle
+                              const Real& k0,
+                              std::vector<Point>& nodal_force);
+
  
+
+  void attach_nodal(const std::vector<Real>& params); 
    /*
    * Attach the particle-particle Excluded volume Force (Gaussian form)
    * This force occurs between the particle and all its neighbors,
@@ -115,7 +144,7 @@ public:
   void compute_pp_ev_gaussian(Real& c1,
                               Real& c2,
                               const std::size_t&  p_id,
-                              std::vector<Real>& pforce ) const;
+                              std::vector<Real>& pforce );
 
   /*
    * Attach particle-particle Excluded volume Force (Lennard-Jones-cut form)
@@ -196,6 +225,15 @@ public:
    */
   void attach_p_constant(const std::vector<Real>& params);
 
+  /*
+   * attach gravity force read from force file to all particles
+   * Each particle has to be assigned a force vector in the force file
+   * the params are body force density
+   */
+  void attach_p_gravity(const std::vector<Real>& params);
+
+
+
 
   /*
    * User-defined function that to calculate force between different objects
@@ -273,15 +311,6 @@ public:
                                         const Real& r0,
                                         const std::size_t& p_id,
                                         std::vector<Real>& pforce) const;
-  /*
-   * compute the constraint forces for the i-th rigid particle
-   * This is achieved by applying large stiff spring forces.
-   * k0 is a large number for the stiffness constant.
-   */
-  void rigid_constraint_force(const std::size_t& i, // the i-th particle
-                              const Real& k0,
-                              std::vector<Point>& nodal_force);
-
    /*
    * Re-init the force vector of each point (set to zeros)
    * This is required at the beginning of each time step when
@@ -409,7 +438,9 @@ private:
                   pp_ev_lj_repulsive,
                   pp_ev_harmonic_repulsive, 
                   pp_wormLike_spring, 
-                  p_constant};
+                  p_constant,
+                  p_gravity,
+                  p_surface_constraint};
 
   enum pw_forces{pw_ev_empirical_polymerChain = 0,
                  pw_ev_lj_cut,

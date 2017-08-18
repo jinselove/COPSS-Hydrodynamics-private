@@ -74,7 +74,9 @@ protected:
 
 	// update object due to PBC after check_wall()
 	void update_object(std::string stage) override;
-
+        
+        // write object to output file
+        void write_object(std::size_t step_id) override;
 
 
 private:

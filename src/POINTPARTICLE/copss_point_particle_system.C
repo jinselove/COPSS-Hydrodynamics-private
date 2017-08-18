@@ -207,6 +207,34 @@ void CopssPointParticleSystem::update_object(std::string stage)
 }
 
 
+void CopssPointParticleSystem::write_object(std::size_t step_id)
+{
+  if(comm_in.rank()==0){
+  /*---------------------------------------------------------------------------------------
+   * output polymer chain / bead data in the VTK format at step i
+   -----------------------------------------------------------------------------------------*/
+   if(point_particle_model == "polymer_chain"){
+     oss << "output_polymer_" << o_step << ".vtk";
+     polymer_chain->write_polymer_chain( oss.str() );
+   }
+   else{
+     oss << "output_bead_" << o_step <<".csv";
+     polymer_chain->write_bead(oss.str());
+   } // end else
+   /*----------------------------------------------------------------------------------------------------
+   * Output mean square displacement, radius of gyration, chain stretch, and center of mass at step i
+   --------------------------------------------------------------------------------------------------- */
+  } // end if comm_in.rank() == 0
+  brownian_sys->output_statistics_stepi(out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag,
+                                             step_id, real_time, center0, ROUT);
+  oss.str(""); oss.clear();
+  /*----------------------------------------------------------------------------------------------------
+   * Write out ROUT for restart mode at step i
+   ----------------------------------------------------------------------------------------------------*/
+  PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
+  VecView(ROUT,viewer);
+}
+
 void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
@@ -272,34 +300,6 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
     cout << "\nStarting Fixman Mid-Point algorithm at step "<< i << endl;
     // integrate particle movement using fixman's mid point scheme
     this -> fixman_integrate(equation_systems, i);  
-    // Update the time
-    if(i%write_interval==0){
-      if(comm_in.rank()==0){
-        /*---------------------------------------------------------------------------------------
-         * output polymer chain / bead data in the VTK format at step i
-        -----------------------------------------------------------------------------------------*/
-        if(point_particle_model == "polymer_chain"){
-                 oss << "output_polymer_" << o_step << ".vtk";
-           polymer_chain->write_polymer_chain( oss.str() );
-        }
-        else{
-           oss << "output_bead_" << o_step <<".csv";
-           polymer_chain->write_bead(oss.str());
-        } // end else
-        /*----------------------------------------------------------------------------------------------------
-         * Output mean square displacement, radius of gyration, chain stretch, and center of mass at step i
-         --------------------------------------------------------------------------------------------------- */
-      } // end if comm_in.rank() == 0
-      brownian_sys->output_statistics_stepi(out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag,
-                                             i, real_time, center0, ROUT);
-      oss.str(""); oss.clear();
-      /*----------------------------------------------------------------------------------------------------
-       * Write out ROUT for restart mode at step i
-      ----------------------------------------------------------------------------------------------------*/
-      PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-      VecView(ROUT,viewer);
-    }
-
   } // end step integration
   
   perf_log.pop ("integration");

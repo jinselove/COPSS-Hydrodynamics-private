@@ -39,7 +39,8 @@ PointParticle::PointParticle(const Point pt,
   _point_type(NOT_DEFINED), _parent_id(-1),
   _processor_id(-1),
   _elem_id(-1),
-  _force(3,0.)
+  _force(3,0.),
+  _velocity(3,0.)
 {
   // do nothing
 }
@@ -54,7 +55,8 @@ PointParticle::PointParticle(const Point pt,
 _parent_id(-1), _point_type(point_type),
 _processor_id(-1),
 _elem_id(-1),
-_force(3,0.)
+_force(3,0.),
+_velocity(3,0.)
 {
   // do nothing
 }
@@ -70,7 +72,9 @@ PointParticle::PointParticle(const Point pt,
   _parent_id(-1), _point_type(point_type),
   _processor_id(-1),
   _elem_id(-1),
-  _force(3,0.),_orientation(rot_vec)
+  _force(3,0.),
+ _velocity(3,0.),
+  _orientation(rot_vec)
 {
   // do nothing
 }
@@ -89,6 +93,7 @@ PointParticle::PointParticle(const PointParticle& particle)
   _elem_id      = particle._elem_id;
   _neighbor_list= particle._neighbor_list;
   _force        = particle._force;
+  _velocity     = particle._velocity;
   _orientation  = particle._orientation;
 }
 
@@ -130,7 +135,6 @@ void PointParticle::zero_particle_force()
   }
 }
   
-  
 
 // ======================================================================
 void PointParticle::reinit_particle()
@@ -150,6 +154,8 @@ void PointParticle::reinit_particle()
 //  }
   
 }
+
+
   
 
 
@@ -171,6 +177,7 @@ void PointParticle::print_info(const bool & print_neighbor_list) const
   printf("      center = (%f, %f, %f)\n", _center(0), _center(1), _center(2));
   printf("      PBC counter = (%d, %d, %d)\n", _counter[0],_counter[1],_counter[2]);
   printf("      force  = (%f, %f, %f)\n", _force[0],_force[1],_force[2]);
+  printf("      velocity = (%f, %f, %f)\n", _velocity[0], _velocity[1], _velocity[2]);
   
   // output elem id and process id
   printf("      parent_id   = %d\n",    _parent_id);

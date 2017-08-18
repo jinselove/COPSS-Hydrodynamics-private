@@ -705,9 +705,6 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   reinit_stokes = true;
   system.solve_stokes("undisturbed",reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
-  if (print_info) {
-    if (comm_in.rank() == 0) point_mesh -> print_point_info();
-  }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    write out the equation systems if write_es = true at Step 0 (undisturbed field)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -762,8 +759,6 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 //==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
 {
-//  PerfLog perf_log("fixman_integrate");
-//  perf_log.push("init_system");
   // get stokes system from equation systems
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -779,24 +774,26 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     // compute undisturbed velocity of points 
     system.compute_point_velocity("undisturbed", vel0);
     reinit_stokes = false;
-//  perf_log.pop("init_system");
-//  perf_log.push("solve_stokes(before bd)");
-
     system.solve_stokes("disturbed",reinit_stokes); // Using StokesSolver
-//  perf_log.pop("solve_stokes(before bd)");
-
     // compute distrubed velocity of points
     system.compute_point_velocity("disturbed", vel1);
     // add up undistrubed and disturbed velocity of points
     for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
-    // transform total point velocity to U0 in Brownian_system
+   // transform total point velocity to U0 in Brownian_system
     brownian_sys->vector_transform(vel1, &U0, "forward");
- 
     /*---------------------------------------------------------------------------------------
      * write equation system at step i
     -----------------------------------------------------------------------------------------*/
     if(i%write_interval == 0){
       o_step++;
+      // set particle velocity before write
+      for (std::size_t p_id = 0; p_id < NP; p_id++) {
+        std::vector<Real> p_velocity(dim,0.);
+        for (int _dim = 0; _dim < dim; _dim++) p_velocity[_dim] = vel1[p_id*dim+_dim];
+        point_mesh->particles()[p_id]->set_particle_velocity(p_velocity);
+      }
+      // write object to output file (position, force, velocity)        
+      this -> write_object(i);
       if( write_es){
         system.add_local_solution();  // add local solution for the disturbed system
         system.solution->add(*v0_ptr);// add the undisturbed solution

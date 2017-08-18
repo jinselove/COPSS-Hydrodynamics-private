@@ -8,7 +8,7 @@ include $(LIBMESH_DIR)/Make.common
 
 package ?= POINTPARTICLE
 
-target     := ./example-$(package)-$(METHOD)
+target     := ./copss-$(package)-$(METHOD)
 
 
 ###############################################################################

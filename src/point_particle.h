@@ -174,7 +174,7 @@ public:
    */
   void set_particle_force(const std::vector<Real>& pforce);
   
-  
+
   /*
    * Add the force vector
    */
@@ -192,7 +192,16 @@ public:
    * Return the force vector on the particle
    */
   const std::vector<Real>& particle_force() const {  return _force;  };
-  
+
+  /*
+   * Return the velocity vector of the particle
+   */
+  const std::vector<Real>& particle_velocity() const {return _velocity; };
+
+  /*
+   * Set particle velocity
+   */ 
+  void set_particle_velocity(const std::vector<Real>& p_velocity) {_velocity = p_velocity;};
   
   /*
    * Return the orientation vector of the particle
@@ -226,6 +235,9 @@ private:
   
   // The coordinate of the particle center
   Point _center;
+
+  // The velocity of the particle center
+  std::vector<Real> _velocity;
 
   // Count how many times the point has crossed a boundary
   // Used to unfold point's coordinate with periodic boundaries

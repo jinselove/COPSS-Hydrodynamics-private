@@ -768,12 +768,21 @@ void PolymerChain::write_bead(const std::string& filename) const
   
   // write out the csv file
   // POINT data
-  outfile <<"scalar x_coord y_coord z_coord\n";
+  outfile <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
   for(std::size_t i=0; i<n_beads; ++i)
   {
     outfile << i << " ";
+    // write position
     for(std::size_t j=0; j<3; ++j){
       outfile << _beads[i]->center()(j) << " ";
+    }
+    // write velocity
+    for (std::size_t j=0; j<3; ++j){
+      outfile <<_beads[i]->particle_velocity()[j] << " ";
+    }
+    // write force
+    for (std::size_t j=0; j<3; ++j){
+      outfile <<_beads[i]->particle_force()[j] <<" ";
     }
     outfile <<"\n";
   }

@@ -357,7 +357,7 @@ protected:
   void fixman_integrate(EquationSystems& equation_systems, unsigned int i);
   // update object positions due to PBS
   virtual void update_object(std::string stage) = 0;
-
+  virtual void write_object(std::size_t step_id) =0;
 };
 
 } // end namespace libMesh

@@ -756,7 +756,8 @@ void PolymerChain::write_polymer_chain(const std::string& filename) const
 }
   
 // ======================================================================
-void PolymerChain::write_bead(const std::string& filename) const
+void PolymerChain::write_bead(const std::string& filename,
+			      const Real& realTime) const
 {
   START_LOG ("write_bead()", "PolymerChain");
   
@@ -767,6 +768,10 @@ void PolymerChain::write_bead(const std::string& filename) const
   const std::size_t n_beads = _beads.size();
   
   // write out the csv file
+  // real time
+  outfile <<"real_time\n";
+  outfile <<realTime <<"\n";
+  
   // POINT data
   outfile <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
   for(std::size_t i=0; i<n_beads; ++i)

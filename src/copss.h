@@ -187,8 +187,8 @@ public:
   unsigned int n_vec;
   Real hmin;
   bool cheb_converge;
-  Real eig_min = 0, eig_max = 0;
-  Real real_time;
+  Real eig_min = 0., eig_max = 0.;
+  Real real_time = 0.;
   std::string out_system_filename = "output_pm_system";
   UniquePtr<NumericVector<Real>> v0_ptr;
   ExodusII_IO* exodus_ptr;

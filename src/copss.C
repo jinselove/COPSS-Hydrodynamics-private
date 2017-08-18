@@ -410,7 +410,7 @@ void Copss::read_run_info(){
   write_interval = input_file("write_interval", 1);
   debug_info   = input_file("debug_info", false);
   write_es      = input_file("write_es", true);
-  out_msd_flag      = input_file("out_msd_flag", true);
+  out_msd_flag      = input_file("out_msd_flag", false);
   out_stretch_flag  = input_file("out_stretch_flag", false);
   out_gyration_flag = input_file("out_gyration_flag", false);
   out_com_flag      = input_file("out_com_flag", false);

@@ -160,7 +160,7 @@ public:
   /*
    * Write out the bead to a local file
    */
-  void write_bead(const std::string& filename) const;
+  void write_bead(const std::string& filename, const Real& realTime) const;
 
 
 

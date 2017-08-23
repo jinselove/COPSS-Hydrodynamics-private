@@ -35,11 +35,9 @@ Copss::~Copss()
 {
   delete mesh;
   delete pm_periodic_boundary;
-  delete force_field;
   delete brownian_sys;
   mesh = NULL;
   pm_periodic_boundary = NULL;
-  force_field = NULL;
   brownian_sys = NULL;
 }
 
@@ -169,19 +167,13 @@ void Copss::read_domain_info()
   dim = input_file("dimension", 3);
   //=============== wall type and wall params
   wall_type = input_file("wall_type", "not_defined");
-  wall_params.resize(input_file.vector_variable_size(wall_type));
-  if(wall_type != "not_defined"){
-    for (unsigned int j = 0; j < wall_params.size(); j++){
-      wall_params[j] = input_file(wall_type,0.0,j);
-    }
+  if (wall_type == "slit" or wall_type == "sphere"){
+    wall_params.resize(input_file.vector_variable_size(wall_type));
+    for (unsigned int j = 0; j < wall_params.size(); j++) wall_params[j] = input_file(wall_type,0.0,j);
   }
-
-
-
   else{
-    error_msg = "wall_type undefined; please check the wall_type definition in control file (1. wall_type; 2. wall_params)";
-    PMToolBox::output_message(error_msg, comm_in);
-    libmesh_error();
+    std::cout << "*** Error: wall_type ("<< wall_type <<") is not supported !!! (in check_wall)" << std::endl;
+    libmesh_error();    
   }
   //=============== periodicity
   periodicity.resize(input_file.vector_variable_size("periodicity"));
@@ -241,59 +233,34 @@ void Copss::read_domain_info()
    */
 void Copss::read_force_info(){
   // read particle-particle force types
-  num_pp_force = input_file.vector_variable_size("particle_particle_force_types");
-  pp_force_type.resize(num_pp_force);
-  pp_force.resize(num_pp_force);
-  for (unsigned int i=0; i < num_pp_force; i++){    
-    pp_force_type[i] = input_file("particle_particle_force_types", "nothing", i);
-    std::vector<Real> params(input_file.vector_variable_size(pp_force_type[i]));
-    if(pp_force_type[i] != "nothing"){
+  fix_factory = new FixFactory();
+  numForceTypes = input_file.vector_variable_size("force_field");
+  forceTypes.resize(numForceTypes);
+  forces.resize(numForceTypes);
+  for (unsigned int i=0; i < numForceTypes; i++){    
+    forceTypes[i] = input_file("force_field", "nothing", i);
+    std::vector<Real> params(input_file.vector_variable_size(forceTypes[i]));
+    if(forceTypes[i] != "nothing"){
       for (unsigned int j = 0; j < params.size(); j++){
-        params[j] = input_file(pp_force_type[i],0.0,j);
+        params[j] = input_file(forceTypes[i],0.0,j);
       }
     }
-    pp_force[i].first = pp_force_type[i];
-    pp_force[i].second = params;
+    forces[i].first = forceTypes[i];
+    forces[i].second = params;
   }
 
-    // read particle-wall force types
-  num_pw_force = input_file.vector_variable_size("particle_wall_force_types");
-  pw_force_type.resize(num_pw_force);
-  pw_force.resize(num_pw_force);
-  for (unsigned int i=0; i < num_pw_force; i++){    
-    pw_force_type[i] = input_file("particle_wall_force_types", "nothing" , i);
-    std::vector<Real> params(input_file.vector_variable_size(pw_force_type[i]));
-    if(pw_force_type[i] != "nothing"){
-      for (unsigned int j = 0; j < params.size(); j++){
-        params[j] = input_file(pw_force_type[i],0.0,j);
-      }
-    }
-    pw_force[i].first = pw_force_type[i];
-    pw_force[i].second = params;
-  } 
   cout <<endl<< "##########################################################"<<endl
-       << "#    Force information (particle-particle)                     " <<endl
+       << "#    Force field (fixes)                " <<endl
        << "##########################################################"<<endl<<endl;
-  for (int i = 0; i < num_pp_force; i++){
+  for (int i = 0; i < numForceTypes; i++){
     cout << "-----------> ";
-    cout << pp_force[i].first <<"= '";
-    for (int j = 0; j < pp_force[i].second.size(); j++){
-          cout << pp_force[i].second[j] <<"  ";       
+    cout << forces[i].first <<"= '";
+    for (int j = 0; j < forces[i].second.size(); j++){
+          cout << forces[i].second[j] <<"  ";       
     }
     cout << "'" <<endl;
   }
 
-  cout <<endl<< "##########################################################"<<endl
-       << "#    Force information (particle-wall)                     " <<endl
-       << "##########################################################"<<endl<<endl;
-  for (int i = 0; i < num_pw_force; i++){
-    cout << "-----------> ";
-    cout << pw_force[i].first <<"= '";
-    for (int j = 0; j < pw_force[i].second.size(); j++){
-          cout << pw_force[i].second[j] <<"  ";       
-    }
-    cout << "'" <<endl;
-  }
 } // end read_force_info()
 
 /*
@@ -446,18 +413,18 @@ void Copss::create_domain_mesh()
         const Real meshsize_y   = (wall_params[3] - wall_params[2])/Real( n_mesh[1] );
         const Real meshsize_z   = (wall_params[5] - wall_params[4])/Real( n_mesh[2] );
 //        cout << "mesh_size = " <<meshsize_x  << "; "<<meshsize_y << "; "<<meshsize_z << endl;      
-        min_mesh_size           = std::min(meshsize_x, meshsize_y);
-        min_mesh_size           = std::min(min_mesh_size, meshsize_z);
-        max_mesh_size           = std::max(meshsize_x, meshsize_y);
-        max_mesh_size           = std::max(max_mesh_size, meshsize_z);
+        hminf  = std::min(meshsize_x, meshsize_y);
+        hminf  = std::min(hminf, meshsize_z);
+        hmaxf  = std::max(meshsize_x, meshsize_y);
+        hmaxf  = std::max(hmaxf, meshsize_z);
         cout<<"\n##########################################################\n"
             <<"#                 The created mesh information              \n"
             << "########################################################## \n\n"
             << "   nx_mesh = " << n_mesh[0] <<", Lx = " << wall_params[1]-wall_params[0] <<", hx = "<< meshsize_x <<endl
             << "   ny_mesh = " << n_mesh[1] <<", Ly = " << wall_params[3]-wall_params[2] <<", hy = "<< meshsize_y <<endl
             << "   nz_mesh = " << n_mesh[2] <<", Lz = " << wall_params[5]-wall_params[4] <<", hz = "<< meshsize_z <<endl
-            << "   minimum mesh size of fluid: hmin = " << min_mesh_size << endl
-            << "   maximum mesh size of fluid: hmax = " << max_mesh_size <<endl;
+            << "   minimum mesh size of fluid: hminf = " << hminf << endl
+            << "   maximum mesh size of fluid: hmaxf = " << hmaxf <<endl;
      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      * Create a mesh, distributed across the default MPI communicator.
      * We build a mesh with Quad9(8) elements for 2D and HEX27(20) element for 3D
@@ -482,13 +449,13 @@ void Copss::create_domain_mesh()
           mesh->all_second_order();
           mesh->prepare_for_use();
           const std::vector<Real> mesh_size = PMToolBox::mesh_size(*mesh);
-          min_mesh_size = mesh_size[0];
-          max_mesh_size = mesh_size[1];
+          hminf = mesh_size[0];
+          hmaxf = mesh_size[1];
           cout <<endl<< "##########################################################"<<endl
            << "#                 The Read-in mesh information                      " <<endl
            << "##########################################################"<<endl<<endl;
-            cout << "   minimum mesh size of fluid: hmin = " << min_mesh_size << endl;
-            cout << "   maximum mesh size of fliud: hmax = " << max_mesh_size << endl;
+            cout << "   minimum mesh size of fluid: hminf = " << hminf << endl;
+            cout << "   maximum mesh size of fliud: hmaxf = " << hmaxf << endl;
           }
     else{
         cout <<"**************************************warning***********************************"<<endl;
@@ -497,6 +464,12 @@ void Copss::create_domain_mesh()
         libmesh_error();
     } 
   } // end else (generate mesh)
+
+  // initialize search radius
+  // create object mesh
+  search_radius_p = 4.0/alpha;
+  search_radius_e = 0.5*hmaxf + search_radius_p;
+
   // print mesh info
   mesh -> print_info();
 } // end function
@@ -575,9 +548,11 @@ EquationSystems Copss::create_equation_systems()
   this -> set_parameters(equation_systems);
 
   // initialized force field
-  cout<<"==>(8/8) Attach force_field to 'stokes' system"<<endl;
-  force_field = new ForceField(system);
-  system.attach_force_field(force_field);
+  cout<<"==>(8/8) Attach fixes to 'stokes' system"<<endl;
+  this -> attach_fixes(system); 
+
+  // force_field = new ForceField(system);
+  // system.attach_force_field(force_field);
 
   /* Print information about the mesh and system to the screen. */
   cout << endl <<"--------------> Print equation systems info" <<endl;
@@ -589,6 +564,19 @@ EquationSystems Copss::create_equation_systems()
              <<"              "<< point_mesh->num_particles()<<" particles.\n" << std::endl;
   return equation_systems;
 }
+
+//=======================================================================================
+void Copss::attach_fixes(PMLinearImplicitSystem& pm_system)
+{
+
+  // Fix *f;
+  fixes.resize(numForceTypes);
+  for (int i=0; i < numForceTypes; i++){
+    fixes[i] = fix_factory -> GetFix(forceTypes[i], pm_system);
+  }
+  pm_system.attach_fixes(fixes);
+}
+
 
 //===============================================================================
 void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
@@ -691,7 +679,6 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
   }  
 }
 
-
 //============================================================================================
 void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
 {
@@ -702,6 +689,12 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
    NOTE: We MUST re-init particle-mesh before solving Stokes
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   system.reinit_system();
+  if (print_info) {
+    if (comm_in.rank() == 0){
+     printf("====> point info after reinit system\n");
+     point_mesh -> print_point_info();
+    }
+  }
   reinit_stokes = true;
   system.solve_stokes("undisturbed",reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
@@ -713,7 +706,7 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   {
     //system.add_local_solution(); // Don't add local solution for undisturbed system!
 #ifdef LIBMESH_HAVE_EXODUS_API
-    exodus_ptr->write_equation_systems(out_system_filename+".e", equation_systems);
+    exodus_ptr->write_equation_systems(out_system_filename, equation_systems);
 #endif
   }
 }
@@ -799,7 +792,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
         system.solution->add(*v0_ptr);// add the undisturbed solution
 #ifdef LIBMESH_HAVE_EXODUS_API
         exodus_ptr->append(true);
-        exodus_ptr->write_timestep(out_system_filename+".e",system.get_equation_systems(),o_step,o_step);
+        exodus_ptr->write_timestep(out_system_filename,system.get_equation_systems(),o_step,o_step);
 #endif
       } // end if (write es)   
     } // end if (i % write_interval == 0 )
@@ -807,7 +800,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
      Adaptive time step.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     Real dt = 0;
-    hmin = equation_systems.parameters.get<Real>("fluid mesh size");
     if(adaptive_dt){
       Real vp_max = 0.0, vp_min = 0.0;
       for(unsigned int k=0; k<dim;++k) {
@@ -833,11 +825,11 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
         cout << "       ##############################################################################################################" << endl
              << "       # Max velocity magnitude is " << vp_max << endl
              << "       # Min velocity magnitude is " << vp_min << endl
-             << "       # minimum fluid mesh size = " << hmin << endl
+             << "       # minimum mesh size = " << hmin << endl
              << "       # The adaptive time increment at step "<< i << " is dt = " << dt<<endl
              << "       # max_dr_coeff = " << max_dr_coeff <<endl 
              << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
-             << "       # (without Brownian) adapting_time_step = max_dr_coeff * fluid_mesh_size_min / (max_bead_velocity at t_i) "<<endl      
+             << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i) "<<endl      
              << "       ##############################################################################################################" << endl;
       } // end if (i% write_interval)  
     }
@@ -853,7 +845,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
              << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl
              << "       # max_dr_coeff = " << max_dr_coeff << endl
        	     << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
-             << "       # (Without Brownian) fixed_time_step = max_dr_coeff * fluid_mesh_size_min / 1.0 "<<endl
+             << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0 "<<endl
              << "       ##############################################################################################################" << endl;
       } // end if (i % write_interval == 0)
     } // end if (adaptive_dt)
@@ -952,7 +944,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Check and correct beads' position at the midpoint
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      force_field->check_walls(); // check pbc and inpenetrable wall
+      fixes[0]->check_walls(); // check pbc and inpenetrable wall
       this -> update_object("after midpoint at step"+std::to_string(i));
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Update the particle mesh for the mid-point step,
@@ -982,7 +974,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Check and correct the beads' position again after the midpoint update
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      force_field->check_walls(); // check pbc and inpenetrable wall
+      fixes[0]->check_walls(); // check pbc and inpenetrable wall
       this -> update_object("after step "+std::to_string(i));
 
       // Update ROUT (position vector excluding pbc) at the i-th step
@@ -998,7 +990,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords
  
       // Check and correct beads' position at the midpoint
-      force_field->check_walls(); // check pbc and inpenetrable wall
+      fixes[0]->check_walls(); // check pbc and inpenetrable wall
       this -> update_object("after step "+std::to_string(i));
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   

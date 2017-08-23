@@ -34,7 +34,6 @@
 #include "point_mesh.h"
 #include "pm_linear_implicit_system.h"
 #include "brownian_system.h"
-#include "force_field.h"
 #include "chebyshev.h"
 
 

@@ -52,7 +52,6 @@
 #include "point_particle.h"
 #include "particle_mesh.h"
 #include "point_mesh.h"
-#include "force_field.h"
 #include "pm_linear_implicit_system.h"
 #include "brownian_system.h"
 #include "pm_periodic_boundary.h"
@@ -63,6 +62,8 @@
 #include "stokes_solver.h"
 #include "ggem_system.h"
 #include "copss_init.h"
+#include "include_fixes.h"
+
 
 
 /*! This file serves as a template to build\solve a Stokes system
@@ -105,7 +106,7 @@ public:
   Real tc; // characteristic time (diffusion time) (s)
   Real uc; // characteristic velocity (um/s)
   Real fc; // characteristic force (N)
-  Real muc; // non-dimensional viscosity
+  Real muc; // non-dimension viscosity
 
   // Geometry information
   unsigned int dim; // dimension of the box
@@ -120,13 +121,14 @@ public:
   std::string domain_mesh_file; // domain mesh filename
   std::vector<unsigned int> n_mesh; // mesh size in all directions
 
-  // Force information
-  unsigned int num_pp_force;
-  std::vector<std::string> pp_force_type;
-  std::vector<ForceField::type_force> pp_force;
-  unsigned int num_pw_force;
-  std::vector<std::string> pw_force_type;
-  std::vector<ForceField::type_force> pw_force;
+  // Fix
+  std::vector<Fix*> fixes;
+  FixFactory* fix_factory;
+  unsigned int numForceTypes;
+  std::vector<std::string> forceTypes;
+  std::vector<Fix::type_force> forces;
+  // map force_type to Fix Pointers
+
 
   // GGEM information
   Real alpha;
@@ -175,8 +177,6 @@ public:
   PMPeriodicBoundary* pm_periodic_boundary;
   //std::unique_ptr<PMPeriodicBoundary> pm_periodic_boundary;
 
-  //force field
-  ForceField* force_field;
   // equation system
   unsigned int u_var, v_var, w_var, p_var;
 
@@ -185,11 +185,12 @@ public:
   bool reinit_stokes;
   unsigned int NP;
   unsigned int n_vec;
-  Real hmin;
+  Real hminf, hmaxf; // fluid mesh minimum
+  Real hmin, hmax;
   bool cheb_converge;
-  Real eig_min = 0., eig_max = 0.;
-  Real real_time = 0.;
-  std::string out_system_filename = "output_pm_system";
+  Real eig_min = 0, eig_max = 0;
+  Real real_time;
+  const std::string out_system_filename = "output_pm_system.e";
   UniquePtr<NumericVector<Real>> v0_ptr;
   ExodusII_IO* exodus_ptr;
 
@@ -335,6 +336,9 @@ protected:
   virtual void attach_object_mesh(PMLinearImplicitSystem& system) = 0;
   void attach_period_boundary(PMLinearImplicitSystem& system);
   virtual void set_parameters(EquationSystems& equation_systems) = 0;
+
+  // force field
+  void attach_fixes(PMLinearImplicitSystem& system);
 
   /*!
    * Steps for integrate()

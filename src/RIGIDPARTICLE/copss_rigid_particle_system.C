@@ -1,4 +1,4 @@
-#include "copss_point_particle_system.h"
+#include "copss_rigid_particle_system.h"
 
 using std::cout;
 using std::endl;
@@ -53,7 +53,6 @@ void CopssPointParticleSystem::create_object(){
   std::ostringstream pfilename;
   if(restart)
   {
-    cout <<"in restart mode ---------" << endl;
     if(point_particle_model == "polymer_chain"){
     	pfilename << "output_polymer_"<< restart_step << ".vtk";
       polymer_chain->read_data_vtk(pfilename.str());
@@ -130,8 +129,12 @@ void CopssPointParticleSystem::create_object_mesh(){
   this -> create_object();
 
   cout << "\n==>(4/4) Create point_mesh object \n";
+  // create object mesh
+  search_radius_p = 4.0/alpha;
+  search_radius_e = 0.5*max_mesh_size + search_radius_p;
 
   point_mesh = new PointMesh<3> (*mesh, *polymer_chain, search_radius_p, search_radius_e);
+  //point_mesh = std::unique_ptr<PointMesh<3> >(new PointMesh<3> (*mesh, *polymer_chain, search_radius_p, search_radius_e));
 
   point_mesh->add_periodic_boundary(*pm_periodic_boundary);
 
@@ -154,8 +157,6 @@ void CopssPointParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system
 {
 	system.attach_point_mesh(point_mesh);
 }
-
-
 
 //======================================================================================
 void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems){
@@ -183,9 +184,10 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
   equation_systems.parameters.set<string> ("point_particle_model") = point_particle_model;
   // Attach force fields
-  equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;
-  for (int i=0; i<numForceTypes; i++) equation_systems.parameters.set<std::vector<Real>> (forces[i].first) = forces[i].second;
-  // 
+  equation_systems.parameters.set<std::vector<string>> ("pp_force_types") = pp_force_type;
+  for (int i=0; i<num_pp_force; i++) equation_systems.parameters.set<std::vector<Real>> (pp_force[i].first) = pp_force[i].second;
+  equation_systems.parameters.set<std::vector<string>> ("pw_force_types") = pw_force_type;
+  for (int i=0; i<num_pw_force; i++) equation_systems.parameters.set<std::vector<Real>> (pw_force[i].first) = pw_force[i].second;
   equation_systems.parameters.set<string> ("test_name") = test_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
@@ -205,34 +207,6 @@ void CopssPointParticleSystem::update_object(std::string stage)
 }
 
 
-void CopssPointParticleSystem::write_object(std::size_t step_id)
-{
-  if(comm_in.rank()==0){
-  /*---------------------------------------------------------------------------------------
-   * output polymer chain / bead data in the VTK format at step i
-   -----------------------------------------------------------------------------------------*/
-   if(point_particle_model == "polymer_chain"){
-     oss << "output_polymer_" << o_step << ".vtk";
-     polymer_chain->write_polymer_chain( oss.str() );
-   }
-   else{
-     oss << "output_bead_" << o_step <<".csv";
-     polymer_chain->write_bead(oss.str(), real_time);
-   } // end else
-   /*----------------------------------------------------------------------------------------------------
-   * Output mean square displacement, radius of gyration, chain stretch, and center of mass at step i
-   --------------------------------------------------------------------------------------------------- */
-  } // end if comm_in.rank() == 0
-  brownian_sys->output_statistics_stepi(out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag,
-                                             step_id, real_time, center0, ROUT);
-  oss.str(""); oss.clear();
-  /*----------------------------------------------------------------------------------------------------
-   * Write out ROUT for restart mode at step i
-   ----------------------------------------------------------------------------------------------------*/
-  PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-  VecView(ROUT,viewer);
-}
-
 void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
@@ -244,8 +218,6 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   NP     = point_mesh->num_particles();
   n_vec  = dim*NP;
-  hmin = hminf;
-  hmax = hmaxf;
 
 
   // Get a better conformation of polymer chains before simulation.
@@ -264,7 +236,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   {
     if(comm_in.rank()==0){
 	     if(point_particle_model == "polymer_chain") polymer_chain->write_polymer_chain("output_polymer_0.vtk");
-	     else polymer_chain->write_bead("output_bead_0.csv", real_time);
+	     else polymer_chain->write_bead("output_bead_0.csv");
     }
   }
 
@@ -300,6 +272,34 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
     cout << "\nStarting Fixman Mid-Point algorithm at step "<< i << endl;
     // integrate particle movement using fixman's mid point scheme
     this -> fixman_integrate(equation_systems, i);  
+    // Update the time
+    if(i%write_interval==0){
+      if(comm_in.rank()==0){
+        /*---------------------------------------------------------------------------------------
+         * output polymer chain / bead data in the VTK format at step i
+        -----------------------------------------------------------------------------------------*/
+        if(point_particle_model == "polymer_chain"){
+                 oss << "output_polymer_" << o_step << ".vtk";
+           polymer_chain->write_polymer_chain( oss.str() );
+        }
+        else{
+           oss << "output_bead_" << o_step <<".csv";
+           polymer_chain->write_bead(oss.str());
+        } // end else
+        /*----------------------------------------------------------------------------------------------------
+         * Output mean square displacement, radius of gyration, chain stretch, and center of mass at step i
+         --------------------------------------------------------------------------------------------------- */
+      } // end if comm_in.rank() == 0
+      brownian_sys->output_statistics_stepi(out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag,
+                                             i, real_time, center0, ROUT);
+      oss.str(""); oss.clear();
+      /*----------------------------------------------------------------------------------------------------
+       * Write out ROUT for restart mode at step i
+      ----------------------------------------------------------------------------------------------------*/
+      PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
+      VecView(ROUT,viewer);
+    }
+
   } // end step integration
   
   perf_log.pop ("integration");

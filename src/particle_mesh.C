@@ -1180,27 +1180,14 @@ void ParticleMesh<KDDim>::write_particle_mesh(const std::string& mesh_name)
   
   this->comm().barrier();
   const std::size_t n_particles = this->num_particles();
-  if(n_particles == 0)
+  SerialMesh stitch_mesh (_particles[0]->mesh());
+  for(std::size_t i=1; i<this->num_particles(); ++i)
   {
-    printf("--->ParticleMesh::write_particle_mesh():\n");
-    printf("    Warning: The total number of particles is zero. Write nothing!\n");
-  }
-  else if(n_particles == 1)
-  {
-    _particles[0]->mesh().write(mesh_name);
-  }
-  else
-  {
-    SerialMesh stitch_mesh (_particles[0]->mesh());
-    for(std::size_t i=1; i<this->num_particles(); ++i)
-    {
-      stitch_mesh.stitch_meshes(_particles[i]->mesh(),0,0);
-    }
-    
-    // output the stitched mesh
-    stitch_mesh.write(mesh_name);
-  }
-  
+    stitch_mesh.stitch_meshes(_particles[i]->mesh(),0,0);
+  }    
+  // output the stitched mesh
+  stitch_mesh.write(mesh_name);
+
   STOP_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
 }
   

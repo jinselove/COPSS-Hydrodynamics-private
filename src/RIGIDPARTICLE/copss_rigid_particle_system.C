@@ -7,159 +7,164 @@ using std::string;
 
 namespace libMesh{
 //==========================================================================
-CopssPointParticleSystem::CopssPointParticleSystem(CopssInit& init)
+CopssRigidParticleSystem::CopssRigidParticleSystem(CopssInit& init)
 :Copss(init)
 {
 
 }
 
-CopssPointParticleSystem::~CopssPointParticleSystem(){
-	delete polymer_chain;
+CopssRigidParticleSystem::~CopssRigidParticleSystem(){
+  delete _particle_mesh;
+  _particle_mesh = NULL;
 	delete point_mesh;
-	polymer_chain = NULL;
 	point_mesh = NULL;
 }
 
 
 //==========================================================================
-void CopssPointParticleSystem::read_particle_info(){
-	if (particle_type != "point_particle"){
+void CopssRigidParticleSystem::read_particle_info(){
+	if (particle_type != "rigid_particle"){
 		error_msg = "invalid particle type ("+particle_type+") defined\n";
 		PMToolBox::output_message(error_msg,comm_in);
 		libmesh_error();
 	}
-	point_particle_model	= input_file("point_particle_model", "other");
-	if(point_particle_model == "bead"){
-	}
-	else if(point_particle_model == "polymer_chain"){
-		bk = input_file("bk", 1E-6);//Kuhn length(um)
-		Nks = input_file("Nks", 1E-6);// # of Kuhn length per spring
-		Ss2 = Nks*bk*bk/6.; // (um^2)
-		q0 = Nks * bk;// maximum spring length (um)
-    max_spring_len = q0/Rb;     // non-dimensional max spring length
-	}
-	else{
-		error_msg = "	Invalid point_particle_model !!!";
-		PMToolBox::output_message(error_msg, comm_in);
-		libmesh_error();
-	}
-}// end read_particle_parameter()
 
+  // Particles' meshes
+  _particle_mesh_type = input_file("particle_mesh_type", "surface_mesh");  
+  _particle_mesh_file.resize( input_file.vector_variable_size(_particle_mesh_type) ); // set the length of input vector
+  for (unsigned int i=0; i < _particle_mesh_file.size(); i++){
+    _particle_mesh_file[i] = input_file(_particle_mesh_type, "particle_mesh.e", i);
+  }
+
+}// end read_particle_info()
 
 //==========================================================================
-void CopssPointParticleSystem::create_object(){
-  const unsigned int chain_id = 0;
-  polymer_chain = new PolymerChain(chain_id, *pm_periodic_boundary);
-  std::ostringstream pfilename;
-  if(restart)
-  {
-    if(point_particle_model == "polymer_chain"){
-    	pfilename << "output_polymer_"<< restart_step << ".vtk";
-      polymer_chain->read_data_vtk(pfilename.str());
-    }
-    else if (point_particle_model == "bead"){
-      pfilename << "output_bead_" << restart_step << ".csv";
-      polymer_chain->read_data_csv(pfilename.str());
-    }
-    cout <<"-------------> read "<< point_particle_model << "data from " << pfilename.str() << " in restart mode" << endl;
+void CopssRigidParticleSystem::create_object(){
 
-  } 
-  else
-  {
-  	pfilename << "point_particle_data.in";
-    cout<<"--------------> skip generating datafile, will read in existed pizza file: "<<pfilename.str()<<endl;
-    polymer_chain->read_data_pizza(pfilename.str());
-    cout<<"--------------> Polymer_chain class is built!\n";
+  // initialize _particle_mesh
+  _particle_mesh = new ParticleMesh<3> (*mesh,search_radius_p,search_radius_e);
+  // add periodic boundary
+  _particle_mesh -> add_periodic_boundary(*pm_periodic_boundary);
+  //Read the particle data
+  std::ostringstream pfilename;
+    // if restart, read particle data from ...
+  if(restart){
+
+    // implement this for restart mode
+    cout <<"Warning: restart mode for rigid particles has not been implemented yet" << endl;
+    libmesh_error();
   }
-  // output data read from file
-  if(point_particle_model == "bead"){
-    Nb = polymer_chain -> n_beads();
-    Ns = Nb - 1;
+    // if not restart, read particle data from "rigid_particle_data.in"
+  else{
+    pfilename <<"rigid_particle_data.in";
+    _particle_mesh -> read_particles_data(pfilename.str(), _particle_mesh_type, _particle_mesh_file);    
   }
-  else if (point_particle_model == "polymer_chain"){
-    Nb = polymer_chain -> n_beads();
-    nChains = polymer_chain -> n_chains();
-    nBonds = polymer_chain -> n_bonds();
-    Ns = nBonds / nChains;
-    chain_length = Ns * q0; // contour length of the spring (um)
-    Dc = Db / Real(Nb); // Diffusivity of the chain (um^2/s)
-  }
-  // for particular models
+
+  // reinit _particle_mesh
+  _particle_mesh -> reinit();
+  _hsize_solid = _particle_mesh->mesh_size();// mesh size of solid
+  _hmins = _hsize_solid[0];
+  _hmaxs = _hsize_solid[1];
+  _num_particles = _particle_mesh -> num_particles();
+
+  // attach mesh spring network
+  this -> attach_mesh_spring_network();
+
+  // print out information
   cout<<"##########################################################\n"
            <<"#                  Particle Parameters                    \n"
            <<"##########################################################\n\n"
            <<"   particle type             : " << particle_type.c_str() << endl
-           <<"   point Particle model      : " << point_particle_model.c_str() << endl
-           <<"   number of point particles Nb = " << Nb << endl;
-  if(point_particle_model == "polymer_chain"){
-  cout<<"   number of springs per Chain       Ns  = " << Ns << endl
-           <<"   number of Chains              nChains = " << nChains << endl
-           <<"   Kuhn length                      bk  = " <<bk <<" (um)\n"
-           <<"   # of Kuhn segment per spring      Nks = " << Nks << "\n"
-           <<"   second moment of polymer chain    Ss2 = " << Ss2 << " (um^2)\n"
-           <<"   maximum spring length             q0  = " << q0  << " (um)\n"
-           <<"   chain length of polymer           Lc  = " << chain_length <<" (um)\n"
-           <<"   chain diffusivity                 Dc  = " << Dc <<" (um^2/s)\n";
-  }
+           <<"   particle mesh type        : " << _particle_mesh_type.c_str() << endl
+           <<"   minimum mesh size of particle surface: hmins  : " << _hmins << endl
+           <<"   maximum mesh size of particle surface: hmaxs = " << _hmins << endl;
+  cout <<"------------> The non-dimensional variables:\n"
+       <<"   non-dimensional bead radius      a0     : " << 1.0 << "\n"
+       <<"   non-dimensional ksi = sqrt(PI)/(3a0)    : " << std::sqrt(PI) / 3. <<"\n";
 
-  cout << "------------> The non-dimensional variables:\n";
-
-
-  cout<<"   non-dimensional bead radius      a0     = " << 1.0 << "\n"
-           <<"   non-dimensional ksi = sqrt(PI)/(3a0)    = " << std::sqrt(PI) / 3. <<"\n";
-  if(point_particle_model == "polymer_chain"){
-    cout <<"   non-dimensional Kuhn length    bk/a     = " <<bk/Rb <<"\n"
-              <<"   non-dimensional spring length  q0/a     = " <<q0/Rb <<"\n"
-              <<"   non-dimensional contour length Lc/a     = " <<chain_length/Rb <<"\n"
-              <<"   non-dimensional Ss/a = sqrt(Ss2/a^2)    = " <<std::sqrt(Ss2/Rb/Rb) <<"\n"
-              <<"   non-dimensional ksi = sqrt(PI)/(3a0)    = " <<std::sqrt(PI)/(3.) <<"\n";
-  }
-  pfilename.str(""); pfilename.clear();
+  pfilename.str("");
+  pfilename.clear();
   comm_in.barrier();
 }//end function
 
+//==========================================================================
+void CopssRigidParticleSystem::attach_mesh_spring_network()
+{
+  _mesh_spring_network.resize(_num_particles);
+  //std::vector<MeshSpringNetwork*> (particle_mesh.num_particles());
+  for(std::size_t i=0; i<_num_particles; ++i)
+  {
+    MeshBase& p_mesh = _particle_mesh->particles()[i]->mesh();
+    const Point& center0 = _particle_mesh->particles()[i]->center();
+    _mesh_spring_network[i] = new MeshSpringNetwork(p_mesh,*pm_periodic_boundary);
+    _mesh_spring_network[i]->build_spring_network(center0);
+    _particle_mesh->particles()[i]->attach_mesh_spring_network(_mesh_spring_network[i]);
+  }
+
+}
+
 //=====================================================================
-void CopssPointParticleSystem::create_object_mesh(){
+void CopssRigidParticleSystem::create_object_mesh(){
   // prepare domain and objects
   cout << "\n==>(1/4) Generate/Create domain Mesh\n";
   this -> create_domain_mesh();
   cout << "\n==>(2/4) Create periodic box \n ";
   this -> create_periodic_boundary();
-  cout << "\n==>(3/4) Create polymer chain object (for beads or polymer_chain) \n";
+  cout << "\n==>(3/4) Create particle mesh object\n";
   this -> create_object();
 
   cout << "\n==>(4/4) Create point_mesh object \n";
-  // create object mesh
-  search_radius_p = 4.0/alpha;
-  search_radius_e = 0.5*max_mesh_size + search_radius_p;
+  // Create object mesh
+  point_mesh = new PointMesh<3> (*_particle_mesh, search_radius_p, search_radius_e);
 
-  point_mesh = new PointMesh<3> (*mesh, *polymer_chain, search_radius_p, search_radius_e);
-  //point_mesh = std::unique_ptr<PointMesh<3> >(new PointMesh<3> (*mesh, *polymer_chain, search_radius_p, search_radius_e));
+  // No need to add periodic boundary, which is already included in particle_mesh
 
-  point_mesh->add_periodic_boundary(*pm_periodic_boundary);
-
+  // Reinit point_mesh
   point_mesh->reinit();
-  cout <<"-------------> Reinit point mesh object, finished! \n"
-            <<"- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
-		        <<"### The point-mesh info:\n"
-		        <<"- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
-		        <<"Total number of point particles:"<<point_mesh->num_particles() << endl
-		        <<"search_radius_p = "<< search_radius_p << endl
-            <<"search_radius_e = "<< search_radius_e << endl;
-  if(print_info == true){
-    if (comm_in.rank() == 0) point_mesh->print_point_info();
-  } 
+
+  // finish point_mesh, print information
+
+  cout << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n";
+  cout << "### The particle-mesh and point-mesh info:\n";
+  cout << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n";
+  cout << "Total number of particles: " << _particle_mesh->num_particles() << "\n";
+  cout << "Total number of points: " << _particle_mesh->num_mesh_points() << "\n";
+  // iterate over all particles for debug purpose
+  if (debug_info = true){
+    for (std::size_t i=0; i<_particle_mesh->num_particles(); ++i) {
+      Real vol  = _particle_mesh->particles()[i]->compute_volume();
+      Real area = _particle_mesh->particles()[i]->compute_area();
+      Point pc_i = _particle_mesh->particles()[i]->compute_centroid();
+      const std::vector<Real> hs = _particle_mesh->particles()[i]->mesh_size();
+      const std::size_t n_surf_elem = _particle_mesh->particles()[i]->num_mesh_elem();
+      const std::size_t n_surf_node = _particle_mesh->particles()[i]->num_mesh_nodes();
+
+      cout << "------> Volume of the "<< i <<"-th particle is "<< vol <<", and area is "<< area << endl;
+      if(dim == 2){
+        cout << "        The centroid = ("<< pc_i(0) <<","<< pc_i(1) <<")" <<endl;
+      }
+      else if(dim == 3){
+        cout << "        The centroid = ("<< pc_i(0) <<","<< pc_i(1) <<","<< pc_i(2) <<")" <<endl;
+      }
+      cout << "        hmin = "<< hs[0] <<", hmax = "<< hs[1] << endl;
+      cout << "  Particle "<<i<<": center " << _particle_mesh->particles()[i]->center() << endl;
+      cout << "         " << n_surf_elem << " elements for the particle's mesh" << endl;
+      cout << "         " << n_surf_node << " nodes  for the particle's mesh" << endl;
+    }
+  }
+  cout << "search_radius_p = " << search_radius_p << ", search_radius_e = " << search_radius_e << endl<<endl<<endl;
 } // end function
 
 
 //==================================================================================
-void CopssPointParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system)
+void CopssRigidParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system)
 {
+  system.attach_particle_mesh(_particle_mesh);
 	system.attach_point_mesh(point_mesh);
 }
 
 //======================================================================================
-void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems){
+void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems){
   equation_systems.parameters.set<unsigned int>("linear solver maximum iterations") = max_linear_iterations;
   equation_systems.parameters.set<Real> ("linear solver rtol") = linear_solver_rtol;
   equation_systems.parameters.set<Real> ("linear solver atol") = linear_solver_atol;
@@ -172,17 +177,14 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>              ("alpha") = alpha;
   equation_systems.parameters.set<Real>         ("kBT")        = kBT;
   equation_systems.parameters.set<Real>   ("fluid mesh size")  = min_mesh_size;
+  equation_systems.parameters.set<Real>    ("solid mesh size") = _hmins;
   equation_systems.parameters.set<Real>       ("viscosity_0")  = muc;
   equation_systems.parameters.set<Real>               ("br0")  = 1.0;
-  equation_systems.parameters.set<Real>               ("bk")   = bk;
-  equation_systems.parameters.set<Real>               ("q0")   = q0;
   equation_systems.parameters.set<Real>       ("bead radius")  = Rb;
   equation_systems.parameters.set<Real>              ("drag")  = drag_c;
   equation_systems.parameters.set<Real>                ("tc")  = tc;
-  equation_systems.parameters.set<Real>               ("Nks")  = Nks;
-  equation_systems.parameters.set<Real>               ("Ss2")  = Ss2;
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
-  equation_systems.parameters.set<string> ("point_particle_model") = point_particle_model;
+  equation_systems.parameters.set<string> ("particle_mesh_type") = _particle_mesh_type;
   // Attach force fields
   equation_systems.parameters.set<std::vector<string>> ("pp_force_types") = pp_force_type;
   for (int i=0; i<num_pp_force; i++) equation_systems.parameters.set<std::vector<Real>> (pp_force[i].first) = pp_force[i].second;
@@ -193,22 +195,17 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
 }
 
-void CopssPointParticleSystem::update_object(std::string stage)
+void CopssRigidParticleSystem::update_object(std::string stage)
 {
-  if(point_particle_model == "polymer_chain")
-  {
-    chain_broken = polymer_chain->check_chain(max_spring_len);
-    if(chain_broken) {
-      output_msg = "   ********** warning: Polymer chain is broken " + stage +"\n"+
-                   "   ********** warning: bead position is corrected by scaling the chain length and moving the particle according to periodicity";
-      PMToolBox::output_message(output_msg, comm_in);
-    }
-  }  
+  point_mesh->update_particle_mesh(_particle_mesh);
+  if(debug_info == true){
+    std::cout << "particle meshes are updated " << stage << endl;
+  }
 }
 
 
-void CopssPointParticleSystem::run(EquationSystems& equation_systems){
-  PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
+void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
+  PerfLog perf_log("Copss-Hydrodynamics-RigidParticleSystem");
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
   // get stokes system from equation systems
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
@@ -218,7 +215,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   NP     = point_mesh->num_particles();
   n_vec  = dim*NP;
-
+  hmin = std::min(_hmins, hminf);
+  hmax = std::max(_hmaxs, hmaxf);
+  _write_particle_mesh = input_file("write_particle_mesh", true);
 
   // Get a better conformation of polymer chains before simulation.
   this -> update_object("in initial data input");
@@ -232,12 +231,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   this -> solve_undisturbed_system(equation_systems); 
   perf_log.pop ("solve undisturbed_system");
   /* output particle data at the 0-th step in the VTK format */
-  if(restart==false)
+  if(_write_particle_mesh==true and restart==false)
   {
-    if(comm_in.rank()==0){
-	     if(point_particle_model == "polymer_chain") polymer_chain->write_polymer_chain("output_polymer_0.vtk");
-	     else polymer_chain->write_bead("output_bead_0.csv");
-    }
+    _particle_mesh -> write_particle_mesh(smesh_file_name);
   }
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -259,11 +255,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   o_step = restart_step;  // output step
   vel0.resize(n_vec);
   vel1.resize(n_vec);
- 
   real_time = restart_time;
-  if (adaptive_dt == true and point_particle_model == "polymer_chain") max_dr_coeff = 0.1 * Ss2 / Rb / Rb;
-
-
   //start integration
 
   perf_log.push ("integration");
@@ -274,25 +266,15 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
     this -> fixman_integrate(equation_systems, i);  
     // Update the time
     if(i%write_interval==0){
-      if(comm_in.rank()==0){
-        /*---------------------------------------------------------------------------------------
-         * output polymer chain / bead data in the VTK format at step i
-        -----------------------------------------------------------------------------------------*/
-        if(point_particle_model == "polymer_chain"){
-                 oss << "output_polymer_" << o_step << ".vtk";
-           polymer_chain->write_polymer_chain( oss.str() );
-        }
-        else{
-           oss << "output_bead_" << o_step <<".csv";
-           polymer_chain->write_bead(oss.str());
-        } // end else
-        /*----------------------------------------------------------------------------------------------------
-         * Output mean square displacement, radius of gyration, chain stretch, and center of mass at step i
-         --------------------------------------------------------------------------------------------------- */
-      } // end if comm_in.rank() == 0
-      brownian_sys->output_statistics_stepi(out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag,
-                                             i, real_time, center0, ROUT);
-      oss.str(""); oss.clear();
+      smesh_file_name_i <<smesh_file_name 
+                        <<"-s."
+                        << std::setw(8) 
+                        << std::setfill('0') 
+                        << std::right 
+                        << o_step;
+
+  //    brownian_sys->output_statistics_stepi(out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag,
+  //                                           i, real_time, center0, ROUT);
       /*----------------------------------------------------------------------------------------------------
        * Write out ROUT for restart mode at step i
       ----------------------------------------------------------------------------------------------------*/

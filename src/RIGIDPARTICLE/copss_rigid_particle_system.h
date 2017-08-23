@@ -18,7 +18,8 @@
 #pragma once
 
 #include "../copss.h"
-#include "../polymer_chain.h"
+#include "../rigid_particle.h"
+#include "../particle_mesh.h"
 
 using std::cout;
 using std::endl;
@@ -26,44 +27,34 @@ using std::string;
 
 namespace libMesh{
 
-class CopssPointParticleSystem : public Copss
+class CopssRigidParticleSystem : public Copss
 {
 public:
 	
-	CopssPointParticleSystem (CopssInit& init);
+	CopssRigidParticleSystem (CopssInit& init);
 
-	~CopssPointParticleSystem();
+	~CopssRigidParticleSystem();
 
 	// integrator
 	void run(EquationSystems& equation_systems) override;
 
 protected:
-	std::string point_particle_model;
-	// ===========for beads and polymer chains
-	unsigned int Nb; // total # of beads
-	unsigned int Ns; // total # of springs per Chain
-	unsigned int nBonds; // total # of springs/bonds
-	// ===========for polymer chains
-	unsigned int nChains; // total # of chains
-	Real bk; // Kuhn length (um)
-	Real Nks; // # of Kuhn length per Chain
-	Real Ss2; // (um^2)
-	Real q0; //maximum spring length (um)
-	Real chain_length; // contour length of the spring (um)
-	Real Dc; // Diffusivity of the chain (um^2/s)
-
-	// extra parameters for dynamic process
-	Real max_spring_len;
-	bool chain_broken;
-
-	//void read_data(std::string control_file){};
-	// override read_particle_parameters() function in Copss class
+	// override read_particle_info() function in Copss class
 	void read_particle_info () override;
 
 	// create objects, polymer chains
 	void create_object() override;
 
-	// create object mesh
+	// attach mesh spring network to particle mesh
+	void attach_mesh_spring_network();
+
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Build MeshSpringNetwork according to the particle's mesh, which will be used to
+   apply the rigid-body constraint force.
+
+   Note: if the particles use different meshes, or have different sizes,
+   we need to build them for each of particles!
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 	void create_object_mesh() override;
 
 	// attach object mesh to system
@@ -77,13 +68,30 @@ protected:
 
 
 
+
 private:
 
-	PolymerChain* polymer_chain;
-	//std::unique_ptr<PolymerChain> polymer_chain;
+	std::string _particle_mesh_type;
 
-	//std::unique_ptr<PointMesh<3> > point_mesh; 
+	std::vector<std::string> _particle_mesh_file;
 
+	std::vector<Real> _hsize_solid;
+
+	Real _hmins; // surface mesh hmin
+
+	Real _hmaxs;
+
+  	ParticleMesh<3>* _particle_mesh;
+
+  	std::vector<MeshSpringNetwork*> _mesh_spring_network;
+
+  	std::size_t _num_particles;
+
+  	const std::string smesh_file_name = "particle_surface_mesh.e";
+
+  	std::ostringstream smesh_file_name_i;
+
+  	bool _write_particle_mesh;
 
 
 };

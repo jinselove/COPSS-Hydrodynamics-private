@@ -18,53 +18,28 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-
 #pragma once
 
-#include <stdio.h>
-#include <map>
-#include <cmath>
-
-#include "fix.h"
-#include "../point_particle.h"
-
+#include "fix_point.h"
 namespace libMesh
 {
 
-  /*
-   * The class is designed for computing the force field
-   * of the system
-   */
-  
-  
-class FixPoint: public Fix
+class FixPointGaussian : public FixPoint
 {
 public:
-  
-  //! Constructor for a system with point particles
-  FixPoint(PMLinearImplicitSystem& pm_sys);
+	FixPointGaussian(PMLinearImplicitSystem& pm_sys);
 
-  virtual ~FixPoint(){}
+	~FixPointGaussian(){};
 
-  /*! Prepare for running
-  /*
-   * Check if particle_type == "point_particle"
-   * this -> check_params()
-  */
-  void initParticleType();
+	void print_fix();
 
-  virtual void initPointParticleType() {}
+	void initParams();
 
-  void check_walls();
-
-  void check_walls_pbcCount();
+	void compute();
 
 protected:
-  
-  std::string point_particle_model;
+	Real c1;
+	Real c2;
+};
 
-
-
-};  // end of class
-  
-} // end of namespace
+}

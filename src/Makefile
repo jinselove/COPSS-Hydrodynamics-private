@@ -18,7 +18,7 @@ target     := ./copss-$(package)-$(METHOD)
 
 
 # source files
-srcfiles 	:= $(wildcard *.C  $(package)/*.C fix/*.C)
+srcfiles 	:= $(wildcard *.C  fix/*.C $(package)/*.C)
 
 #
 # object files

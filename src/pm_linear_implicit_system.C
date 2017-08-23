@@ -422,7 +422,7 @@ void PMLinearImplicitSystem::reinit_system()
     _point_mesh->update_particle_mesh(_particle_mesh);
   }   
   for (std::size_t i = 0; i < _fixes.size(); i++){
-  //  _fixes[i]->print_fix();
+    // _fixes[i]->print_fix();
     _fixes[i]->compute();
   }
 

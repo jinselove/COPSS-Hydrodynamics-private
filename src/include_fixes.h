@@ -3,6 +3,7 @@
 // Fix for force field between point particles
 #include "fix/fix_point.h"
 #include "fix/fix_point_LJCut.h"
+#include "fix/fix_point_Gaussian.h"
 
 // Fix for force field between rigid particles
 #include "fix/fix_rigid.h"

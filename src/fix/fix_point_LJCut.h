@@ -26,18 +26,23 @@ namespace libMesh
 
 class FixPointLJCut : public FixPoint
 {
-public:
-	FixPointLJCut(PMLinearImplicitSystem& pm_sys);
 
-	FixPointLJCut();
+public:
+
+	FixPointLJCut(PMLinearImplicitSystem& pm_sys);
 
 	~FixPointLJCut(){};
 
-	void checkParams();
+	void initParams();
 
 	void print_fix();
 
 	void compute();
+
+protected:
+	Real epsilon;
+	Real sigma;
+	Real rCut;
 
 };
 

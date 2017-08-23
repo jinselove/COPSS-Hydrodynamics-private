@@ -77,5 +77,7 @@ void Fix::initialization()
   
   inlet = pbc->inlet_direction();
 
+  bead_r   = pm_system->get_equation_systems().parameters.get<Real>("bead radius");
+
   num_points = point_mesh -> num_particles();
 }

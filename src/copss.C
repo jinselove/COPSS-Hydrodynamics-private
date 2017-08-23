@@ -573,6 +573,7 @@ void Copss::attach_fixes(PMLinearImplicitSystem& pm_system)
   fixes.resize(numForceTypes);
   for (int i=0; i < numForceTypes; i++){
     fixes[i] = fix_factory -> GetFix(forceTypes[i], pm_system);
+    // fixes[i] -> preSimulation();
   }
   pm_system.attach_fixes(fixes);
 }

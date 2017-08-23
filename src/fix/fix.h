@@ -54,10 +54,6 @@ public:
   //! Constructor for a system with point particles
   Fix(PMLinearImplicitSystem& pm_sys);
 
-  //! Constructor
-  Fix(){  // be sure to call attach_system when initialize fix in this way
-  };
-
   void attach_system(PMLinearImplicitSystem& pm_sys);
 
   void initialization();
@@ -82,11 +78,11 @@ public:
    * 3) if correct number of parameters are assigned to this "force field"
   */
 
-  virtual void preSimulation() {}
+  virtual void initParticleType() {}
 
 
   //! Check if num of parameters are correct
-  virtual void checkParams() {}
+  virtual void initParams() {}
 
   /*! Compute force field attach it to particles
   /*!
@@ -138,11 +134,15 @@ public:
   // particle type
   std::string particle_type;
 
-  // bead numbers
+  // bead 
+  Real bead_r;
   std::size_t num_points;
 
   // kBT
   Real kBT;
+
+  // const 
+  const Real PI  = libMesh::pi;  //3.1415926
 
 
   // boundaries

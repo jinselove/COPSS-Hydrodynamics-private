@@ -333,6 +333,12 @@ public:
   void build_nodal_force(const std::vector<Real>& f,
                          std::vector<Point>& nf);
   
+  /*
+   * This function adds forces to the center of mass of rigid particles
+   * These forces will be distributed over the nodal points 
+   */
+  void add_particle_force(const std::vector<Real>& pforce);
+
   
   
   /*

@@ -555,6 +555,15 @@ void RigidParticle::restore_periodic_mesh()
   STOP_LOG("restore_periodic_mesh()", "RigidParticle");
 }
 
+// ======================================================================
+void RigidParticle::add_particle_force(const std::vector<Real>& pforce)
+{
+  for(std::size_t i=0; i<pforce.size(); ++i)
+  {
+    _force[i] += pforce[i];
+  }
+}
+
 
   
 // ======================================================================

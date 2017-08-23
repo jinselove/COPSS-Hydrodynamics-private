@@ -53,6 +53,7 @@ void CopssPointParticleSystem::create_object(){
   std::ostringstream pfilename;
   if(restart)
   {
+    cout <<"in restart mode ---------" << endl;
     if(point_particle_model == "polymer_chain"){
     	pfilename << "output_polymer_"<< restart_step << ".vtk";
       polymer_chain->read_data_vtk(pfilename.str());
@@ -129,12 +130,8 @@ void CopssPointParticleSystem::create_object_mesh(){
   this -> create_object();
 
   cout << "\n==>(4/4) Create point_mesh object \n";
-  // create object mesh
-  search_radius_p = 4.0/alpha;
-  search_radius_e = 0.5*max_mesh_size + search_radius_p;
 
   point_mesh = new PointMesh<3> (*mesh, *polymer_chain, search_radius_p, search_radius_e);
-  //point_mesh = std::unique_ptr<PointMesh<3> >(new PointMesh<3> (*mesh, *polymer_chain, search_radius_p, search_radius_e));
 
   point_mesh->add_periodic_boundary(*pm_periodic_boundary);
 
@@ -157,6 +154,8 @@ void CopssPointParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system
 {
 	system.attach_point_mesh(point_mesh);
 }
+
+
 
 //======================================================================================
 void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems){
@@ -184,10 +183,9 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
   equation_systems.parameters.set<string> ("point_particle_model") = point_particle_model;
   // Attach force fields
-  equation_systems.parameters.set<std::vector<string>> ("pp_force_types") = pp_force_type;
-  for (int i=0; i<num_pp_force; i++) equation_systems.parameters.set<std::vector<Real>> (pp_force[i].first) = pp_force[i].second;
-  equation_systems.parameters.set<std::vector<string>> ("pw_force_types") = pw_force_type;
-  for (int i=0; i<num_pw_force; i++) equation_systems.parameters.set<std::vector<Real>> (pw_force[i].first) = pw_force[i].second;
+  equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;
+  for (int i=0; i<numForceTypes; i++) equation_systems.parameters.set<std::vector<Real>> (forces[i].first) = forces[i].second;
+  // 
   equation_systems.parameters.set<string> ("test_name") = test_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
@@ -218,6 +216,8 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   NP     = point_mesh->num_particles();
   n_vec  = dim*NP;
+  hmin = hminf;
+  hmax = hmaxf;
 
 
   // Get a better conformation of polymer chains before simulation.

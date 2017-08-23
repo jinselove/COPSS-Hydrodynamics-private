@@ -37,12 +37,12 @@
 #include "pm_toolbox.h"
 #include "ggem_system.h"
 #include "brownian_system.h"
-#include "force_field.h"
 #include "pm_linear_implicit_system.h"
 #include "analytical_solution.h"
 
 // assemble functions
 #include "assemble_navier_stokes.h"
+#include "include_fixes.h"
 
 namespace libMesh
 {
@@ -56,8 +56,7 @@ PMLinearImplicitSystem::PMLinearImplicitSystem(EquationSystems& es,
 : Parent (es, name, number),
   _stokes_solver(es),
   _point_mesh(NULL),
-  _particle_mesh(NULL),
-  _force_field(NULL)
+  _particle_mesh(NULL)
 {
   // Assemble Navier Stokes
   _assemble_ns = ( new AssembleNS(es) );
@@ -408,7 +407,7 @@ std::vector<Real> PMLinearImplicitSystem::point_velocity(const std::vector<Real>
 
 
 // ==================================================================================
-void PMLinearImplicitSystem::reinit_system(const std::vector<Real>* vel_last_step)
+void PMLinearImplicitSystem::reinit_system()
 {
   START_LOG("reinit_system()", "PMLinearImplicitSystem");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
@@ -422,24 +421,10 @@ void PMLinearImplicitSystem::reinit_system(const std::vector<Real>* vel_last_ste
   if(_particle_mesh != NULL){
     _point_mesh->update_particle_mesh(_particle_mesh);
   }   
-  // re-compute the force field if there is any force_field attached
-  if(_force_field != NULL)
-  {
-    if(vel_last_step == NULL){
-     _force_field->reinit_force_field();
-    }
-    else {
-      std::cout << "==========================warning=========================" << std::endl
-                << "'vel_last_step' is only used for calculating friction" << std::endl
-                << " However, no friction force has been implemented yet." << std::endl 
-                << " Consider using reinit_system() instead" << std::endl
-                << "==========================================================" <<std::endl;
-      //_force_field->reinit_force_field(*vel_last_step);
-      libmesh_error(); 
-    }
-  //  std::cout << "   force_field reinitialized .." << std::endl;
+  for (std::size_t i = 0; i < _fixes.size(); i++){
+  //  _fixes[i]->print_fix();
+    _fixes[i]->compute();
   }
-
 
   STOP_LOG("reinit_system()", "PMLinearImplicitSystem");
 }

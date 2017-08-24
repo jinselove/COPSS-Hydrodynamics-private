@@ -4,6 +4,7 @@
 #include "fix_point_LJCut.h"
 #include "fix_point_Gaussian.h"
 #include "fix_point_Gaussian_PolymerChain.h"
+#include "fix_point_WormLikeSpring.h"
 #include "../pm_linear_implicit_system.h"
 
 namespace libMesh
@@ -28,6 +29,9 @@ public:
 		}
 		else if (fix_name == "point_Gaussian_PolymerChain"){
 			return new FixPointGaussianPolymerChain(system);
+		}
+		else if (fix_name == "point_WormLikeSpring"){
+			return new FixPointWormLikeSpring(system);
 		}
 		else{
 			std::cout <<"Error: undefined force type: " << fix_name	<< std::endl;

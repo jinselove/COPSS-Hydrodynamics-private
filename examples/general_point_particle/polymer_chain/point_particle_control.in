@@ -69,12 +69,8 @@ n_mesh = '37 37 4'
 #############################################
 #	 Force info (particle-particle force)         			
 #############################################
-particle_particle_force_types = 'pp_wormLike_spring pp_ev_gaussian_polymerChain'
-pp_ev_gaussian_polymerChain = '2.628506592'
-#############################################
-#	 Force info (particle-wall force)
-#############################################
-particle_wall_force_types = 'pw_ev_empirical_polymerChain'
+force_field = 'point_Gaussian_PolymerChain point_WormLikeSpring'
+point_Gaussian_PolymerChain = '2.628506592'
 
 #############################################
 #			   GGEM info

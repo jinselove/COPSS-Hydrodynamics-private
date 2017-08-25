@@ -62,7 +62,8 @@
 #include "stokes_solver.h"
 #include "ggem_system.h"
 #include "copss_init.h"
-#include "include_fixes.h"
+#include "fix/fix_factory.h"
+#include "fix/fix.h"
 
 
 

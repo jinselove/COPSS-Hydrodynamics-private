@@ -1,4 +1,4 @@
-#include "fix_point_LJCut.h"
+#include "fix_point_lj_cut.h"
 
 FixPointLJCut::FixPointLJCut(PMLinearImplicitSystem& pm_sys_)
 :
@@ -9,10 +9,10 @@ FixPointLJCut::FixPointLJCut(PMLinearImplicitSystem& pm_sys_)
 
 void FixPointLJCut::initParams()
 {
-  force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("point_LJCut");
+  force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("lj_cut");
   if(force_params.size()!=3){
     std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'point_LJCut' requires 3 parameter (epsilon, sigma, rcut) (dimensionless form)" << std::endl
+              << "---------------> The force type 'lj_cut' requires 3 parameter (epsilon, sigma, rcut) (dimensionless form)" << std::endl
               << "****************************************" << std::endl;
     libmesh_error();    
   }

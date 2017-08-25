@@ -113,10 +113,6 @@ public:
   // the particle-mesh (linear implicit) system
   PMLinearImplicitSystem* pm_system;
   
-  // The elastic system for solids
-  // Use pointer instead of const Ref. to avoid explicit initialization!
-  ElasticitySystem* elastic_system;
-
   // pointMesh object
   PointMesh<3>* point_mesh;
 

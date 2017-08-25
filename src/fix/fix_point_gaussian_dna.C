@@ -1,13 +1,13 @@
-#include "fix_point_Gaussian_PolymerChain.h"
+#include "fix_point_gaussian_dna.h"
 
-FixPointGaussianPolymerChain::FixPointGaussianPolymerChain(PMLinearImplicitSystem& pm_sys_)
+FixPointGaussianDNA::FixPointGaussianDNA(PMLinearImplicitSystem& pm_sys_)
 :FixPoint(pm_sys_)
 {
   this -> initPointParticleType();
   this -> initParams();
 }
 
-void FixPointGaussianPolymerChain::initPointParticleType()
+void FixPointGaussianDNA::initPointParticleType()
 {
   point_particle_model = pm_system->get_equation_systems().parameters.get<std::string>("point_particle_model");
   if(point_particle_model != "polymer_chain") {
@@ -19,12 +19,12 @@ void FixPointGaussianPolymerChain::initPointParticleType()
   }   
 }
 
-void FixPointGaussianPolymerChain::initParams()
+void FixPointGaussianDNA::initParams()
 {
-  force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("point_Gaussian_PolymerChain");
+  force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("gaussian_dna");
   if(force_params.size()!=1){
     std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'point_Gaussian_PolymerChain' require 1 parameter (ev) (dimensionless form)" << std::endl
+              << "---------------> The force type 'gaussian_dna' require 1 parameter (ev) (dimensionless form)" << std::endl
               << "****************************************" << std::endl;
     libmesh_error();    
   }	
@@ -42,12 +42,12 @@ void FixPointGaussianPolymerChain::initParams()
   std::cout << "c2 = " << c2 <<std::endl;
 }
 
-void FixPointGaussianPolymerChain::print_fix()
+void FixPointGaussianDNA::print_fix()
 {
-  std::cout <<"this is FixPointGaussianPolymerChain" << std::endl;
+  std::cout <<"this is FixPointGaussianDNA" << std::endl;
 }
 
-void FixPointGaussianPolymerChain::compute()
+void FixPointGaussianDNA::compute()
 { 
   for(std::size_t p_id=0; p_id < num_points; ++p_id)
   {  

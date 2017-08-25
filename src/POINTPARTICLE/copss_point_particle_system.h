@@ -19,7 +19,6 @@
 
 #include "../copss.h"
 #include "../polymer_chain.h"
-#include "../include_fixes.h"
 
 using std::cout;
 using std::endl;

@@ -24,12 +24,12 @@
 namespace libMesh
 {
 
-class FixPointGaussianPolymerChain : public FixPoint
+class FixPointGaussianDNA : public FixPoint
 {
 public:
-	FixPointGaussianPolymerChain(PMLinearImplicitSystem& pm_sys);
+	FixPointGaussianDNA(PMLinearImplicitSystem& pm_sys);
 
-	~FixPointGaussianPolymerChain(){};
+	~FixPointGaussianDNA(){};
 
 	void print_fix();
 

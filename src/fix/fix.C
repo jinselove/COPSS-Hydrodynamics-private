@@ -27,17 +27,6 @@
 
 using namespace libMesh;
 
-
-// ======================================================================
-Fix::Fix(PMLinearImplicitSystem& pm_sys_,
-                       ElasticitySystem& el_sys_)
-: pm_system(&pm_sys_), elastic_system(&el_sys_)
-{
-  this -> initialization();
-}
-
-
-
 // ======================================================================
 Fix::Fix(PMLinearImplicitSystem& pm_sys_)
 : pm_system(&pm_sys_)

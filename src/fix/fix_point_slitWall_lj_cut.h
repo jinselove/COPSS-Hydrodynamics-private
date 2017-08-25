@@ -21,29 +21,29 @@
 #pragma once
 
 #include "fix_point.h"
-#include "../polymer_chain.h"
 namespace libMesh
 {
 
-class FixPointWormLikeSpring : public FixPoint
+class FixPointSlitWallLJCut : public FixPoint
 {
+
 public:
-	FixPointWormLikeSpring(PMLinearImplicitSystem& pm_sys);
 
-	~FixPointWormLikeSpring(){};
+	FixPointSlitWallLJCut(PMLinearImplicitSystem& pm_sys);
 
-	void print_fix();
-
-	void initPointParticleType();
+	~FixPointSlitWallLJCut(){};
 
 	void initParams();
 
+	void print_fix();
+
 	void compute();
-private:
-	Real c1;
-	Real Ls;
-	std::size_t n_bonds;
-	PolymerChain* polymer_chain;
+
+protected:
+	Real epsilon;
+	Real sigma;
+	Real rCut;
+
 };
 
 }

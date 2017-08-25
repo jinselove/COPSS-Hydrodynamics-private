@@ -1,13 +1,13 @@
-#include "fix_point_WormLikeSpring.h"
+#include "fix_point_wls.h"
 
-FixPointWormLikeSpring::FixPointWormLikeSpring(PMLinearImplicitSystem& pm_sys_)
+FixPointWLS::FixPointWLS(PMLinearImplicitSystem& pm_sys_)
 :FixPoint(pm_sys_)
 {
   this -> initPointParticleType();
   this -> initParams();
 }
 
-void FixPointWormLikeSpring::initPointParticleType()
+void FixPointWLS::initPointParticleType()
 {
   point_particle_model = pm_system->get_equation_systems().parameters.get<std::string>("point_particle_model");
   if(point_particle_model != "polymer_chain") {
@@ -19,7 +19,7 @@ void FixPointWormLikeSpring::initPointParticleType()
   }   
 }
 
-void FixPointWormLikeSpring::initParams()
+void FixPointWLS::initParams()
 {
   n_bonds = point_mesh -> num_bonds();
   polymer_chain = point_mesh->polymer_chain();
@@ -29,21 +29,21 @@ void FixPointWormLikeSpring::initParams()
   c1  = bead_r/(2.0*bk);
   Ls  = Nks*bk/bead_r;
 
-  force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("point_WormLikeSpring");
+  force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("worm_like_spring");
   if(force_params.size()!=0){
     std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'point_WormLikeSpring' require 0 parameter" << std::endl
+              << "---------------> The force type 'worm_like_spring' require 0 parameter" << std::endl
               << "****************************************" << std::endl;
     libmesh_error();    
   }	
 }
 
-void FixPointWormLikeSpring::print_fix()
+void FixPointWLS::print_fix()
 {
-  std::cout <<"this is FixPointWormLikeSpring" << std::endl;
+  std::cout <<"this is FixPointWLS" << std::endl;
 }
 
-void FixPointWormLikeSpring::compute()
+void FixPointWLS::compute()
 { 
   // get bonds from polymer_chain
   const std::vector<std::vector<std::size_t> >& bonds = polymer_chain->bonds();

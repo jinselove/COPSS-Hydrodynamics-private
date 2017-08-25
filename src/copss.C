@@ -233,7 +233,6 @@ void Copss::read_domain_info()
    */
 void Copss::read_force_info(){
   // read particle-particle force types
-  fix_factory = new FixFactory();
   numForceTypes = input_file.vector_variable_size("force_field");
   forceTypes.resize(numForceTypes);
   forces.resize(numForceTypes);
@@ -570,9 +569,10 @@ void Copss::attach_fixes(PMLinearImplicitSystem& pm_system)
 {
 
   // Fix *f;
+  fix_factory = new FixFactory();
   fixes.resize(numForceTypes);
   for (int i=0; i < numForceTypes; i++){
-    fixes[i] = fix_factory -> GetFix(forceTypes[i], pm_system);
+    fixes[i] = fix_factory -> buildFix(forceTypes[i], pm_system);
     // fixes[i] -> preSimulation();
   }
   pm_system.attach_fixes(fixes);

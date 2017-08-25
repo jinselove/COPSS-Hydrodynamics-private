@@ -27,6 +27,7 @@
 
 #include "fix.h"
 #include "../rigid_particle.h"
+#include "../elasticity_system.h"
 
 namespace libMesh
 {
@@ -40,7 +41,11 @@ namespace libMesh
 class FixRigid: public Fix
 {
 public:
-  
+
+  //! Constructor for a system with elastic structures (finite size particles)
+  FixRigid(PMLinearImplicitSystem& pm_sys,
+             ElasticitySystem& el_sys);
+
   //! Constructor for a system with point particles
   FixRigid(PMLinearImplicitSystem& pm_sys);
 
@@ -48,18 +53,23 @@ public:
 
   /*! Prepare for running
   /*
-   * Check if particle_type == "point_particle"
-   * this -> check_params()
+   * Check if particle_type == "rigid_particle"
   */
-  void preSimulation();
+  void initParticleType();
 
   void check_walls();
 
   void check_walls_pbcCount();
 
+protected:
+  // The elastic system for solids
+  // Use pointer instead of const Ref. to avoid explicit initialization!
+  ElasticitySystem* elastic_system;
+
+  // partiticle mesh for finite size particle
+  ParticleMesh<3>* particle_mesh;  
+
   unsigned int num_particles;
-
-
 
 };  // end of class
   

@@ -1,11 +1,11 @@
-#include "fix_point_Gaussian.h"
+#include "fix_point_gaussian.h"
 
 FixPointGaussian::FixPointGaussian(PMLinearImplicitSystem& pm_sys_)
 :
  FixPoint(pm_sys_)
 {
   //force_type = "pp_ev_lj_cut";
-	force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("point_Gaussian");
+	force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("gaussian");
   this -> initParams();
 }
 
@@ -13,7 +13,7 @@ void FixPointGaussian::initParams()
 {
   if(force_params.size()!=2){
     std::cout << std::endl << "********************Error message********************" << std::endl
-              << "---------------> The force type 'point_Gaussian' requires 2 parameter (c1, c2) (dimensionless form)" << std::endl
+              << "---------------> The force type 'gaussian' requires 2 parameter (c1, c2) (dimensionless form)" << std::endl
               << "****************************************" << std::endl;
     libmesh_error();    
   }	

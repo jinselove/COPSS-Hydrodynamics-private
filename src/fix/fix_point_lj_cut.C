@@ -1,8 +1,7 @@
 #include "fix_point_lj_cut.h"
 
 FixPointLJCut::FixPointLJCut(PMLinearImplicitSystem& pm_sys_)
-:
- FixPoint(pm_sys_)
+:FixPoint(pm_sys_)
 {
   this -> initParams();
 }

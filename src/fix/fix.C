@@ -34,12 +34,6 @@ Fix::Fix(PMLinearImplicitSystem& pm_sys_)
   this -> initialization();
 }
 
-void Fix::attach_system(PMLinearImplicitSystem& pm_system_)
-{
-  pm_system = &pm_system_;
-  this -> initialization();
-}
-
 void Fix::initialization()
 {
   point_mesh = pm_system->point_mesh();

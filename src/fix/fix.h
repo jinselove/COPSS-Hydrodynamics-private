@@ -54,10 +54,8 @@ public:
   //! Constructor for a system with point particles
   Fix(PMLinearImplicitSystem& pm_sys);
 
-  void attach_system(PMLinearImplicitSystem& pm_sys);
-
   void initialization();
-  
+
   //! Destructor
   virtual ~Fix(){};
 

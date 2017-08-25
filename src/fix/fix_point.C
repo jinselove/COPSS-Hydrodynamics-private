@@ -3,17 +3,16 @@
 FixPoint::FixPoint(PMLinearImplicitSystem& pm_sys_)
 :Fix(pm_sys_)
 {
-  this -> initParticleType();
+ particle_type = pm_system->get_equation_systems().parameters.get<std::string>("particle_type");
+ point_particle_model = pm_system->get_equation_systems().parameters.get<std::string>("point_particle_model");
 }
 
 //================================================================
 void FixPoint::initParticleType()
 {
-  particle_type = pm_system->get_equation_systems().parameters.get<std::string>("particle_type");
-  if(particle_type != "point_particle") {
+ if(particle_type != "point_particle") {
 	std::cout << std::endl << "*******************Error message*********************" << std::endl
-              << "The force field : "<< force_type << " is only for point_particle, i.e.,"
-              << "not applicable to particle type: " << particle_type << std::endl
+              << "The force field = "<< force_type << " is only for point_particle, i.e., cannot be applied to particle type = " << particle_type << std::endl
               << "****************************************" << std::endl;
 	libmesh_error();
   } 

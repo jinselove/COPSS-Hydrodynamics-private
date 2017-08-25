@@ -28,7 +28,6 @@ class FixPointLJCut : public FixPoint
 {
 
 public:
-
 	FixPointLJCut(PMLinearImplicitSystem& pm_sys);
 
 	~FixPointLJCut(){};

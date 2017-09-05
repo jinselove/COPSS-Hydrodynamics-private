@@ -219,7 +219,7 @@ void CopssPointParticleSystem::write_object(std::size_t step_id)
    }
    else{
      oss << "output_bead_" << o_step <<".csv";
-     polymer_chain->write_bead(oss.str(), real_time);
+     polymer_chain->write_bead(oss.str());
    } // end else
    /*----------------------------------------------------------------------------------------------------
    * Output mean square displacement, radius of gyration, chain stretch, and center of mass at step i
@@ -264,7 +264,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   {
     if(comm_in.rank()==0){
 	     if(point_particle_model == "polymer_chain") polymer_chain->write_polymer_chain("output_polymer_0.vtk");
-	     else polymer_chain->write_bead("output_bead_0.csv", real_time);
+	     else polymer_chain->write_bead("output_bead_0.csv");
     }
   }
 

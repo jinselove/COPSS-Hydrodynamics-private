@@ -335,6 +335,8 @@ void PolymerChain::read_data_csv(const std::string& filename)
   // point_type:  0 - polymer bead point; 1 - tracking point; or user-defined type
   const PointType point_type = POLYMER_BEAD;
   Real x=0., y=0., z=0.;            // initialize bead coords
+  Real vx=0., vy=0., vz=0.;         // initialize bead velocities
+  Real fx=0., fy=0., fz=0.;         // initialize bead forces
   int bead_id, chain_id, bead_type; //
   std::vector<Real> rot_vec(4); // rotation vector (a,b,c) + theta.
   _n_chains = 1;
@@ -346,7 +348,7 @@ void PolymerChain::read_data_csv(const std::string& filename)
   int i = 0;
   int bead_old = 0;
   while (!infile.eof()) {
-    infile >> bead_id >> x >> y >> z;
+    infile >> bead_id >> x >> y >> z >> vx >> vy >> vz >> fx >> fy >> fz;
     // create PointParticle
     Point pt(x,y,z);
     bead_type = 0;    // bead type = 0 for polymer chain.
@@ -756,8 +758,7 @@ void PolymerChain::write_polymer_chain(const std::string& filename) const
 }
   
 // ======================================================================
-void PolymerChain::write_bead(const std::string& filename,
-			      const Real& realTime) const
+void PolymerChain::write_bead(const std::string& filename) const
 {
   START_LOG ("write_bead()", "PolymerChain");
   
@@ -768,10 +769,6 @@ void PolymerChain::write_bead(const std::string& filename,
   const std::size_t n_beads = _beads.size();
   
   // write out the csv file
-  // real time
-  outfile <<"real_time\n";
-  outfile <<realTime <<"\n";
-  
   // POINT data
   outfile <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
   for(std::size_t i=0; i<n_beads; ++i)

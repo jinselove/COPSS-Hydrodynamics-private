@@ -155,17 +155,11 @@ void PointParticle::reinit_particle()
   
 }
 
-
-  
-
-
 // ======================================================================
 void PointParticle::set_orientation(const std::vector<Real>& rot_vec)
 {
   _orientation = rot_vec;
 }
-
-
 
 // ======================================================================
 void PointParticle::print_info(const bool & print_neighbor_list) const

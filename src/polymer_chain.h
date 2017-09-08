@@ -155,14 +155,104 @@ public:
   /*
    * Write out the polymer chain to a local file
    */
-  void write_polymer_chain(const std::string& filename) const;
-  
+  void write_polymer_chain(const unsigned int& step_id,
+                           const unsigned int& o_step,
+                           const Real& real_time,
+                           const std::vector<Point>& center0,
+                           const std::vector<Real>& lvec,
+                           std::vector<std::string>& output_file,
+                           unsigned int comm_in_rank) const;
+  /*
+   * Write out trajectories of all polymers (in vtk format)
+   * "output_polymer_o_step.vtk"
+   */
+  void write_polymer_trajectory (const unsigned int& o_step,
+                                 unsigned int comm_in_rank) const;
+
+  /*
+   * Write out center of mass of each chain (in vtk format)
+   * "out.center_of_mass"
+   */
+  void write_polymer_com(const unsigned int& step_id,
+                         const unsigned int& o_step,
+                         const std::vector<Real>& lvec,
+                         unsigned int comm_in_rank) const;
+  /*
+   * Write out stretch of each polymer chain
+   * "out.stretch"
+   */
+  void write_polymer_stretch(const unsigned int& step_id,
+                             const unsigned int& o_step,
+                             const std::vector<Real>& lvec,
+                             unsigned int comm_in_rank) const;
+  /*
+   * Write out radius of gyration of each polymer chain
+   * "out.radius_of_gyration"
+   */
+  void write_polymer_rog(const unsigned int& step_id,
+                         const unsigned int& o_step,
+                         const std::vector<Real>& lvec,
+                         unsigned int comm_in_rank) const;
+
+  /*
+   * Write out mean square displacement
+   * Average over all chains
+   * "out.mean_square_displacement"
+   */
+  void write_polymer_msd(const unsigned int& step_id,
+                         const unsigned int& o_step,
+                         const std::vector<Point>& center0,
+                         const std::vector<Real>& lvec,
+                         unsigned int comm_in_rank) const;
+
   /*
    * Write out the bead to a local file
    */
-  void write_bead(const std::string& filename, const Real& realTime) const;
+  void write_bead(const unsigned int& step_id,
+                  const unsigned int& o_step,
+                  const Real& real_time,
+                  const std::vector<Point>& center0,
+                  const std::vector<Real>& lvec,
+                  const std::vector<std::string>& output_file,
+                  unsigned int comm_in_rank) const;
+
+  /*
+   * Write out bead trajectories && forces && velocity to csv files
+   * "output_bead_o_step.csv"
+   */
+  void write_bead_trajectory(const unsigned int& o_step,
+                             unsigned int comm_in_rank) const;
+
+  /*
+   * Write out center of mass 
+   * average over all beads, output is a point
+   * this center of mass usually is of no use, but I implemented it just in case
+   * "out.center_of_mass"
+   */
+  void write_bead_com(const unsigned int& step_id,
+                      const unsigned int& o_step,
+                      const std::vector<Real>& lvec,
+                      unsigned int comm_in_rank) const; 
+
+  /*
+   * Write out mean square displacement of all beads
+   * Average over all beads
+   * "out.center_of_mass"
+   */
+  void write_bead_msd(const unsigned int& step_id,
+                      const unsigned int& o_step,
+                      const std::vector<Point>& center0,
+                      const std::vector<Real>& lvec,
+                      unsigned int comm_in_rank) const;
 
 
+  /*
+   * write out step and real time
+   */
+  void write_time(const unsigned int& step_id,
+                  const unsigned int& o_step,
+                  const Real& real_time,
+                  unsigned int comm_in_rank) const;
 
   /*
    * Write out the unfolded polymer chain to a local file in .xyz format
@@ -236,7 +326,7 @@ public:
    */
   Point end_to_end_vector_square() const;
   
-  
+
   /*
    * Compute the current length of the chain
    * Note the chain length is NOT the contour length of the chain
@@ -249,8 +339,39 @@ public:
    */
   //const Real contour_length() const;
   
+  /*
+   * Compute center_of_mass of each chain
+   */ 
+  void compute_center_of_mass(const std::vector<Real>& lvec,
+                              std::vector<Point>& center) const;
+
+  /*
+   * Compute center of mass at step 0: center0, for beads
+   */
+  void initial_bead_center_of_mass(std::vector<Point>& center0) const;
+
+  /*
+   * Compute center of mass at step 0: center0, for chains
+   */
+  void initial_chain_center_of_mass(std::vector<Point>& center0) const;
+
+  /*
+   * Compute chain_stretch of each chain
+   */
+  void compute_chain_stretch(const std::vector<Real>& lvec,
+                             std::vector<Point>& stretch) const;
+
+  /*
+   * Compute radius_of_gyration of each chain
+   */
+  void compute_radius_of_gyration(const std::vector<Real>& lvec,
+                                  const std::vector<Point>& center,
+                                  std::vector<Real>& RgSqrt) const;
+
   
-  
+  void compute_mean_square_displacement(const std::vector<Point>& R0,
+                                        const std::vector<Point>& Rt,
+                                        Point& msd) const;
   /*
    * Check if the chain is broken. If so, repair it.
    * It loops over every bond, so the created chain MUST
@@ -303,6 +424,9 @@ private:
   
   // the identity of the chain
   std::size_t _chain_id;
+
+  // dimension of the system
+  const unsigned int _dim = 3;
   
   // Bead list: two neighboring beads are connected by a spring.
   //std::vector<PointParticle*> _beads;
@@ -310,6 +434,8 @@ private:
   // Pointer to the Periodic boundary condition
   PMPeriodicBoundary* _periodic_boundary;
 
+  // precision of output
+  const int o_precision = 9;
 }; // end of class
   
 }  // end of namespace

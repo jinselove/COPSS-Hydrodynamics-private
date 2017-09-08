@@ -32,7 +32,6 @@
 #include "particle_mesh.h"
 #include "point_particle.h"
 #include "point_mesh.h"
-#include "pm_linear_implicit_system.h"
 #include "brownian_system.h"
 #include "chebyshev.h"
 
@@ -127,14 +126,11 @@ BrownianSystem::BrownianSystem(EquationSystems& es)
 : ParallelObject (es),
   _equation_systems(es)
 {
-  // init
-  const PMLinearImplicitSystem & p_sys = es.get_system<PMLinearImplicitSystem>("Stokes");
-  std::string _particle_type = p_sys.get_equation_systems().parameters.get<std::string>("particle_type");
-  _n_points     = p_sys.point_mesh()->num_particles();
-  if(_particle_type == "point_particle"){
-    _n_chains	= p_sys.point_mesh()->num_chains();
-  }
-  _dim = p_sys.get_mesh().mesh_dimension();
+  PMLinearImplicitSystem & _pm_system = es.get_system<PMLinearImplicitSystem>("Stokes");
+  _point_mesh = _pm_system.point_mesh();
+  _n_points     = _point_mesh->num_particles();
+  _fixes = _pm_system.fixes();
+  _dim = _pm_system.get_mesh().mesh_dimension();
 }
 
 
@@ -197,20 +193,13 @@ PetscErrorCode BrownianSystem::extract_particle_vector(Vec* x,
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Get the particle mesh system and its parameters
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  PMLinearImplicitSystem& pm_system = _equation_systems.get_system<PMLinearImplicitSystem>("Stokes");
-  const std::size_t       n_particles =  this->num_points();
-  const std::size_t	  n_chains    = this->num_chains();
-  //std::cout << "\n------------------------------------------------\nnumber of particles = "<<n_particles<<"\n-----------------------------------------\n";
-  std::vector<PointParticle*> point_particles  = pm_system.point_mesh()->particles();
-  
-  
-  
+  std::vector<PointParticle*> point_particles  = _point_mesh->particles();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    form the vec with the desired distribution if(mode=="extract").
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   if(mode=="extract")
   {
-    const std::size_t n_vec = _dim*n_particles;
+    const std::size_t n_vec = _dim*_n_points;
     ierr = this->_create_petsc_vec(n_vec, x);CHKERRQ(ierr);
   }
   
@@ -225,13 +214,16 @@ PetscErrorCode BrownianSystem::extract_particle_vector(Vec* x,
   // ---extract/assign the coordinates to vx = [x1,y1,z1; x2,y2,z2, ..., xN,yN,zN]
   if(vec_type=="coordinate")
   {
-    for(std::size_t i=0; i<n_particles; ++i)
+    for(std::size_t i=0; i<_n_points; ++i)
     {
       Point& pt = point_particles[i]->point();
       if(mode=="extract")
         for(std::size_t j=0; j<_dim; ++j) px[i*_dim + j] = pt(j);
-      else if(mode=="assign")
+      else if(mode=="assign"){
         for(std::size_t j=0; j<_dim; ++j) pt(j) = px[i*_dim + j];
+        // apply periodic boundary condition
+        _fixes[0]->check_walls();
+      }
       else
         libmesh_error();
       // end if-else
@@ -240,7 +232,7 @@ PetscErrorCode BrownianSystem::extract_particle_vector(Vec* x,
   // ---extract/assign the force to vf = [f1x,f1y,f1z; f2x,f2y,f2z; ...; fNx,fNy,fNz]
   else if(vec_type=="force")
   {
-    for (std::size_t i=0; i<n_particles; ++i)
+    for (std::size_t i=0; i<_n_points; ++i)
     {
       std::vector<Real> pforce(_dim);
       if(mode=="extract")
@@ -362,9 +354,7 @@ PetscErrorCode BrownianSystem::std_random_vector(const Real& a,      // a (mean)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Get the vector size and problem dimension.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  PMLinearImplicitSystem& pm_system = _equation_systems.get_system<PMLinearImplicitSystem>("Stokes");
-  const std::size_t n_particles = this->num_points();
-  const std::size_t       n_vec = _dim*n_particles;
+  const std::size_t       n_vec = _dim*_n_points;
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Generate random vector and assign it to vu on each process
@@ -1008,410 +998,6 @@ bool BrownianSystem::chebyshev_polynomial_approximation(const std::size_t N,
   STOP_LOG ("chebyshev_polynomial_approximation()", "BrownianSystem");
   PetscFunctionReturn(convergence);
 }
-
-
-
-// ======================================================================================
-Real BrownianSystem::mean_square_displacement(Vec V0,
-                                              Vec V1) const
-{
-  Vec               V2;
-  PetscScalar       msd;
-  PetscInt          size;
-  PetscErrorCode    ierr;
-  PetscFunctionBeginUser;
-  START_LOG ("mean_square_displacement()", "BrownianSystem");
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Check the size of Vec
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  ierr = VecGetSize(V0,&size);
-  libmesh_assert_equal_to(size, _dim*_n_points);
-  ierr = VecGetSize(V1,&size);
-  libmesh_assert_equal_to(size, _dim*_n_points);
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Compute the msd
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  ierr = VecDuplicate(V0,&V2);
-  ierr = VecWAXPY(V2,-1.0,V0,V1); // V2 = V1 - V0
-  ierr = VecDot(V2,V2,&msd);
-  ierr = VecDestroy(&V2);
-  
-  // return
-  STOP_LOG ("mean_square_displacement()", "BrownianSystem");
-  PetscFunctionReturn( Real(msd)/Real(_n_points) );
-}
-
-
-
-// ======================================================================================
-Point BrownianSystem::mean_square_displacement(const Point& Rc0,
-                                               const Point& Rc1) const
-{
-  PetscFunctionBeginUser;
-  START_LOG ("mean_square_displacement()", "BrownianSystem");
-  
-  // compute current center of mass from the position vector
-  Point Rc;
-  for (std::size_t i=0; i<_dim; ++i){
-    Rc(i) = ( Rc1(i) - Rc0(i) )*( Rc1(i) - Rc0(i) );
-  }
-  
-  STOP_LOG ("mean_square_displacement()", "BrownianSystem");
-  PetscFunctionReturn( Rc );
-}
-
-
-/*
-// ======================================================================================
-Real BrownianSystem::mean_square_end_to_end_distance(Vec R0) const
-{
-  PetscFunctionBeginUser;
-  
-  // NOT implemented yet
-  PetscPrintf(PETSC_COMM_WORLD,"This function has not been implemented yet!\n");
-  PetscPrintf(PETSC_COMM_WORLD,"BrownianSystem::mean_square_end_to_end_distance()\n");
-  
-  PetscFunctionReturn( 0.0 );
-}
-*/
-
-
-// ======================================================================================
-std::vector<Point> BrownianSystem::center_of_mass(Vec R0) const
-{
-  START_LOG ("center_of_mass()", "BrownianSystem");
-  std::vector<Point> center(this->num_chains());
-  PetscInt          size;
-  PetscErrorCode    ierr;
-  std::vector<Real> lvec;
-  PetscFunctionBeginUser;  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Check the size of Vec
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  ierr = VecGetSize(R0,&size);
-  libmesh_assert_equal_to(size, _dim*_n_points);
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Allgather the distributed vector R0 to local vector lvec on all processors
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-  this->vector_transform(lvec,&R0,"backward"); // R0->lvec
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   loop over each particle
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  for(std::size_t i = 0; i < this->num_chains(); i++){
-     for(std::size_t j = 0; j < _n_points/_n_chains; j++){
-          center[i](0) += lvec[(_n_points/_n_chains*i + j )* 3 + 0];
-          center[i](1) += lvec[(_n_points/_n_chains*i + j )* 3 + 1];
-          center[i](2) += lvec[(_n_points/_n_chains*i + j )* 3 + 2];              
-          }// end j loop over each beads of a chain
-     center[i] /= Real(_n_points/_n_chains);
-  }//end i loop over each chain
-
-  // return
-  STOP_LOG ("center_of_mass()", "BrownianSystem");
-  PetscFunctionReturn(center);
-}// end center_of_mass function
-
-
-/*
-// ======================================================================================
-std::vector<Real> BrownianSystem::radius_of_gyration(Vec R0) const
-{
-  PetscInt          size;
-  PetscErrorCode    ierr;
-  std::vector<Real> lvec;
-  PetscFunctionBeginUser;
-  START_LOG ("radius_of_gyration()", "BrownianSystem");
-  
-   //Check the size of Vec, and Allgather the distributed vector R0 to local vector lvec
-  ierr = VecGetSize(R0,&size);
-  libmesh_assert_equal_to(size, _dim*_n_points);
-  this->vector_transform(lvec,&R0,"backward"); // R0->lvec
-  
-   //loop over each particle to get the center of mass
-  std::vector<Point> center = this -> center_of_mass(R0);
-
-   //loop over each particle again to compute the radius of gyration
-  std::vector<Real>  Rg(this->num_chains());
-  std::vector<Real> RgSqrt(this->num_chains());
-
-  for(std::size_t chain_id=0; chain_id<_n_chains; chain_id++){
-	for(std::size_t bead_id=0; bead_id < _n_points/_n_chains; bead_id++){
-		Point pti;
-		for (std::size_t dim=0; dim < _dim; dim++){
-			pti(dim) = lvec[ (chain_id*(_n_points/_n_chains) + bead_id) * _dim + dim];
-		}
-		pti -= center[chain_id];
-		Rg[chain_id] += pti.size_sq() / Real(_n_points / _n_chains);
-	}
-	RgSqrt[chain_id] = std::sqrt(Rg[chain_id]);
-  }
-
-  // return
-  STOP_LOG ("radius_of_gyration()", "BrownianSystem");
-  PetscFunctionReturn(RgSqrt); // return sqrt(Rg^2)
-}
-*/
-
-
-// ======================================================================================
-std::vector<Real> BrownianSystem::radius_of_gyration(Vec R0,
-                                        const std::vector<Point>& center) const
-{
-  PetscInt          size;
-  PetscErrorCode    ierr;
-  std::vector<Real> lvec;
-  PetscFunctionBeginUser;
-  START_LOG ("radius_of_gyration()", "BrownianSystem");
-  
-  //Check the size of Vec, and Allgather the distributed vector R0 to local vector lvec
-  ierr = VecGetSize(R0,&size);
-  libmesh_assert_equal_to(size, _dim*_n_points);
-  this->vector_transform(lvec,&R0,"backward"); // R0->lvec
-  
-  //loop over each particle again to compute the radius of gyration
-  std::vector<Real> Rg( this->num_chains() );
-  std::vector<Real> RgSqrt( this->num_chains() );
-  std::size_t beads_perChain = (this->num_points() / this->num_chains());
-
-  for (std::size_t chain_id = 0; chain_id < this->num_chains(); chain_id++)
-  {
-	for (std::size_t bead_id = 0; bead_id < beads_perChain ; bead_id++ ){
-		Point pti;
-		for (std::size_t dim = 0; dim < _dim; dim++){
-			pti(dim) = lvec [ (chain_id * beads_perChain + bead_id)*_dim + dim ] - center[chain_id](dim);
-		}
-	Rg[chain_id] += pti.norm_sq() / beads_perChain;
-	}
-	RgSqrt[chain_id] = std::sqrt(Rg[chain_id]);
-  }
-  // return
-  STOP_LOG ("radius_of_gyration()", "BrownianSystem");
-  PetscFunctionReturn(RgSqrt); // return sqrt(Rg^2)
-}
-
-
-
-// ======================================================================================
-std::vector<Point> BrownianSystem::chain_stretch(Vec R0) const   // position vector of a chain
-{
-
-  std::vector<Point> stretch(this->num_chains());
-
-  PetscInt          size;
-  PetscErrorCode    ierr;
-  std::vector<Real> lvec;
-  PetscFunctionBeginUser;
-  START_LOG ("chain_stretch()", "BrownianSystem");
-  
-  // Check the size of Vec  ierr = VecGetSize(R0,&size);
-  libmesh_assert_equal_to(size, _dim*_n_points);
-
-  // Allgather the distributed vector R0 to local vector lvec on all processors
-  this->vector_transform(lvec,&R0,"backward"); // R0->lvec
-  
-  // loop over each particle and find the max/min (X,Y,Z)
-
-  //std::cout <<"\n---------------------------------\ntest brownian_system::chain_stretch(): num_chains = "<<this->num_chains()<<"\n--------------------------------------\n";
- 
-  std::vector<Point> max_xyz(_n_chains);
-  std::vector<Point> min_xyz(_n_chains);
-  Point pti;
-  
-  //loop over each chain
-  for (std::size_t _chain_id = 0; _chain_id < _n_chains; _chain_id++){
-    // loop over each bead in a chain
-    for (std::size_t i=0; i<this->num_points()/_n_chains; i++)
-    {
-     // loop over each direction
-     for (std::size_t dim = 0; dim < _dim; dim++){
-	pti(dim) = lvec[(_chain_id*(_n_points/_n_chains) + i)*_dim + dim];
-     }// end dim
-     if (i==0){
-       min_xyz[_chain_id] = pti;
-       max_xyz[_chain_id] = pti;
-     } // end if
-     else{
-	     for (std::size_t dim = 0; dim < _dim; dim++){
-		if (pti(dim) < min_xyz[_chain_id](dim)) {min_xyz[_chain_id](dim) = pti(dim);}
-		if(pti(dim) > max_xyz[_chain_id](dim)) {max_xyz[_chain_id](dim) = pti(dim);}
-             }// end loop dim
-     }// end else
-    }// end loop i
-   // std::cout <<"min_xyz of chain id = "<<chain_id <<" = "<<min_xyz[chain_id](0) << " "<<min_xyz[chain_id](1) <<" "<<min_xyz[chain_id](2)<<"\n";
-   // std::cout <<"max_xyz of chain id = "<<chain_id <<" = "<<max_xyz[chain_id](0) << " "<<max_xyz[chain_id](1) <<" "<<max_xyz[chain_id](2)<<"\n";
-  }// end loop chain_id
-
- 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Compute the stretch in different directions
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-  for(std::size_t chain_id =0; chain_id < _n_chains; chain_id++) {
-    for(std::size_t dim=0; dim < _dim; dim++ ){
-       stretch[chain_id](dim) = max_xyz[chain_id](dim) - min_xyz[chain_id](dim);
-    }// end dim
-    // std::cout <<"\n\nchain stretch of chain_id = "<<chain_id <<" = "<<stretch[chain_id](0) <<" "<<stretch[chain_id](1)<<" "<<stretch[chain_id](2)<<"\n";
-  }//end chain_id
-  
-  // return
-  STOP_LOG ("chain_stretch()", "BrownianSystem");
-  PetscFunctionReturn(stretch); // return sqrt(Rg^2)
-}
-
-
-
-// ======================================================================================
-void BrownianSystem::output_statistics_step0(bool out_msd_flag, bool out_stretch_flag,
-                                             bool out_gyration_flag, bool out_com_flag, Vec RIN)
-{
-  std::ofstream out_file;
-  // center of mass
-  const std::vector<Point> center0 = this->center_of_mass(RIN);
-  // chain stretch
-  std::vector<Point> chain_stretch = this->chain_stretch(RIN);
-  // radius of gyration 
-  std::vector<Real> Rg = this->radius_of_gyration(RIN, center0);
-  int o_width = 10, o_precision = 9;
-
-  if(this->comm().rank()==0){
-    // output mean square displacement
-    out_file.open("output_statistics.dat", std::ios_base::out);
-    out_file.setf(std::ios::right); out_file.setf(std::ios::fixed);
-    out_file.precision(o_precision); out_file.width(o_width);
-    out_file <<"stepID	realTime	";
-    
-    if(out_msd_flag){
-    	out_file<<"msd_x	msd_y	msd_z	";
-    }
-   
-    if(out_com_flag){
-    	for (std::size_t i = 0; i < _n_chains; i++){
-    		out_file <<"COM["<<i+1 <<"][x]	"<<"COM["<<i+1 <<"][y]	"<<"COM["<<i+1 <<"][z]" <<"	";
-    	}
-    }
-    
-    if(out_gyration_flag){
-    	for (std::size_t i = 0; i < _n_chains; i++){
-    		out_file <<"Rg["<<i+1 <<"]	"<<"	";
-    	}
-    }
-    
-    if(out_stretch_flag){
-    	for (std::size_t i = 0; i < _n_chains; i++){
-    		out_file <<"ChainS["<<i+1 <<"][x]	"<<"ChainS["<<i+1 <<"][y]	"<<"ChainS["<<i+1 <<"][z]" <<"	";
-    	}
-    }
-
-    out_file <<"\n";
-    //step, real_time
-    out_file << 0 << " "<<0.0 <<" ";
-
-    //msd_x, msd_y, msd_z	
-    if (out_msd_flag){
-       out_file<< 0.0 << " "<< 0.0 <<" " << 0.0<<" ";
-    }
-    
-    //center of mass of all chains
-    if(out_com_flag){
-    	for (std::size_t i = 0; i < _n_chains; i ++){
-    		for (std::size_t j = 0; j < _dim; j++){
-    			out_file << center0[i](j) << " ";
-    		}
-    	}
-    }
-    
-    //gyration radius of all chains
-    if(out_gyration_flag){
-    	for (std::size_t i = 0; i < _n_chains; i++){
-    			out_file << Rg[i] << " ";
-    	}	
-    }
-    
-    //chain strech of all chains
-    if(out_stretch_flag){
-    	for (std::size_t i = 0; i < _n_chains; i ++){
-    		for (std::size_t j = 0; j < _dim; j++){
-    			out_file << chain_stretch[i](j) << " ";
-    		}
-    	}
-    }
-    out_file <<"\n";
-    out_file.close();
-  } // end this->comm().rank()==0
-}
-
-
-
-// ======================================================================================
-void BrownianSystem::output_statistics_stepi(bool out_msd_flag, bool out_stretch_flag,
-                                             bool out_gyration_flag, bool out_com_flag,
-                                             unsigned int i, Real real_time,
-                                             const std::vector<Point> center0,
-					     Vec ROUT)
-{
-  // center of mass
-  const std::vector<Point> center1 = this->center_of_mass(ROUT);
-  // mean square displacement
-  Point msd(0.,0.,0.);
-
-  for (std::size_t j = 0; j < _n_chains; j++)
-  {
-    Point msd_j = this->mean_square_displacement(center0[j], center1[j]);
-    msd += msd_j;
-  }
-  msd /= _n_chains;
-  // chain stretch
-  std::vector<Point> chain_stretch1 = this->chain_stretch(ROUT);
-  // radius of gyration
-  std::vector<Real> Rg1 = this->radius_of_gyration(ROUT, center1);
-  std::ofstream out_file;
-  int o_width = 10, o_precision = 9; 
-  if(this->comm().rank()==0){
-    // output mean square displacement
-    out_file.open("output_statistics.dat", std::ios_base::app);
-    out_file.setf(std::ios::left); out_file.setf(std::ios::fixed);
-    out_file.precision(o_precision); out_file.width(o_width);
-    //step, real_time
-    out_file << i << " "<<real_time <<" ";
-
-    //msd_x, msd_y, msd_z
-    if (out_msd_flag){
-      out_file<< msd(0) << " "<< msd(1) <<" " << msd(2)<<" ";
-    }
-
-    //center of mass of all chains
-    if(out_com_flag){
-            for (std::size_t j = 0; j < _n_chains; j++){
-                    for (std::size_t k = 0; k < _dim; k++){
-                            out_file << center1[j](k) << " ";
-                    }
-            }
-    }
-
-    //gyration radius of all chains
-    if(out_gyration_flag){
-            for (std::size_t j = 0; j < _n_chains; j++){
-                            out_file << Rg1[j] << " ";
-            }
-    }
-
-    //chain strech of all chains
-    if(out_stretch_flag){
-            for (std::size_t j = 0; j < _n_chains; j++){
-                    for (std::size_t k = 0; k < _dim; k++){
-                            out_file << chain_stretch1[j](k) << " ";
-                    }
-            }
-    }
-    out_file <<"\n";
-    out_file.close();
-  }// end this->comm().rank() == 0
-}
-
 
 
 // ======================================================================================

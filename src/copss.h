@@ -161,12 +161,11 @@ public:
   Real max_dr_coeff; // max displacement per step
   bool restart; // if restart
   std::size_t restart_step; // restart step
-  Real restart_time; // real time at restart step
   unsigned int nstep; // totol number of steps to run
+  bool debug_info;
+  // ouput file 
   unsigned int write_interval; // output file write interval
-  bool debug_info, write_es, out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag;
-  std::ostringstream oss;
-
+  std::vector<std::string> output_file;
   // mesh
   SerialMesh* mesh;
   PointMesh<3>* point_mesh;
@@ -187,10 +186,9 @@ public:
   unsigned int NP;
   unsigned int n_vec;
   Real hminf, hmaxf; // fluid mesh minimum
-  Real hmin, hmax;
+  Real hmin, hmax; // all mesh minimum
   bool cheb_converge;
   Real eig_min = 0, eig_max = 0;
-  Real real_time;
   const std::string out_system_filename = "output_pm_system.e";
   UniquePtr<NumericVector<Real>> v0_ptr;
   ExodusII_IO* exodus_ptr;
@@ -212,7 +210,9 @@ public:
   std::vector<Point> center0;
 
   //variables in integrator
+  unsigned int istart;
   unsigned int o_step;
+  Real real_time;
   std::vector<Real> vel0;
   std::vector<Real> vel1;
 
@@ -323,6 +323,8 @@ protected:
   void read_stokes_solver_info(); 
   void read_chebyshev_info(); 
   void read_run_info(); 
+  void read_restart_time();
+  virtual void read_output_info() = 0;
 
   /*!
    * Steps for create_object_mesh()
@@ -362,7 +364,7 @@ protected:
   void fixman_integrate(EquationSystems& equation_systems, unsigned int i);
   // update object positions due to PBS
   virtual void update_object(std::string stage) = 0;
-  virtual void write_object(std::size_t step_id) =0;
+  virtual void write_object(unsigned int step_id) =0;
 };
 
 } // end namespace libMesh

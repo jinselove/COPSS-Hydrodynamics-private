@@ -220,7 +220,7 @@ void Copss::read_domain_info()
   if (generate_mesh){
     n_mesh.resize(input_file.vector_variable_size("n_mesh"));
     for (unsigned int i=0; i < n_mesh.size(); i++){ n_mesh[i] = input_file("n_mesh", 1, i); }
-    cout << "------------> Generate Mesh using COPSS: n_mesh = " << n_mesh[0] << n_mesh[1] << n_mesh[2] << endl;
+    cout << "------------> Generate Mesh using COPSS: n_mesh = " << n_mesh[0] <<";" << n_mesh[1] <<";" << n_mesh[2] << endl;
   }
   else{
     domain_mesh_file = input_file("domain_mesh_file" , "nothing");
@@ -827,6 +827,29 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
    // transform total point velocity to U0 in Brownian_system
     brownian_sys->vector_transform(vel1, &U0, "forward");
+    if (debug_info){
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       * ---> test: output the particle velocity
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+      const Real v0_min = v0_ptr->min();
+      const Real v0_max = v0_ptr->max();
+      const Real v0_sum = v0_ptr->sum();
+      if(comm_in.rank()==0){
+        for(unsigned int j=0; j<NP;++j)
+        {    
+          std::vector<Real> vtest0(dim), vtest1(dim);
+          for(std::size_t k=0; k<dim;++k){
+            vtest0[k] = vel0[j*dim+k];
+            vtest1[k] = vel1[j*dim+k];
+          }
+          printf("--->test in test_move_particles(): velocity on the %u-th point:\n",j);
+          printf("            U0 = (%f,%f,%f)\n",   vtest0[0],vtest0[1],vtest0[2]);
+          printf("       U0 + U1 = (%f,%f,%f)\n\n", vtest1[0],vtest1[1],vtest1[2]);
+        }    
+        printf("            v0_min = %f, v0_max = %f, v0_sum = %f)\n",v0_min,v0_max,v0_sum);
+      }    
+    }
+
     // assign vel1 to particle velocity
     for (std::size_t p_id = 0; p_id < NP; p_id++) {
       std::vector<Real> p_velocity(dim,0.);

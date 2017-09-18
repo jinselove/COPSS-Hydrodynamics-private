@@ -742,7 +742,7 @@ void PolymerChain::write_polymer_trajectory(const unsigned int& o_step,
   std::ofstream outfile;
   if(comm_in_rank == 0){
     outfile.open(oss.str(), std::ios_base::out);
-    outfile.precision(o_precision);
+//    outfile.precision(o_precision);
     const std::size_t n_beads = _beads.size();  
     // write out the VTK file
     outfile << "# vtk DataFile Version 4.0\n";

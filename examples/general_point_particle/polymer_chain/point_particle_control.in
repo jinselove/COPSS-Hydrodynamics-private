@@ -7,7 +7,6 @@
 #############################################
 
 test_name = general
-print_info = false
 
 #############################################
 #			   Physical parameters         			
@@ -53,7 +52,7 @@ wall_type = slit
 slit = '-130. 130. -130. 130. -13. 13.'
 
 # periodicity #
-periodicity = 'true false false'
+periodicity = 'true true false'
 
 # inlet info #
 inlet = 'false false false'
@@ -76,7 +75,7 @@ gaussian_dna = '2.628506592'
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.3
+alpha = 0.1
 
 
 #############################################
@@ -149,8 +148,8 @@ adaptive_dt    = true
 max_dr_coeff   = 0.1
 restart        = false
 random_seed    = 123456789
-nstep          = 1
+nstep          = 5
 write_interval = 1
 output_file = 'trajectory center_of_mass chain_stretch radius_of_gyration mean_square_displacement'
-debug_info = false
-
+debug_info = true
+print_info = true

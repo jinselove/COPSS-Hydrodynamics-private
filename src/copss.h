@@ -154,6 +154,7 @@ public:
   bool compute_eigen; // if compute eigen value; initially set it true
 
   // Run time info
+  bool with_hi;
   bool with_brownian; // if consider brownian motion
   std::size_t random_seed;
   bool adaptive_dt; // if use adaptive time step (essential for brownian systems)
@@ -362,6 +363,12 @@ protected:
    * Integrate particle motions using Fixman's midpoint scheme
    */
   void fixman_integrate(EquationSystems& equation_systems, unsigned int i);
+
+  /*!
+   * Integrate particle motions using overdamped Langevin(Brownian dynamics) scheme
+   */
+  void langevin_integrate(EquationSystems& equation_systems, unsigned int i);
+
   // update object positions due to PBS
   virtual void update_object(std::string stage) = 0;
   virtual void write_object(unsigned int step_id) =0;

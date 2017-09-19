@@ -352,6 +352,7 @@ void Copss::read_run_info(){
   //############## With Brownian ##################################
   // For polymer_chain: maximum displacement (non dimensional) of one step = 0.1 * Ss2/Rb/Rb
   // For bead: maximum displacement (non_dimensional) of one step = 0.1
+  with_hi        = input_file("with_hi", true);
   with_brownian  = input_file("with_brownian", true);
   if(with_brownian){
     dt0 = input_file("dt0", 1.e-3);
@@ -380,9 +381,10 @@ void Copss::read_run_info(){
        << "-----------> dt0: " << dt0 << endl
        << "-----------> max_dr_coeff: " << max_dr_coeff << endl
        << "-----------> print_debug_info: " << std::boolalpha << debug_info << endl; 
+  if (with_hi) cout << "-----------> with_hi: " <<std::boolalpha <<with_hi <<endl;
   if (with_brownian){
-	cout << "-----------> with_brownian: " <<std::boolalpha<<with_brownian <<endl
-             << "-----------> random seed: " <<random_seed <<endl;
+	 cout << "-----------> with_brownian: " <<std::boolalpha<<with_brownian <<endl
+        << "-----------> random seed: " <<random_seed <<endl;
   }
   cout << "-----------> Restart mode: "<<std::boolalpha << restart <<endl;
   if(restart){
@@ -967,14 +969,12 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Print out the mean and variance or view the generated vector.
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      //PetscPrintf(PETSC_COMM_WORLD,
-      //            "Generated random_vector:               mean = %f, variance = %f\n",
-      //            mean_dw, variance_dw);
-      //PetscPrintf(PETSC_COMM_WORLD,
-      //            "Exact values for uniform distribution: mean = %f, variance = %f\n",
-      //            0.5, 1./12.);
-      
-      
+      PetscPrintf(PETSC_COMM_WORLD,
+                 "Generated random_vector: mean = %f, variance = %f\n",
+                 mean_dw, variance_dw);
+      PetscPrintf(PETSC_COMM_WORLD,
+                 "Predicted random_vector: mean = %f, variance = %f\n",
+                 0, std::sqrt(2*dt));
       // Compute dw = B^-1 * dw using Chebyshev polynomial, dw will be changed!
       VecCopy (dw,dw_mid);  // save dw to dw_mid, which will be used for Chebyshev
       for(std::size_t j=0; j<2; j++)
@@ -1081,6 +1081,146 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     real_time += dt;
 }
 
+void Copss::langevin_integrate(EquationSystems& equation_systems,
+                               unsigned int i)
+{
+
+  // get stokes system from equation systems
+  PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+  if(i>0){
+    system.update();
+    system.reinit_system();
+  }
+  std::vector<Real> p_velocity(dim,0.);
+  for (std::size_t p_id = 0; p_id < NP; p_id++) {
+    for (int _dim = 0; _dim < dim; _dim++){
+      p_velocity[_dim] = point_mesh->particles()[p_id]->particle_force()[_dim];        
+      vel1[dim*p_id+_dim] = p_velocity[_dim];
+    } 
+    point_mesh->particles()[p_id]->set_particle_velocity(p_velocity);
+  }
+  // transform total point velocity to U0 in Brownian_system
+  brownian_sys->vector_transform(vel1, &U0, "forward");
+  /*---------------------------------------------------------------------------------------
+   * write equation system at step i
+   * print out information at step 0
+   * do not print out information at the first step when restart since it is identical to the 
+   * last step before restart.
+  -----------------------------------------------------------------------------------------*/
+  if(i%write_interval == 0){
+
+    if (i != restart_step){  
+      /*
+       * write particle to output file
+       */ 
+      this -> write_object(i);
+      /*----------------------------------------------------------------------------------------------------
+       * Write out ROUT for restart mode at step i
+       ----------------------------------------------------------------------------------------------------*/
+      PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
+      VecView(ROUT,viewer);        
+    }
+    // update o_step
+    o_step++;
+  } // end if (i % write_interval == 0 )
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Adaptive time step.
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  Real dt = 0;
+  if(adaptive_dt){
+    Real vp_max = 0.0, vp_min = 0.0;
+    for(unsigned int k=0; k<dim;++k) {
+      vp_max += vel1[k]*vel1[k];
+    }
+    vp_min = vp_max;
+    for(unsigned int j=1; j<NP;++j)
+    {
+      Real vp_norm = 0.0;
+      for(std::size_t k=0; k<dim;++k) vp_norm += vel1[j*dim+k]*vel1[j*dim+k];
+      vp_max = std::max(vp_max,vp_norm);
+      vp_min = std::min(vp_min,vp_norm);
+    }
+    vp_max = std::sqrt(vp_max);     // maximum magnitude of particle velocity
+    vp_min = std::sqrt(vp_min);
+    dt = (vp_max == 0) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  // maximum |dr| =  max_dr = dt0 * 1; dt0 = 0.1 for beads; dt0 = 0.1*Ss2/Rb/Rb for polymers
+    if(i % write_interval == 0){
+      cout << "       ##############################################################################################################" << endl
+           << "       # Max velocity magnitude is " << vp_max << endl
+           << "       # Min velocity magnitude is " << vp_min << endl
+           << "       # minimum mesh size = " << hmin << endl
+           << "       # The adaptive time increment at step "<< i << " is dt = " << dt<<endl
+           << "       # max_dr_coeff = " << max_dr_coeff <<endl 
+           << "       # adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
+           << "       ##############################################################################################################" << endl;
+    } // end if (i% write_interval)  
+  }
+  else{
+    dt = max_dr_coeff * 1;  // maximum |dr| =  max_dr = dt0 * 1; dt0 = 0.1 for beads; dt0 = 0.1*Ss2/Rb/Rb for polymers
+    if(i % write_interval == 0){
+      cout << "       ##############################################################################################################" << endl
+           << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl
+           << "       # max_dr_coeff = " << max_dr_coeff << endl
+           << "       # fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
+           << "       ##############################################################################################################" << endl;
+    } // end if (i % write_interval == 0)
+  } // end if (adaptive_dt)
+
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    If with Brownian motion, we use midpoint scheme
+    If without Brownian motion, we use normal stepping: dR = Utotal*dt
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
+  if (with_brownian)
+  {
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
+     petsc_random_vector generates a uniform distribution [0 1] whose
+     mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    Real mean_dw = 0.0, variance_dw = 0.0;
+    
+    // A more precise way is to construct a random vector with gaussian distribution
+    const Real std_dev  = std::sqrt(dt);
+    brownian_sys->std_random_vector(0.0,std_dev,"gaussian",&dw);
+    brownian_sys->_vector_mean_variance(dw, mean_dw, variance_dw);
+    VecScale(dw,std::sqrt(2.0));
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Print out the mean and variance or view the generated vector.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    PetscPrintf(PETSC_COMM_WORLD,
+               "Generated random_vector: mean = %f, variance = %f\n",
+               mean_dw, variance_dw);
+    PetscPrintf(PETSC_COMM_WORLD,
+               "Predicted random_vector: mean = %f, variance = %f\n",
+               0., std::sqrt(2.*dt));
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Particle coordinate vector R0.
+     Move the particle R_mid = R0 + U0*dt (deterministic)
+     and R_mid = R_mid + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1     (stochastic)
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
+    VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt * U0  (R0 and U0 do NOT change)
+    coef = 1.;                    // coefficient. 
+    VecAXPY(R_mid,coef,dw);    // R_mid = R_mid + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1
+    brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
+    this -> update_object("after midpoint at step"+std::to_string(i)); 
+    // Update ROUT (position vector excluding pbc) at the i-th step
+    VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
+    VecAXPY(ROUT,coef,dw);   // ROUT = ROUT + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1
+  } // end if Brownian
+  
+  else{ // if without Brownian
+    // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
+    brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
+    VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
+    brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords
+    this -> update_object("after step "+std::to_string(i));
+    // Update ROUT (position vector excluding pbc) at the i-th step
+    VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
+  } // end else (without_brownian)
+  real_time += dt;
+}
+
 
 void Copss::destroy()
 {
@@ -1093,7 +1233,7 @@ void Copss::destroy()
   if(with_brownian){
     VecDestroy(&dw);
   }
-  if(exodus_ptr) {
+  if(exodus_ptr and with_hi) {
     delete exodus_ptr;
   }
   PetscViewerDestroy(&viewer);

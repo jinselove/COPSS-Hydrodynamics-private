@@ -264,9 +264,14 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   NOTE: We MUST re-init particle-mesh before solving Stokes
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   cout<<"==>(1/3) Compute the undisturbed velocity field"<<endl;
-  perf_log.push ("solve undisturbed_system");
-  this -> solve_undisturbed_system(equation_systems); 
-  perf_log.pop ("solve undisturbed_system");
+  if (with_hi){
+    perf_log.push ("solve undisturbed_system");
+    this -> solve_undisturbed_system(equation_systems); 
+    perf_log.pop ("solve undisturbed_system");
+  }
+  else{
+    cout <<"HI is turned off, donothing in this step. " << endl;
+  }
   // create Brownian system for simulation
   cout<<"==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"<<endl;
   this -> create_brownian_system(equation_systems);
@@ -283,9 +288,16 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   // if restart = true  ---> istart = restart_step
   for(unsigned int i=istart; i<=istart+nstep; ++i)
   {
-    cout << "\nStarting Fixman Mid-Point algorithm at step "<< i << endl;
-    // integrate particle movement using fixman's mid point scheme
-    this -> fixman_integrate(equation_systems, i);  
+    if(with_hi){
+      cout << "\nStarting Fixman Mid-Point algorithm at step "<< i << endl;
+      // integrate particle movement using fixman's mid point scheme
+      this -> fixman_integrate(equation_systems, i);    
+    }
+    else{
+      cout << "\nStarting Langevin algorithm at step "<< i << endl;
+      // integrate particle movement using fixman's mid point scheme
+      this -> langevin_integrate(equation_systems, i);
+    }
   } // end step integration
   
   perf_log.pop ("integration");

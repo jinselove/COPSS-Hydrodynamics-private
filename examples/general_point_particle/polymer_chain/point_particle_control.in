@@ -143,6 +143,7 @@ tol_eigen = 0.01
 #############################################
 #			   Run info
 #############################################
+with_hi	       = true
 with_brownian  = true
 adaptive_dt    = true
 max_dr_coeff   = 0.1

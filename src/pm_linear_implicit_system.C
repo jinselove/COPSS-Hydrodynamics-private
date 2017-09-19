@@ -42,7 +42,6 @@
 
 // assemble functions
 #include "assemble_navier_stokes.h"
-#include "include_fixes.h"
 
 namespace libMesh
 {
@@ -404,7 +403,6 @@ std::vector<Real> PMLinearImplicitSystem::point_velocity(const std::vector<Real>
   STOP_LOG("point_velocity()", "PMLinearImplicitSystem");
   return point_v;
 }
-
 
 // ==================================================================================
 void PMLinearImplicitSystem::reinit_system()

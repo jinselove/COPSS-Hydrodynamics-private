@@ -52,8 +52,6 @@ PolymerChain::PolymerChain(const std::size_t chain_id,
   // Do nothing
 }
   
-  
-
 // ======================================================================
 PolymerChain::~PolymerChain()
 {
@@ -309,9 +307,12 @@ void PolymerChain::read_data_vtk(const std::string& filename)
   
   // Finish and close the file
   infile.close();
+
+  // set number of beads on each chain
+  for (std::size_t i=0; i<_n_beads; ++i){
+    _n_beads_per_chain[_beads[i]->parent_id()] += 1;
+  }
   std::cout << "Reading polymer chain data from "<<filename<<" is completed!\n\n";
-  
-  
   STOP_LOG ("read_data_vtk()", "PolymerChain");
 }
 
@@ -363,8 +364,14 @@ void PolymerChain::read_data_csv(const std::string& filename)
   }
   _n_beads = bead_id + 1; // number of beads = bead id of last bead read from csv
   _beads.resize(_n_beads);
+  _n_beads_per_chain.resize(_n_chains,0);
   // Finish and close the file
   infile.close();
+  std::cout <<"_n_beads = "<<_n_beads <<std::endl;
+  // set number of beads on each chain
+  for (std::size_t i=0; i<_n_beads; ++i){
+   _n_beads_per_chain[_beads[i]->parent_id()] += 1;
+  }
   std::cout << "Reading bead data from "<<filename<<" is completed!\n\n";
   STOP_LOG ("read_data_csv()", "PolymerChain");
 
@@ -458,7 +465,6 @@ void PolymerChain::generate_polymer_chains(const unsigned int n_beads,
     std::cout << "                 box max = ( "<<init_bbox_max(0) << ", " <<init_bbox_max(1) <<", "<<init_bbox_max(2)<<" );\n";
     // write the particle coordinates into a file
     //std::string filename = "polymer_data.in";
-    int o_width = 5, o_precision = 9;
     std::ofstream outfile;
     outfile.open(filename, std::ios_base::out);
     // header line
@@ -536,7 +542,7 @@ void PolymerChain::generate_polymer_chains(const unsigned int n_beads,
       // default: rot_x = 0, rot_y = 0, rot_z = 0
       // default: atom_type = 1
       outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-      outfile.precision(o_precision);   outfile.width(o_width);
+      outfile.precision(o_precision); 
       // compute chain_id_i, starting from 0
       std::size_t chain_id_i = i / n_beads_perChain;
       // bead_id starting from 1; chain_id starts from 1
@@ -581,8 +587,6 @@ void PolymerChain::generate_polymer_chain(const Point pt0,
     
     // write the particle coordinates into a file
     //std::string filename = "polymer_data.in";
-    int o_width = 5, o_precision = 9;
-    
     std::ofstream outfile;
     outfile.open(filename, std::ios_base::out);
     outfile << Nb << "\n";
@@ -639,7 +643,7 @@ void PolymerChain::generate_polymer_chain(const Point pt0,
       
       // write out the coordinates
       outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-      outfile.precision(o_precision);   outfile.width(o_width);
+      outfile.precision(o_precision);
       outfile << pt1(0) << "  " << pt1(1) << "  " << pt1(2) << "  " << r << "  "<< den << "  \n";
     } // end loop-i
     
@@ -704,93 +708,360 @@ void PolymerChain::print_info() const
   
   
 // ======================================================================
-void PolymerChain::write_polymer_chain(const std::string& filename) const
+void PolymerChain::write_polymer_chain(const unsigned int& step_id,
+                                       const unsigned int& o_step,
+                                       const Real& real_time,
+                                       const std::vector<Point>& center0,
+                                       const std::vector<Real>& lvec,
+                                       std::vector<std::string>& output_file,
+                                       unsigned int comm_in_rank) const
 {
   START_LOG ("write_polymer_chain()", "PolymerChain");
-  
-
-  // OFSTEAM
-  std::ofstream outfile;
-  outfile.open(filename, std::ios_base::out);
-  const std::size_t n_beads = _beads.size();
-  
-  // write out the VTK file
-  outfile << "# vtk DataFile Version 4.0\n";
-  outfile << "Polymer chain\n";
-  outfile << "ASCII\n";
-  outfile << "DATASET POLYDATA\n";
-  
-  // POINT data
-  outfile << "POINTS " << n_beads << " float\n";
-  for(std::size_t i=0; i<n_beads; ++i)
-  {
-    for(std::size_t j=0; j<3; ++j){
-      outfile << _beads[i]->center()(j) << " ";
+  this -> write_time(step_id, o_step, real_time, comm_in_rank);
+  for (int i = 0; i < output_file.size(); i++){
+    if(output_file[i] == "trajectory") this -> write_polymer_trajectory(o_step, comm_in_rank);
+    else if(output_file[i] == "center_of_mass") this -> write_polymer_com(step_id, o_step,lvec, comm_in_rank);
+    else if(output_file[i] == "chain_stretch") this -> write_polymer_stretch(step_id,o_step, lvec, comm_in_rank);
+    else if(output_file[i] == "radius_of_gyration") this -> write_polymer_rog(step_id, o_step, lvec, comm_in_rank);
+    else if(output_file[i] == "mean_square_displacement") this -> write_polymer_msd(step_id, o_step, center0, lvec, comm_in_rank);
+    else {
+      std::cout << "unsupported output_file content: (" << output_file[i] <<")" << std::endl; 
+      libmesh_error();
     }
-    outfile << "\n";
   }
-  outfile << "\n";
-  
-  // LINE(spring) data, which can be visualized by connectivity in Paraview
-  const std::size_t Ns = _bonds.size();
-  outfile << "LINES " << Ns << " " << Ns*3 << "\n";
-  for(std::size_t i=0; i<Ns; ++i)
-  {
-    outfile << 2 << " " << _bonds[i][1] << " " << _bonds[i][2] << "\n";
-  }
-  
-  // Define the bead types
-  outfile << "POINT_DATA " << n_beads << "\n";
-  outfile << "SCALARS " << "bead_type "<< "int" << "\n";
-  outfile << "LOOKUP_TABLE default \n";
-  for(std::size_t i=0; i<n_beads; ++i)
-  {
-    const int parent_id = _beads[i]->parent_id();
-    //const int b_type = (parent_id>0)? parent_id : 1;
-    const int b_type = parent_id;
-    outfile << b_type << " \n";
-  }
-  
-  outfile.close();
-
-  
   STOP_LOG ("write_polymer_chain()", "PolymerChain");
 }
+
+// ========================================================================
+void PolymerChain::write_polymer_trajectory(const unsigned int& o_step,
+                                            unsigned int comm_in_rank) const
+{
+  // OFSTEAM
+  std::ostringstream oss;
+  oss << "output_polymer_" << o_step <<".vtk";
+  std::ofstream outfile;
+  if(comm_in_rank == 0){
+    outfile.open(oss.str(), std::ios_base::out);
+//    outfile.precision(o_precision);
+    const std::size_t n_beads = _beads.size();  
+    // write out the VTK file
+    outfile << "# vtk DataFile Version 4.0\n";
+    outfile << "Polymer chain\n";
+    outfile << "ASCII\n";
+    outfile << "DATASET POLYDATA\n";
+    
+    // POINT data
+    outfile << "POINTS " << n_beads << " float\n";
+    for(std::size_t i=0; i<n_beads; ++i)
+    {
+      for(std::size_t j=0; j<3; ++j){
+        outfile << _beads[i]->center()(j) << " ";
+      }
+      outfile << "\n";
+    }
+    outfile << "\n";
+    
+    // LINE(spring) data, which can be visualized by connectivity in Paraview
+    const std::size_t Ns = _bonds.size();
+    outfile << "LINES " << Ns << " " << Ns*3 << "\n";
+    for(std::size_t i=0; i<Ns; ++i)
+    {
+      outfile << 2 << " " << _bonds[i][1] << " " << _bonds[i][2] << "\n";
+    }
+    
+    // Define the bead types
+    outfile << "POINT_DATA " << n_beads << "\n";
+    outfile << "SCALARS " << "bead_type "<< "int" << "\n";
+    outfile << "LOOKUP_TABLE default \n";
+    for(std::size_t i=0; i<n_beads; ++i)
+    {
+      const int parent_id = _beads[i]->parent_id();
+      //const int b_type = (parent_id>0)? parent_id : 1;
+      const int b_type = parent_id;
+      outfile << b_type << " \n";
+    }
+    outfile.close();    
+  } // end if comm_in_rank
+}
+
+// =============================================================================
+void PolymerChain::write_polymer_com(const unsigned int& step_id,
+                                     const unsigned int& o_step,
+                                     const std::vector<Real>& lvec,
+                                     unsigned int comm_in_rank) const
+{
+  // compute center of mass at step i
+  std::vector<Point> centeri(_n_chains);
+  compute_center_of_mass(lvec, centeri);
+  // write center of mass of every chain to out.center_of_mass
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if(step_id == 0){
+      out_file.open("out.center_of_mass", std::ios_base::out);
+      out_file <<"o_step" <<"  " <<"center_of_mass\n"; 
+    }
+    else{
+      out_file.open("out.center_of_mass", std::ios_base::app);
+    }
+    out_file.precision(o_precision);
+    out_file << o_step <<"  "; 
+    for (std::size_t j = 0; j < _n_chains; j++){
+            for (std::size_t k = 0; k < _dim; k++){
+                    out_file << centeri[j](k) << " ";
+            } // end k loop
+    } // end j loop
+    out_file <<"\n";
+    out_file.close();
+  }// end if comm_in_rank == 0
+}
+
+//==============================================================================
+void PolymerChain::write_polymer_stretch(const unsigned int& step_id,
+                                         const unsigned int& o_step,
+                                         const std::vector<Real>& lvec,
+                                         unsigned int comm_in_rank) const
+{
+  // compute chain strech at step i
+  std::vector<Point> stretch(_n_chains);
+  this -> compute_chain_stretch(lvec,stretch);
+  // write strech of each chain to out.chain_strech
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if(step_id == 0){
+      out_file.open("out.chain_strech", std::ios_base::out);
+      out_file <<"o_step" <<"  " <<"chain_strech\n";
+    }
+    else{
+      out_file.open("out.chain_strech", std::ios_base::app);
+    }
+    out_file.precision(o_precision);    
+    out_file << o_step <<"  ";     
+    for (std::size_t j = 0; j < _n_chains; j++){
+      for (std::size_t k = 0; k < _dim; k++){
+              out_file << stretch[j](k) << " ";
+      } // end k loop
+    }// end j loop
+    out_file <<"\n";
+    out_file.close();
+  }// end if comm_in_rank == 0
+} // end function
+
+//==========================================================================
+void PolymerChain::write_polymer_rog(const unsigned int& step_id,
+                                     const unsigned int& o_step,
+                                     const std::vector<Real>& lvec,
+                                     unsigned int comm_in_rank) const
+{
+  //compute center of mass of each chain at step i
+  std::vector<Point> centeri(_n_chains);
+  this -> compute_center_of_mass(lvec, centeri);
+  //compute radius of gyration:sqrt(Rg^2)
+  std::vector<Real> RgSqrt(_n_chains);
+  this -> compute_radius_of_gyration(lvec, centeri, RgSqrt);
+  // write radius of gyration of each chain to out.radius_of_gyration
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if(step_id == 0){
+      out_file.open("out.radius_of_gyration", std::ios_base::out);
+      out_file <<"o_step" <<"  " << "radius_of_gyration\n";    
+    }
+    else{
+      out_file.open("out.radius_of_gyration", std::ios_base::app);
+    }
+    out_file.precision(o_precision);
+    out_file <<o_step  <<"  ";     
+    for (std::size_t j = 0; j < _n_chains; j++){
+      out_file << RgSqrt[j] <<"  ";
+    }// end j loop 
+    out_file <<"\n";
+    out_file.close(); 
+  }// end if comm_in_rank == 0
+}
+
+//==========================================================================
+void PolymerChain::write_polymer_msd(const unsigned int& step_id,
+                                     const unsigned int& o_step,
+                                     const std::vector<Point>& center0,
+                                     const std::vector<Real>& lvec,
+                                     unsigned int comm_in_rank) const
+{
+  //compute center of mass of each chain at step i
+  std::vector<Point> centeri(_n_chains);
+  this -> compute_center_of_mass(lvec, centeri);
+  // compute mean square displacement
+  Point msd;
+  this->compute_mean_square_displacement(center0, centeri, msd);
+  // write mean square displacment to out.mean_square_displacement
+  std::ofstream out_file;  
+  if(comm_in_rank == 1){
+    if(step_id ==0){
+      out_file.open("out.mean_square_displacement", std::ios_base::out);
+      out_file << "o_step" <<"  " << "msd" << "\n";      
+    }
+    else{
+      out_file.open("out.mean_square_displacement", std::ios_base::app);
+    }
+    out_file.precision(o_precision);    
+    out_file << o_step <<"  "; 
+    for (int i = 0; i <_dim; i++){
+      out_file <<msd(i) <<"  ";
+    }
+    out_file <<"\n";
+    out_file.close(); 
+  }// end if comm_in_rank == 0  
+}
+
   
 // ======================================================================
-void PolymerChain::write_bead(const std::string& filename) const
+void PolymerChain::write_bead(const unsigned int& step_id,
+                              const unsigned int& o_step,
+                              const Real& real_time,
+                              const std::vector<Point>& center0,
+                              const std::vector<Real>& lvec,
+                              const std::vector<std::string>& output_file,
+                              unsigned int comm_in_rank) const
 {
-  START_LOG ("write_bead()", "PolymerChain");
-  
-
-  // OFSTEAM
-  std::ofstream outfile;
-  outfile.open(filename, std::ios_base::out);
-  const std::size_t n_beads = _beads.size();
-  
-  // write out the csv file
-  // POINT data
-  outfile <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
-  for(std::size_t i=0; i<n_beads; ++i)
-  {
-    outfile << i << " ";
-    // write position
-    for(std::size_t j=0; j<3; ++j){
-      outfile << _beads[i]->center()(j) << " ";
+  START_LOG("write_bead()", "PolymerChain");
+  this->write_time(step_id, o_step, real_time, comm_in_rank);
+  for (int i = 0; i < output_file.size(); i++){
+    if(output_file[i] == "trajectory") this -> write_bead_trajectory(o_step, comm_in_rank);
+    else if(output_file[i] == "center_of_mass") this -> write_bead_com(step_id, o_step,lvec, comm_in_rank);
+    else if(output_file[i] == "mean_square_displacement") this -> write_bead_msd(step_id, o_step,center0, lvec, comm_in_rank);
+    else {
+      std::cout << "unsupported output_file content: (" << output_file[i] <<")" << std::endl; 
+      libmesh_error();
     }
-    // write velocity
-    for (std::size_t j=0; j<3; ++j){
-      outfile <<_beads[i]->particle_velocity()[j] << " ";
-    }
-    // write force
-    for (std::size_t j=0; j<3; ++j){
-      outfile <<_beads[i]->particle_force()[j] <<" ";
-    }
-    outfile <<"\n";
   }
-  outfile << "\n";
-  outfile.close();
-  STOP_LOG ("write_bead()", "PolymerChain");
+  STOP_LOG("write_bead()", "PolymerChain");
+}
+
+
+void PolymerChain::write_bead_trajectory(const unsigned int& o_step,
+                                         unsigned int comm_in_rank) const
+{
+  START_LOG ("write_bead_trajectory()", "PolymerChain");
+  std::ostringstream oss;
+  oss << "output_bead_" << o_step <<".csv";
+  std::ofstream out_file;
+  if (comm_in_rank == 0){
+    out_file.open(oss.str(), std::ios_base::out);
+    // write out the csv file  
+    // POINT data
+    out_file <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
+    out_file.precision(o_precision);
+    for(std::size_t i=0; i<_n_beads; ++i)
+    {
+      out_file << i << " ";
+      // write position
+      for(std::size_t j=0; j<_dim; ++j){
+        out_file << _beads[i]->center()(j) << " ";
+      }
+      // write velocity
+      for (std::size_t j=0; j<_dim; ++j){
+        out_file <<_beads[i]->particle_velocity()[j] << " ";
+      }
+      // write force
+      for (std::size_t j=0; j<_dim; ++j){
+        out_file <<_beads[i]->particle_force()[j] <<" ";
+      }
+      out_file <<"\n";
+    }
+    out_file << "\n";
+    out_file.close();
+  } // end if comm_in_rank == 0
+  STOP_LOG ("write_bead_trajectory()", "PolymerChain");
+}
+
+void PolymerChain::write_bead_com(const unsigned int& step_id,
+                                  const unsigned int& o_step,
+                                  const std::vector<Real>& lvec,
+                                  unsigned int comm_in_rank) const
+{
+  START_LOG ("write_bead_com()", "PolymerChain");
+  // compute center of mass at step i
+  std::vector<Point> centeri(_n_chains);
+  this->compute_center_of_mass(lvec, centeri);  
+  // write center of mass of every chain to out.center_of_mass
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if (step_id == 0){
+      out_file.open("out.center_of_mass", std::ios_base::out);
+      out_file << "o_step" <<"  " << "center_of_mass";       
+    }
+    else{
+      out_file.open("out.center_of_mass", std::ios_base::app);
+    }
+    out_file.precision(o_precision);
+    out_file << o_step <<"  "; 
+    for (std::size_t j = 0; j < _n_chains; j++){
+            for (std::size_t k = 0; k < _dim; k++){
+                    out_file << centeri[j](k) << " ";
+            } // end k loop
+    } // end j loop      
+    out_file <<"\n";
+    out_file.close();
+  }// end if comm_in_rank == 0
+  STOP_LOG ("write_bead_com()", "PolymerChain");
+}
+
+void PolymerChain::write_bead_msd(const unsigned int& step_id,
+                                  const unsigned int& o_step,
+                                  const std::vector<Point>& center0,
+                                  const std::vector<Real>& lvec,
+                                  unsigned int comm_in_rank) const
+{
+  START_LOG("write_bead_msd()", "PolymerChain");
+  //get centers of all beads
+  std::vector<Point> centeri(_n_beads);
+  for (unsigned int i = 0; i < _n_beads; i++){
+    for (int j = 0; j <_dim; j++){
+      centeri[i](j) = lvec[i*_dim+j];
+    }
+  }
+  // compute mean square displacement
+  Point msd;
+  this->compute_mean_square_displacement(center0, centeri, msd);
+  // write mean square displacment to out.mean_square_displacement
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if(step_id == 0){
+      out_file.open("out.mean_square_displacement", std::ios_base::out);
+      out_file << "o_step" <<"  " << "mean_square_displacement" << "\n";      
+    }
+    else{
+      out_file.open("out.mean_square_displacement", std::ios_base::app);
+    }
+    out_file.precision(o_precision);
+    out_file << o_step <<"  ";
+    for (int i = 0; i < _dim; i++){
+      out_file <<msd(i) <<"  ";
+    }
+    out_file<<"\n";
+    out_file.close();       
+  }// end if comm_in_rank == 0  
+  STOP_LOG("write_bead_msd()", "PolymerChain");
+}
+
+// ======================================================================
+void PolymerChain::write_time(const unsigned int& step_id,
+                              const unsigned int& o_step,
+                              const Real& real_time,
+                              unsigned int comm_in_rank) const
+{
+  // write step and real time
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if(step_id == 0){
+      out_file.open("out.time", std::ios_base::out);
+      out_file << "step_id" <<"  " <<"o_step" <<"  " << "real_time" << "\n";      
+    }
+    else{
+      out_file.open("out.time", std::ios_base::app);
+    }
+    out_file.precision(o_precision);
+    out_file <<step_id <<"  "<< o_step <<"  " <<real_time <<"\n";
+    out_file.close();  
+  }
 }
   
 // ======================================================================
@@ -979,8 +1250,144 @@ Real PolymerChain::compute_chain_length()
   STOP_LOG ("compute_chain_length()", "PolymerChain");
   return len;
 }
- 
 
+// ======================================================================
+void PolymerChain::compute_center_of_mass(const std::vector<Real>& lvec,
+                                          std::vector<Point>& center) const
+{
+  START_LOG("compute_center_of_mass()", "PolymerChain");
+  //loop over each chain
+  std::size_t start_id = 0;
+  for(std::size_t i = 0; i < _n_chains; i++){
+   // loop over each bead on this chain
+    for(std::size_t j = 0; j < _n_beads_per_chain[i]; j++){
+      for (std::size_t k = 0; k < _dim; k++){
+        center[i](k) += lvec[(start_id + j) * _dim + k];
+      }// end k loop
+    }// end j loop over each beads of a chain
+    center[i] /= Real(_n_beads_per_chain[i]);
+    start_id += _n_beads_per_chain[i]; 
+  }//end i loop over each chain
+  STOP_LOG("compute_center_of_mass()", "PolymerChain");
+}
+
+//=======================================================================
+void PolymerChain::initial_bead_center_of_mass(std::vector<Point>& center0) const
+{
+  START_LOG("initial_bead_center_of_mass()", "PolymerChain");
+  center0.resize(_n_beads);
+  for (std::size_t i = 0; i < _n_beads; i++){
+    center0[i] = _beads[i] -> point();
+  }
+  STOP_LOG("initial_bead_center_of_mass()", "PolymerChain");
+}
+
+// =====================================================================
+void PolymerChain::initial_chain_center_of_mass(std::vector<Point>& center0) const
+{
+  START_LOG("initial_chain_center_of_mass()", "PolymerChain");
+  center0.resize(_n_chains);
+  std::size_t start_id = 0;
+  for (std::size_t i = 0; i < _n_chains; i ++){
+    for (std::size_t j = 0; j < _n_beads_per_chain[i]; j++){
+      center0[i] += _beads[start_id + j]->point();
+    } // end j loop
+    center0[i] /= Real(_n_beads_per_chain[i]);
+    start_id += _n_beads_per_chain[i];
+  }// end i loop
+  STOP_LOG("initial_chain_center_of_mass()", "PolymerChain");
+}
+
+// ======================================================================
+void PolymerChain::compute_chain_stretch(const std::vector<Real>& lvec,
+                                         std::vector<Point>& stretch) const
+{
+  START_LOG("compute_chain_stretch()", "PolymerChain");
+  // loop over each particle and find the max/min (X,Y,Z) 
+  std::vector<Point> max_xyz(_n_chains);
+  std::vector<Point> min_xyz(_n_chains);
+  Point pti;
+  //loop over each chain
+  std::size_t start_id  = 0;
+  for (std::size_t i = 0; i < _n_chains; i++){
+    // loop over each bead in this chain
+    for (std::size_t j=0; j < _n_beads_per_chain[i]; j++)
+    {
+     // loop over each direction
+     for (std::size_t k = 0;  k < _dim; k++){
+       pti(k) = lvec[(start_id + j)*_dim + k];
+     }// end k loop
+     // compute min_xyz and max_xyz of this chain
+     if (j==0){
+       min_xyz[i] = pti;
+       max_xyz[i] = pti;
+     } // end if
+     else{
+       for (std::size_t k = 0; k < _dim; k++){
+         if (pti(k) < min_xyz[i](k)) {min_xyz[i](k) = pti(k);}
+         if(pti(k) > max_xyz[i](k)) {max_xyz[i](k) = pti(k);}
+       }// end loop k
+     }// end else
+    }// end loop j
+    start_id += _n_beads_per_chain[i];
+  }// end loop i 
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Compute the stretch in different directions
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+  for(std::size_t i =0; i < _n_chains; i++) {
+    for(std::size_t k=0; k<_dim; k++ ){
+       stretch[i](k) = max_xyz[i](k)-min_xyz[i](k);
+    }// end dim
+  }//end chain_id
+
+  STOP_LOG("compute_chain_stretch()", "PolymerChain");
+}
+
+void PolymerChain::compute_radius_of_gyration(const std::vector<Real>& lvec,
+                                              const std::vector<Point>& center,
+                                              std::vector<Real>& RgSqrt) const
+{
+  START_LOG("compute_radius_of_gyration()", "PolymerChain");
+  std::size_t start_id = 0;
+  // loop over each chain
+  for (std::size_t i = 0; i < _n_chains; i++)
+  {
+    Real Rg = 0.;
+    // loop over each bead on this chain
+    for (std::size_t j = 0; j < _n_beads_per_chain[i] ; j++){
+     Point pti;
+     for (std::size_t k = 0; k < _dim; k++){
+       pti(k) = lvec [ (start_id + j) *_dim + k] - center[i](k);
+     } // end k loop
+     Rg += pti.norm_sq() / _n_beads_per_chain[i];
+    } // end j loop
+    RgSqrt[i] = std::sqrt(Rg);
+  }
+  STOP_LOG("compute_radius_of_gyration()", "PolymerChain");
+}
+
+void PolymerChain::compute_mean_square_displacement(const std::vector<Point>& R0,
+                                                    const std::vector<Point>& Rt,
+                                                    Point& msd) const
+{
+  START_LOG("compute_mean_square_displacement()", "PolymerChain");
+  if(R0.size() != Rt.size()) {
+    std::cout <<"Warning in PolymerChain::compute_mean_square_displacement(R0, Rt): size of R0 (="<<R0.size()
+    <<") and Rt (=" << Rt.size() 
+    <<") are not the same" << std::endl;
+    libmesh_error();
+  }
+  unsigned int num_center = R0.size();
+  for (unsigned int i = 0; i < num_center; i++){
+    Point displacement = Rt[i] - R0[i];
+    for (int j = 0; j < _dim; j++){
+      msd(j) += displacement(j) * displacement(j);
+    }
+  }
+  msd /= Real(num_center);
+  STOP_LOG("compute_mean_square_displacement()", "PolymerChain");
+}
 
 // ======================================================================
 bool PolymerChain::check_chain(const Real& Ls)

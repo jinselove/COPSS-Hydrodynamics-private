@@ -38,8 +38,6 @@ void FixPointGaussianDNA::initParams()
   Real c1_tmp3 = c1_tmp * c1_tmp * c1_tmp;
   c1 = ev*Nks*Nks*std::sqrt(c1_tmp3);
   c2   = 3.*bead_r*bead_r/(4.*Ss2);    
-  std::cout << "c1 = " << c1 <<std::endl;
-  std::cout << "c2 = " << c2 <<std::endl;
 }
 
 void FixPointGaussianDNA::print_fix()

@@ -648,7 +648,7 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
   // Get a reference to the Particle-Mesh linear implicit system object.
   PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
 //  const MeshBase& mesh   = pm_system.get_mesh();
-  const Real penalty     = 1E10;    // The penalty value.
+  const Real penalty     = 1E6;    // The penalty value.
   const Real tol         = 1E-6;   // The tolerence value.
   const unsigned int n_nodes = elem->n_nodes();
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();

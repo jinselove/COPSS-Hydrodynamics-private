@@ -10,7 +10,7 @@ namespace libMesh{
 CopssPointParticleSystem::CopssPointParticleSystem(CopssInit& init)
 :Copss(init)
 {
-
+  //nothing
 }
 
 CopssPointParticleSystem::~CopssPointParticleSystem(){
@@ -23,6 +23,7 @@ CopssPointParticleSystem::~CopssPointParticleSystem(){
 
 //==========================================================================
 void CopssPointParticleSystem::read_particle_info(){
+  particle_type = input_file("particle_type", "other");
 	if (particle_type != "point_particle"){
 		error_msg = "invalid particle type ("+particle_type+") defined\n";
 		PMToolBox::output_message(error_msg,comm_in);
@@ -45,6 +46,25 @@ void CopssPointParticleSystem::read_particle_info(){
 	}
 }// end read_particle_parameter()
 
+//==========================================================================
+void CopssPointParticleSystem::read_output_info()
+{
+  // write interval
+  write_interval = input_file("write_interval", 1);
+  //output file flags
+  output_file.resize(input_file.vector_variable_size("output_file"));
+  for (unsigned int i=0; i < output_file.size(); i++){
+    output_file[i] = input_file("output_file","not defined", i);
+  }
+  cout <<"\n##########################################################\n"
+       << "#                 output file information                      \n"
+       << "##########################################################\n\n"
+       << "-----------> write_interval: " << write_interval << endl
+       << "-----------> write output file: " << endl;
+  for(int i = 0; i < output_file.size(); i++){
+    cout << "                               " << output_file[i] << endl;
+  }
+}
 
 //==========================================================================
 void CopssPointParticleSystem::create_object(){
@@ -55,11 +75,11 @@ void CopssPointParticleSystem::create_object(){
   {
     cout <<"in restart mode ---------" << endl;
     if(point_particle_model == "polymer_chain"){
-    	pfilename << "output_polymer_"<< restart_step << ".vtk";
+    	pfilename << "output_polymer_"<< o_step << ".vtk";
       polymer_chain->read_data_vtk(pfilename.str());
     }
     else if (point_particle_model == "bead"){
-      pfilename << "output_bead_" << restart_step << ".csv";
+      pfilename << "output_bead_" << o_step << ".csv";
       polymer_chain->read_data_csv(pfilename.str());
     }
     cout <<"-------------> read "<< point_particle_model << "data from " << pfilename.str() << " in restart mode" << endl;
@@ -76,6 +96,7 @@ void CopssPointParticleSystem::create_object(){
   if(point_particle_model == "bead"){
     Nb = polymer_chain -> n_beads();
     Ns = Nb - 1;
+    polymer_chain -> initial_bead_center_of_mass(center0);
   }
   else if (point_particle_model == "polymer_chain"){
     Nb = polymer_chain -> n_beads();
@@ -84,7 +105,8 @@ void CopssPointParticleSystem::create_object(){
     Ns = nBonds / nChains;
     chain_length = Ns * q0; // contour length of the spring (um)
     Dc = Db / Real(Nb); // Diffusivity of the chain (um^2/s)
-  }
+    polymer_chain -> initial_chain_center_of_mass(center0);
+  }  
   // for particular models
   cout<<"##########################################################\n"
            <<"#                  Particle Parameters                    \n"
@@ -189,6 +211,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<string> ("test_name") = test_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
+  equation_systems.parameters.set<std::vector<std::string>> ("output_file") = output_file;
 }
 
 void CopssPointParticleSystem::update_object(std::string stage)
@@ -205,32 +228,20 @@ void CopssPointParticleSystem::update_object(std::string stage)
 }
 
 
-void CopssPointParticleSystem::write_object(std::size_t step_id)
+void CopssPointParticleSystem::write_object(unsigned int step_id)
 {
-  if(comm_in.rank()==0){
-  /*---------------------------------------------------------------------------------------
-   * output polymer chain / bead data in the VTK format at step i
-   -----------------------------------------------------------------------------------------*/
-   if(point_particle_model == "polymer_chain"){
-     oss << "output_polymer_" << o_step << ".vtk";
-     polymer_chain->write_polymer_chain( oss.str() );
-   }
-   else{
-     oss << "output_bead_" << o_step <<".csv";
-     polymer_chain->write_bead(oss.str());
-   } // end else
-   /*----------------------------------------------------------------------------------------------------
-   * Output mean square displacement, radius of gyration, chain stretch, and center of mass at step i
-   --------------------------------------------------------------------------------------------------- */
-  } // end if comm_in.rank() == 0
-  brownian_sys->output_statistics_stepi(out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag,
-                                             step_id, real_time, center0, ROUT);
-  oss.str(""); oss.clear();
-  /*----------------------------------------------------------------------------------------------------
-   * Write out ROUT for restart mode at step i
-   ----------------------------------------------------------------------------------------------------*/
-  PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-  VecView(ROUT,viewer);
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Allgather the distributed vector R0 to local vector lvec on all processors
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  std::vector<Real> lvec;
+  brownian_sys->vector_transform(lvec,&ROUT, "backward"); // ROUT -> lvec
+  // write output file
+  if(point_particle_model == "polymer_chain"){
+    polymer_chain->write_polymer_chain(step_id, o_step, real_time, center0, lvec, output_file, comm_in.rank());
+  }
+  else{
+    polymer_chain->write_bead(step_id, o_step, real_time, center0, lvec, output_file, comm_in.rank());
+  } // end else
 }
 
 void CopssPointParticleSystem::run(EquationSystems& equation_systems){
@@ -238,7 +249,6 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
   // get stokes system from equation systems
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
-   
    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Parameters for dynamic process
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -246,8 +256,6 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   n_vec  = dim*NP;
   hmin = hminf;
   hmax = hmaxf;
-
-
   // Get a better conformation of polymer chains before simulation.
   this -> update_object("in initial data input");
 
@@ -259,43 +267,21 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   perf_log.push ("solve undisturbed_system");
   this -> solve_undisturbed_system(equation_systems); 
   perf_log.pop ("solve undisturbed_system");
-  /* output particle data at the 0-th step in the VTK format */
-  if(restart==false)
-  {
-    if(comm_in.rank()==0){
-	     if(point_particle_model == "polymer_chain") polymer_chain->write_polymer_chain("output_polymer_0.vtk");
-	     else polymer_chain->write_bead("output_bead_0.csv");
-    }
-  }
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Create vectors and Shell Mat for use:
-   U0:          particle velocity vector;
-   R0/R_mid:    particle position vector;
-   dw/dw_mid:   random vector;
-   RIN/ROUT:    the initial and intermediate particle postion vector for msd output
-   RIN will not change, and ROUT excludes pbc
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  // create Brownian system for simulation
   cout<<"==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"<<endl;
   this -> create_brownian_system(equation_systems);
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Advancing in time. Fixman Mid-Point algorithm
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   cout<<"==>(3/3) Start calculating dynamics and advancing time steps"<<endl;
-  const unsigned int istart = restart_step + 1;
-  const unsigned int iend   = restart_step + nstep;
-  o_step = restart_step;  // output step
   vel0.resize(n_vec);
   vel1.resize(n_vec);
- 
-  real_time = restart_time;
   if (adaptive_dt == true and point_particle_model == "polymer_chain") max_dr_coeff = 0.1 * Ss2 / Rb / Rb;
-
-
   //start integration
-
   perf_log.push ("integration");
-  for(unsigned int i=istart; i<=iend; ++i)
+  // if restart = false ---> istart = 0, restart_step = -1
+  // if restart = true  ---> istart = restart_step
+  for(unsigned int i=istart; i<=istart+nstep; ++i)
   {
     cout << "\nStarting Fixman Mid-Point algorithm at step "<< i << endl;
     // integrate particle movement using fixman's mid point scheme

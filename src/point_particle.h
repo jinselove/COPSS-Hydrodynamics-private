@@ -222,8 +222,6 @@ public:
    */
   void reinit_particle();
   
-  
-  
   /*
    * Print information of this particle
    */

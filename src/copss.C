@@ -109,6 +109,7 @@ void Copss::read_input()
   this -> read_stokes_solver_info();
   this -> read_chebyshev_info();
   this -> read_run_info();
+  this -> read_output_info();
 } // end read_data function
 
 //====================================================================
@@ -131,7 +132,6 @@ void Copss::read_physical_info()
   kBT    = kB * T; //(N*um)
   viscosity            = input_file("viscosity", 1.0); // viscosity (cP = N*s/um^2)
   Rb                   = input_file("radius", 0.10); // radius of the bead (um)
-  particle_type = input_file("particle_type", "other");
   drag_c      = 6.*PI*viscosity*Rb;    // Drag coefficient (N*s/um)
   Db          = kBT/drag_c;     // diffusivity of a bead (um^2/s)  
 
@@ -220,7 +220,7 @@ void Copss::read_domain_info()
   if (generate_mesh){
     n_mesh.resize(input_file.vector_variable_size("n_mesh"));
     for (unsigned int i=0; i < n_mesh.size(); i++){ n_mesh[i] = input_file("n_mesh", 1, i); }
-    cout << "------------> Generate Mesh using COPSS: n_mesh = " << n_mesh[0] << n_mesh[1] << n_mesh[2] << endl;
+    cout << "------------> Generate Mesh using COPSS: n_mesh = " << n_mesh[0] <<";" << n_mesh[1] <<";" << n_mesh[2] << endl;
   }
   else{
     domain_mesh_file = input_file("domain_mesh_file" , "nothing");
@@ -359,42 +359,93 @@ void Copss::read_run_info(){
   }
   max_dr_coeff   = input_file("max_dr_coeff", 0.1);
   adaptive_dt    = input_file("adaptive_dt", true);  
-  restart       = input_file("restart", false);  
-  restart_step  = input_file("restart_step", 0);
-  restart_time  = input_file("restart_time", 0.0);
-  if(restart) // update the seed for restart mode
-  {
-    random_seed++;
+  restart       = input_file("restart", false); 
+  if (restart){
+    this->read_restart_time();
+    istart = restart_step;
+    random_seed++;    
   }
-  else        // set the restart_step as zero
-  {
-    restart_step = 0;
-    restart_time = 0.0;
-  }
-
+  else{
+    restart_step = -1;
+    istart = 0;
+    o_step = 0;
+    real_time = 0.;
+  } 
   nstep = input_file("nstep", 1);
-  write_interval = input_file("write_interval", 1);
   debug_info   = input_file("debug_info", false);
-  write_es      = input_file("write_es", true);
-  out_msd_flag      = input_file("out_msd_flag", false);
-  out_stretch_flag  = input_file("out_stretch_flag", false);
-  out_gyration_flag = input_file("out_gyration_flag", false);
-  out_com_flag      = input_file("out_com_flag", false);
   cout <<"\n##########################################################\n"
        << "#                 Run information                      \n"
        << "##########################################################\n\n"
        << "-----------> adaptive_dt: " << std::boolalpha << adaptive_dt << endl
        << "-----------> dt0: " << dt0 << endl
        << "-----------> max_dr_coeff: " << max_dr_coeff << endl
-       << "-----------> write interval: " <<write_interval <<endl
-       << "-----------> Restart mode: "<<std::boolalpha << restart <<"; restart step: "<<restart_step <<"; restart time: "<<restart_time <<endl
-       << "-----------> nstep: " <<nstep <<endl
        << "-----------> print_debug_info: " << std::boolalpha << debug_info << endl; 
   if (with_brownian){
 	cout << "-----------> with_brownian: " <<std::boolalpha<<with_brownian <<endl
              << "-----------> random seed: " <<random_seed <<endl;
   }
+  cout << "-----------> Restart mode: "<<std::boolalpha << restart <<endl;
+  if(restart){
+   cout <<"-----------> Restart step: "<<restart_step << endl;
+   cout <<"-----------> Restart from real_time: "<<real_time <<endl;
+   cout <<"-----------> Restart particle data read from o_step: " << o_step << endl;
+  }
+  cout << "-----------> nstep: " <<nstep <<endl;
 } // end read_run_info()
+
+//============================================================================
+void Copss::read_restart_time()
+{
+  // Open the local file and check the existance
+  std::cout <<"\n###Read time output: out.time"<<std::endl;
+  std::ifstream fin;
+  fin.open ("out.time", std::ios_base::ate);
+  std::string tmp;
+  char c = '\0';
+  if( fin.is_open() ){
+    const unsigned int length = fin.tellg();
+    cout << "length = " << length <<endl;
+    for (int i = length-2; i>0;i--){
+      fin.seekg(i);
+      c = fin.get();
+      if(c=='\r' || c=='\n') // new line?
+        break;
+    }
+    fin >> restart_step >> o_step >> real_time;
+
+   // std::getline(fin,tmp);
+   // std::cout << tmp <<std::endl;
+    fin.close();
+
+    // fin.seekg(-1,std::ios_base::end);                // go to one spot before the EOF
+    // bool keepLooping = true;
+    // while(keepLooping) {
+    //     char ch;
+    //     fin.get(ch);                            // Get current byte's data
+    //     if((int)fin.tellg() <= 1) {             // If the data was at or before the 0th byte
+    //         fin.seekg(0);                       // The first line is the last line
+    //         keepLooping = false;                // So stop there
+    //     }
+    //     else if(ch == '\n') {                   // If the data was a newline
+    //         keepLooping = false;                // Stop at the current position.
+    //     }
+    //     else {                                  // If the data was neither a newline nor at the 0 byte
+    //         fin.seekg(-2,std::ios_base::cur);        // Move to the front of that data, then to the front of the data before it
+    //     }
+    // }
+    // std::string lastLine;            
+    // getline(fin,lastLine);                      // Read the current line
+    // cout << "Result: " << lastLine << '\n';     // Display it    
+    // //fin >> restart_step >> o_step >> real_time; // restart_s
+    // //o_step++;
+    // fin.close();
+  } // end if
+  else{
+    printf("***warning: read_restart_time can NOT read the time output: out.time");
+    libmesh_error();
+  }
+}
+
 
 //============================================================================
 void Copss::create_domain_mesh()
@@ -700,10 +751,10 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   system.solve_stokes("undisturbed",reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   write out the equation systems if write_es = true at Step 0 (undisturbed field)
+   write out the equation systems at Step 0 (undisturbed field)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   exodus_ptr = new ExodusII_IO(*mesh);
-  if(write_es && restart==false)
+  if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end() && restart==false)
   {
     //system.add_local_solution(); // Don't add local solution for undisturbed system!
 #ifdef LIBMESH_HAVE_EXODUS_API
@@ -715,6 +766,14 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
 //============================================================================================
 void Copss::create_brownian_system(EquationSystems& equation_systems)
 {
+ /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Create vectors and Shell Mat for use:
+   U0:          particle velocity vector;
+   R0/R_mid:    particle position vector;
+   dw/dw_mid:   random vector;
+   RIN/ROUT:    the initial and intermediate particle postion vector for msd output
+   RIN will not change, and ROUT excludes pbc
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   brownian_sys = new BrownianSystem(equation_systems);
   brownian_sys->init_petsc_random(&rand_ctx);
   brownian_sys->_create_shell_mat(n_vec, &M);
@@ -726,7 +785,6 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
   VecDuplicate(ROUT,&RIN);
   VecCopy(ROUT,RIN);  // RIN = ROUT = the initial position vector
   brownian_sys->set_std_random_seed(random_seed);  // random seed
- 
   if(restart)
   {
     // read RIN & ROUT from local file output during the previous simulation
@@ -742,12 +800,6 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
     VecView(RIN,viewer);
   }
   comm_in.barrier();
-  center0 = brownian_sys->center_of_mass(RIN);
-  if(!restart)
-  {
-    /* Output mean square displacement and radius of gyration at step 0 (the origin) */
-    brownian_sys->output_statistics_step0(out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag, RIN);
-  }  
 }
 
 //==============================================================================================
@@ -775,27 +827,68 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
    // transform total point velocity to U0 in Brownian_system
     brownian_sys->vector_transform(vel1, &U0, "forward");
+    if (debug_info){
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       * ---> test: output the particle velocity
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+      const Real v0_min = v0_ptr->min();
+      const Real v0_max = v0_ptr->max();
+      const Real v0_sum = v0_ptr->sum();
+      if(comm_in.rank()==0){
+        for(unsigned int j=0; j<NP;++j)
+        {    
+          std::vector<Real> vtest0(dim), vtest1(dim);
+          for(std::size_t k=0; k<dim;++k){
+            vtest0[k] = vel0[j*dim+k];
+            vtest1[k] = vel1[j*dim+k];
+          }
+          printf("--->test in test_move_particles(): velocity on the %u-th point:\n",j);
+          printf("            U0 = (%f,%f,%f)\n",   vtest0[0],vtest0[1],vtest0[2]);
+          printf("       U0 + U1 = (%f,%f,%f)\n\n", vtest1[0],vtest1[1],vtest1[2]);
+        }    
+        printf("            v0_min = %f, v0_max = %f, v0_sum = %f)\n",v0_min,v0_max,v0_sum);
+      }    
+    }
+
+    // assign vel1 to particle velocity
+    for (std::size_t p_id = 0; p_id < NP; p_id++) {
+      std::vector<Real> p_velocity(dim,0.);
+      for (int _dim = 0; _dim < dim; _dim++) p_velocity[_dim] = vel1[p_id*dim+_dim];
+      point_mesh->particles()[p_id]->set_particle_velocity(p_velocity);
+    }
     /*---------------------------------------------------------------------------------------
      * write equation system at step i
+     * print out information at step 0
+     * do not print out information at the first step when restart since it is identical to the 
+     * last step before restart.
     -----------------------------------------------------------------------------------------*/
     if(i%write_interval == 0){
-      o_step++;
-      // set particle velocity before write
-      for (std::size_t p_id = 0; p_id < NP; p_id++) {
-        std::vector<Real> p_velocity(dim,0.);
-        for (int _dim = 0; _dim < dim; _dim++) p_velocity[_dim] = vel1[p_id*dim+_dim];
-        point_mesh->particles()[p_id]->set_particle_velocity(p_velocity);
+
+      if (i != restart_step){
+        /*
+         * write equation system to output file
+         */
+        if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end())
+        {
+          system.add_local_solution();  // add local solution for the disturbed system
+          system.solution->add(*v0_ptr);// add the undisturbed solution
+  #ifdef LIBMESH_HAVE_EXODUS_API
+          exodus_ptr->append(true);
+          exodus_ptr->write_timestep(out_system_filename,system.get_equation_systems(),o_step,o_step);
+  #endif
+        } // end if (write es)  
+        /*
+         * write particle to output file
+         */ 
+        this -> write_object(i);
+        /*----------------------------------------------------------------------------------------------------
+         * Write out ROUT for restart mode at step i
+         ----------------------------------------------------------------------------------------------------*/
+        PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
+        VecView(ROUT,viewer);        
       }
-      // write object to output file (position, force, velocity)        
-      this -> write_object(i);
-      if( write_es){
-        system.add_local_solution();  // add local solution for the disturbed system
-        system.solution->add(*v0_ptr);// add the undisturbed solution
-#ifdef LIBMESH_HAVE_EXODUS_API
-        exodus_ptr->append(true);
-        exodus_ptr->write_timestep(out_system_filename,system.get_equation_systems(),o_step,o_step);
-#endif
-      } // end if (write es)   
+      // update o_step
+      o_step++;
     } // end if (i % write_interval == 0 )
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Adaptive time step.
@@ -893,7 +986,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
           //cout << "Compute the max & min eigenvalues for Chebyshev polynomial at step "<<i+1<<endl;
           brownian_sys->compute_eigenvalues(eig_min,eig_max,tol_eigen);
           // Magnify the spectral range by a factor (1.05 by default).
-  	  eig_max *= eig_factor; eig_min /= eig_factor;
+  	      eig_max *= eig_factor; eig_min /= eig_factor;
           PetscPrintf(PETSC_COMM_WORLD,
                      "--->Recomputed eigen values and magnify the range by a factor eig_factor = %f: eig_min = %f, eig_max = %f, tol_cheb = %f, max_n_cheb = %d\n",
                      eig_factor,eig_min,eig_max,tol_cheb,max_n_cheb);   
@@ -940,13 +1033,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       VecWAXPY(R_mid,0.5*dt,U0,R0);  // R_mid = R0 + 0.5*dt*(U0+U1)  (R0 and U0 do NOT change)
       coef = 0.5;                    // coefficient. sqrt(2) is introduced when generating dw
       VecAXPY(R_mid,coef,dw_mid);    // R_mid = R_mid + 0.5*sqrt(2)*D*B^-1*dw
-      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords
-   
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Check and correct beads' position at the midpoint
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      fixes[0]->check_walls(); // check pbc and inpenetrable wall
-      this -> update_object("after midpoint at step"+std::to_string(i));
+      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
+      this -> update_object("after midpoint at step"+std::to_string(i)); 
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Update the particle mesh for the mid-point step,
        and recompute U0 + U1_mid, D_mid*(B^-1*dw)
@@ -970,18 +1058,12 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       //cout << "Update from mid-point to the NEW particle coordinates at step " <<i+1<<endl;
       VecWAXPY(R_mid,dt,U0,R0);         // R_mid = R0 + dt*U0_mid
       VecAXPY(R_mid,2.0*coef,dw_mid); // R_mid = R_mid + sqrt(2)*D_mid*B^-1*dw
-      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign");
-  
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Check and correct the beads' position again after the midpoint update
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      fixes[0]->check_walls(); // check pbc and inpenetrable wall
+      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
       this -> update_object("after step "+std::to_string(i));
 
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
       VecAXPY(ROUT,2.0*coef,dw_mid);  // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
-//  perf_log.pop("bd");  
     } // end if Brownian
     
     else{ // if without Brownian
@@ -996,9 +1078,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
     } // end else (without_brownian)
-
     real_time += dt;
-
 }
 
 

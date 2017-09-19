@@ -56,9 +56,11 @@ protected:
 	Real max_spring_len;
 	bool chain_broken;
 
-	//void read_data(std::string control_file){};
 	// override read_particle_parameters() function in Copss class
 	void read_particle_info () override;
+
+	// override read_output_info() function in Copss class
+	void read_output_info() override;
 
 	// create objects, polymer chains
 	void create_object() override;
@@ -75,8 +77,8 @@ protected:
 	// update object due to PBC after check_wall()
 	void update_object(std::string stage) override;
         
-        // write object to output file
-        void write_object(std::size_t step_id) override;
+    // write object to output file
+    void write_object(unsigned int step_id) override;
 
 
 

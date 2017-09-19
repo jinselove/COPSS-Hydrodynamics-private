@@ -24,6 +24,7 @@ rm *.pvtu*
 rm *.csv
 rm *.txt
 rm *.dat
+rm out.*
 
 rm binaryoutput*
 rm vector_RIN.* vector_ROUT.*

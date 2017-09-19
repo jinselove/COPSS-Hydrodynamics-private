@@ -7,7 +7,6 @@
 #############################################
 
 test_name = general
-print_info = false
 
 #############################################
 #			   Physical parameters         			
@@ -53,7 +52,7 @@ wall_type = slit
 slit = '-130. 130. -130. 130. -13. 13.'
 
 # periodicity #
-periodicity = 'true false false'
+periodicity = 'true true false'
 
 # inlet info #
 inlet = 'false false false'
@@ -69,14 +68,14 @@ n_mesh = '37 37 4'
 #############################################
 #	 Force info (particle-particle force)         			
 #############################################
-force_field = 'point_Gaussian_PolymerChain point_WormLikeSpring'
-point_Gaussian_PolymerChain = '2.628506592'
+force_field = 'gaussian_dna worm_like_spring'
+gaussian_dna = '2.628506592'
 
 #############################################
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.3
+alpha = 0.1
 
 
 #############################################
@@ -121,6 +120,12 @@ schur_pc_type = SMp
 #############################################
 #	Chebyshev info (only for brownian system)         			
 #############################################
+#compute eigenvalues at the first step
+compute_eigen = true
+
+# specify eig_min and eig_max if compute_eigen=false
+# eig_min = 
+# eig_max = 
 
 # max number of chebyshev polynomial #
 max_n_cheb = 50
@@ -141,10 +146,10 @@ tol_eigen = 0.01
 with_brownian  = true
 adaptive_dt    = true
 max_dr_coeff   = 0.1
-write_interval = 1
 restart        = false
-restart_step   = 10
-restart_time   = 1.438907510
 random_seed    = 123456789
-nstep          = 1
-
+nstep          = 5
+write_interval = 1
+output_file = 'trajectory center_of_mass chain_stretch radius_of_gyration mean_square_displacement'
+debug_info = true
+print_info = true

@@ -7,7 +7,6 @@
 #############################################
 
 test_name = general
-print_info = false
 
 #############################################
 #			   Physical parameters         			
@@ -59,7 +58,7 @@ generate_mesh = true
 n_mesh = '37 37 4'
 
 #############################################
-#	 Force info (particle-particle force)         			
+#	 Force info         			
 #############################################
 force_field = 'lj_cut wall/lj_cut'
 lj_cut = '1. 2.2 2.469416506'
@@ -69,8 +68,8 @@ wall/lj_cut = '1. 1.2 1.346954458'
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.3
-
+alpha = 0.1
+#search_radius_p = 3.2
 
 #############################################
 #			   Solver info         			
@@ -145,6 +144,6 @@ restart        = false
 random_seed    = 123456789
 nstep          = 5
 write_interval = 1
-output_file    = 'trajectory center_of_mass mean_square_displacement' 
+output_file    = 'equation_systems trajectory center_of_mass mean_square_displacement' 
 debug_info     = false
-
+print_info = false

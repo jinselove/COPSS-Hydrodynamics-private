@@ -859,7 +859,7 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
 
 // ======================================================================
 template <unsigned int KDDim>
-void PointMesh<KDDim>::reinit()
+void PointMesh<KDDim>::reinit(const bool with_hi)
 {
   START_LOG ("reinit()", "PointMesh<KDDim>");
   // std::string msg = "PointMesh::reinit(): Re-initialize the PointMesh ...";
@@ -923,7 +923,9 @@ void PointMesh<KDDim>::reinit()
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Construct the element-particle neighbor list and particle-element id map
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  this->build_elem_neighbor_list();
+  if(with_hi){
+    this->build_elem_neighbor_list();
+  }
 
   STOP_LOG ("reinit()", "PointMesh<KDDim>");
 }

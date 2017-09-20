@@ -10,7 +10,7 @@ FixPointSphereWallLJCut::FixPointSphereWallLJCut(PMLinearImplicitSystem& pm_sys_
 void FixPointSphereWallLJCut::initParams()
 {
   force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("wall/lj_cut");
-  wall_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>>("slit");
+  wall_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>>("sphere");
   if(force_params.size()!=3){
     std::cout << std::endl << "********************Error message********************" << std::endl
               << "---------------> The force type 'wall/lj_cut' requires 3 parameter (epsilon, sigma, rcut) (dimensionless form)" << std::endl

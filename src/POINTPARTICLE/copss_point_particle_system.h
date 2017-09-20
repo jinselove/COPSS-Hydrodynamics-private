@@ -59,9 +59,6 @@ protected:
 	// override read_particle_parameters() function in Copss class
 	void read_particle_info () override;
 
-	// override read_output_info() function in Copss class
-	void read_output_info() override;
-
 	// create objects, polymer chains
 	void create_object() override;
 

@@ -109,7 +109,6 @@ void Copss::read_input()
   this -> read_stokes_solver_info();
   this -> read_chebyshev_info();
   this -> read_run_info();
-  this -> read_output_info();
 } // end read_data function
 
 //====================================================================
@@ -373,7 +372,16 @@ void Copss::read_run_info(){
     real_time = 0.;
   } 
   nstep = input_file("nstep", 1);
+  // write interval
+  write_interval = input_file("write_interval", 1);
+  //output file flags
+  output_file.resize(input_file.vector_variable_size("output_file"));
+  for (unsigned int i=0; i < output_file.size(); i++){
+    output_file[i] = input_file("output_file","not defined", i);
+  }
+  // debug info
   debug_info   = input_file("debug_info", false);
+  // write to screen
   cout <<"\n##########################################################\n"
        << "#                 Run information                      \n"
        << "##########################################################\n\n"
@@ -392,7 +400,12 @@ void Copss::read_run_info(){
    cout <<"-----------> Restart from real_time: "<<real_time <<endl;
    cout <<"-----------> Restart particle data read from o_step: " << o_step << endl;
   }
-  cout << "-----------> nstep: " <<nstep <<endl;
+  cout << "-----------> nstep: " <<nstep <<endl
+       << "-----------> write_interval: " << write_interval << endl
+       << "-----------> write output file: " << endl;
+  for(int i = 0; i < output_file.size(); i++){
+    cout << "                               " << output_file[i] << endl;
+  }
 } // end read_run_info()
 
 //============================================================================
@@ -518,10 +531,17 @@ void Copss::create_domain_mesh()
   } // end else (generate mesh)
 
   // initialize search radius
-  // create object mesh
-  search_radius_p = 4.0/alpha;
+  if(with_hi == false){
+    search_radius_p = input_file("search_radius_p", 0.0);
+    if (search_radius_p <= 0.) {
+      cout <<"  Warning: for Free draining systems, a search_radius_p(> 0) needs to be given to build particle-particle neighborlist" << endl;
+      libmesh_error();
+    }
+  }
+  else{
+    search_radius_p = 4.0/alpha;
+  }
   search_radius_e = 0.5*hmaxf + search_radius_p;
-
   // print mesh info
   mesh -> print_info();
 } // end function
@@ -807,8 +827,9 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 //==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
 {
-  // get stokes system from equation systems
-  PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+ 
+   // get stokes system from equation systems
+   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -866,19 +887,22 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     -----------------------------------------------------------------------------------------*/
     if(i%write_interval == 0){
 
+      cout << "\nStarting Fixman integration at step "<< i << endl;
       if (i != restart_step){
         /*
          * write equation system to output file
          */
-        if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end())
-        {
-          system.add_local_solution();  // add local solution for the disturbed system
-          system.solution->add(*v0_ptr);// add the undisturbed solution
-  #ifdef LIBMESH_HAVE_EXODUS_API
-          exodus_ptr->append(true);
-          exodus_ptr->write_timestep(out_system_filename,system.get_equation_systems(),o_step,o_step);
-  #endif
-        } // end if (write es)  
+        if (i != 0){
+          if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end())
+          {
+            system.add_local_solution();  // add local solution for the disturbed system
+            system.solution->add(*v0_ptr);// add the undisturbed solution
+    #ifdef LIBMESH_HAVE_EXODUS_API
+            exodus_ptr->append(true);
+            exodus_ptr->write_timestep(out_system_filename,equation_systems,o_step,o_step);
+    #endif
+          } // end if (write es)  
+        }
         /*
          * write particle to output file
          */ 
@@ -969,12 +993,12 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Print out the mean and variance or view the generated vector.
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      PetscPrintf(PETSC_COMM_WORLD,
-                 "Generated random_vector: mean = %f, variance = %f\n",
-                 mean_dw, variance_dw);
-      PetscPrintf(PETSC_COMM_WORLD,
-                 "Predicted random_vector: mean = %f, variance = %f\n",
-                 0, std::sqrt(2*dt));
+//      PetscPrintf(PETSC_COMM_WORLD,
+//                 "Generated random_vector: mean = %f, variance = %f\n",
+//                 mean_dw, variance_dw);
+//      PetscPrintf(PETSC_COMM_WORLD,
+//                 "Predicted random_vector: mean = %f, variance = %f\n",
+//                 0., std::sqrt(2.*dt));
       // Compute dw = B^-1 * dw using Chebyshev polynomial, dw will be changed!
       VecCopy (dw,dw_mid);  // save dw to dw_mid, which will be used for Chebyshev
       for(std::size_t j=0; j<2; j++)
@@ -1084,12 +1108,11 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
 void Copss::langevin_integrate(EquationSystems& equation_systems,
                                unsigned int i)
 {
-
   // get stokes system from equation systems
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
   if(i>0){
     system.update();
-    system.reinit_system();
+    system.reinit_fd_system();
   }
   std::vector<Real> p_velocity(dim,0.);
   for (std::size_t p_id = 0; p_id < NP; p_id++) {
@@ -1108,7 +1131,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
    * last step before restart.
   -----------------------------------------------------------------------------------------*/
   if(i%write_interval == 0){
-
+    cout << "\nStarting Langevin integration at step "<< i << endl;
     if (i != restart_step){  
       /*
        * write particle to output file
@@ -1187,12 +1210,12 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Print out the mean and variance or view the generated vector.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    PetscPrintf(PETSC_COMM_WORLD,
-               "Generated random_vector: mean = %f, variance = %f\n",
-               mean_dw, variance_dw);
-    PetscPrintf(PETSC_COMM_WORLD,
-               "Predicted random_vector: mean = %f, variance = %f\n",
-               0., std::sqrt(2.*dt));
+//    PetscPrintf(PETSC_COMM_WORLD,
+//               "Generated random_vector: mean = %f, variance = %f\n",
+//               mean_dw, variance_dw);
+//    PetscPrintf(PETSC_COMM_WORLD,
+//               "Predicted random_vector: mean = %f, variance = %f\n",
+//               0., std::sqrt(2.*dt));
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Particle coordinate vector R0.
      Move the particle R_mid = R0 + U0*dt (deterministic)

@@ -413,8 +413,9 @@ void PMLinearImplicitSystem::reinit_system()
   // reinit point-mesh system, including
   // (1) build the point-point neighbor list according to search radius;
   // (2) build the element-point neighbor list according to search radius;
-  // (3) set the elem_id and proc_id for points
-  _point_mesh->reinit();  
+  // (3) evaluate forces
+  const bool with_hi = true;
+  _point_mesh->reinit(with_hi);  
   // update the tracking points position on the mesh if needed
   if(_particle_mesh != NULL){
     _point_mesh->update_particle_mesh(_particle_mesh);
@@ -427,6 +428,24 @@ void PMLinearImplicitSystem::reinit_system()
   STOP_LOG("reinit_system()", "PMLinearImplicitSystem");
 }
 
+// ==================================================================================
+void PMLinearImplicitSystem::reinit_fd_system()
+{
+  START_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
+  this->comm().barrier(); // Is this at the beginning or the end necessary?
+  
+  // reinit point-mesh system, including
+  // (1) build the point-point neighbor list according to search radius;
+  // (2) set the elem_id and proc_id for points
+  const bool with_hi = false;
+  _point_mesh->reinit(with_hi);  
+  for (std::size_t i = 0; i < _fixes.size(); i++){
+    // _fixes[i]->print_fix();
+    _fixes[i]->compute();
+  }
+
+  STOP_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
+}
 
   
 

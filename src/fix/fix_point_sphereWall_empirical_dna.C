@@ -9,7 +9,7 @@ FixPointSphereWallEmpiricalDNA::FixPointSphereWallEmpiricalDNA(PMLinearImplicitS
 
 void FixPointSphereWallEmpiricalDNA::initParams()
 {
-  wall_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>>("slit");
+  wall_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>>("sphere");
   for (int i = 0; i < dim; i++){
     if(box_min(i) != wall_params[2*i] or box_max(i) != wall_params[2*i+1]){
       std::cout << std::endl << "********************Error message********************" << std::endl

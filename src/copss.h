@@ -325,7 +325,6 @@ protected:
   void read_chebyshev_info(); 
   void read_run_info(); 
   void read_restart_time();
-  virtual void read_output_info() = 0;
 
   /*!
    * Steps for create_object_mesh()

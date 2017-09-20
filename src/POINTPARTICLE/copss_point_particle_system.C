@@ -47,26 +47,6 @@ void CopssPointParticleSystem::read_particle_info(){
 }// end read_particle_parameter()
 
 //==========================================================================
-void CopssPointParticleSystem::read_output_info()
-{
-  // write interval
-  write_interval = input_file("write_interval", 1);
-  //output file flags
-  output_file.resize(input_file.vector_variable_size("output_file"));
-  for (unsigned int i=0; i < output_file.size(); i++){
-    output_file[i] = input_file("output_file","not defined", i);
-  }
-  cout <<"\n##########################################################\n"
-       << "#                 output file information                      \n"
-       << "##########################################################\n\n"
-       << "-----------> write_interval: " << write_interval << endl
-       << "-----------> write output file: " << endl;
-  for(int i = 0; i < output_file.size(); i++){
-    cout << "                               " << output_file[i] << endl;
-  }
-}
-
-//==========================================================================
 void CopssPointParticleSystem::create_object(){
   const unsigned int chain_id = 0;
   polymer_chain = new PolymerChain(chain_id, *pm_periodic_boundary);
@@ -157,7 +137,7 @@ void CopssPointParticleSystem::create_object_mesh(){
 
   point_mesh->add_periodic_boundary(*pm_periodic_boundary);
 
-  point_mesh->reinit();
+  point_mesh->reinit(with_hi);
   cout <<"-------------> Reinit point mesh object, finished! \n"
             <<"- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
 		        <<"### The point-mesh info:\n"
@@ -284,17 +264,13 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   if (adaptive_dt == true and point_particle_model == "polymer_chain") max_dr_coeff = 0.1 * Ss2 / Rb / Rb;
   //start integration
   perf_log.push ("integration");
-  // if restart = false ---> istart = 0, restart_step = -1
-  // if restart = true  ---> istart = restart_step
   for(unsigned int i=istart; i<=istart+nstep; ++i)
   {
     if(with_hi){
-      cout << "\nStarting Fixman Mid-Point algorithm at step "<< i << endl;
       // integrate particle movement using fixman's mid point scheme
       this -> fixman_integrate(equation_systems, i);    
     }
     else{
-      cout << "\nStarting Langevin algorithm at step "<< i << endl;
       // integrate particle movement using fixman's mid point scheme
       this -> langevin_integrate(equation_systems, i);
     }

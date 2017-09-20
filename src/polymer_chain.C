@@ -719,7 +719,10 @@ void PolymerChain::write_polymer_chain(const unsigned int& step_id,
   START_LOG ("write_polymer_chain()", "PolymerChain");
   this -> write_time(step_id, o_step, real_time, comm_in_rank);
   for (int i = 0; i < output_file.size(); i++){
-    if(output_file[i] == "trajectory") this -> write_polymer_trajectory(o_step, comm_in_rank);
+    if(output_file[i] == "equation_systems") {
+      // this output has been written in COPSS.C
+    }
+    else if(output_file[i] == "trajectory") this -> write_polymer_trajectory(o_step, comm_in_rank);
     else if(output_file[i] == "center_of_mass") this -> write_polymer_com(step_id, o_step,lvec, comm_in_rank);
     else if(output_file[i] == "chain_stretch") this -> write_polymer_stretch(step_id,o_step, lvec, comm_in_rank);
     else if(output_file[i] == "radius_of_gyration") this -> write_polymer_rog(step_id, o_step, lvec, comm_in_rank);
@@ -924,7 +927,10 @@ void PolymerChain::write_bead(const unsigned int& step_id,
   START_LOG("write_bead()", "PolymerChain");
   this->write_time(step_id, o_step, real_time, comm_in_rank);
   for (int i = 0; i < output_file.size(); i++){
-    if(output_file[i] == "trajectory") this -> write_bead_trajectory(o_step, comm_in_rank);
+    if(output_file[i] == "equation_systems") {
+      // this output has been written in Copss.C
+    }
+    else if(output_file[i] == "trajectory") this -> write_bead_trajectory(o_step, comm_in_rank);
     else if(output_file[i] == "center_of_mass") this -> write_bead_com(step_id, o_step,lvec, comm_in_rank);
     else if(output_file[i] == "mean_square_displacement") this -> write_bead_msd(step_id, o_step,center0, lvec, comm_in_rank);
     else {

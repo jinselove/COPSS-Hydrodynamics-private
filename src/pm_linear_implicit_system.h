@@ -196,6 +196,15 @@ public:
    *             modify the force field according to the vel_last_step.
    */
   void reinit_system();
+
+  /*
+   * Re-init free-draining system, including:
+   * (1) reinit() reinit point particles
+   *              build_particle_neighbor_list()
+   * (2) compute particle force (by force field)
+   *             modify the force field according to the vel_last_step.
+   */
+  void reinit_fd_system();
   
   
   

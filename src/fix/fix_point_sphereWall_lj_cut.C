@@ -48,6 +48,7 @@ void FixPointSphereWallLJCut::compute()
     const Point r_i_sphereWall = pti_unit * (cavity_radius-pti_norm); 
     // bead-wall interaction force
     if(r_i_sphereWall.norm() <= rCut) pforce = fix_base.lj_force(r_i_sphereWall, epsilon, sigma);
+    // attach this force to particle i
     point_mesh->particles()[i]->add_particle_force(pforce);    
   } // end for i-loop 
 }

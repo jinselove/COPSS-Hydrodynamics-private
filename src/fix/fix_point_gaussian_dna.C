@@ -12,7 +12,7 @@ void FixPointGaussianDNA::initPointParticleType()
   point_particle_model = pm_system->get_equation_systems().parameters.get<std::string>("point_particle_model");
   if(point_particle_model != "polymer_chain") {
   std::cout << std::endl << "*******************Error message*********************" << std::endl
-              << "The force field : "<< force_type << " is only for polymer_chain, i.e.,"
+              << "The force field 'gaussian_dna' is only for polymer_chain, i.e.,"
               << "not applicable to point_particle_model: " << point_particle_model << std::endl
               << "****************************************" << std::endl;
   libmesh_error();

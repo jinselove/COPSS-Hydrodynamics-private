@@ -33,6 +33,8 @@ public:
 
 	~FixPointSphereWallEmpiricalDNA(){};
 
+	void initPointParticleType();
+	
 	void initParams();
 
 	void print_fix();
@@ -42,6 +44,7 @@ public:
 protected:
 	Real c0;
 	Real d0;
+	Real sphereWallRadius;
 
 };
 

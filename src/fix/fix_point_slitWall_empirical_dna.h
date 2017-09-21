@@ -33,6 +33,8 @@ public:
 
 	~FixPointSlitWallEmpiricalDNA(){};
 
+	void initPointParticleType();
+
 	void initParams();
 
 	void print_fix();

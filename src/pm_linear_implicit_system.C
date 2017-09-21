@@ -478,9 +478,9 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Point &p,
    For point particle simulation, there is no solid mesh. "hmin" actually is NOT used.
    For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
    ---------------------------------------------------------------------------------------- */
-  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("fluid mesh size");
+  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
   if(particle_type=="rigid_particle"){
-    hmin  =  this->get_equation_systems().parameters.get<Real> ("solid mesh size");
+    hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
   }
   
   
@@ -527,9 +527,9 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_bead(const std::size_
    For point particle simulation, there is no solid mesh. "hmin" actually is NOT used.
    For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
    ---------------------------------------------------------------------------------------- */
-  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("fluid mesh size");
-  if(particle_type!="point_particle"){
-    hmin  =  this->get_equation_systems().parameters.get<Real> ("solid mesh size");
+  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
+  if(particle_type == "rigid_particle"){
+    hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
   }
   
   

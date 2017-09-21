@@ -354,7 +354,6 @@ void Copss::read_run_info(){
   with_hi        = input_file("with_hi", true);
   with_brownian  = input_file("with_brownian", true);
   if(with_brownian){
-    dt0 = input_file("dt0", 1.e-3);
     random_seed   = input_file("random_seed",111);
   }
   max_dr_coeff   = input_file("max_dr_coeff", 0.1);
@@ -386,7 +385,6 @@ void Copss::read_run_info(){
        << "#                 Run information                      \n"
        << "##########################################################\n\n"
        << "-----------> adaptive_dt: " << std::boolalpha << adaptive_dt << endl
-       << "-----------> dt0: " << dt0 << endl
        << "-----------> max_dr_coeff: " << max_dr_coeff << endl
        << "-----------> print_debug_info: " << std::boolalpha << debug_info << endl; 
   if (with_hi) cout << "-----------> with_hi: " <<std::boolalpha <<with_hi <<endl;
@@ -936,10 +934,10 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       vp_max = std::sqrt(vp_max);     // maximum magnitude of particle velocity
       vp_min = std::sqrt(vp_min);
       if(with_brownian) {
-        dt = (vp_max == 0) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  // maximum |dr| =  max_dr = dt0 * 1; dt0 = 0.1 for beads; dt0 = 0.1*Ss2/Rb/Rb for polymers
+        dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  
       }
       else {
-        dt = (vp_max == 0) ? (max_dr_coeff * hmin) : (max_dr_coeff * hmin / vp_max); // maximum |dr| = dt0 * hmin
+        dt = (vp_max <= 1.) ? (max_dr_coeff * hmin) : (max_dr_coeff * hmin / vp_max); 
       }
       if(i % write_interval == 0){
         cout << "       ##############################################################################################################" << endl
@@ -955,10 +953,10 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     }
     else{
       if(with_brownian) {
-        dt = max_dr_coeff * 1;  // maximum |dr| =  max_dr = dt0 * 1; dt0 = 0.1 for beads; dt0 = 0.1*Ss2/Rb/Rb for polymers
+        dt = max_dr_coeff * 1.; 
       }
       else {
-        dt = max_dr_coeff * hmin; // maximum |dr| = dt0 * hmin
+        dt = max_dr_coeff * hmin; 
       } // end if (with brownian)
       if(i % write_interval == 0){
         cout << "       ##############################################################################################################" << endl
@@ -1165,7 +1163,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
     }
     vp_max = std::sqrt(vp_max);     // maximum magnitude of particle velocity
     vp_min = std::sqrt(vp_min);
-    dt = (vp_max == 0) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  // maximum |dr| =  max_dr = dt0 * 1; dt0 = 0.1 for beads; dt0 = 0.1*Ss2/Rb/Rb for polymers
+    dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max); 
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
            << "       # Max velocity magnitude is " << vp_max << endl
@@ -1178,7 +1176,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
     } // end if (i% write_interval)  
   }
   else{
-    dt = max_dr_coeff * 1;  // maximum |dr| =  max_dr = dt0 * 1; dt0 = 0.1 for beads; dt0 = 0.1*Ss2/Rb/Rb for polymers
+    dt = max_dr_coeff * 1;  
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
            << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl

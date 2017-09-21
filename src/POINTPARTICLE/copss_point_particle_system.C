@@ -172,7 +172,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<StokesSolverType> ("solver_type") = solver_type;
   equation_systems.parameters.set<Real>              ("alpha") = alpha;
   equation_systems.parameters.set<Real>         ("kBT")        = kBT;
-  equation_systems.parameters.set<Real>   ("fluid mesh size")  = min_mesh_size;
+  equation_systems.parameters.set<Real>   ("minimum fluid mesh size")  = hminf;
   equation_systems.parameters.set<Real>       ("viscosity_0")  = muc;
   equation_systems.parameters.set<Real>               ("br0")  = 1.0;
   equation_systems.parameters.set<Real>               ("bk")   = bk;
@@ -184,14 +184,9 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>               ("Ss2")  = Ss2;
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
   equation_systems.parameters.set<string> ("point_particle_model") = point_particle_model;
-  // Attach force fields
-  equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;
-  for (int i=0; i<numForceTypes; i++) equation_systems.parameters.set<std::vector<Real>> (forces[i].first) = forces[i].second;
-  // 
   equation_systems.parameters.set<string> ("test_name") = test_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
-  equation_systems.parameters.set<std::vector<std::string>> ("output_file") = output_file;
 }
 
 void CopssPointParticleSystem::update_object(std::string stage)
@@ -261,7 +256,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   cout<<"==>(3/3) Start calculating dynamics and advancing time steps"<<endl;
   vel0.resize(n_vec);
   vel1.resize(n_vec);
-  if (adaptive_dt == true and point_particle_model == "polymer_chain") max_dr_coeff = 0.1 * Ss2 / Rb / Rb;
+  if (adaptive_dt == true and point_particle_model == "polymer_chain") max_dr_coeff *= Ss2 / Rb / Rb;
   //start integration
   perf_log.push ("integration");
   for(unsigned int i=istart; i<=istart+nstep; ++i)

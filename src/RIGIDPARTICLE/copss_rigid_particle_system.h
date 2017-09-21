@@ -42,6 +42,11 @@ protected:
 	// override read_particle_info() function in Copss class
 	void read_particle_info () override;
 
+	// override read_output_info() function in Copss class
+	vod read_output_info() override;
+
+	// override read_output_info() function in Copss class
+	void read_output_info () override;
 	// create objects, polymer chains
 	void create_object() override;
 
@@ -66,32 +71,35 @@ protected:
 	// update object due to PBC after check_wall()
 	void update_object(std::string stage) override;
 
+	// write object to object file
+	void write_object(unsigned int step_id) override;
+
 
 
 
 private:
 
-	std::string _particle_mesh_type;
+	std::string particle_mesh_type;
 
-	std::vector<std::string> _particle_mesh_file;
+	std::vector<std::string> particle_mesh_file;
 
-	std::vector<Real> _hsize_solid;
+	std::vector<Real> hsize_solid;
 
-	Real _hmins; // surface mesh hmin
+	Real hmins; // surface mesh hmin
 
-	Real _hmaxs;
+	Real hmaxs;
 
-  	ParticleMesh<3>* _particle_mesh;
+  	ParticleMesh<3>* particle_mesh;
 
-  	std::vector<MeshSpringNetwork*> _mesh_spring_network;
+  	std::vector<MeshSpringNetwork*> mesh_spring_network;
 
-  	std::size_t _num_particles;
+  	std::size_t num_particles;
 
   	const std::string smesh_file_name = "particle_surface_mesh.e";
 
   	std::ostringstream smesh_file_name_i;
 
-  	bool _write_particle_mesh;
+  	bool write_particle_mesh;
 
 
 };

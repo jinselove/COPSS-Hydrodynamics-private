@@ -28,7 +28,12 @@ Fix* FixFactory::buildFix(std::string& fix_name, PMLinearImplicitSystem& pm_syst
 		}
 	}
 	else{
-		// put force field between rigid particles here
+		// rigid particle surface constraint has to be added by default
+		if(fix_name == "surface_constraint") return new FixRigidSurfaceConstraint(pm_system);
+		else{
+			std::cout <<"Error: undefined force field for rigid_particles: " << fix_name << std::endl;
+			libmesh_error();
+		}
 	}
 
 }

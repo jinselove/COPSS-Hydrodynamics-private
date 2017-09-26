@@ -40,7 +40,7 @@ void FixPointSlitWallLJCut::compute()
   for(std::size_t i=0; i<num_points; ++i)
   {
     std::vector<Real> pforce(dim);
-    const Point pti = point_mesh->particles()[i] -> point();
+    const Point pti = point_particles[i] -> point();
     for(std::size_t j = 0; j<dim;++j){
       Point r_i_lo, r_i_hi;
       if(periodic[j]==false and inlet[j]==false){
@@ -50,7 +50,7 @@ void FixPointSlitWallLJCut::compute()
         if(r_i_hi.norm() <= rCut) pforce[j] += fix_base.lj_force(r_i_hi, epsilon,sigma)[j];
       }// end of
     } // end for (i<_dim)
-    point_mesh->particles()[i]->add_particle_force(pforce);    
+    point_particles[i]->add_particle_force(pforce);    
   } // end for i-loop 
 }
 

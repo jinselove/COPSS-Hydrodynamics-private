@@ -184,6 +184,8 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>               ("Ss2")  = Ss2;
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
   equation_systems.parameters.set<string> ("point_particle_model") = point_particle_model;
+  equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;
+  for (int i=0; i<numForceTypes; i++) equation_systems.parameters.set<std::vector<Real>> (forces[i].first) = forces[i].second;
   equation_systems.parameters.set<string> ("test_name") = test_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
@@ -233,7 +235,6 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   hmax = hmaxf;
   // Get a better conformation of polymer chains before simulation.
   this -> update_object("in initial data input");
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   Compute undisturbed velocity field without particles.
   NOTE: We MUST re-init particle-mesh before solving Stokes
@@ -245,7 +246,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
     perf_log.pop ("solve undisturbed_system");
   }
   else{
-    cout <<"HI is turned off, donothing in this step. " << endl;
+    cout <<"HI is turned off, do nothing in this step. " << endl;
   }
   // create Brownian system for simulation
   cout<<"==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"<<endl;

@@ -53,12 +53,12 @@ void FixPointSphereWallEmpiricalDNA::compute()
   {
     std::vector<Real> pforce(dim);
     //  retrieve bead position and the box boundary
-    const Point pti = point_mesh->particles()[i]->point();
+    const Point pti = point_particles[i]->point();
     const Point r_i_sphereWall = pti.unit() * (sphereWallRadius-pti.norm());
     // compute force
     pforce = fix_base.polymer_wall_empirical_force(r_i_sphereWall, c0, d0);    
     // attach this force to particle i 
-    point_mesh->particles()[i]->add_particle_force(pforce);    
+    point_particles[i]->add_particle_force(pforce);    
   } // end for i-loop 	
 }
 

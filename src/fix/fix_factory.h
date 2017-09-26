@@ -9,6 +9,8 @@
 #include "fix_point_sphereWall_lj_cut.h"
 #include "fix_point_slitWall_empirical_dna.h"
 #include "fix_point_sphereWall_empirical_dna.h"
+#include "fix_rigid_surface_constraint.h"
+
 #include "../pm_linear_implicit_system.h"
 
 namespace libMesh

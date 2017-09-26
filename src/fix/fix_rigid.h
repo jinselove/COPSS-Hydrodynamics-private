@@ -52,7 +52,7 @@ public:
   virtual ~FixRigid(){}
 
   /*! Prepare for running
-  /*
+   *
    * Check if particle_type == "rigid_particle"
   */
   void initParticleType();
@@ -69,7 +69,11 @@ protected:
   // partiticle mesh for finite size particle
   ParticleMesh<3>* particle_mesh;  
 
-  unsigned int num_particles;
+  // rigid particles
+  std::vector<RigidParticle*> rigid_particles;
+
+  // number of rigid particles
+  std::size_t num_particles;
 
 };  // end of class
   

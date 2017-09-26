@@ -131,6 +131,7 @@ public:
   // bead 
   Real bead_r;
   std::size_t num_points;
+  std::vector<PointParticle*> point_particles;
 
   // kBT
   Real kBT;

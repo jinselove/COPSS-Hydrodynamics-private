@@ -25,9 +25,9 @@ void FixPoint::check_walls()
   // for slit walls
   if(wall_type == "slit"){
     for(std::size_t id=0; id<num_points; ++id){
-      const std::size_t p_id = point_mesh->particles()[id]->id();
-      std::vector<int> & count = point_mesh->particles()[p_id]->counter();
-      Point& pt0     = point_mesh->particles()[p_id]->point();
+      const std::size_t p_id = point_particles[id]->id();
+      std::vector<int> & count = point_particles[p_id]->counter();
+      Point& pt0     = point_particles[p_id]->point();
       // check all three directions of the box
       for(std::size_t i=0; i<dim; ++i)
       {
@@ -57,9 +57,9 @@ void FixPoint::check_walls()
   else{
     Real cavity_radius = wall_params[0];
     for(std::size_t id=0; id<num_points; ++id){
-      const std::size_t p_id = point_mesh->particles()[id]->id();
-      std::vector<int> & count = point_mesh->particles()[p_id]->counter();
-      Point& pt0     = point_mesh->particles()[p_id]->point();
+      const std::size_t p_id = point_particles[id]->id();
+      std::vector<int> & count = point_particles[p_id]->counter();
+      Point& pt0     = point_particles[p_id]->point();
       Real  pt0_norm = pt0.norm();
       Point pt0_unit = pt0.unit();
     // Move particle back into spherical cavity

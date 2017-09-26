@@ -158,7 +158,6 @@ public:
   bool with_brownian; // if consider brownian motion
   std::size_t random_seed;
   bool adaptive_dt; // if use adaptive time step (essential for brownian systems)
-  Real dt0; // timestep when brownian system starts (step1)
   Real max_dr_coeff; // max displacement per step
   bool restart; // if restart
   std::size_t restart_step; // restart step

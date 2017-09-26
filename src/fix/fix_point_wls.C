@@ -57,8 +57,8 @@ void FixPointWLS::compute()
     std::size_t bead_id_2 = bonds[i][2];  // connect bead 2
 
     // Force on bead 1
-    const Point pti   = point_mesh->particles()[bead_id_1]->point();
-    const Point ptj   = point_mesh->particles()[bead_id_2]->point();
+    const Point pti   = point_particles[bead_id_1]->point();
+    const Point ptj   = point_particles[bead_id_2]->point();
     const Point R_ij  = point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
     const std::vector<Real> F_ij = fix_base.spring_force_wls(R_ij,c1,Ls);
 
@@ -67,8 +67,8 @@ void FixPointWLS::compute()
     for (std::size_t j=0; j<dim; ++j) F_ji[j] = -F_ij[j];
 
     // Add forces to beads
-    point_mesh->particles()[bead_id_1]->add_particle_force(F_ij);
-    point_mesh->particles()[bead_id_2]->add_particle_force(F_ji);
+    point_particles[bead_id_1]->add_particle_force(F_ij);
+    point_particles[bead_id_2]->add_particle_force(F_ji);
   }
 }
 

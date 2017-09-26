@@ -62,5 +62,7 @@ void Fix::initialization()
 
   bead_r   = pm_system->get_equation_systems().parameters.get<Real>("bead radius");
 
-  num_points = point_mesh -> num_particles();
+  num_points = point_mesh->num_particles();
+
+  point_particles = point_mesh->particles();
 }

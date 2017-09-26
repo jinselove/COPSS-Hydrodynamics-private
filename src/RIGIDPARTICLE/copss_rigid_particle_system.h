@@ -42,11 +42,6 @@ protected:
 	// override read_particle_info() function in Copss class
 	void read_particle_info () override;
 
-	// override read_output_info() function in Copss class
-	vod read_output_info() override;
-
-	// override read_output_info() function in Copss class
-	void read_output_info () override;
 	// create objects, polymer chains
 	void create_object() override;
 
@@ -83,6 +78,8 @@ private:
 
 	std::vector<std::string> particle_mesh_file;
 
+	std::vector<Real> surface_constraint;
+	
 	std::vector<Real> hsize_solid;
 
 	Real hmins; // surface mesh hmin
@@ -95,11 +92,12 @@ private:
 
   	std::size_t num_particles;
 
-  	const std::string smesh_file_name = "particle_surface_mesh.e";
 
-  	std::ostringstream smesh_file_name_i;
+  	// const std::string smesh_file_name = "particle_surface_mesh.e";
 
-  	bool write_particle_mesh;
+  	// std::ostringstream smesh_file_name_i;
+
+  	// bool write_particle_mesh;
 
 
 };

@@ -39,7 +39,7 @@ void FixPointSphereWallLJCut::compute()
   for(std::size_t i=0; i<num_points; ++i)
   {
     std::vector<Real> pforce(dim);
-    const Point pti = point_mesh->particles()[i] -> point();
+    const Point pti = point_particles[i] -> point();
     // Retrieve wall_info
     Real cavity_radius = wall_params[0];
     const Real  pti_norm = pti.norm();
@@ -49,7 +49,7 @@ void FixPointSphereWallLJCut::compute()
     // bead-wall interaction force
     if(r_i_sphereWall.norm() <= rCut) pforce = fix_base.lj_force(r_i_sphereWall, epsilon, sigma);
     // attach this force to particle i
-    point_mesh->particles()[i]->add_particle_force(pforce);    
+    point_particles[i]->add_particle_force(pforce);    
   } // end for i-loop 
 }
 

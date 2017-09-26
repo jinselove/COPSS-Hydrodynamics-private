@@ -34,11 +34,20 @@ Copss::Copss(const CopssInit& init)
 Copss::~Copss()
 {
   delete mesh;
+  delete point_mesh;
   delete pm_periodic_boundary;
   delete brownian_sys;
+  delete fix_factory;
   mesh = NULL;
   pm_periodic_boundary = NULL;
   brownian_sys = NULL;
+  fix_factory = NULL;
+  for (int i = 0; i < fixes.size(); i++)
+  {
+    delete fixes[i];
+    fixes[i] = NULL;
+  } 
+  fixes.clear();
 }
 
 
@@ -386,7 +395,7 @@ void Copss::read_run_info(){
        << "##########################################################\n\n"
        << "-----------> adaptive_dt: " << std::boolalpha << adaptive_dt << endl
        << "-----------> max_dr_coeff: " << max_dr_coeff << endl
-       << "-----------> print_debug_info: " << std::boolalpha << debug_info << endl; 
+       << "-----------> debug_info: " << std::boolalpha << debug_info << endl; 
   if (with_hi) cout << "-----------> with_hi: " <<std::boolalpha <<with_hi <<endl;
   if (with_brownian){
 	 cout << "-----------> with_brownian: " <<std::boolalpha<<with_brownian <<endl
@@ -458,7 +467,6 @@ void Copss::read_restart_time()
     libmesh_error();
   }
 }
-
 
 //============================================================================
 void Copss::create_domain_mesh()
@@ -644,7 +652,6 @@ void Copss::attach_fixes(PMLinearImplicitSystem& pm_system)
   fixes.resize(numForceTypes);
   for (int i=0; i < numForceTypes; i++){
     fixes[i] = fix_factory -> buildFix(forceTypes[i], pm_system);
-    // fixes[i] -> preSimulation();
   }
   pm_system.attach_fixes(fixes);
 }
@@ -1092,8 +1099,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
       brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
       VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
-      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords
- 
+      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords 
       // Check and correct beads' position at the midpoint
       fixes[0]->check_walls(); // check pbc and inpenetrable wall
       this -> update_object("after step "+std::to_string(i));

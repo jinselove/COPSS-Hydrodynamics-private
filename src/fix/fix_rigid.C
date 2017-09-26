@@ -6,8 +6,8 @@ FixRigid::FixRigid(PMLinearImplicitSystem& pm_sys_,
  elastic_system(&el_sys_)
 {
 	this -> initParticleType();
-	particle_mesh = pm_system -> particle_mesh();
-
+	particle_mesh = pm_system->particle_mesh();
+	rigid_particles = particle_mesh->particles();
 }
 
 FixRigid::FixRigid(PMLinearImplicitSystem& pm_sys_)
@@ -15,6 +15,8 @@ FixRigid::FixRigid(PMLinearImplicitSystem& pm_sys_)
 {
 	this -> initParticleType();
 	particle_mesh = pm_system -> particle_mesh();
+	num_particles = particle_mesh -> num_particles();
+  rigid_particles = particle_mesh->particles();
 }
 
 //================================================================
@@ -34,7 +36,6 @@ void FixRigid::initParticleType()
 void FixRigid::check_walls()
 {
   std::cout <<"Warning: check_walls() is not implemented yet for rigid particles" << std::endl;
-
 }
 
 

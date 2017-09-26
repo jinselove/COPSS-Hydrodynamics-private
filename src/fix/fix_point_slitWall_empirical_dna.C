@@ -53,7 +53,7 @@ void FixPointSlitWallEmpiricalDNA::compute()
   {
     std::vector<Real> pforce(dim);
     //  retrieve bead position and the box boundary
-    const Point pti = point_mesh->particles()[i]->point();
+    const Point pti = point_particles[i]->point();
     // compute the particle-wall interaction force
     for (std::size_t j=0; j<dim; ++j){  // loop over each direction
     // compute the distance to the wall if NO periodic boundary and no inlet 
@@ -67,7 +67,7 @@ void FixPointSlitWallEmpiricalDNA::compute()
       pforce[j] += fix_base.polymer_wall_empirical_force(r_i_hi, c0, d0)[j];
     } // end if
   } // end for j-loop    
-    point_mesh->particles()[i]->add_particle_force(pforce);    
+    point_particles[i]->add_particle_force(pforce);    
   } // end for i-loop	
 }
 

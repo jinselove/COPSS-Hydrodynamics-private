@@ -362,6 +362,28 @@ void RigidParticle::update_mesh(const std::vector<Point>& nodal_vec)
   
   STOP_LOG("update_mesh()", "RigidParticle");
 }
+
+// ======================================================================
+void RigidParticle::translate_mesh(const Point& translationDist)
+{
+  START_LOG("translate_mesh()", "RigidParticle");
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   We apply a translation move to the position of nodes of particle surface mesh 
+      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+  MeshBase::node_iterator       nd     = _mesh.active_nodes_begin();
+  const MeshBase::node_iterator end_nd = _mesh.active_nodes_end();
+  for ( ; nd != end_nd; ++nd)
+  {
+    // Store a pointer to the current node
+    Node* node = *nd;
+    const dof_id_type n_id = node->id();
+    for(unsigned int i=0; i<3; ++i) {
+      (*node)(i) = translationDist(i);
+    }
+  } // end for
+  
+  STOP_LOG("translate_mesh()", "RigidParticle");
+}
   
 
 
@@ -485,7 +507,6 @@ bool RigidParticle::on_the_periodic_boundary() const
   STOP_LOG("on_the_periodic_boundary()", "RigidParticle");
   return flag;
 }
-
 
 
 // ======================================================================

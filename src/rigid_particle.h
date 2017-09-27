@@ -262,6 +262,12 @@ public:
    */
   void update_mesh(const std::vector<Point>& nodal_vec);
   
+
+  /*
+   * Rebuild mesh when rigidparticle is forced to make a translation move
+   *
+   */
+  void translate_mesh(const Point& translationDist);
   
   /*
    * Extract nodal coordinates of the particle mesh.

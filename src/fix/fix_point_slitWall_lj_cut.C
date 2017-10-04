@@ -4,11 +4,13 @@ FixPointSlitWallLJCut::FixPointSlitWallLJCut(PMLinearImplicitSystem& pm_sys_)
 :
  FixPoint(pm_sys_)
 {
+  force_type = "wall/lj_cut";
   this -> initParams();
 }
 
 void FixPointSlitWallLJCut::initParams()
 {
+START_LOG("FixPointSlitWallLJCut::initParams()", "FixPointSlitWallLJCut");
   force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("wall/lj_cut");
   wall_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>>("slit");
   if(force_params.size()!=3){
@@ -28,15 +30,19 @@ void FixPointSlitWallLJCut::initParams()
   epsilon = force_params[0];
   sigma = force_params[1];
   rCut = force_params[2];
+STOP_LOG("FixPointSlitWallLJCut::initParams()", "FixPointSlitWallLJCut");
 }
 
 void FixPointSlitWallLJCut::print_fix()
 {
+START_LOG("FixPointSlitWallLJCut::print_fix()", "FixPointSlitWallLJCut");
   std::cout <<"this is FixPointSlitWallLJCut" << std::endl;
+STOP_LOG("FixPointSlitWallLJCut::print_fix()", "FixPointSlitWallLJCut");
 }
 
 void FixPointSlitWallLJCut::compute()
 {	
+START_LOG("FixPointSlitWallLJCut::compute()", "FixPointSlitWallLJCut");
   for(std::size_t i=0; i<num_points; ++i)
   {
     std::vector<Real> pforce(dim);
@@ -52,5 +58,6 @@ void FixPointSlitWallLJCut::compute()
     } // end for (i<_dim)
     point_particles[i]->add_particle_force(pforce);    
   } // end for i-loop 
+STOP_LOG("FixPointSlitWallLJCut::compute()", "FixPointSlitWallLJCut");
 }
 

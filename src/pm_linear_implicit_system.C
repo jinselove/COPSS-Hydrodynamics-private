@@ -41,7 +41,7 @@
 #include "analytical_solution.h"
 
 // assemble functions
-#include "assemble_navier_stokes.h"
+//#include "assemble_navier_stokes.h"
 
 namespace libMesh
 {
@@ -349,19 +349,19 @@ void PMLinearImplicitSystem::compute_point_velocity(const std::string& option,
     } // end for j-loop
 
     // ---------------------------- output for test -----------------------------
-//    if (this->comm().rank()==0 && option=="disturbed")
-//    {
-//      printf("\n--->test in compute_point_velocity(): output point velocity:\n");
-//      printf("i = %lu, point %lu: Uglobal (FEM) = (%E, %E, %E)\n",
-//             i, pid, _pv_send_list[dim*i], _pv_send_list[dim*i+1], _pv_send_list[dim*i+2] );
-//      printf("              Ulocal (Green Function) = (%E, %E, %E)\n",
-//             pvlocal[dim*i],pvlocal[dim*i+1],pvlocal[dim*i+2] );
-//      printf("              Uexc    = (%E, %E, %E)\n", Uex[0], Uex[1], Uex[2] );
-//      printf("       Stokes drag    = (%E, %E, %E)\n", fv[0], fv[1], fv[2] );
-//      printf("           ---Utotal  = (%E, %E, %E)\n\n",
-//             pv[dim*pid], pv[dim*pid+1], pv[dim*pid+2] );
-//    }
-    // --------------------------------------------------------------------------
+  //  if (this->comm().rank()==0 && option=="disturbed")
+  //  {
+  //    printf("\n--->test in compute_point_velocity(): output point velocity:\n");
+  //    printf("i = %lu, point %lu: Uglobal (FEM) = (%E, %E, %E)\n",
+  //           i, pid, _pv_send_list[dim*i], _pv_send_list[dim*i+1], _pv_send_list[dim*i+2] );
+  //    printf("              Ulocal (Green Function) = (%E, %E, %E)\n",
+  //           pvlocal[dim*i],pvlocal[dim*i+1],pvlocal[dim*i+2] );
+  //    printf("              Uexc    = (%E, %E, %E)\n", Uex[0], Uex[1], Uex[2] );
+  //    printf("       Stokes drag    = (%E, %E, %E)\n", fv[0], fv[1], fv[2] );
+  //    printf("           ---Utotal  = (%E, %E, %E)\n\n",
+  //           pv[dim*pid], pv[dim*pid+1], pv[dim*pid+2] );
+  //   }
+  //   // --------------------------------------------------------------------------
   } // end for i-loop
   //STOP_LOG("compute_point_velocity()", "PMLinearImplicitSystem");
 }
@@ -419,11 +419,37 @@ void PMLinearImplicitSystem::reinit_system()
   // update the tracking points position on the mesh if needed
   if(_particle_mesh != NULL){
     _point_mesh->update_particle_mesh(_particle_mesh);
-  }   
-  for (std::size_t i = 0; i < _fixes.size(); i++){
-    // _fixes[i]->print_fix();
-    _fixes[i]->compute();
+    // need to check if particles are on the pbc, if so, rebuild the particle mesh
+    _fixes[0]->check_pbc_pre_fix();
+    /*
+     * apply compute for all fixes
+     * FixRigidSurfaceConstraint::compute() applies surface constraint force on each node
+     * All the other fix::compute() only add a body force density to each particles
+     */
+    for (std::size_t i = 0; i < _fixes.size(); i++){
+      _fixes[i]->compute();
+    }
+    /* since all the other fix::compute() expect for FixRigidSurfaceConstraint::compute
+     * only add a body force density to each particle, we need to attach forces on each node
+     * using this force density
+     * Notice that: this attach_nodal() function only needs to be called once since the body force
+     * density is already the total one.
+     */
+    for (std::size_t i = 0; i<_fixes.size(); i++){
+      if (_fixes[i]->force_type != "surface_constraint"){
+       _fixes[i] -> attach_nodal();
+       break;
+      }
+    }
+    // need to restore particle mesh after applying all fixes if particles are on pbc
+    _fixes[0]->check_pbc_post_fix();
   }
+  else
+  {
+    for (std::size_t i = 0; i < _fixes.size(); i++){
+      _fixes[i]->compute();
+    }
+  }   
 
   STOP_LOG("reinit_system()", "PMLinearImplicitSystem");
 }

@@ -25,6 +25,15 @@
 #include <map>
 #include <cmath>
 
+// Local includes
+#include "libmesh/libmesh_common.h"
+#include "libmesh/reference_counted_object.h"
+#include "libmesh/parallel_object.h"
+#include "libmesh/point.h"
+#include "libmesh/id_types.h"
+#include "libmesh/mesh.h"
+#include "libmesh/serial_mesh.h"
+
 #include "../pm_linear_implicit_system.h"
 #include "../elasticity_system.h"
 #include "../pm_toolbox.h"
@@ -107,6 +116,23 @@ public:
 
   // debug
   virtual void print_fix(){}
+
+  /*! use this for rigid particle fixes
+   * check if particle is on periodic boundary, if so, rebuild particle mesh
+   * this function is called once before all fix::compute(), no matter how many fixes we have 
+   */
+  virtual void check_pbc_pre_fix(){}
+
+  /* use this for rigid particle fixes
+   * restore particle mesh after fix::compute()
+   */
+  virtual void check_pbc_post_fix() {}
+
+  /* use this for rigid particle fixes
+   * attach nodal force on particle nodes once given nodal_force_density, which will be calculate in each sub-fix
+   */
+  virtual void attach_nodal() {}
+
 
   // the particle-mesh (linear implicit) system
   PMLinearImplicitSystem* pm_system;

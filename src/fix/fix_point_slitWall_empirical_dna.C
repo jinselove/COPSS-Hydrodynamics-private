@@ -4,12 +4,14 @@ FixPointSlitWallEmpiricalDNA::FixPointSlitWallEmpiricalDNA(PMLinearImplicitSyste
 :
  FixPoint(pm_sys_)
 {
+  force_type = "wall/empirical_dna";
   this -> initPointParticleType();
   this -> initParams();
 }
 
 void FixPointSlitWallEmpiricalDNA::initPointParticleType()
 {
+START_LOG("FixPointSlitWallEmpiricalDNA::initPointParticleType()", "FixPointSlitWallEmpiricalDNA");
   point_particle_model = pm_system->get_equation_systems().parameters.get<std::string>("point_particle_model");
   if(point_particle_model != "polymer_chain") {
   std::cout << std::endl << "*******************Error message*********************" << std::endl
@@ -18,10 +20,12 @@ void FixPointSlitWallEmpiricalDNA::initPointParticleType()
               << "****************************************" << std::endl;
   libmesh_error();
   }   
+STOP_LOG("FixPointSlitWallEmpiricalDNA::initPointParticleType()", "FixPointSlitWallEmpiricalDNA");
 }
 
 void FixPointSlitWallEmpiricalDNA::initParams()
 {
+START_LOG("FixPointSlitWallEmpiricalDNA::initParams()", "FixPointSlitWallEmpiricalDNA");
   wall_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>>("slit");
   for (int i = 0; i < dim; i++){
     if(box_min(i) != wall_params[2*i] or box_max(i) != wall_params[2*i+1]){
@@ -37,15 +41,19 @@ void FixPointSlitWallEmpiricalDNA::initParams()
   Real c2 = c1 / std::sqrt(Nks);
   d0 = 0.5/c2;
   c0 = 25.0*c1;
+STOP_LOG("FixPointSlitWallEmpiricalDNA::initParams()", "FixPointSlitWallEmpiricalDNA");
 }
 
 void FixPointSlitWallEmpiricalDNA::print_fix()
 {
+START_LOG("FixPointSlitWallEmpiricalDNA::print_fix()", "FixPointSlitWallEmpiricalDNA");
   std::cout <<"this is FixPointSlitWallEmpiricalDNA" << std::endl;
+STOP_LOG("FixPointSlitWallEmpiricalDNA::print_fix()", "FixPointSlitWallEmpiricalDNA");
 }
 
 void FixPointSlitWallEmpiricalDNA::compute()
 {
+START_LOG("FixPointSlitWallEmpiricalDNA::compute()", "FixPointSlitWallEmpiricalDNA");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop each point and apply forces
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -69,5 +77,6 @@ void FixPointSlitWallEmpiricalDNA::compute()
   } // end for j-loop    
     point_particles[i]->add_particle_force(pforce);    
   } // end for i-loop	
+STOP_LOG("FixPointSlitWallEmpiricalDNA::compute()", "FixPointSlitWallEmpiricalDNA");
 }
 

@@ -3,12 +3,14 @@
 FixPointWLS::FixPointWLS(PMLinearImplicitSystem& pm_sys_)
 :FixPoint(pm_sys_)
 {
+  force_type = "worm_like_spring";
   this -> initPointParticleType();
   this -> initParams();
 }
 
 void FixPointWLS::initPointParticleType()
 {
+START_LOG("FixPointWLS::initPointParticleType()", "FixPointWLS");
   point_particle_model = pm_system->get_equation_systems().parameters.get<std::string>("point_particle_model");
   if(point_particle_model != "polymer_chain") {
   std::cout << std::endl << "*******************Error message*********************" << std::endl
@@ -17,10 +19,12 @@ void FixPointWLS::initPointParticleType()
               << "****************************************" << std::endl;
   libmesh_error();
   }   
+STOP_LOG("FixPointWLS::initPointParticleType()", "FixPointWLS");
 }
 
 void FixPointWLS::initParams()
 {
+START_LOG("FixPointWLS::initParams()", "FixPointWLS");
   n_bonds = point_mesh -> num_bonds();
   polymer_chain = point_mesh->polymer_chain();
   // Worm-like-spring force parameters
@@ -36,15 +40,19 @@ void FixPointWLS::initParams()
               << "****************************************" << std::endl;
     libmesh_error();    
   }	
+STOP_LOG("FixPointWLS::initParams()", "FixPointWLS");
 }
 
 void FixPointWLS::print_fix()
 {
+START_LOG("FixPointWLS::print_fix()", "FixPointWLS");
   std::cout <<"this is FixPointWLS" << std::endl;
+STOP_LOG("FixPointWLS::print_fix()", "FixPointWLS");
 }
 
 void FixPointWLS::compute()
-{ 
+{
+START_LOG("FixPointWLS::compute()", "FixPointWLS"); 
   // get bonds from polymer_chain
   const std::vector<std::vector<std::size_t> >& bonds = polymer_chain->bonds();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -70,5 +78,6 @@ void FixPointWLS::compute()
     point_particles[bead_id_1]->add_particle_force(F_ij);
     point_particles[bead_id_2]->add_particle_force(F_ji);
   }
+STOP_LOG("FixPointWLS::compute()", "FixPointWLS"); 
 }
 

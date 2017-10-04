@@ -44,7 +44,7 @@ void FixPoint::check_walls()
                   std::cout << "*** Warning: " << p_id << "-th bead is out of domain. Out of domain occurs "
                             << out_domain_counter << " times in total." << std::endl;
                 }
-          if( pt0(i) >  box_max(i) ){
+          if( pt0(i) >=  box_max(i) ){
                   pt0(i) = 2.*box_max(i) - pt0(i);  
                   out_domain_counter += 1;
                   std::cout << "*** Warning: " << p_id << "-th bead is out of domain. Out of domain occurs "

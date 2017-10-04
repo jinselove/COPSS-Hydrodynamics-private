@@ -57,9 +57,34 @@ public:
   */
   void initParticleType();
 
+  /*
+   * 1) check if a rigid particle is on a periodic boundary, if so, rebuild the particlemesh (fix me, is this necessary)
+   * 2) check if a particle is on or crosses a non-slip wall, if so, move the nodes that crosses the wall back 
+   */
   void check_walls();
 
+  /*
+   * Not implemented yet
+   */
   void check_walls_pbcCount();
+
+  /*
+   * check if particle is on periodic boundary, if so, rebuild particle mesh
+   * this function is called once before all fix::compute(), no matter how many fixes we have 
+   */
+  void check_pbc_pre_fix();
+
+  /*
+   * restore particle mesh after fix::compute()
+   */
+  void check_pbc_post_fix();
+
+  /*
+   * attach nodal force on particle nodes once given nodal_force_density, which will be calculate in each sub-fix
+   */
+  void attach_nodal();
+
+
 
 protected:
   // The elastic system for solids
@@ -73,8 +98,8 @@ protected:
   std::vector<RigidParticle*> rigid_particles;
 
   // number of rigid particles
-  std::size_t num_particles;
-
+  std::size_t num_rigid_particles;
+  
 };  // end of class
   
 } // end of namespace

@@ -4,6 +4,7 @@ FixPointSphereWallEmpiricalDNA::FixPointSphereWallEmpiricalDNA(PMLinearImplicitS
 :
  FixPoint(pm_sys_)
 {
+  force_type = "wall/empirical_dna";
   this -> initPointParticleType();
   this -> initParams();
 }
@@ -11,6 +12,7 @@ FixPointSphereWallEmpiricalDNA::FixPointSphereWallEmpiricalDNA(PMLinearImplicitS
 
 void FixPointSphereWallEmpiricalDNA::initPointParticleType()
 {
+START_LOG("FixPointSphereWallEmpiricalDNA::initPointParticleType()", "FixPointSphereWallEmpiricalDNA");
   point_particle_model = pm_system->get_equation_systems().parameters.get<std::string>("point_particle_model");
   if(point_particle_model != "polymer_chain") {
   std::cout << std::endl << "*******************Error message*********************" << std::endl
@@ -19,10 +21,12 @@ void FixPointSphereWallEmpiricalDNA::initPointParticleType()
               << "****************************************" << std::endl;
   libmesh_error();
   }   
+STOP_LOG("FixPointSphereWallEmpiricalDNA::initPointParticleType()", "FixPointSphereWallEmpiricalDNA");
 }
 
 void FixPointSphereWallEmpiricalDNA::initParams()
 {
+START_LOG("FixPointSphereWallEmpiricalDNA::initParams()", "FixPointSphereWallEmpiricalDNA");
   wall_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>>("sphere");
   if(wall_params.size()!=1){
     std::cout << std::endl << "********************Error message********************" << std::endl
@@ -37,15 +41,19 @@ void FixPointSphereWallEmpiricalDNA::initParams()
   Real c2 = c1 / std::sqrt(Nks);
   d0 = 0.5/c2;
   c0 = 25.0*c1;
+STOP_LOG("FixPointSphereWallEmpiricalDNA::initParams()", "FixPointSphereWallEmpiricalDNA");
 }
 
 void FixPointSphereWallEmpiricalDNA::print_fix()
 {
+START_LOG("FixPointSphereWallEmpiricalDNA::print_fix()", "FixPointSphereWallEmpiricalDNA");
   std::cout <<"this is FixPointSphereWallEmpiricalDNA" << std::endl;
+STOP_LOG("FixPointSphereWallEmpiricalDNA::print_fix()", "FixPointSphereWallEmpiricalDNA");
 }
 
 void FixPointSphereWallEmpiricalDNA::compute()
 {
+START_LOG("FixPointSphereWallEmpiricalDNA::compute()", "FixPointSphereWallEmpiricalDNA");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop each point and apply forces
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -60,5 +68,6 @@ void FixPointSphereWallEmpiricalDNA::compute()
     // attach this force to particle i 
     point_particles[i]->add_particle_force(pforce);    
   } // end for i-loop 	
+STOP_LOG("FixPointSphereWallEmpiricalDNA::compute()", "FixPointSphereWallEmpiricalDNA");
 }
 

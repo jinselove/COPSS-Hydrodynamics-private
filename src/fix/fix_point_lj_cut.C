@@ -3,11 +3,13 @@
 FixPointLJCut::FixPointLJCut(PMLinearImplicitSystem& pm_sys_)
 :FixPoint(pm_sys_)
 {
+  force_type = "lj_cut";
   this -> initParams();
 }
 
 void FixPointLJCut::initParams()
 {
+  START_LOG("FixPointLJCut::initParams()", "FixPointLJCut");
   force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("lj_cut");
   if(force_params.size()!=3){
     std::cout << std::endl << "********************Error message********************" << std::endl
@@ -18,15 +20,19 @@ void FixPointLJCut::initParams()
   epsilon = force_params[0];
   sigma = force_params[1];
   rCut = force_params[2];
+  STOP_LOG("FixPointLJCut::initParams()", "FixPointLJCut");
 }
 
 void FixPointLJCut::print_fix()
 {
+  START_LOG("FixPointLJCut::print_fix()", "FixPointLJCut");
   std::cout <<"this is FixPointLJCut" << std::endl;
+  STOP_LOG("FixPointLJCut::print_fix()", "FixPointLJCut");
 }
 
 void FixPointLJCut::compute()
-{	
+{
+  START_LOG("FixPointLJCut::compute()", "FixPointLJCut");
   for(std::size_t p_id=0; p_id<num_points; ++p_id)
   {  
     // apply lj force on particle i
@@ -48,6 +54,7 @@ void FixPointLJCut::compute()
      } // end if
     } // end loop over neighbors 
     point_particles[p_id]->add_particle_force(pforce);
-  }  
+  } 
+  STOP_LOG("FixPointLJCut::compute()", "FixPointLJCut");
 }
 

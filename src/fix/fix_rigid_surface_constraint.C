@@ -3,11 +3,13 @@
 FixRigidSurfaceConstraint::FixRigidSurfaceConstraint(PMLinearImplicitSystem& pm_sys_)
 :FixRigid(pm_sys_)
 {
+  force_type = "surface_constraint";
   this -> initParams();
 }
 
 void FixRigidSurfaceConstraint::initParams()
 {
+  START_LOG("FixRigidSurfaceConstraint::initParams()", "FixRigidSurfaceConstraint");
   force_params = pm_system->get_equation_systems().parameters.get<std::vector<Real>> ("surface_constraint");
   if (force_params.size() != 2) {
    std::cout << std::endl << "*******************Error message*********************" << std::endl
@@ -19,34 +21,25 @@ void FixRigidSurfaceConstraint::initParams()
     surface_spring_constant = force_params[0];
     center_spring_constant = force_params[1];
   }
+  STOP_LOG("FixRigidSurfaceConstraint::initParams()", "FixRigidSurfaceConstraint");
 }
 
 void FixRigidSurfaceConstraint::print_fix()
 {
+  START_LOG("FixRigidSurfaceConstraint::print_fix()", "FixRigidSurfaceConstraint");
   std::cout <<"this is FixRigidSurfaceConstraint" << std::endl;
+  STOP_LOG("FixRigidSurfaceConstraint::print_fix()", "FixRigidSurfaceConstraint");
 }
 
 void FixRigidSurfaceConstraint::compute()
 {
- START_LOG("compute()", "FixRigidSurfaceConstraint");	
+ START_LOG("FixRigidSurfaceConstraint::compute()", "FixRigidSurfaceConstraint");	
   std::size_t  point_start_id     = 0;
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Loop over each particle, and add the body force to each node.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  for(std::size_t i=0; i < num_particles; ++i)
+  for(std::size_t i=0; i < num_rigid_particles; ++i)
   {
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Check if this particle is on the periodic boundary. If so, move the nodes
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    const bool on_pb = rigid_particles[i]->on_the_periodic_boundary();
-    if( on_pb )
-    {
-      if(pm_system->comm().rank()==0){
-        printf("--->TEST in ForceField::attach_surface_constraint() \n");
-        printf("         The particle %lu is on the periodic boundary!\n",i);
-      }
-      rigid_particles[i]->rebuild_periodic_mesh();
-    }    
     // compute the rigid constraint force on each node
     std::vector<Point> constraint_force;
     this->compute_constraint_force(i,constraint_force);
@@ -68,37 +61,33 @@ void FixRigidSurfaceConstraint::compute()
         gforce[k] = constraint_force[node_id](k);
       } // end k-loop
       // ------------------ TEST: print out the surface constraint force ----------------------
-      // if(_pm_system->comm().rank()==0){
-      //   printf("--->TEST:attach_surface_constraint() gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
-      //   printf("         surface_constraint_force = (%f,%f,%f)\n",
-      //          surface_constraint_force[node_id](0),surface_constraint_force[node_id](1),surface_constraint_force[node_id](2));
+      // if(pm_system->comm().rank()==0){
+      //   printf("--->TEST:FixRigidSurfaceConstraint::compute() -> gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
+      //   printf("         constraint_force = (%f,%f,%f)\n",
+      //          constraint_force[node_id](0),constraint_force[node_id](1),constraint_force[node_id](2));
       // }
       // -------------------------------------------------------------------------
       point_particles[point_start_id+node_id]->add_particle_force(gforce);
     } // end for nd-loop
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Move back the mesh nodes.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    if( on_pb ) rigid_particles[i]->restore_periodic_mesh();
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      update the point start id
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     point_start_id += n_nodes;
   } // end for i-loop
- STOP_LOG("compute()", "FixRigidSurfaceConstraint");	
+ STOP_LOG("FixRigidSurfaceConstraint::compute()", "FixRigidSurfaceConstraint");  
 }
 
 void FixRigidSurfaceConstraint::compute_constraint_force(const std::size_t& i,
 																 std::vector<Point>& nodal_force)
 {
-	START_LOG("compute_constraint_force()", "FixRigidSurfaceConstraint");
+	START_LOG("FixRigidSurfaceConstraint::compute_constraint_force()", "FixRigidSurfaceConstraint");
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    find the partilce center and number of tracking points on the surface.
    We need this center position to construct springs in the radial direction.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   MeshSpringNetwork* mesh_spring  = rigid_particles[i]->mesh_spring_network();
   const std::size_t n_nodes = rigid_particles[i]->num_mesh_nodes();
-  const Point      p_center = rigid_particles[i]->compute_centroid();
+  const Point      p_centroid = rigid_particles[i]->get_centroid();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    loop over each tracking point(node), and compute spring forces
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -117,29 +106,34 @@ void FixRigidSurfaceConstraint::compute_constraint_force(const std::size_t& i,
       const Real&        neigh_l0 = node_neighbors[k].second;
       const Point& ptk = rigid_particles[i]->mesh_point(neigh_id);
       const Point R_ij = particle_mesh->pm_periodic_boundary()->point_vector(pt0,ptk);
+      // if(R_ij.size() != neigh_l0) {
+      //   std::cout << "Error: initial surface mesh distance is not equal to initial bond length" <<std::endl;
+      //   std::cout << "|R_ij| = " <<R_ij.size() <<"; neigh_l0 = " <<neigh_l0 << std::endl;
+      // }
       std::vector<Real> sf  = fix_base.spring_force_lhs(R_ij,neigh_l0,surface_spring_constant);
       for(std::size_t l=0; l<dim; ++l) spring_f[l] += sf[l];
     } // end for k-loop
     // 3. compute the Spring force between the node the the particle center
     const Real  lc0    = mesh_spring->node_center_equilibrium_dist(j);
-    const Point Rc_ij  = particle_mesh->pm_periodic_boundary()->point_vector(pt0,p_center);
+    const Point Rc_ij  = particle_mesh->pm_periodic_boundary()->point_vector(pt0,p_centroid);
     std::vector<Real> sfc  = fix_base.spring_force_lhs(Rc_ij,lc0,center_spring_constant);
+    
+    //std::cout << "|Rc_ij| = " <<Rc_ij.size() <<"; lc0 = " <<lc0 << std::endl;
     for(std::size_t k=0; k<dim; ++k) spring_f[k] += sfc[k];
     // 4. convert the point local id to the global id, and apply forces.
     for(std::size_t k=0; k<dim; ++k) nodal_force[j](k) = spring_f[k];
     /* - - - - - - - - - - - - - - - - - - - - - - - - - -- - - - -
      * test: print out the spring force on each node.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//    if(_pm_system->comm().rank()==0)
-//    {
-//      printf("--->test in ForceField::rigid_constraint_force(), Particle %lu\n",i);
-//      printf("--->Spring force (surface+center=total) on node %lu is fs = (%f,%f,%f)\n",
-//             j,spring_f[0],spring_f[1],spring_f[2]);
-//      printf("--->Spring force (center) on node %lu is               fs = (%f,%f,%f)\n",
-//             j,sfc[0],sfc[1],sfc[2]);
-//    }
+   // if(pm_system->comm().rank()==0)
+   // {
+   //   printf("--->test in ForceField::rigid_constraint_force(), Particle %lu\n",i);
+   //   printf("--->Spring force (surface+center=total) on node %lu is fs = (%f,%f,%f)\n",
+   //          j,spring_f[0],spring_f[1],spring_f[2]);
+   //   printf("--->Spring force (center) on node %lu is               fs = (%f,%f,%f)\n",
+   //          j,sfc[0],sfc[1],sfc[2]);
+   // }
     
   } // end for j-loop
-
-	STOP_LOG("compute_constraint_force()", "FixRigidSurfaceConstraint");	
+  STOP_LOG("FixRigidSurfaceConstraint::compute_constraint_force()", "FixRigidSurfaceConstraint");
 }

@@ -1,0 +1,62 @@
+#!python
+
+##############################################
+# Generate spherical surface mesh, mesh scheme = TriMesh
+##############################################
+
+#cubit.cmd('reset')
+#cubit.cmd('create sphere radius 1 ')
+
+#cubit.cmd('surface 1 scheme TriMesh')
+#cubit.cmd('surface 1  size 0.4')
+#cubit.cmd('mesh surface 1 ')
+#cubit.cmd('block 1 surface 1')
+
+#cubit.cmd('block all element type Tri3')
+#cubit.cmd('set large exodus file off')
+#cubit.cmd('export Genesis  "/home/jyli/Desktop/surface_mesh_sphere_triMesh_0.4.e" dimension 3 overwrite')
+
+##############################################
+# Generate spherical surface mesh, mesh scheme is by default (quad)
+##############################################
+
+#cubit.cmd('reset')
+#cubit.cmd('create sphere radius 1 ')
+#
+#cubit.cmd('surface 1  size 0.25')
+#cubit.cmd('mesh surface 1 ')
+#cubit.cmd('block 1 surface 1')
+#
+#cubit.cmd('block all element type SHELL4')
+#cubit.cmd('set large exodus file off')
+#cubit.cmd('export Genesis  "/home/jyli/Desktop/surface_mesh_sphere_0.25.e" dimension 3 overwrite')
+
+##############################################
+# Generate cylinderial surface mesh, mesh scheme is by default (quad)
+##############################################
+#cubit.cmd('reset')
+#cubit.cmd('create Cylinder height 1 radius 1 ')
+#
+#cubit.cmd('surface 1 2 3  size 0.25')
+#cubit.cmd('mesh surface 1 2 3 ')
+#cubit.cmd('block 1 surface 1 2 3')
+#
+#cubit.cmd('block all element type SHELL4')
+#cubit.cmd('set large exodus file off')
+#cubit.cmd('export Genesis  "/home/jyli/Desktop/surface_mesh_cylinder_0.25.e" dimension 3 overwrite')
+
+##############################################
+# Generate cylinderial surface mesh, mesh scheme is triMesh
+##############################################
+cubit.cmd('reset')
+cubit.cmd('create Cylinder height 1 radius 1 ')
+
+
+cubit.cmd('surface 1 2 3 scheme TriMesh')
+cubit.cmd('surface 1 2 3  size 0.25')
+cubit.cmd('mesh surface 1 2 3 ')
+cubit.cmd('block 1 surface 1 2 3')
+
+cubit.cmd('block all element type Tri3')
+cubit.cmd('set large exodus file off')
+cubit.cmd('export Genesis  "/home/jyli/Desktop/surface_mesh_cylinder_triMesh_0.25.e" dimension 3 overwrite')

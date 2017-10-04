@@ -168,10 +168,10 @@ void PointParticle::print_info(const bool & print_neighbor_list) const
    * Scheme 1: using printf. Then every process will print out info on its own.
    * --------------------------------------------------------------------------*/
   printf("point particle[%d]: \n", _id);
-  printf("      center = (%f, %f, %f)\n", _center(0), _center(1), _center(2));
+  printf("      center = (%.12e, %.12e, %.12e)\n", _center(0), _center(1), _center(2));
   printf("      PBC counter = (%d, %d, %d)\n", _counter[0],_counter[1],_counter[2]);
-  printf("      force  = (%f, %f, %f)\n", _force[0],_force[1],_force[2]);
-  printf("      velocity = (%f, %f, %f)\n", _velocity[0], _velocity[1], _velocity[2]);
+  printf("      force  = (%.18e, %.18e, %.18e)\n", _force[0],_force[1],_force[2]);
+  printf("      velocity = (%.12e, %.12e, %.12e)\n", _velocity[0], _velocity[1], _velocity[2]);
   
   // output elem id and process id
   printf("      parent_id   = %d\n",    _parent_id);

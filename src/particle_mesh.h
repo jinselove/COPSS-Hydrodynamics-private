@@ -124,7 +124,7 @@ protected:
       libmesh_assert_less (idx_p2, _pts.size());
       
       // retrieve the point data with index = idx_p2
-      const Point &p2( _pts[idx_p2]->center() );
+      const Point &p2( _pts[idx_p2]->get_centroid() );
       
       switch (size)
       {
@@ -166,7 +166,7 @@ protected:
       libmesh_assert_less (idx, _pts.size());
       libmesh_assert_less (dim, 3);
       
-      const Point &p(_pts[idx]->center() );
+      const Point &p(_pts[idx]->get_centroid() );
       if (dim==0) return p(0);
       if (dim==1) return p(1);
       return p(2);
@@ -234,18 +234,17 @@ public:
    * defaulty, we turn the "Electrostatics" off
    */
    void read_particles_data(const std::string& filename,      // particle xyz file
-                            const std::string& particle_mesh_type,
-                            const std::vector<std::string>& particle_mesh_file);    // mesh type of the particle);
+                            const std::string& particle_mesh_type);    // mesh type of the particle);
   
   
   /**
    * Read chromatin data (cylinder particle) from the local file.
    * mesh_type = "surface_mesh" or "volume_mesh"
    */
-  void read_chromatin_data(const std::string& filename,      // particle xyz file
-                           const std::string& vmesh_file,    // volume mesh file name
-                           const std::string& smesh_file,    // surface mesh file name
-                           const std::string& mesh_type);    // mesh type of the particle
+  // void read_chromatin_data(const std::string& filename,      // particle xyz file
+  //                          const std::string& vmesh_file,    // volume mesh file name
+  //                          const std::string& smesh_file,    // surface mesh file name
+  //                          const std::string& mesh_type);    // mesh type of the particle
   
   
   /**
@@ -273,7 +272,7 @@ public:
   /**
    * Return the total number of particles
    */
-  std::size_t num_particles() const {  return _particles.size();  }
+  std::size_t num_particles() const {  return _n_rigid_particles;  }
   
   
   /**
@@ -500,7 +499,21 @@ public:
 
 
 private:
-  
+  // number of rigid particles
+  std::size_t _n_rigid_particles;
+
+  // number of rigid particle types
+  std::size_t _n_rigid_particle_types;
+
+  // mass values of rigid particles
+  std::vector<Real> _mass;
+
+  // mesh files
+  std::vector<std::string> _rigid_particle_mesh_files;
+
+    // A vector that store the pointers to Particle
+  std::vector<RigidParticle*> _particles;
+
   // Mesh base: this is the domain(fluid) mesh, not the particle's mesh
   MeshBase& _mesh;
   
@@ -509,9 +522,6 @@ private:
   
   // Search radius (around an element)
   Real _search_radius_e;
-
-  // A vector that store the pointers to Particle
-  std::vector<RigidParticle*> _particles;
   
   // The point list adapter
   // - interface to the nanoflann in order to construct KD-Tree

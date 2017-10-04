@@ -15,9 +15,24 @@ CopssPointParticleSystem::CopssPointParticleSystem(CopssInit& init)
 
 CopssPointParticleSystem::~CopssPointParticleSystem(){
 	delete polymer_chain;
+  delete mesh;
 	delete point_mesh;
+  delete pm_periodic_boundary;
+  delete brownian_sys;
+  delete fix_factory;
 	polymer_chain = NULL;
 	point_mesh = NULL;
+  pm_periodic_boundary = NULL;
+  mesh = NULL;
+  pm_periodic_boundary = NULL;
+  brownian_sys = NULL;
+  fix_factory = NULL;
+  for (int i = 0; i < fixes.size(); i++)
+  {
+    delete fixes[i];
+    fixes[i] = NULL;
+  } 
+  fixes.clear();
 }
 
 

@@ -14,31 +14,22 @@ CopssRigidParticleSystem::CopssRigidParticleSystem(CopssInit& init)
 }
 
 CopssRigidParticleSystem::~CopssRigidParticleSystem(){
-
-  //  delete particle_mesh;
-  //  particle_mesh = NULL;
-	 // delete point_mesh;
-	 // point_mesh = NULL;
-  //  for (int i=0; i<mesh_spring_network.size(); i++) {
-  //    delete mesh_spring_network[i];
-  //    mesh_spring_network[i] = NULL;
-  //  } 
-  //  mesh_spring_network.clear();
-  //  delete mesh;
-  //  mesh = NULL;
-  //  delete pm_periodic_boundary;
-  //  pm_periodic_boundary = NULL;
-  //  delete brownian_sys;
-  //  brownian_sys = NULL;
-  //  delete fix_factory;
-  //  fix_factory = NULL;
-  // for (int i = 0; i < fixes.size(); i++)
-  // {
-  //  delete fixes[i];
-  //  fixes[i] = NULL;
-  // } 
-  // fixes.clear();
-
+  delete mesh;
+  mesh = NULL;
+  delete point_mesh;
+  point_mesh = NULL;
+  delete pm_periodic_boundary;
+  pm_periodic_boundary = NULL;
+  delete brownian_sys;
+  brownian_sys = NULL;  
+  delete fix_factory;
+  fix_factory = NULL;
+  for (int i = 0; i < fixes.size(); i++)
+  {
+    delete fixes[i];
+    fixes[i] = NULL;
+  } 
+  fixes.clear();
   delete particle_mesh;
   particle_mesh = NULL;
    for (int i=0; i<mesh_spring_network.size(); i++) {
@@ -46,7 +37,6 @@ CopssRigidParticleSystem::~CopssRigidParticleSystem(){
      mesh_spring_network[i] = NULL;
    } 
    mesh_spring_network.clear();
-  
 }
 
 
@@ -60,10 +50,6 @@ void CopssRigidParticleSystem::read_particle_info(){
 	}
   // Particles' meshes
   particle_mesh_type = input_file("particle_mesh_type", "surface_mesh");  
-  particle_mesh_file.resize( input_file.vector_variable_size(particle_mesh_type) ); // set the length of input vector
-  for (unsigned int i=0; i < particle_mesh_file.size(); i++){
-    particle_mesh_file[i] = input_file(particle_mesh_type, "particle_mesh.e", i);
-  }
 }// end read_particle_info()
 
 //==========================================================================
@@ -71,7 +57,9 @@ void CopssRigidParticleSystem::create_object(){
   // initialize _particle_mesh
   particle_mesh = new ParticleMesh<3> (*mesh,search_radius_p,search_radius_e);
   // add periodic boundary
+  //std::cout << "debug in create_object: pm_periodic_boundary->box_length = " << pm_periodic_boundary->box_length() <<endl;
   particle_mesh -> add_periodic_boundary(*pm_periodic_boundary);
+
   //Read the particle data
   std::ostringstream pfilename;
     // if restart, read particle data from ...
@@ -83,7 +71,7 @@ void CopssRigidParticleSystem::create_object(){
     // if not restart, read particle data from "rigid_particle_data.in"
   else{
     pfilename <<"rigid_particle_data.in";
-    particle_mesh -> read_particles_data(pfilename.str(), particle_mesh_type, particle_mesh_file);    
+    particle_mesh -> read_particles_data(pfilename.str(), particle_mesh_type);    
   }
   // reinit _particle_mesh
   particle_mesh -> reinit();
@@ -100,7 +88,7 @@ void CopssRigidParticleSystem::create_object(){
            <<"   particle type             : " << particle_type.c_str() << endl
            <<"   particle mesh type        : " << particle_mesh_type.c_str() << endl           
            <<"   minimum mesh size of particle surface: hmins  : " << hmins << endl
-           <<"   maximum mesh size of particle surface: hmaxs = " << hmins << endl;
+           <<"   maximum mesh size of particle surface: hmaxs = " << hmaxs << endl;
   cout <<"------------> The non-dimensional variables:\n"
        <<"   non-dimensional bead radius      a0     : " << 1.0 << "\n"
        <<"   non-dimensional ksi = sqrt(PI)/(3a0)    : " << std::sqrt(PI) / 3. <<"\n";
@@ -118,9 +106,9 @@ void CopssRigidParticleSystem::attach_mesh_spring_network()
   for(std::size_t i=0; i<num_particles; ++i)
   {
     MeshBase& p_mesh = particle_mesh->particles()[i]->mesh();
-    const Point& center0 = particle_mesh->particles()[i]->center();
+    const Point& centroid0 = particle_mesh->particles()[i]->get_centroid0();
     mesh_spring_network[i] = new MeshSpringNetwork(p_mesh,*pm_periodic_boundary);
-    mesh_spring_network[i]->build_spring_network(center0);
+    mesh_spring_network[i]->build_spring_network(centroid0);
     particle_mesh->particles()[i]->attach_mesh_spring_network(mesh_spring_network[i]);
   }
 
@@ -156,25 +144,9 @@ void CopssRigidParticleSystem::create_object_mesh(){
   
   // iterate over all particles for debug purpose
   if (debug_info){
+    const bool print_neighbor_list = false;
     for (std::size_t i=0; i<particle_mesh->num_particles(); ++i) {
-      Real vol  = particle_mesh->particles()[i]->compute_volume();
-      Real area = particle_mesh->particles()[i]->compute_area();
-      Point pc_i = particle_mesh->particles()[i]->compute_centroid();
-      const std::vector<Real> hs = particle_mesh->particles()[i]->mesh_size();
-      const std::size_t n_surf_elem = particle_mesh->particles()[i]->num_mesh_elem();
-      const std::size_t n_surf_node = particle_mesh->particles()[i]->num_mesh_nodes();
-
-      cout << "------> Volume of the "<< i <<"-th particle is "<< vol <<", and area is "<< area << endl;
-      if(dim == 2){
-        cout << "        The centroid = ("<< pc_i(0) <<","<< pc_i(1) <<")" <<endl;
-      }
-      else if(dim == 3){
-        cout << "        The centroid = ("<< pc_i(0) <<","<< pc_i(1) <<","<< pc_i(2) <<")" <<endl;
-      }
-      cout << "        hmin = "<< hs[0] <<", hmax = "<< hs[1] << endl;
-      cout << "  Particle "<<i<<": center " << particle_mesh->particles()[i]->center() << endl;
-      cout << "         " << n_surf_elem << " elements for the particle's mesh" << endl;
-      cout << "         " << n_surf_node << " nodes  for the particle's mesh" << endl;
+      particle_mesh->particles()[i]->print_info();
     }
   }
 } // end function
@@ -244,8 +216,6 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
   n_vec  = dim*NP;
   hmin = std::min(hmins, hminf);
   hmax = std::max(hmaxs, hmaxf);
-  // Get a better conformation of polymer chains before simulation.
-  this -> update_object("in initial data input");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   Compute undisturbed velocity field without particles.
   NOTE: We MUST re-init particle-mesh before solving Stokes

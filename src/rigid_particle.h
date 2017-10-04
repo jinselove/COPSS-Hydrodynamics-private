@@ -44,8 +44,8 @@ namespace libMesh
    */
   enum ParticleShape {
     SPHERE    = 0,
-    ELLIPSOID = 1,
-    CYLINDER  = 2,
+    CYLINDER  = 1,
+    ELLIPSOID = 2,
     CUBE      = 3,
     GENERAL   = 100
   };
@@ -60,44 +60,17 @@ namespace libMesh
 class RigidParticle : public ReferenceCountedObject<RigidParticle>,
                       public ParallelObject
 {
-public:
-  
-  // Constructor for a spherical particle with radius and (relative) density
-  RigidParticle(const Point pt,
-                const dof_id_type particle_id,
-                const Real r,
-                const Real density,
-                const Parallel::Communicator &comm_in);
-
-  
-  // A simple Constructor for general shaped particles without r (general geometry)
-  RigidParticle(const Point pt,
-                const dof_id_type particle_id,
-                const Real density,
-                const Parallel::Communicator &comm_in);
-  
-  
-  // A simpler Constructor for general shaped particles without r and density.
-  RigidParticle(const Point pt,                         // center
-                const dof_id_type particle_id,          // id
-                const Parallel::Communicator &comm_in); // comm
-  
-  
-  // Constructor for general shaped particles from a given mesh.
-  // NOTE: we don't use const SerialMesh& for constructing es
-  RigidParticle(SerialMesh& pmesh,                // particle mesh
-                const std::string& mesh_type,
-                const dof_id_type particle_id,          // id
-                const Parallel::Communicator &comm_in); // comm
-  
+public:  
   
   // Constructor for a spherical particle with radius, density, total charge, and relative permittivity
-  RigidParticle(const Point pt,
-                const dof_id_type point_id,
-                const Real r,
-                const Real density,
-                const Real charge,
-                const Real epsilon_in,
+  RigidParticle(const dof_id_type& particle_id,
+                const int& particle_type,
+                const Point& pt,
+                const Point& mag,
+                const Point& rot,
+                const Real& charge,
+                const Real& epsilon_in,
+                const Point& sedimentation_body_force_density,
                 const Parallel::Communicator &comm_in);
   
   // ~ Destructor
@@ -105,18 +78,21 @@ public:
   
   
   /*
-   * The coordinate of the particle center which is a writeable reference
-   * Note that this value will be changed when the particle moves
+   * Initialize particle volume0, volume, area0, area, centroid0, centroid, etc.
    */
-  //Point& point()  {  return _center;  };
-  Point& center() {  return _center;  };
+  void init();
+
+  /*
+   * The counter that counts how many times a particle has crossed boundaries
+   */
+  std::vector<int> & counter() {  return _counter; };
   
   
   /*
    * Return particle id, which is unique for a particle.
    * This id is set during the initialization,and not allowed to reset afterwards.
    */
-  dof_id_type id() const {  return _id; };
+  dof_id_type id() const {  return _particle_id; };
   
   
   /*
@@ -125,12 +101,6 @@ public:
    * but meaningless for particles with general shapes!
    */
   Real radius() const { return _radius; }
-  
-  
-  /*
-   * density, which may be used for inertial flow.
-   */
-  Real density() const { return _density; }
 
 
   /*
@@ -231,8 +201,7 @@ public:
    * and modify the mesh size according to the radius value
    * and center position.
    */
-  void read_mesh_sphere(const std::string& filename,
-                        const std::string& mesh_type);
+  void read_mesh_sphere(const std::string& filename);
   
   
   /*
@@ -244,10 +213,7 @@ public:
    *
    * Note this can also be used to read other particles, e.g. spheres
    */
-  void read_mesh_cylinder(const std::string& filename,
-                          const std::string& mesh_type,
-                          const std::vector<Real>& mag_factor,
-                          const std::vector<Real>& angles);
+  void read_mesh_cylinder(const std::string& filename);
   
   
   /*
@@ -261,7 +227,6 @@ public:
    * by updating the coordinates of each node on the mesh.
    */
   void update_mesh(const std::vector<Point>& nodal_vec);
-  
 
   /*
    * Rebuild mesh when rigidparticle is forced to make a translation move
@@ -309,7 +274,12 @@ public:
   /*
    * Check if this particle is sitting on the periodic boundary
    */
-  bool on_the_periodic_boundary() const;
+  bool on_the_periodic_boundary();
+
+  /*
+   * get the information that if a particle is on the periodic boundary, this function is used in FixRigid::check_pbc_post_fix()
+   */
+  const bool& if_on_the_periodic_boundary() const {return _on_pb;}; 
   
   
   /*
@@ -336,8 +306,7 @@ public:
    * It is an area density for surface mesh, and volume density of volume mesh!
    * NOTE: we don't use "()" const for constructing es
    */
-  void build_nodal_force(const std::vector<Real>& f,
-                         std::vector<Point>& nf);
+  void build_nodal_force(std::vector<Point>& nf);
   
   /*
    * This function adds forces to the center of mass of rigid particles
@@ -351,14 +320,14 @@ public:
    * compute the volume of the particle.
    * The algorithm is different for surface mesh and volume mesh.
    */
-  Real compute_volume();
+  void compute_volume();
   
   
   /*
    * compute the area of the particle.
    * The algorithm is different for surface mesh and volume mesh.
    */
-  Real compute_area();
+  void compute_area();
   
   
   /*
@@ -369,8 +338,48 @@ public:
    *
    * This function doesn't care what mesh type is used.
    */
-  Point compute_centroid(); 
- 
+  void compute_centroid(); 
+
+
+  /*
+   * Get volume0
+   */
+  const Real& get_volume0() const {return _volume0;};
+
+  /*
+   * Get volume
+   */  
+  const Real& get_volume() const{return _volume;};
+ /*
+   * Get area0
+   */
+  const Real& get_area0() const {return _area0;};
+  
+ /*
+   * Get area
+   */
+  const Real& get_area() const {return _area;};
+
+  /*
+   * Get center0
+   */
+  const Point& get_center0() const {return _center0;};
+
+/*
+   * Get centroid0
+   */
+  const Point& get_centroid0() {return _centroid0;};
+  
+/*
+   * Get centroid0
+   */
+  const Point& get_centroid() {return _centroid;};
+
+  /*
+   * Get particle shape
+   */
+  const std::string& get_particle_shape() {return _particle_shape;};
+  
 
   // this function has not implemented
   //Point compute_centroid(const std::string& mesh_type = "surface_mesh"){};
@@ -400,33 +409,38 @@ public:
   /*
    * Print information of this particle
    */
-  void print_info(const bool & print_neighbor_list = true) const;
-  
+  void print_info() const;
+
+  /*
+   * set centroid force from outside
+   */
+  void add_body_force_density(Point& body_force_density);
+
+  /*
+   * add sedimentation body force density
+   */
+  void add_sedimentation_body_force_density();
   
   
 private:
-  
-  // The coordinate of the particle center
-  Point _center;
-  
+    
   // particle id
-  dof_id_type _id;
+  dof_id_type _particle_id;
+
+  // particle type
+  int _particle_type;
+
+  // how many time the particle has crossed the boundary
+  std::vector<int> _counter;
   
   // radius of particle (for spherical particles only)
   Real _radius;
-  
-  // (relative) density of the particle rel_den = density_particle/density_fluid
-  Real _density;
 
   // free charge of particle, Xikai
   Real _charge;
 
   // relative permittivity of particle, Xikai
   Real _epsilon_in;
-  
-  // Initial volume of the particle.
-  // This is used to monitor the volume change of the particle, and correct the volume value.
-  Real _volume0;
   
   // the processor that the particle belongs to
   // *** Currently, this is not used for the finite size particles.
@@ -448,6 +462,38 @@ private:
   // Mesh - spring network
   MeshSpringNetwork* _mesh_spring_network;
 
+  // Initial values (if it is the perfect shape)
+  Real _volume0;
+  Real _area0;
+  Point _center0;
+  Point _centroid0;
+
+
+  // discretized values
+  Real _volume;
+  Real _area;
+  Point _centroid;
+
+  // particle shape
+  std::string _particle_shape;
+
+  // particle rotation
+  Point _rot;
+
+  // particle magnitude
+  Point _mag;
+
+  // check if particle is on the periodic boundary
+  bool _on_pb;
+
+  // body force density
+  Point _body_force_density;
+
+  // surface force density
+  Point _surface_force_density;
+
+  // sedimentation body force density
+  Point _sedimentation_body_force_density;
 }; // end of class defination
   
   

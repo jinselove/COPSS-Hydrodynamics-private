@@ -33,21 +33,6 @@ Copss::Copss(const CopssInit& init)
 
 Copss::~Copss()
 {
-  delete mesh;
-  delete point_mesh;
-  delete pm_periodic_boundary;
-  delete brownian_sys;
-  delete fix_factory;
-  mesh = NULL;
-  pm_periodic_boundary = NULL;
-  brownian_sys = NULL;
-  fix_factory = NULL;
-  for (int i = 0; i < fixes.size(); i++)
-  {
-    delete fixes[i];
-    fixes[i] = NULL;
-  } 
-  fixes.clear();
 }
 
 
@@ -771,7 +756,7 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   if (print_info) {
     if (comm_in.rank() == 0){
      printf("====> point info after reinit system\n");
-     point_mesh -> print_point_info();
+     point_mesh->print_point_info();
     }
   }
   reinit_stokes = true;
@@ -871,10 +856,10 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
             vtest1[k] = vel1[j*dim+k];
           }
           printf("--->test in test_move_particles(): velocity on the %u-th point:\n",j);
-          printf("            U0 = (%f,%f,%f)\n",   vtest0[0],vtest0[1],vtest0[2]);
-          printf("       U0 + U1 = (%f,%f,%f)\n\n", vtest1[0],vtest1[1],vtest1[2]);
+          printf("            U0 = (%.12e,%.12e,%.12e)\n",   vtest0[0],vtest0[1],vtest0[2]);
+          printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n\n", vtest1[0],vtest1[1],vtest1[2]);
         }    
-        printf("            v0_min = %f, v0_max = %f, v0_sum = %f)\n",v0_min,v0_max,v0_sum);
+        printf("            v0_min = %.12e, v0_max = %.12e, v0_sum = %.12e)\n",v0_min,v0_max,v0_sum);
       }    
     }
 
@@ -1089,7 +1074,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       VecAXPY(R_mid,2.0*coef,dw_mid); // R_mid = R_mid + sqrt(2)*D_mid*B^-1*dw
       brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
       this -> update_object("after step "+std::to_string(i));
-
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
       VecAXPY(ROUT,2.0*coef,dw_mid);  // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
@@ -1100,8 +1084,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
       VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
       brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords 
-      // Check and correct beads' position at the midpoint
-      fixes[0]->check_walls(); // check pbc and inpenetrable wall
       this -> update_object("after step "+std::to_string(i));
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
@@ -1265,6 +1247,7 @@ void Copss::destroy()
   }
   PetscViewerDestroy(&viewer);
 }
+
 
 } // end namespace
 

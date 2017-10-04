@@ -63,8 +63,6 @@ void MeshSpringNetwork::build_spring_network(const Point& center)
   _node_center_equilibrium_dist.resize(n_nodes);
   std::vector< std::vector< const Elem * > > 	nodes_to_elem_map;
   MeshTools::build_nodes_to_elem_map(_p_mesh, nodes_to_elem_map);
-
-  
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop over each node, and built connected springs between neighboring nodes
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -89,13 +87,10 @@ void MeshSpringNetwork::build_spring_network(const Point& center)
       const Real        pt_dist  = _periodic_boundary->point_distance(pt0,neigh_pt);
       std::pair<std::size_t, Real> pp = std::make_pair(neigh_id, pt_dist);
       _nodes_neighbors[nid][i] = pp;
-    }
-    
+    }    
     // build connections between the nodes and the center of the mesh
     _node_center_equilibrium_dist[nid] = _periodic_boundary->point_distance(pt0,center);
   } // end for
-  
-  
   STOP_LOG("build_spring_network()", "MeshSpringNetwork");
 }
 

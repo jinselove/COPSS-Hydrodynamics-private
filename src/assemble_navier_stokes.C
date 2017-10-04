@@ -46,8 +46,7 @@
 #include "analytical_solution.h"
 #include "ggem_system.h"
 #include "pm_toolbox.h"
-#include "assemble_navier_stokes.h"
-#include "pm_linear_implicit_system.h"
+//#include "pm_linear_implicit_system.h"
 
 // ==================================================================================
 AssembleNS::AssembleNS(EquationSystems& es)

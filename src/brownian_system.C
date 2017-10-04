@@ -221,13 +221,12 @@ PetscErrorCode BrownianSystem::extract_particle_vector(Vec* x,
         for(std::size_t j=0; j<_dim; ++j) px[i*_dim + j] = pt(j);
       else if(mode=="assign"){
         for(std::size_t j=0; j<_dim; ++j) pt(j) = px[i*_dim + j];
-        // apply periodic boundary condition
-        _fixes[0]->check_walls();
       }
       else
         libmesh_error();
       // end if-else
     } // end for i-loop
+    if(mode=="assign") _fixes[0]->check_walls();
   }
   // ---extract/assign the force to vf = [f1x,f1y,f1z; f2x,f2y,f2z; ...; fNx,fNy,fNz]
   else if(vec_type=="force")

@@ -90,7 +90,7 @@ private:
 
   	std::vector<MeshSpringNetwork*> mesh_spring_network;
 
-  	std::size_t num_particles;
+  	std::size_t num_rigid_particles;
 
 
   	// const std::string smesh_file_name = "particle_surface_mesh.e";

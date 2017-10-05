@@ -221,3 +221,4 @@ void FixRigid::attach_nodal()
   STOP_LOG("FixRigid::attach_nodal()", "FixRigid");
 }
 
+

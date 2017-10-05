@@ -405,9 +405,9 @@ std::vector<Real> PMLinearImplicitSystem::point_velocity(const std::vector<Real>
 }
 
 // ==================================================================================
-void PMLinearImplicitSystem::reinit_system()
+void PMLinearImplicitSystem::reinit_hi_system()
 {
-  START_LOG("reinit_system()", "PMLinearImplicitSystem");
+  START_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
   
   // reinit point-mesh system, including
@@ -419,6 +419,7 @@ void PMLinearImplicitSystem::reinit_system()
   // update the tracking points position on the mesh if needed
   if(_particle_mesh != NULL){
     _point_mesh->update_particle_mesh(_particle_mesh);
+    _particle_mesh->zero_particle_force_density();
     // need to check if particles are on the pbc, if so, rebuild the particle mesh
     _fixes[0]->check_pbc_pre_fix();
     /*
@@ -451,7 +452,7 @@ void PMLinearImplicitSystem::reinit_system()
     }
   }   
 
-  STOP_LOG("reinit_system()", "PMLinearImplicitSystem");
+  STOP_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
 }
 
 // ==================================================================================
@@ -608,7 +609,7 @@ void PMLinearImplicitSystem::test_l2_norm()
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Numerical solution: Global(FEM) + Local(Analytical)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  this->reinit_system();       // re-init particle-mesh before start
+  this->reinit_hi_system();       // re-init particle-mesh before start
   const bool re_init = true;
   this->solve_stokes("disturbed",re_init);
   this->add_local_solution();
@@ -688,7 +689,7 @@ void PMLinearImplicitSystem::test_velocity_profile()
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   std::cout<< "========>2. Test in PMLinearImplicitSystem::test_velocity_profile(): \n";
   
-  this->reinit_system();       // re-init particle-mesh before start
+  this->reinit_hi_system();       // re-init particle-mesh before start
   const bool re_init = true;
   this->solve_stokes("disturbed",re_init);
   

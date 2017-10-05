@@ -78,7 +78,7 @@ void CopssRigidParticleSystem::create_object(){
   hsize_solid = particle_mesh->mesh_size();// mesh size of solid
   hmins = hsize_solid[0];
   hmaxs = hsize_solid[1];
-  num_particles = particle_mesh->num_particles();
+  num_rigid_particles = particle_mesh->num_particles();
   // attach mesh spring network
   this -> attach_mesh_spring_network();
   // print out information
@@ -101,9 +101,9 @@ void CopssRigidParticleSystem::create_object(){
 //==========================================================================
 void CopssRigidParticleSystem::attach_mesh_spring_network()
 {
-  mesh_spring_network.resize(num_particles);
+  mesh_spring_network.resize(num_rigid_particles);
   //std::vector<MeshSpringNetwork*> (particle_mesh.num_particles());
-  for(std::size_t i=0; i<num_particles; ++i)
+  for(std::size_t i=0; i<num_rigid_particles; ++i)
   {
     MeshBase& p_mesh = particle_mesh->particles()[i]->mesh();
     const Point& centroid0 = particle_mesh->particles()[i]->get_centroid0();
@@ -229,6 +229,10 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
   else{
     cout << "HI is turned off, do nothing in this step";
   }
+  if(debug_info){
+    for (int i = 0; i<num_rigid_particles; i++) particle_mesh->particles()[i]->debug_body_force();
+  }
+
   cout<<"==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"<<endl;
   this -> create_brownian_system(equation_systems);
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

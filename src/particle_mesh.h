@@ -465,6 +465,12 @@ public:
    */
   void update_particle_mesh(const PointMesh<KDDim>* point_mesh);
   
+
+  /*
+   * zero particle force density
+   */
+  void zero_particle_force_density();
+
   
   /*
    * Return the mesh size (hmin/hmax) associated with this particle
@@ -476,7 +482,7 @@ public:
    * Correct the position of tracking points to avoid volume change!
    * NOTE: this is only for surface mesh.
    */
-  void volume_conservation(const std::string& mesh_type);
+  void volume_conservation();
   
   
   

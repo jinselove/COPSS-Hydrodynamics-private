@@ -752,10 +752,9 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
    Compute undisturbed velocity field without particles.
    NOTE: We MUST re-init particle-mesh before solving Stokes
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  system.reinit_system();
+  system.reinit_hi_system();
   if (print_info) {
     if (comm_in.rank() == 0){
-     printf("====> point info after reinit system\n");
      point_mesh->print_point_info();
     }
   }
@@ -828,7 +827,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
       // Update the local values to reflect the solution on neighboring processors
       system.update();
-      system.reinit_system();
+      system.reinit_hi_system();
     }
     // compute undisturbed velocity of points 
     system.compute_point_velocity("undisturbed", vel0);
@@ -840,6 +839,9 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
    // transform total point velocity to U0 in Brownian_system
     brownian_sys->vector_transform(vel1, &U0, "forward");
+    // assign vel1 to particle velocity
+    point_mesh->set_particle_velocity(vel1);
+
     if (debug_info){
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        * ---> test: output the particle velocity
@@ -855,19 +857,14 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
             vtest0[k] = vel0[j*dim+k];
             vtest1[k] = vel1[j*dim+k];
           }
+          Point vtest2 = point_mesh->particles()[j]->particle_velocity();
           printf("--->test in test_move_particles(): velocity on the %u-th point:\n",j);
           printf("            U0 = (%.12e,%.12e,%.12e)\n",   vtest0[0],vtest0[1],vtest0[2]);
-          printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n\n", vtest1[0],vtest1[1],vtest1[2]);
+          printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n", vtest1[0],vtest1[1],vtest1[2]);
+          printf("     bead velocity(should be equal to U0+U1) = (%.12e,%.12e,%.12e)\n\n", vtest2(0), vtest2(1), vtest2(2));
         }    
-        printf("            v0_min = %.12e, v0_max = %.12e, v0_sum = %.12e)\n",v0_min,v0_max,v0_sum);
+        printf("fluid field v0_min = %.12e, v0_max = %.12e, v0_sum = %.12e)\n",v0_min,v0_max,v0_sum);
       }    
-    }
-
-    // assign vel1 to particle velocity
-    for (std::size_t p_id = 0; p_id < NP; p_id++) {
-      std::vector<Real> p_velocity(dim,0.);
-      for (int _dim = 0; _dim < dim; _dim++) p_velocity[_dim] = vel1[p_id*dim+_dim];
-      point_mesh->particles()[p_id]->set_particle_velocity(p_velocity);
     }
     /*---------------------------------------------------------------------------------------
      * write equation system at step i
@@ -911,20 +908,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     Real dt = 0;
     if(adaptive_dt){
-      Real vp_max = 0.0, vp_min = 0.0;
-      for(unsigned int k=0; k<dim;++k) {
-        vp_max += vel1[k]*vel1[k];
-      }
-      vp_min = vp_max;
-      for(unsigned int j=1; j<NP;++j)
-      {
-        Real vp_norm = 0.0;
-        for(std::size_t k=0; k<dim;++k) vp_norm += vel1[j*dim+k]*vel1[j*dim+k];
-        vp_max = std::max(vp_max,vp_norm);
-        vp_min = std::min(vp_min,vp_norm);
-      }
-      vp_max = std::sqrt(vp_max);     // maximum magnitude of particle velocity
-      vp_min = std::sqrt(vp_min);
+      Real vp_max = point_mesh->maximum_bead_velocity();
+      Real vp_min = point_mesh->minimum_bead_velocity();
       if(with_brownian) {
         dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  
       }
@@ -1057,7 +1042,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
       *(system.solution) = *v0_ptr;       // re-assign the undisturbed solution
       system.update();
-      system.reinit_system();
+      system.reinit_hi_system();
       system.compute_point_velocity("undisturbed", vel0);
       reinit_stokes = false;
       system.solve_stokes("disturbed",reinit_stokes);   // solve the disturbed solution
@@ -1100,14 +1085,15 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
     system.update();
     system.reinit_fd_system();
   }
-  std::vector<Real> p_velocity(dim,0.);
+  Point p_velocity(0.);
   for (std::size_t p_id = 0; p_id < NP; p_id++) {
     for (int _dim = 0; _dim < dim; _dim++){
-      p_velocity[_dim] = point_mesh->particles()[p_id]->particle_force()[_dim];        
-      vel1[dim*p_id+_dim] = p_velocity[_dim];
+      p_velocity(_dim) = point_mesh->particles()[p_id]->particle_force()[_dim];        
+      vel1[dim*p_id+_dim] = p_velocity(_dim);
     } 
-    point_mesh->particles()[p_id]->set_particle_velocity(p_velocity);
   }
+  // set vel1 to particle velocity
+  point_mesh->set_particle_velocity(vel1);
   // transform total point velocity to U0 in Brownian_system
   brownian_sys->vector_transform(vel1, &U0, "forward");
   /*---------------------------------------------------------------------------------------
@@ -1137,20 +1123,8 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   Real dt = 0;
   if(adaptive_dt){
-    Real vp_max = 0.0, vp_min = 0.0;
-    for(unsigned int k=0; k<dim;++k) {
-      vp_max += vel1[k]*vel1[k];
-    }
-    vp_min = vp_max;
-    for(unsigned int j=1; j<NP;++j)
-    {
-      Real vp_norm = 0.0;
-      for(std::size_t k=0; k<dim;++k) vp_norm += vel1[j*dim+k]*vel1[j*dim+k];
-      vp_max = std::max(vp_max,vp_norm);
-      vp_min = std::min(vp_min,vp_norm);
-    }
-    vp_max = std::sqrt(vp_max);     // maximum magnitude of particle velocity
-    vp_min = std::sqrt(vp_min);
+    Real vp_max = point_mesh->maximum_bead_velocity();
+    Real vp_min = point_mesh->minimum_bead_velocity();
     dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max); 
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl

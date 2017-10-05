@@ -1127,6 +1127,17 @@ void ParticleMesh<KDDim>::update_particle_mesh(const PointMesh<KDDim>* point_mes
   
   STOP_LOG ("update_particle_mesh()", "ParticleMesh<KDDim>");
 }
+
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::zero_particle_force_density()
+{
+  START_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
+  for (int i=0; i<_n_rigid_particles;i++) _particles[i]->zero_force_density();
+  
+  STOP_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
+}
   
   
   
@@ -1159,14 +1170,14 @@ std::vector<Real> ParticleMesh<KDDim>::mesh_size() const
   
 // ======================================================================
 template <unsigned int KDDim>
-void ParticleMesh<KDDim>::volume_conservation(const std::string& mesh_type)
+void ParticleMesh<KDDim>::volume_conservation()
 {
   START_LOG ("volume_conservation()", "ParticleMesh<KDDim>");
   
   // Loop over all the particles, and update their nodal values
   for (std::size_t i=0; i<_particles.size(); ++i)
   {
-    _particles[i]->volume_conservation(mesh_type);
+    _particles[i]->volume_conservation();
   }
   
   STOP_LOG ("volume_conservation()", "ParticleMesh<KDDim>");

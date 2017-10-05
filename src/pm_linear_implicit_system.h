@@ -195,7 +195,7 @@ public:
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    */
-  void reinit_system();
+  void reinit_hi_system();
 
   /*
    * Re-init free-draining system, including:

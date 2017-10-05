@@ -160,9 +160,6 @@ void CopssPointParticleSystem::create_object_mesh(){
 		        <<"Total number of point particles:"<<point_mesh->num_particles() << endl
 		        <<"search_radius_p = "<< search_radius_p << endl
             <<"search_radius_e = "<< search_radius_e << endl;
-  if(print_info == true){
-    if (comm_in.rank() == 0) point_mesh->print_point_info();
-  } 
 } // end function
 
 

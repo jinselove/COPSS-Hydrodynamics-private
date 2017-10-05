@@ -158,15 +158,13 @@ public:
    * Set the force and torque vectors on the particle
    * This is set by the member function in the class "ParticleMesh"
    */
-  void set_particle_force(const std::vector<Real>& pforce){ _force = pforce; };
+  // void set_particle_force(const std::vector<Real>& pforce){ _force = pforce; };
   
   
   /*
    * Return the force and torque vector on the particle
    */
-  const std::vector<Real>& particle_force() const {  return _force;  };
-  
-  
+  std::vector<Real>& compute_particle_force();
   
   /*
    * Attach MeshSpringNetwork & return the pointer
@@ -312,7 +310,7 @@ public:
    * This function adds forces to the center of mass of rigid particles
    * These forces will be distributed over the nodal points 
    */
-  void add_particle_force(const std::vector<Real>& pforce);
+  // void add_particle_force(const std::vector<Real>& pforce);
 
   
   
@@ -396,14 +394,14 @@ public:
    * Construct the unit surface normal
    * NOTE: this is only for surface mesh.
    */
-  std::vector<Point> compute_surface_normal(const std::string& mesh_type);
+  std::vector<Point> compute_surface_normal();
   
   
   /*
    * Correct the position of tracking points to conserve the volume!
    * NOTE: this is only for surface mesh.
    */
-  void volume_conservation(const std::string& mesh_type);
+  void volume_conservation();
   
   
   /*
@@ -416,10 +414,20 @@ public:
    */
   void add_body_force_density(Point& body_force_density);
 
+
+  /*
+   * zero force density
+   */
+  void zero_force_density(){_surface_force_density.zero(); _body_force_density.zero();}
   /*
    * add sedimentation body force density
    */
   void add_sedimentation_body_force_density();
+
+  /*
+   * get body force (for debug purpose)
+   */
+  const void debug_body_force() const;
   
   
 private:
@@ -429,6 +437,12 @@ private:
 
   // particle type
   int _particle_type;
+
+  // dim
+  std::size_t _dim;
+
+  // mesh dim
+  std::size_t _mesh_dim;
 
   // how many time the particle has crossed the boundary
   std::vector<int> _counter;
@@ -494,6 +508,9 @@ private:
 
   // sedimentation body force density
   Point _sedimentation_body_force_density;
+
+  // forces on each nodes
+  std::vector<Point> _nf;
 }; // end of class defination
   
   

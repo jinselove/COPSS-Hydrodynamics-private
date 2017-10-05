@@ -86,7 +86,7 @@ void RigidParticle::init()
   this->compute_area();
   this->compute_centroid();
   _area0 = _area;
-  _volume0 = _area0;
+  _volume0 = _volume;
   _centroid0 = _centroid;
   STOP_LOG("init()", "RigidParticle");
 }
@@ -169,14 +169,15 @@ void RigidParticle::read_mesh_sphere(const std::string& filename)
    change the coordinates of the surface mesh according to its radius
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
   _radius = 1. * _mag(0);
-  const unsigned int            dim    = _mesh.spatial_dimension();
+  _dim    = _mesh.spatial_dimension();
+  _mesh_dim = _mesh.mesh_dimension();
   MeshBase::node_iterator       nd     = _mesh.active_nodes_begin();
   const MeshBase::node_iterator end_nd = _mesh.active_nodes_end();
   for ( ; nd != end_nd; ++nd)
   {
     // Store a pointer to the element we are currently working on.
     Node* node = *nd;
-    for(unsigned int i=0; i<dim; ++i){
+    for(unsigned int i=0; i<_dim; ++i){
       (*node)(i) =  ((*node)(i)*_radius + _center0(i) );
     }
   } // end for
@@ -210,6 +211,8 @@ void RigidParticle::read_mesh_cylinder(const std::string& filename)
    read the data file
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
   _mesh.read(filename);
+  _dim    = _mesh.spatial_dimension();
+  _mesh_dim = _mesh.mesh_dimension();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     Magnify, rotate and shift
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -259,7 +262,7 @@ void RigidParticle::update_mesh(const std::vector<Point>& nodal_vec)
     // Store a pointer to the current node
     Node* node = *nd;
     const dof_id_type n_id = node->id();
-    for(unsigned int i=0; i<3; ++i) {
+    for(unsigned int i=0; i<_dim; ++i) {
       (*node)(i) = nodal_vec[n_id](i);
     }
   } // end for
@@ -292,7 +295,7 @@ void RigidParticle::translate_mesh(const Point& translationDist)
   {
     // Store a pointer to the current node
     Node* node = *nd;
-    for(unsigned int i=0; i<3; ++i) {
+    for(unsigned int i=0; i<_dim; ++i) {
       (*node)(i) = translationDist(i);
     }
   } // end for
@@ -318,7 +321,7 @@ void RigidParticle::extract_nodes(std::vector<Point>& node_xyz)
   {
     // Store a pointer to the current node
     Node* node = *nd;
-    for(unsigned int i=0; i<3; ++i)
+    for(unsigned int i=0; i<_dim; ++i)
     node_xyz[node->id()](i) =  (*node)(i) ;
   } // end for
   
@@ -377,8 +380,7 @@ bool RigidParticle::on_the_periodic_boundary()
    First we check if there is periodic boundary condition
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
   bool pbc  = false;
-  const std::size_t dim = _mesh_spring_network->periodic_boundary()->dimension();  
-  for(std::size_t i=0; i<dim; ++i)
+  for(std::size_t i=0; i<_dim; ++i)
   {  
     if( pbc_tmp->periodic_direction(i) )
     {
@@ -442,7 +444,7 @@ void RigidParticle::rebuild_periodic_mesh()
     
     // Loop in each direction, and find the periodic boundary
     PMPeriodicBoundary* pbc = _mesh_spring_network->periodic_boundary();
-    for(std::size_t i=0; i<pbc->dimension(); ++i)
+    for(std::size_t i=0; i<_dim; ++i)
     {
       if( pbc->periodic_direction(i) )
       {
@@ -483,14 +485,14 @@ void RigidParticle::restore_periodic_mesh()
   STOP_LOG("restore_periodic_mesh()", "RigidParticle");
 }
 
-// ======================================================================
-void RigidParticle::add_particle_force(const std::vector<Real>& pforce)
-{
-  for(std::size_t i=0; i<pforce.size(); ++i)
-  {
-    _force[i] += pforce[i];
-  }
-}
+// // ======================================================================
+// void RigidParticle::add_particle_force(const std::vector<Real>& pforce)
+// {
+//   for(std::size_t i=0; i<pforce.size(); ++i)
+//   {
+//     _force[i] += pforce[i];
+//   }
+// }
 
 void RigidParticle::add_body_force_density(Point& body_force_density) 
 {
@@ -514,15 +516,13 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
    We will build the nodal force vector through the EquationSystems.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
   _surface_force_density = _body_force_density * _volume0 / _area0;
-  const unsigned int dim = _mesh.spatial_dimension();
-  const unsigned int mesh_dim = _mesh.mesh_dimension();
   EquationSystems equation_systems (_mesh);
   ExplicitSystem& system = equation_systems.add_system<ExplicitSystem>("Elasticity");
 
   unsigned int u_var = 0, v_var = 0, w_var = 0;
   u_var = system.add_variable ("U", FIRST);
   v_var = system.add_variable ("V", FIRST);
-  if(dim==3)  w_var  = system.add_variable ("W", FIRST);
+  if(_dim==3)  w_var  = system.add_variable ("W", FIRST);
   equation_systems.init();
   system.rhs->zero();
   // equation_systems.print_info();
@@ -532,10 +532,10 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
    Build a FEBase object and qrule (typedef FEGenericBase<Real> FEBase)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
   FEType fe_vel_type  = system.variable_type(u_var);
-  UniquePtr<FEBase> fe_vel (FEBase::build(mesh_dim, fe_vel_type) );
+  UniquePtr<FEBase> fe_vel (FEBase::build(_mesh_dim, fe_vel_type) );
   
   // Gauss Quadrature rule and tell the finite element objects
-  QGauss qrule (mesh_dim, fe_vel_type.default_quadrature_order());   //3^dim pts
+  QGauss qrule (_mesh_dim, fe_vel_type.default_quadrature_order());   //3^dim pts
   fe_vel->attach_quadrature_rule (&qrule);
   
   // The element Jacobian * quadrature weight at each integration point.
@@ -571,7 +571,7 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
     const unsigned int n_u_dofs = dof_indices_u.size();
     const unsigned int n_v_dofs = dof_indices_v.size();
     unsigned int n_w_dofs = 0;
-    if(dim==3)
+    if(_dim==3)
     {
       dof_map.dof_indices (elem, dof_indices_w, w_var);
       n_w_dofs = dof_indices_w.size();
@@ -585,7 +585,7 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
     Fe.resize (n_dofs);   // Ke.resize (n_dofs, n_dofs);
     Fu.reposition (u_var*n_u_dofs, n_u_dofs);
     Fv.reposition (v_var*n_u_dofs, n_v_dofs);
-    if(dim==3)    Fw.reposition (w_var*n_u_dofs, n_w_dofs);
+    if(_dim==3)    Fw.reposition (w_var*n_u_dofs, n_w_dofs);
     
     // Loop over each Gauss pt
     for (unsigned int qp=0; qp<qrule.n_points(); qp++)
@@ -595,7 +595,7 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
       {
         Fu(i) += JxW[qp]*phi[i][qp]*_surface_force_density(0);
         Fv(i) += JxW[qp]*phi[i][qp]*_surface_force_density(1);
-        if(dim==3) Fw(i) += JxW[qp]*phi[i][qp]*_surface_force_density(2);
+        if(_dim==3) Fw(i) += JxW[qp]*phi[i][qp]*_surface_force_density(2);
       }
     }
     
@@ -631,13 +631,12 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
     const dof_id_type node_id = node->id();
   
     // get the dof numbers at this node
-    for(unsigned int k=0; k<dim; ++k){ // sys#; var(k) = 0, 1, 2; component=0
+    for(unsigned int k=0; k<_dim; ++k){ // sys#; var(k) = 0, 1, 2; component=0
       const dof_id_type dof_num = node->dof_number(0,k,0);
       nf[node_id](k) = local_f[dof_num];
     }
   }
-
-  
+  _nf = nf;
   STOP_LOG("build_nodal_force()", "RigidParticle");
 }
 
@@ -650,10 +649,9 @@ void RigidParticle::compute_volume()
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Define FE and quadrature rules
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  const unsigned int  dim  = _mesh.mesh_dimension();
   FEType fe_type;         // default: first order and Lagrange element
-  UniquePtr<FEBase>  fe_base (FEBase::build(dim, fe_type) );
-  QGauss qrule (dim, fe_type.default_quadrature_order());
+  UniquePtr<FEBase>  fe_base (FEBase::build(_mesh_dim, fe_type) );
+  QGauss qrule (_mesh_dim, fe_type.default_quadrature_order());
   fe_base->attach_quadrature_rule (&qrule);  
   // The element Jacobian * quadrature weight at each integration point.
   const std::vector<Real>&  JxW        = fe_base->get_JxW();
@@ -670,12 +668,12 @@ void RigidParticle::compute_volume()
     const Elem* elem = *el;
     
     // If this particle has volume mesh, just sum up the volumes of all elem
-    if (dim==3){
+    if (_mesh_dim==3){
       val += elem->volume();
     }
     
     // If this particle has surface mesh, compute \int (x*n)
-    else if(dim==2)
+    else if(_mesh_dim==2)
     {
       fe_base->reinit(elem);
       
@@ -714,7 +712,6 @@ void RigidParticle::compute_area()
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop over each element and compute the volume(area)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  const unsigned int dim    = _mesh.mesh_dimension(); // mesh dimension
   Real val = 0.0;
   MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
   const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
@@ -724,13 +721,13 @@ void RigidParticle::compute_area()
     const Elem* elem = *el;
     
     // If this particle has surface mesh, just sum up the area of all elem
-    if (dim==2)
+    if (_mesh_dim==2)
     {
       val += elem->volume();
     }
     
     // If this particle has volume mesh, only compute the area of its external side
-    else if(dim==3)
+    else if(_mesh_dim==3)
     {
       // loop over each side, and find the surface side.
       for (unsigned int s=0; s<elem->n_sides(); s++)
@@ -858,7 +855,7 @@ Point RigidParticle::elem_surface_normal(const Elem& elem,
   
   
 // ======================================================================
-std::vector<Point> RigidParticle::compute_surface_normal(const std::string& mesh_type)
+std::vector<Point> RigidParticle::compute_surface_normal()
 {
   START_LOG("compute_surface_normal()", "RigidParticle");
   
@@ -866,7 +863,7 @@ std::vector<Point> RigidParticle::compute_surface_normal(const std::string& mesh
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    check the input argument. Only allows surface mesh!
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  if(mesh_type != "surface_mesh")
+  if(_mesh_type != "surface_mesh")
   {
     printf("--->error in RigidParticle::compute_surface_normal()\n");
     printf("    ONLY surface mesh is supported in this function!\n");
@@ -923,7 +920,7 @@ std::vector<Point> RigidParticle::compute_surface_normal(const std::string& mesh
   
   
 // ======================================================================
-void RigidParticle::volume_conservation(const std::string& mesh_type)
+void RigidParticle::volume_conservation()
 {
   START_LOG("volume_conservation()", "RigidParticle");
   
@@ -938,7 +935,7 @@ void RigidParticle::volume_conservation(const std::string& mesh_type)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Compute nodal position increment
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  std::vector<Point> n_vec = this->compute_surface_normal(mesh_type);
+  std::vector<Point> n_vec = this->compute_surface_normal();
   this->compute_volume();
   this->compute_area();
   const Real aa = -3.*(_volume - _volume0) / _area; // 3 or 6?
@@ -970,7 +967,52 @@ void RigidParticle::volume_conservation(const std::string& mesh_type)
   STOP_LOG("volume_conservation()", "RigidParticle");
 }
   
+// ======================================================================  
+std::vector<Real>& RigidParticle::compute_particle_force()
+{
+  START_LOG("RigidParticle::compute_particle_force()", "RigidParticle");
+
+
+  STOP_LOG("RigidParticle::compute_particle_force()", "RigidParticle");
+}
   
+const void RigidParticle::debug_body_force() const
+{
+  START_LOG("RigidParticle::debug_body_force()", "RigidParticle");
+  std::cout << "============debug_body_force()================= " <<std::endl;
+  std::cout << "==> 1) body force density = ";
+  for (int i=0; i<_dim; i++){
+    std::cout <<_body_force_density(i) <<"; ";
+  }
+  std::cout << "\n total force = ";
+  for (int i=0; i<_dim; i++){
+    std::cout <<_body_force_density(i) * _volume0 << "; ";
+  }
+  std::cout << std::endl;
+
+  std::cout << "==> 2) surface force density = ";
+  for (int i=0; i<_dim; i++){
+    std::cout <<_surface_force_density(i) <<"; ";
+  }
+  std::cout << "\n total force = ";
+  for (int i=0; i<_dim; i++){
+    std::cout <<_surface_force_density(i) * _area0 << "; ";
+  }
+  std::cout << std::endl;
+
+
+  Point total_force;
+  for (int i =0; i<_nf.size(); i++) total_force += _nf[i];
+  std::cout << "==> 3) total force by adding up node force = ";
+  for(int i=0; i<_dim; i++){
+    std::cout << total_force(i) << ";";
+  }    
+  std::cout << std::endl;
+
+  STOP_LOG("RigidParticle::debug_body_force()", "RigidParticle");
+}
+
+
 
 // ======================================================================
 void RigidParticle::print_info() const
@@ -1009,8 +1051,6 @@ void RigidParticle::print_info() const
   // printf("\n");
   
 } // the end of print_info()
-  
-
   
 } // end of namespace
   

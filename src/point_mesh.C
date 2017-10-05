@@ -42,44 +42,6 @@
 namespace libMesh
 {
   
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-PointMesh<KDDim>::PointMesh(MeshBase& mesh)
-: ParallelObject(mesh),
-  _mesh(mesh),
-  _point_list_adaptor(_particles),
-  _polymer_chain(NULL),
-  _is_sorted(true),
-  _periodic_boundary(NULL)
-{
-  // read particle data from outside files
-  // this->read_particles_data();
-}
-
-
-
-// ======================================================================
-template <unsigned int KDDim>
-PointMesh<KDDim>::PointMesh(MeshBase& mesh,
-                            const Real& search_radius_p,
-                            const Real& search_radius_e)
-: ParallelObject(mesh),
-  _mesh(mesh),
-  _search_radius_p(search_radius_p),
-  _search_radius_e(search_radius_e),
-  _point_list_adaptor(_particles),
-  _polymer_chain(NULL),
-  _is_sorted(true),
-  _periodic_boundary(NULL)
-{
-  // read particle data from outside files
-  // this->read_particles_data();
-}
-
-
-  
 // ======================================================================
 template <unsigned int KDDim>
 PointMesh<KDDim>::PointMesh(ParticleMesh<KDDim>& particle_mesh,
@@ -95,21 +57,17 @@ PointMesh<KDDim>::PointMesh(ParticleMesh<KDDim>& particle_mesh,
   _periodic_boundary(NULL)
 {
   // total # of tracking points on the surface of all the finite-sized particles
-  const std::size_t n_points = particle_mesh.num_mesh_points();
-  _particles.resize(n_points);
-//  std::string msg = "PointMesh(): There are "+std::to_string(n_points)
-//                  +" tracking points on the surface.";
-//  PMToolBox::output_message(msg,this->comm());
-  
+  _num_point_particles = particle_mesh.num_mesh_points();
+  _particles.resize(_num_point_particles);
+  _velocity_magnitude.resize(_num_point_particles);
   // create point particle list
   std::size_t count = 0;
-  const std::size_t n_particles = particle_mesh.num_particles();
-  for (std::size_t i=0; i<n_particles; ++i)
+  const std::size_t n_rigid_particles = particle_mesh.num_particles();
+  for (std::size_t i=0; i<n_rigid_particles; ++i)
   {
     // extract the nodal coordinates of the current particle
     std::vector<Point> node_xyz;
-    particle_mesh.particles()[i]->extract_nodes(node_xyz);
-    
+    particle_mesh.particles()[i]->extract_nodes(node_xyz);    
     // Create the PointParticle to form the particle list
     const std::size_t n_nodes = node_xyz.size();
     for (std::size_t j=0; j<n_nodes; ++j)
@@ -131,7 +89,6 @@ PointMesh<KDDim>::PointMesh(ParticleMesh<KDDim>& particle_mesh,
   std::string msg = "PointMesh has been constructed from the extracted nodal points of particle's mesh!";
 //  msg += " count = " + std::to_string(count);
   PMToolBox::output_message(msg,this->comm());
-  
   return;
 }
   
@@ -155,24 +112,23 @@ PointMesh<KDDim>::PointMesh(MeshBase& mesh,
 {
   // Total # of beads and chains
   const std::size_t n_chains = polymer_chains.size();
-  std::size_t n_points = 0;
+  _num_point_particles = 0;
   for (std::size_t i=0; i<n_chains; ++i)
   {
-    n_points += polymer_chains[i].n_beads();
+    _num_point_particles += polymer_chains[i].n_beads();
   }
-  _particles.resize(n_points);
-  
-  
+  _particles.resize(_num_point_particles);
+  _velocity_magnitude.resize(_num_point_particles);
   // Construct the PointParticle vector from the polymer chains
-  n_points = 0;
+  std::size_t count = 0;
   std::vector<PointParticle*>::iterator it = _particles.begin();
   for (std::size_t i=0; i<n_chains; ++i)
   {
-    _particles.insert(it+n_points,
+    _particles.insert(it+count,
                       polymer_chains[i].beads().begin(),
                       polymer_chains[i].beads().end());
     
-    n_points += polymer_chains[i].n_beads();
+    count += polymer_chains[i].n_beads();
   }
 
 }
@@ -196,7 +152,8 @@ _periodic_boundary(NULL)
 {
   // Get the point particles
   _particles = polymer_chain.beads();
-  
+  _num_point_particles = _particles.size();
+  _velocity_magnitude.resize(_num_point_particles);
 }
 
   
@@ -206,7 +163,7 @@ template <unsigned int KDDim>
 PointMesh<KDDim>::~PointMesh()
 {
   // delete the particle pointers
-  for (std::size_t i=0; i<_particles.size(); ++i)
+  for (std::size_t i=0; i<_num_point_particles; ++i)
   {
     // Only delete the Lagrangian points, polymer beads will be
     // destructed in PolymerChain class
@@ -226,129 +183,128 @@ PointMesh<KDDim>::~PointMesh()
 
 
 // ======================================================================
-template <unsigned int KDDim>
-void PointMesh<KDDim>::read_points_data(const std::string& filename)
-{
-  START_LOG ("read_points_data()", "PointMesh<KDDim>");
+// template <unsigned int KDDim>
+// void PointMesh<KDDim>::read_points_data(const std::string& filename)
+// {
+//   START_LOG ("read_points_data()", "PointMesh<KDDim>");
   
-  std::cout <<"\n###point data filename = "<<filename <<std::endl;
-  std::ifstream infile;
-  infile.open (filename, std::ios_base::in);
-  if( !infile.good() )
-  {
-    printf("***warning: read_points_data() can NOT read the particle coordinate file!");
-    libmesh_error();
-  }
+//   std::cout <<"\n###point data filename = "<<filename <<std::endl;
+//   std::ifstream infile;
+//   infile.open (filename, std::ios_base::in);
+//   if( !infile.good() )
+//   {
+//     printf("***warning: read_points_data() can NOT read the particle coordinate file!");
+//     libmesh_error();
+//   }
   
-  // init
-  const std::size_t dim = _mesh.mesh_dimension();
-  const PointType point_type = POINT_PARTICLE;  // polymer bead; Lagrangian point; Point particle;
-  unsigned int n_particles = 0;
-  Real x=0., y=0., z=0., r=0., den=0.;  // initialize particle coords and radius
-  infile >> n_particles;  // total number of particles
+//   // init
+//   const std::size_t dim = _mesh.mesh_dimension();
+//   const PointType point_type = POINT_PARTICLE;  // polymer bead; Lagrangian point; Point particle;
+//   Real x=0., y=0., z=0., r=0., den=0.;  // initialize particle coords and radius
+//   infile >> num_point_particles;  // total number of particles
   
   
-  // read particle data
-  _particles.resize(n_particles);
-  for (std::size_t i=0; i<n_particles; ++i)
-  {
-    infile >> x >> y >> z >> r >> den;
-    r = 0.0;  den = 0.0;  // zeros for the point particle
-    if (KDDim==2 || dim==2) z = 0.0;
-    Point pt(x,y,z);
-    PointParticle* particle = new PointParticle(pt, i);
-    particle->set_point_type(point_type);  // 1 - tracking point; 0 - bead point;
-    _particles[i] = particle;
+//   // read particle data
+//   _particles.resize(num_point_particles);
+//   for (std::size_t i=0; i<num_point_particles; ++i)
+//   {
+//     infile >> x >> y >> z >> r >> den;
+//     r = 0.0;  den = 0.0;  // zeros for the point particle
+//     if (KDDim==2 || dim==2) z = 0.0;
+//     Point pt(x,y,z);
+//     PointParticle* particle = new PointParticle(pt, i);
+//     particle->set_point_type(point_type);  // 1 - tracking point; 0 - bead point;
+//     _particles[i] = particle;
     
-    // --------------------- test ------------------------------------------
-//    if(this->comm().rank()==0 )
-//    {
-//      printf("read_particles_data: x = %f, y = %f, z = %f. ",x, y, z );
-//      printf("radius = %f, relative density = %f. ",r, den );
-//      printf("MPI_rank = %d\n",this->comm().rank() );
-//    }
-    // --------------------- test ------------------------------------------
-  } // end for i-loop
+//     // --------------------- test ------------------------------------------
+// //    if(this->comm().rank()==0 )
+// //    {
+// //      printf("read_particles_data: x = %f, y = %f, z = %f. ",x, y, z );
+// //      printf("radius = %f, relative density = %f. ",r, den );
+// //      printf("MPI_rank = %d\n",this->comm().rank() );
+// //    }
+//     // --------------------- test ------------------------------------------
+//   } // end for i-loop
   
-  infile.close();
+//   infile.close();
   
-  this->comm().barrier();
-  std::cout << "Reading point data from "<<filename<<" is completed!\n\n";
+//   this->comm().barrier();
+//   std::cout << "Reading point data from "<<filename<<" is completed!\n\n";
   
-  STOP_LOG ("read_points_data()", "PointMesh<KDDim>");
-}
+//   STOP_LOG ("read_points_data()", "PointMesh<KDDim>");
+// }
 
 
 
-// ======================================================================
-template <unsigned int KDDim>
-void PointMesh<KDDim>::generate_random_points(const std::size_t N,
-                                              const Real bbox_XA, const Real bbox_XB,
-                                              const Real bbox_YA, const Real bbox_YB,
-                                              const Real bbox_ZA, const Real bbox_ZB)
-{
-  START_LOG ("generate_random_points()", "PointMesh<KDDim>");
+// // ======================================================================
+// template <unsigned int KDDim>
+// void PointMesh<KDDim>::generate_random_points(const std::size_t N,
+//                                               const Real bbox_XA, const Real bbox_XB,
+//                                               const Real bbox_YA, const Real bbox_YB,
+//                                               const Real bbox_ZA, const Real bbox_ZB)
+// {
+//   START_LOG ("generate_random_points()", "PointMesh<KDDim>");
   
-  // problem dimension and domain size
-  const std::size_t dim = _mesh.mesh_dimension();
-  const Real max_range_x = bbox_XB - bbox_XA;
-  const Real max_range_y = bbox_YB - bbox_YA;
-  const Real max_range_z = bbox_ZB - bbox_ZA;
-  const Real r = 1.0, den = 1.0;
+//   // problem dimension and domain size
+//   const std::size_t dim = _mesh.mesh_dimension();
+//   const Real max_range_x = bbox_XB - bbox_XA;
+//   const Real max_range_y = bbox_YB - bbox_YA;
+//   const Real max_range_z = bbox_ZB - bbox_ZA;
+//   const Real r = 1.0, den = 1.0;
   
-  // generate random particle coordinates inside the domain, and write out the file
-  // We only use rank=0 proccessor to avoid generating different random numbers on each processor.
-  if( this->comm().rank()==0 )
-  {
-    printf("---> test in generate_random_points: Generating %lu random points ...\n",N);
+//   // generate random particle coordinates inside the domain, and write out the file
+//   // We only use rank=0 proccessor to avoid generating different random numbers on each processor.
+//   if( this->comm().rank()==0 )
+//   {
+//     printf("---> test in generate_random_points: Generating %lu random points ...\n",N);
     
-    // write the particle coordinates into a file
-    std::string filename = "random_points_file.txt";
-    int o_width = 5, o_precision = 9;
+//     // write the particle coordinates into a file
+//     std::string filename = "random_points_file.txt";
+//     int o_width = 5, o_precision = 9;
     
-    std::ofstream outfile;
-    outfile.open(filename,std::ios_base::out);
-    outfile << N << "\n";
-    for (size_t i=0;i<N;i++)
-    {
-      // generate random coordinates
-      Real x = max_range_x * (std::rand() % 1000) / 1000 + bbox_XA;
-      Real y = max_range_y * (std::rand() % 1000) / 1000 + bbox_YA;
-      Real z = max_range_z * (std::rand() % 1000) / 1000 + bbox_ZA;
-      if (KDDim==2 || dim==2) z = 0.0;
+//     std::ofstream outfile;
+//     outfile.open(filename,std::ios_base::out);
+//     outfile << N << "\n";
+//     for (size_t i=0;i<N;i++)
+//     {
+//       // generate random coordinates
+//       Real x = max_range_x * (std::rand() % 1000) / 1000 + bbox_XA;
+//       Real y = max_range_y * (std::rand() % 1000) / 1000 + bbox_YA;
+//       Real z = max_range_z * (std::rand() % 1000) / 1000 + bbox_ZA;
+//       if (KDDim==2 || dim==2) z = 0.0;
       
-      outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-      outfile.precision(o_precision);   outfile.width(o_width);
-      outfile << x << "  " << y << "  " << z << "  " << r << "  "<< den << "  \n";
-    } // end loop-i
+//       outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
+//       outfile.precision(o_precision);   outfile.width(o_width);
+//       outfile << x << "  " << y << "  " << z << "  " << r << "  "<< den << "  \n";
+//     } // end loop-i
     
-    // close the file
-    outfile.close();
-    printf("---> test in generate_random_points: random particle file is created!\n");
-  }
+//     // close the file
+//     outfile.close();
+//     printf("---> test in generate_random_points: random particle file is created!\n");
+//   }
   
-  this->comm().barrier();
+//   this->comm().barrier();
   
-  STOP_LOG ("generate_random_points()", "PointMesh<KDDim>");
-}
+//   STOP_LOG ("generate_random_points()", "PointMesh<KDDim>");
+// }
 
 
 
 // ======================================================================
-template <unsigned int KDDim>
-void PointMesh<KDDim>::generate_random_points(const std::size_t N,
-                                              const Point& bbox_min,
-                                              const Point& bbox_max)
-{
-  this->generate_random_points(N,
-                               bbox_min(0),bbox_max(0),
-                               bbox_min(1),bbox_max(1),
-                               bbox_min(2),bbox_max(2) );
-}
+// template <unsigned int KDDim>
+// void PointMesh<KDDim>::generate_random_points(const std::size_t N,
+//                                               const Point& bbox_min,
+//                                               const Point& bbox_max)
+// {
+//   this->generate_random_points(N,
+//                                bbox_min(0),bbox_max(0),
+//                                bbox_min(1),bbox_max(1),
+//                                bbox_min(2),bbox_max(2) );
+// }
 
 
 
-// ======================================================================
+// // ======================================================================
 template <unsigned int KDDim>
 void PointMesh<KDDim>::construct_kd_tree ()
 {
@@ -484,7 +440,7 @@ void PointMesh<KDDim>::build_particle_neighbor_list()
 #ifdef LIBMESH_HAVE_NANOFLANN
   
   // do a radius search to build the neighbor list for ALL particles.
-  for (std::size_t j=0; j<_particles.size(); ++j)
+  for (std::size_t j=0; j<_num_point_particles; ++j)
   {
     // get the neighbor indices & distance values
     const Point &tgt( _particles[j]->point() );
@@ -515,14 +471,14 @@ void PointMesh<KDDim>::build_particle_neighbor_list_naively()
   START_LOG ("build_particle_neighbor_list_naively()", "PointMesh<KDDim>");
   
   // do a radius search to build the neighbor list for ALL particles.
-  for (std::size_t i=0; i<_particles.size(); ++i)
+  for (std::size_t i=0; i<_num_point_particles; ++i)
   {
     // The info of the i-th particle
     const Point pt0( _particles[i]->point() );
     std::vector<std::pair<std::size_t,Real> > IndicesDists;
     
     // j-loop over the particles
-    for (std::size_t j=0; j<_particles.size(); ++j)
+    for (std::size_t j=0; j<_num_point_particles; ++j)
     {
       if (i!=j)
       {
@@ -861,11 +817,7 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
 template <unsigned int KDDim>
 void PointMesh<KDDim>::reinit(const bool with_hi)
 {
-  START_LOG ("reinit()", "PointMesh<KDDim>");
-  // std::string msg = "PointMesh::reinit(): Re-initialize the PointMesh ...";
-  // PMToolBox::output_message(msg,this->comm());
-
-  
+  START_LOG ("reinit()", "PointMesh<KDDim>");  
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    if the KD tree is already built, we need to re-construct the KD tree in reinit()
    This is necessary at each time step when particles move!
@@ -881,7 +833,7 @@ void PointMesh<KDDim>::reinit(const bool with_hi)
    Loop over ALL particles to calculate their neighbor lists and forces.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   
-  for (std::size_t j=0; j<_particles.size(); ++j)
+  for (std::size_t j=0; j<_num_point_particles; ++j)
   {
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Re-init the particle j
@@ -939,9 +891,8 @@ void PointMesh<KDDim>::update_particle_mesh(ParticleMesh<KDDim>* particle_mesh) 
   START_LOG("update_particle_mesh()", "PointMesh<KDDim>");
   
   // Extract the point coordinates from the point_mesh object
-  const std::size_t  n_points = this->num_particles();
-  std::vector<Point> nodal_vec(n_points);
-  for(std::size_t i=0; i<n_points; ++i){
+  std::vector<Point> nodal_vec(_num_point_particles);
+  for(std::size_t i=0; i<_num_point_particles; ++i){
     nodal_vec[i] = _particles[i]->point();
   }
   particle_mesh->update_mesh(nodal_vec);
@@ -958,9 +909,9 @@ void PointMesh<KDDim>::update_point_mesh(const ParticleMesh<KDDim>* particle_mes
   START_LOG("update_point_mesh()", "PointMesh<KDDim>");
   
   // Loop over each Particle
-  const std::size_t n_particles = particle_mesh->num_particles();
+  const std::size_t n_rigid_particles = particle_mesh->num_particles();
   std::size_t start_id = 0;
-  for(std::size_t i=0; i<n_particles; ++i)
+  for(std::size_t i=0; i<n_rigid_particles; ++i)
   {
     // Extract the point(node) coordiantes from particle_mesh
     std::vector<Point> node_xyz;
@@ -1006,12 +957,25 @@ Real PointMesh<KDDim>::search_radius(const std::string & p_e) const
 template <unsigned int KDDim>
 void PointMesh<KDDim>::print_point_info() const
 {
-  printf("======================= printing the point information: =======================\n\n");
-  printf("There are totally %lu points (search radius = %f)\n",_particles.size(),_search_radius_p);
-  for (std::size_t j=0; j<_particles.size(); ++j)
-    _particles[j]->print_info();
-  
-  printf("========================= end of the point information =========================\n\n");
+  const int o_precision = 9;
+  std::ofstream out_file; 
+  out_file.precision(o_precision); 
+  out_file.open("out.initial_force_field", std::ios_base::out);
+  out_file <<"bead_id pos_x pos_y pos_z force_x force_y force_z\n"; 
+  for (std::size_t i = 0; i<_num_point_particles; ++i){
+    out_file <<i <<" ";
+    for (int j=0; j<3; j++) out_file << _particles[i]->point()(j) <<" ";
+    for (int j=0; j<3; j++) out_file << _particles[i]->particle_force()[j] <<" ";        
+    out_file<<"\n";
+  }
+  out_file.close();
+  printf("==> done: output bead info after first system.reinit() to 'out.initial_force_field'\n");
+ //  printf("======================= printing the point information: =======================\n\n");
+ //  printf("There are totally %lu points (search radius = %f)\n",_particles.size(),_search_radius_p);
+ //  for (std::size_t j=0; j<_particles.size(); ++j)
+ //    _particles[j]->print_info();
+ // printf("========================= end of the point information =========================\n\n");
+
 }
 
 
@@ -1049,6 +1013,30 @@ void PointMesh<KDDim>::print_elem_neighbor_list(std::ostream &out) const
   } // end for p-loop
   printf("======================= end of the element neighbor list ======================\n\n");
 }
+
+
+// ======================================================================
+template <unsigned int KDDim>
+void PointMesh<KDDim>::set_particle_velocity(const std::vector<Real>& vel)
+{ 
+  START_LOG("PointMesh::set_particle_velocity()", "PointMesh");
+  const int dim = 3;
+  // assign velocity to 0-th to (n-1)-th particle 
+  Point p_velocity(0.);
+  for(std::size_t p_id=0; p_id < _num_point_particles; p_id++){
+    for (int i=0; i<dim; i++) p_velocity(i) = vel[p_id*dim+i];
+    _particles[p_id]->set_particle_velocity(p_velocity);
+    _velocity_magnitude[p_id] = p_velocity.norm_sq();
+  }
+  auto minmax_velocity_magniture = std::minmax_element(_velocity_magnitude.begin(), _velocity_magnitude.end());
+//  _min_velocity_magnitude = _velocity_magnitude[minmax_velocity_magniture.first];
+//  _max_velocity_magnitude = _velocity_magnitude[minmax_velocity_magniture.second];
+  _min_velocity_magnitude = std::sqrt(*minmax_velocity_magniture.first);
+  _max_velocity_magnitude = std::sqrt(*minmax_velocity_magniture.second);
+
+  STOP_LOG("PointMesh::set_particle_velocity()", "PointMesh");
+}
+
 
 
 // ------------------------------------------------------------

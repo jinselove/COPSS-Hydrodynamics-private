@@ -84,8 +84,6 @@ public:
    */
   void attach_nodal();
 
-
-
 protected:
   // The elastic system for solids
   // Use pointer instead of const Ref. to avoid explicit initialization!

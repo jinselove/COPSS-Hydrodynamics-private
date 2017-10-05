@@ -964,7 +964,7 @@ void PolymerChain::write_bead_trajectory(const unsigned int& o_step,
       }
       // write velocity
       for (std::size_t j=0; j<_dim; ++j){
-        out_file <<_beads[i]->particle_velocity()[j] << " ";
+        out_file <<_beads[i]->particle_velocity()(j) << " ";
       }
       // write force
       for (std::size_t j=0; j<_dim; ++j){

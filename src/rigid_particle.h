@@ -153,14 +153,6 @@ public:
   std::vector<std::pair<std::size_t,Real> > neighbor_list() const
   { return _neighbor_list;  };
   
-  
-  /*
-   * Set the force and torque vectors on the particle
-   * This is set by the member function in the class "ParticleMesh"
-   */
-  // void set_particle_force(const std::vector<Real>& pforce){ _force = pforce; };
-  
-  
   /*
    * Return the force and torque vector on the particle
    */
@@ -364,7 +356,7 @@ public:
   const Point& get_center0() const {return _center0;};
 
 /*
-   * Get centroid0
+   * Get centroid
    */
   const Point& get_centroid0() {return _centroid0;};
   
@@ -427,8 +419,33 @@ public:
   /*
    * get body force (for debug purpose)
    */
-  const void debug_body_force() const;
-  
+  void debug_body_force() const;
+
+  /*
+   * get body force
+   */
+  const Point& get_centroid_force() const {return _centroid_force;};
+
+  /*
+   * set node velocity
+   */
+  void set_node_velocity(std::vector<Point>& node_velocity) {
+      _node_velocity = node_velocity;
+  };
+  /*
+   * set body velocity
+   * each node of this rigid particle does not have member velocity
+   * so we can only calculate centroid_velocity in point_mesh.C and assign it
+   * to this rigid particle
+   */
+  Point& compute_centroid_velocity() {
+    _centroid_velocity.zero();
+    for (int i=0; i<_node_velocity.size(); i++){
+      _centroid_velocity += _node_velocity[i];              
+    }
+    _centroid_velocity /= _node_velocity.size(); 
+    return _centroid_velocity;
+  };  
   
 private:
     
@@ -450,10 +467,10 @@ private:
   // radius of particle (for spherical particles only)
   Real _radius;
 
-  // free charge of particle, Xikai
+  // free charge of particle
   Real _charge;
 
-  // relative permittivity of particle, Xikai
+  // relative permittivity of particle
   Real _epsilon_in;
   
   // the processor that the particle belongs to
@@ -462,9 +479,6 @@ private:
   
   // neighbor particles around the present particle: particle id and distance value.
   std::vector<std::pair<std::size_t,Real> > _neighbor_list;
-  
-  // the force vector excerted on this particle(non-hydrodynamic and non-Brownian)
-  std::vector<Real> _force;
   
   // mesh of the particle, which can be eigther surface mesh or volume mesh
   SerialMesh _mesh;
@@ -511,6 +525,15 @@ private:
 
   // forces on each nodes
   std::vector<Point> _nf;
+
+  // force acting on the centroid (which is a sum of node forces)
+  Point _centroid_force;
+
+  // velocity of each nodes
+  std::vector<Point> _node_velocity;
+
+  // velocity of the centroid (mean over all node velocity)
+  Point _centroid_velocity;
 }; // end of class defination
   
   

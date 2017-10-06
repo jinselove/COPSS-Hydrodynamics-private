@@ -81,6 +81,8 @@ void CopssRigidParticleSystem::create_object(){
   num_rigid_particles = particle_mesh->num_particles();
   // attach mesh spring network
   this -> attach_mesh_spring_network();
+  // initialize center0 for calculation of MSD
+  particle_mesh->initial_particle_center_of_mass(center0);
   // print out information
   cout<<"##########################################################\n"
            <<"#                  Particle Parameters                    \n"
@@ -200,7 +202,12 @@ void CopssRigidParticleSystem::update_object(std::string stage)
 
 void CopssRigidParticleSystem::write_object(unsigned int step_id)
 {
-  cout <<"warning: write object has not been implemented yet !!!" <<endl;
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Allgather the distributed vector ROUT to local vector lvec on all processors
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  // std::vector<Real> lvec;
+  // brownian_sys->vector_transform(lvec,&ROUT, "backward"); // ROUT -> lvec
+  particle_mesh->write_particle(step_id, o_step, real_time, output_file, comm_in.rank());
 }
 
 void CopssRigidParticleSystem::run(EquationSystems& equation_systems){

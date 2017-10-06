@@ -58,16 +58,18 @@ PointMesh<KDDim>::PointMesh(ParticleMesh<KDDim>& particle_mesh,
 {
   // total # of tracking points on the surface of all the finite-sized particles
   _num_point_particles = particle_mesh.num_mesh_points();
+  _num_rigid_particles = particle_mesh.num_particles();
   _particles.resize(_num_point_particles);
+  _rigid_particles.resize(_num_rigid_particles);
+  _rigid_particles = particle_mesh.particles();
   _velocity_magnitude.resize(_num_point_particles);
   // create point particle list
   std::size_t count = 0;
-  const std::size_t n_rigid_particles = particle_mesh.num_particles();
-  for (std::size_t i=0; i<n_rigid_particles; ++i)
+  for (std::size_t i=0; i<_num_rigid_particles; ++i)
   {
     // extract the nodal coordinates of the current particle
     std::vector<Point> node_xyz;
-    particle_mesh.particles()[i]->extract_nodes(node_xyz);    
+    _rigid_particles[i]->extract_nodes(node_xyz);    
     // Create the PointParticle to form the particle list
     const std::size_t n_nodes = node_xyz.size();
     for (std::size_t j=0; j<n_nodes; ++j)
@@ -80,12 +82,8 @@ PointMesh<KDDim>::PointMesh(ParticleMesh<KDDim>& particle_mesh,
       count++;
     } // enf for j-loop
   } // enf for i-loop
-  
-  
   // Add the periodic boundary conditions
   this->add_periodic_boundary( *particle_mesh.pm_periodic_boundary() );
-  
-  
   std::string msg = "PointMesh has been constructed from the extracted nodal points of particle's mesh!";
 //  msg += " count = " + std::to_string(count);
   PMToolBox::output_message(msg,this->comm());
@@ -173,8 +171,6 @@ PointMesh<KDDim>::~PointMesh()
       delete _particles[i];
     }
   }
-    
-  // clear other objects
   _particles.clear();
   _elem_neighbor_list.clear();
   _local_elem_neighbor_list.clear();
@@ -1017,9 +1013,9 @@ void PointMesh<KDDim>::print_elem_neighbor_list(std::ostream &out) const
 
 // ======================================================================
 template <unsigned int KDDim>
-void PointMesh<KDDim>::set_particle_velocity(const std::vector<Real>& vel)
+void PointMesh<KDDim>::set_bead_velocity(const std::vector<Real>& vel)
 { 
-  START_LOG("PointMesh::set_particle_velocity()", "PointMesh");
+  START_LOG("PointMesh::set_bead_velocity()", "PointMesh");
   const int dim = 3;
   // assign velocity to 0-th to (n-1)-th particle 
   Point p_velocity(0.);
@@ -1029,15 +1025,25 @@ void PointMesh<KDDim>::set_particle_velocity(const std::vector<Real>& vel)
     _velocity_magnitude[p_id] = p_velocity.norm_sq();
   }
   auto minmax_velocity_magniture = std::minmax_element(_velocity_magnitude.begin(), _velocity_magnitude.end());
-//  _min_velocity_magnitude = _velocity_magnitude[minmax_velocity_magniture.first];
-//  _max_velocity_magnitude = _velocity_magnitude[minmax_velocity_magniture.second];
   _min_velocity_magnitude = std::sqrt(*minmax_velocity_magniture.first);
   _max_velocity_magnitude = std::sqrt(*minmax_velocity_magniture.second);
 
-  STOP_LOG("PointMesh::set_particle_velocity()", "PointMesh");
+  // calculate rigid particle centroid velocity if there are rigid particles
+  // create point particle list
+  std::size_t point_id = 0;
+  for (std::size_t i=0; i<_rigid_particles.size(); ++i)
+  {
+    const std::size_t n_nodes = _rigid_particles[i]->num_mesh_nodes();
+    std::vector<Point> node_velocity(n_nodes);
+    for (std::size_t j=0; j<n_nodes; ++j)
+    {
+      node_velocity[j]=_particles[point_id+j]->particle_velocity();
+    } // enf for j-loop
+    _rigid_particles[i]->set_node_velocity(node_velocity);
+    point_id += n_nodes;
+  } // enf for i-loop
+  STOP_LOG("PointMesh::set_bead_velocity()", "PointMesh");
 }
-
-
 
 // ------------------------------------------------------------
 // Explicit Instantiations

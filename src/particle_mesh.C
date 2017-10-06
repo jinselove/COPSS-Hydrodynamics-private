@@ -52,7 +52,7 @@ ParticleMesh<KDDim>::ParticleMesh(MeshBase& mesh)
     _is_sorted(true),
     _periodic_boundary(NULL)
 {
-  // do nothing
+  _dim = _mesh.mesh_dimension();
 }
 
 
@@ -70,7 +70,7 @@ ParticleMesh<KDDim>::ParticleMesh(MeshBase& mesh,
   _is_sorted(true),
   _periodic_boundary(NULL)
 {
-  // do nothing
+  _dim = _mesh.mesh_dimension();
 }
 
   
@@ -125,8 +125,8 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
 
   // init variables
   const std::size_t dim = _mesh.mesh_dimension(); // fluid mesh dimension
-  unsigned int p_id = 1;
-  unsigned  p_type = 1;
+  unsigned int p_id;
+  unsigned  p_type;
   Point p_center;
   Point mag;
   Point rot;
@@ -1183,24 +1183,192 @@ void ParticleMesh<KDDim>::volume_conservation()
   STOP_LOG ("volume_conservation()", "ParticleMesh<KDDim>");
 }
   
-  
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::initial_particle_center_of_mass(std::vector<Point>& center0) const
+{
+  START_LOG("initial_center_of_mass()", "ParticleMesh<KDDim>");
+  center0.resize(_n_rigid_particles);
+  for (std::size_t i=0; i<_n_rigid_particles; i++){
+    center0[i] = _particles[i]->get_centroid0();
+  }
+  STOP_LOG("initial_center_of_mass()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_particle(const unsigned int& step_id,
+                                          const unsigned int& o_step,
+                                          const Real& real_time,
+                                          const std::vector<std::string>& output_file,
+                                          unsigned int comm_in_rank) const
+{
+  START_LOG("write_particle()", "ParticleMesh<KDDim>");
+  this->write_time(step_id, o_step, real_time, comm_in_rank);
+  for (int i = 0; i < output_file.size(); i++){
+    if(output_file[i] == "equation_systems") {
+      // this output has been written in Copss.C
+    }
+    else if(output_file[i] == "trajectory") this -> write_particle_trajectory(o_step, comm_in_rank);
+    else if (output_file[i] == "particle_mesh") this->write_particle_mesh(step_id, o_step);
+    else if(output_file[i] == "mean_square_displacement"){
+        std::cout <<"Error: there is difficulty to calculate msd of rigid particles from ROUT, fix it before output msd" << std::endl;
+        libmesh_error();
+        // this -> write_particle_msd(step_id, o_step,center0, lvec, comm_in_rank);
+      
+    }
+    else {
+      std::cout << "unsupported output_file content: (" << output_file[i] <<")" << std::endl; 
+      libmesh_error();
+    }
+  }  
+
+  STOP_LOG("write_particle()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_time(const unsigned int& step_id,
+                              const unsigned int& o_step,
+                              const Real& real_time,
+                              unsigned int comm_in_rank) const
+{
+  // write step and real time
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if(step_id == 0){
+      out_file.open("out.time", std::ios_base::out);
+      out_file << "step_id" <<"  " <<"o_step" <<"  " << "real_time" << "\n";      
+    }
+    else{
+      out_file.open("out.time", std::ios_base::app);
+    }
+    out_file.precision(o_precision);
+    out_file <<step_id <<"  "<< o_step <<"  " <<real_time <<"\n";
+    out_file.close();  
+  }
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
+                                                    unsigned int comm_in_rank) const
+{
+  START_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
+  std::ostringstream oss;
+  oss << "output_particle_" << o_step <<".csv";
+  std::ofstream out_file;
+  if (comm_in_rank == 0){
+    out_file.open(oss.str(), std::ios_base::out);
+    // write out the csv file  
+    // POINT data
+    out_file <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
+    out_file.precision(o_precision);
+    for(std::size_t i=0; i<_n_rigid_particles; ++i)
+    {
+      out_file << i << " ";
+      // write position
+      for(std::size_t j=0; j<_dim; ++j){
+        out_file << _particles[i]->get_centroid()(j) << " ";
+      }
+      // write velocity
+      for (std::size_t j=0; j<_dim; ++j){
+        out_file <<_particles[i]->compute_centroid_velocity()(j) << " ";
+      }
+      // write force
+      for (std::size_t j=0; j<_dim; ++j){
+        out_file <<_particles[i]->get_centroid_force()(j) <<" ";
+      }
+      out_file <<"\n";
+    }
+    out_file << "\n";
+    out_file.close();
+  } // end if comm_in_rank == 0
+
+  STOP_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+// template <unsigned int KDDim>
+// void ParticleMesh<KDDim>::write_particle_msd(const unsigned int& step_id,
+//                                             const unsigned int& o_step,
+//                                             const std::vector<Point>& center0,
+//                                             const std::vector<Real>& lvec,
+//                                             unsigned int comm_in_rank) const
+// {
+//   /*
+//    * Fix me: the unwrapped position of all surface nodes are in lvec, however,
+//    * it is hard to calculate the unwrapped centroid position of each rigid particle
+//    * since the calculation requires the mesh configuration (refer to RigidParticle::compute_centroid)
+//    * one way to fix this might be: create another mesh to hold unwrapped node information in each rigid_particle
+//    */
+
+
+
+//   // START_LOG("write_particle_msd()", "ParticleMesh<KDDim>");
+//   // //get centers of all surface nodes
+//   // std::vector<Point> centeri(_n_rigid_particles);
+//   // Point node_center;
+//   // for (unsigned int i = 0; i < _n_rigid_particles; i++){
+//   //   const unsigned int n_nodes = _particles[i]->num_mesh_nodes();
+//   //   for (unsigned int j=0; j<n_nodes; j++){
+//   //     for (int k = 0; k <_dim; k++){
+//   //       node_center(k) = lvec[(i*n_nodes+j)*_dim+k];
+//   //     } 
+//   //     centeri[i] += node_center;     
+//   //   }
+
+//   // }
+//   // // compute mean square displacement
+//   // Point msd;
+//   // this->compute_mean_square_displacement(center0, centeri, msd);
+//   // // write mean square displacment to out.mean_square_displacement
+//   // std::ofstream out_file;  
+//   // if(comm_in_rank == 0){
+//   //   if(step_id == 0){
+//   //     out_file.open("out.mean_square_displacement", std::ios_base::out);
+//   //     out_file << "o_step" <<"  " << "mean_square_displacement" << "\n";      
+//   //   }
+//   //   else{
+//   //     out_file.open("out.mean_square_displacement", std::ios_base::app);
+//   //   }
+//   //   out_file.precision(o_precision);
+//   //   out_file << o_step <<"  ";
+//   //   for (int i = 0; i < _dim; i++){
+//   //     out_file <<msd(i) <<"  ";
+//   //   }
+//   //   out_file<<"\n";
+//   //   out_file.close();       
+//   // }// end if comm_in_rank == 0  
+
+//   // STOP_LOG("write_particle_msd()", "ParticleMesh<KDDim>");
+// }
+
+
   
 // ======================================================================
 template <unsigned int KDDim>
-void ParticleMesh<KDDim>::write_particle_mesh(const std::string& mesh_name)
+void ParticleMesh<KDDim>::write_particle_mesh(const unsigned int& step_id,
+                                              const unsigned int& o_step) const
 {
   START_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
-  
   this->comm().barrier();
-  const std::size_t n_particles = this->num_particles();
+  std::ostringstream surface_mesh_file_name;
+  if(step_id == 0){
+    surface_mesh_file_name<< "particle_surface_mesh.e";  
+  }
+  else{
+    surface_mesh_file_name <<"particle_surface_mesh.e"<< "-s."
+                          << std::setw(8) << std::setfill('0') << std::right << o_step;
+  }
   SerialMesh stitch_mesh (_particles[0]->mesh());
-  for(std::size_t i=1; i<this->num_particles(); ++i)
+  for(std::size_t i=1; i<_n_rigid_particles; ++i)
   {
     stitch_mesh.stitch_meshes(_particles[i]->mesh(),0,0);
   }    
   // output the stitched mesh
-  stitch_mesh.write(mesh_name);
-
+  stitch_mesh.write(surface_mesh_file_name.str());
   STOP_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
 }
   

@@ -419,33 +419,7 @@ void Copss::read_restart_time()
         break;
     }
     fin >> restart_step >> o_step >> real_time;
-
-   // std::getline(fin,tmp);
-   // std::cout << tmp <<std::endl;
     fin.close();
-
-    // fin.seekg(-1,std::ios_base::end);                // go to one spot before the EOF
-    // bool keepLooping = true;
-    // while(keepLooping) {
-    //     char ch;
-    //     fin.get(ch);                            // Get current byte's data
-    //     if((int)fin.tellg() <= 1) {             // If the data was at or before the 0th byte
-    //         fin.seekg(0);                       // The first line is the last line
-    //         keepLooping = false;                // So stop there
-    //     }
-    //     else if(ch == '\n') {                   // If the data was a newline
-    //         keepLooping = false;                // Stop at the current position.
-    //     }
-    //     else {                                  // If the data was neither a newline nor at the 0 byte
-    //         fin.seekg(-2,std::ios_base::cur);        // Move to the front of that data, then to the front of the data before it
-    //     }
-    // }
-    // std::string lastLine;            
-    // getline(fin,lastLine);                      // Read the current line
-    // cout << "Result: " << lastLine << '\n';     // Display it    
-    // //fin >> restart_step >> o_step >> real_time; // restart_s
-    // //o_step++;
-    // fin.close();
   } // end if
   else{
     printf("***warning: read_restart_time can NOT read the time output: out.time");
@@ -613,10 +587,6 @@ EquationSystems Copss::create_equation_systems()
   // initialized force field
   cout<<"==>(8/8) Attach fixes to 'stokes' system"<<endl;
   this -> attach_fixes(system); 
-
-  // force_field = new ForceField(system);
-  // system.attach_force_field(force_field);
-
   /* Print information about the mesh and system to the screen. */
   cout << endl <<"--------------> Print equation systems info" <<endl;
     equation_systems.print_info();
@@ -840,8 +810,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
    // transform total point velocity to U0 in Brownian_system
     brownian_sys->vector_transform(vel1, &U0, "forward");
     // assign vel1 to particle velocity
-    point_mesh->set_particle_velocity(vel1);
-
+    point_mesh->set_bead_velocity(vel1);
     if (debug_info){
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        * ---> test: output the particle velocity
@@ -1093,7 +1062,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
     } 
   }
   // set vel1 to particle velocity
-  point_mesh->set_particle_velocity(vel1);
+  point_mesh->set_bead_velocity(vel1);
   // transform total point velocity to U0 in Brownian_system
   brownian_sys->vector_transform(vel1, &U0, "forward");
   /*---------------------------------------------------------------------------------------

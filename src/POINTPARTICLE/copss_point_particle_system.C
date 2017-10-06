@@ -220,7 +220,7 @@ void CopssPointParticleSystem::update_object(std::string stage)
 void CopssPointParticleSystem::write_object(unsigned int step_id)
 {
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Allgather the distributed vector R0 to local vector lvec on all processors
+   Allgather the distributed vector ROUT to local vector lvec on all processors
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   std::vector<Real> lvec;
   brownian_sys->vector_transform(lvec,&ROUT, "backward"); // ROUT -> lvec

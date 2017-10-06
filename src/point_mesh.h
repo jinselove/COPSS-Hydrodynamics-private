@@ -32,9 +32,9 @@
 
 // Local Includes   -----------------------------------
 #include "point_particle.h"
-//#include "particle_mesh.h"
 #include "polymer_chain.h"
 #include "pm_periodic_boundary.h"
+#include "rigid_particle.h"
 
 // C++ Includes   -------------------------------------
 //#include <stdio.h>
@@ -445,7 +445,15 @@ public:
    * Set particle (bead or surface node) velocity
    * vel.size() = nui
    */
-  void set_particle_velocity(const std::vector<Real>& vel);
+  void set_bead_velocity(const std::vector<Real>& vel);
+
+  /**
+   * Set rigid particle velocity
+   * vel.size() = nui
+   */
+ // void set_rigid_particle_velocity();
+
+
 
   /**
    * Calculate maximum point particle (or rigid particle surface nodes) velocity
@@ -472,8 +480,14 @@ private:
   // A vector that store the pointers to PointParticle(save storage)
   std::vector<PointParticle*> _particles;
 
+  // A vector that store the pointers to RigidParticle(save storage)
+  std::vector<RigidParticle*> _rigid_particles;
+
   // number of point particles
   std::size_t _num_point_particles;
+
+  // number of rigid particles
+  std::size_t _num_rigid_particles;
 
   // Polymer chain
   PolymerChain* _polymer_chain;

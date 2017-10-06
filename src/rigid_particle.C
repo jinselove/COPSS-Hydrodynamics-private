@@ -64,7 +64,7 @@ RigidParticle::RigidParticle(const dof_id_type& particle_id,
   _charge(charge), _epsilon_in(epsilon_in),
   _sedimentation_body_force_density(sedimentation_body_force_density),
   _volume0(0.), _area0(0.),
-  _processor_id(-1), _force(3,0.),
+  _processor_id(-1),
   _mesh(comm_in),
   _mesh_spring_network(NULL)
 {
@@ -516,6 +516,7 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
    We will build the nodal force vector through the EquationSystems.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
   _surface_force_density = _body_force_density * _volume0 / _area0;
+  _centroid_force = _body_force_density * _volume0;
   EquationSystems equation_systems (_mesh);
   ExplicitSystem& system = equation_systems.add_system<ExplicitSystem>("Elasticity");
 
@@ -966,17 +967,10 @@ void RigidParticle::volume_conservation()
   
   STOP_LOG("volume_conservation()", "RigidParticle");
 }
-  
+
+
 // ======================================================================  
-std::vector<Real>& RigidParticle::compute_particle_force()
-{
-  START_LOG("RigidParticle::compute_particle_force()", "RigidParticle");
-
-
-  STOP_LOG("RigidParticle::compute_particle_force()", "RigidParticle");
-}
-  
-const void RigidParticle::debug_body_force() const
+void RigidParticle::debug_body_force() const
 {
   START_LOG("RigidParticle::debug_body_force()", "RigidParticle");
   std::cout << "============debug_body_force()================= " <<std::endl;
@@ -984,13 +978,13 @@ const void RigidParticle::debug_body_force() const
   for (int i=0; i<_dim; i++){
     std::cout <<_body_force_density(i) <<"; ";
   }
-  std::cout << "\n total force = ";
+  std::cout << "\n total force = _body_force_density * _volume0 = ";
   for (int i=0; i<_dim; i++){
-    std::cout <<_body_force_density(i) * _volume0 << "; ";
+    std::cout <<_centroid_force(i) << "; ";
   }
   std::cout << std::endl;
 
-  std::cout << "==> 2) surface force density = ";
+  std::cout << "==> 2) surface force density = _surface_force_density * _area0 = ";
   for (int i=0; i<_dim; i++){
     std::cout <<_surface_force_density(i) <<"; ";
   }
@@ -1003,7 +997,7 @@ const void RigidParticle::debug_body_force() const
 
   Point total_force;
   for (int i =0; i<_nf.size(); i++) total_force += _nf[i];
-  std::cout << "==> 3) total force by adding up node force = ";
+  std::cout << "==> 3) total force by adding up node force = sum (_node_force) = ";
   for(int i=0; i<_dim; i++){
     std::cout << total_force(i) << ";";
   }    

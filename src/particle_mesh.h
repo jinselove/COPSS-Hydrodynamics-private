@@ -485,18 +485,52 @@ public:
   void volume_conservation();
   
   
+  /*
+   * compute center of mass at step 0: center0, for rigid particles
+   */
+  void initial_particle_center_of_mass(std::vector<Point>& center0) const;
+
+  /*
+   * Write particle
+   */ 
+  void write_particle(const unsigned int& step_id,
+                      const unsigned int& o_step,
+                      const Real& real_time,
+                      const std::vector<std::string>& output_file,
+                      unsigned int comm_in_rank) const;
+
+  /*
+   * write out step and real time
+   */
+  void write_time(const unsigned int& step_id,
+                  const unsigned int& o_step,
+                  const Real& real_time,
+                  unsigned int comm_in_rank) const;
+
+  /*
+   * Write out particle trajectories && forces && velocity to csv files
+   * "output_bead_o_step.csv"
+   */
+  void write_particle_trajectory(const unsigned int& o_step,
+                                 unsigned int comm_in_rank) const;
+
+  /*
+   * Write out mean square displacement of rigid particles
+   * Average over all rigidparticles
+   * "out.mean_sqaure_displacement"
+   */
+  // void write_particle_msd(const unsigned int& step_id,
+  //                     const unsigned int& o_step,
+  //                     const std::vector<Point>& center0,
+  //                     const std::vector<Real>& lvec,
+  //                     unsigned int comm_in_rank) const;
   
   /*
    * Write out the particle's mesh(either surface mesh or volume mesh)
    */
-  void write_particle_mesh(const std::string& mesh_name);
+  void write_particle_mesh(const unsigned int & step_id,
+                           const unsigned int& o_step) const;
   
-
-  /*
-   * Write out the particle data
-   */
-  void write_particle_data(const std::string& data_file_name);
-
   /*  
    * Return a stitched mesh associated with all particles for electrostatic solver
    * and assign particle's id to subdomain_id
@@ -522,6 +556,9 @@ private:
 
   // Mesh base: this is the domain(fluid) mesh, not the particle's mesh
   MeshBase& _mesh;
+
+  // dimension
+  std::size_t _dim;
   
   // Search radius (around a particle)
   Real _search_radius_p;
@@ -545,6 +582,9 @@ private:
   
   // Pointer to the Periodic boundary condition
   PMPeriodicBoundary* _periodic_boundary;
+
+  // precision of output
+  const int o_precision = 9;
 };
 
 

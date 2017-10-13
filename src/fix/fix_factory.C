@@ -17,6 +17,9 @@ Fix* FixFactory::buildFix(std::string& fix_name, PMLinearImplicitSystem& pm_syst
 			if(wall_type == "slit") return new FixPointSlitWallLJCut(pm_system);
 			else return new FixPointSphereWallLJCut(pm_system);
 		}
+		else if (fix_name == "discretized_wall/lj_cut"){
+			return new FixPointDiscretizedWallLJCut(pm_system);
+                }
 		else if (fix_name == "wall/empirical_dna")
 		{
 			if(wall_type == "slit") return new FixPointSlitWallEmpiricalDNA(pm_system);

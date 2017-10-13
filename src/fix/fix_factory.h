@@ -7,6 +7,7 @@
 #include "fix_point_wls.h"
 #include "fix_point_slitWall_lj_cut.h"
 #include "fix_point_sphereWall_lj_cut.h"
+#include "fix_point_discretizedWall_lj_cut.h"
 #include "fix_point_slitWall_empirical_dna.h"
 #include "fix_point_sphereWall_empirical_dna.h"
 #include "fix_rigid_surface_constraint.h"

@@ -250,7 +250,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   }
   else {
     neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff);
-    std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n" << std::endl;
+    std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n\n" << std::endl;
+    std::cout << "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
+              << "updating neighborList at each step seems tiny, but we have not fully validated it." <<std::endl;
   }
   // Get a better conformation of polymer chains before simulation.
   this -> update_object("in initial data input");

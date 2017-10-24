@@ -199,6 +199,7 @@ void Copss::read_domain_info()
   for (unsigned int i=0; i < inlet_pressure.size(); i++){ inlet_pressure[i] = input_file("inlet_pressure", 0, i); }
 
   //============== shear
+  std::cout << "\n\nWarning: shear flow has not been implemented \n\n" <<std::cout;
   shear.resize(input_file.vector_variable_size("shear"));
   if(shear.size() != dim*2){
     cout <<"Warning: shear has to be defined for all dimensions and both upper wall and bottom wall" << endl;

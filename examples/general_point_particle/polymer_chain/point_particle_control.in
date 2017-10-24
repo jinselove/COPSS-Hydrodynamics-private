@@ -59,6 +59,9 @@ periodicity = 'true true false'
 inlet = 'false false false'
 inlet_pressure = '0 0 0'
 
+# shear info#
+shear = 'false false false false false false'
+shear_rate = '0 0 0 0 0 0'
 
 #############################################
 #			   Mesh info         			
@@ -77,7 +80,6 @@ gaussian_dna = '2.628506592'
 #############################################
 # smoothing parameter in GGEM (non-unit) #
 alpha = 0.1
-#search_radius_p = 3.2
 
 #############################################
 #			   Solver info         			
@@ -148,6 +150,7 @@ with_hi	       = true
 with_brownian  = true
 adaptive_dt    = true
 max_dr_coeff   = 0.1
+update_neighbor_list_everyStep = true
 restart        = false
 random_seed    = 123456789
 nstep          = 5

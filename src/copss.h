@@ -116,6 +116,8 @@ public:
   std::vector<bool> periodicity; // periodicity of the box
   std::vector<bool> inlet; // inlet direction of the box
   std::vector<Real> inlet_pressure; // inlet pressure
+  std::vector<bool> shear;
+  std::vector<Real> shear_rate;
 
   // Mesh information
   bool generate_mesh; // flag to generate mesh or load mesh
@@ -159,6 +161,7 @@ public:
   std::size_t random_seed;
   bool adaptive_dt; // if use adaptive time step (essential for brownian systems)
   Real max_dr_coeff; // max displacement per step
+  Real max_dr;
   bool restart; // if restart
   std::size_t restart_step; // restart step
   unsigned int nstep; // totol number of steps to run
@@ -212,7 +215,11 @@ public:
   //variables in integrator
   unsigned int istart;
   unsigned int o_step;
-  Real real_time;
+  Real real_time; // real time
+  bool update_neighbor_list_everyStep;
+  unsigned int neighbor_list_update_interval = 0; // how often to update neighbor list
+  unsigned int timestep_duration; // how many steps elapsed since last neighbor_list update
+  bool neighbor_list_update_flag;
   std::vector<Real> vel0;
   std::vector<Real> vel1;
 
@@ -302,6 +309,7 @@ public:
    * step 1: 
   */
   virtual void run(EquationSystems& equation_systems) = 0;
+
 
   /*!
    * destroy PETSC objects

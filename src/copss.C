@@ -170,6 +170,10 @@ void Copss::read_domain_info()
   }
   //=============== periodicity
   periodicity.resize(input_file.vector_variable_size("periodicity"));
+  if(periodicity.size() != dim){
+    cout <<"Warning: periodicity has to be defined for all dimensions" << endl;
+    libmesh_error();
+  }
   for (unsigned int i=0; i < periodicity.size(); i++){ periodicity[i] = input_file("periodicity", false, i); }
   if(periodicity[0]==true and periodicity[1] == true and periodicity[2]==true){
     error_msg = "warning: The box cannot be periodic on all directions at the same time. (required by FEM)";
@@ -178,10 +182,14 @@ void Copss::read_domain_info()
   }
   //============== inlet 
   inlet.resize(input_file.vector_variable_size("inlet"));
+  if(inlet.size() != dim){
+    cout <<"Warning: inlet has to be defined for all dimensions" << endl;
+    libmesh_error();
+  }
   for (unsigned int i=0; i < inlet.size(); i++){ 
      inlet[i] = input_file("inlet", false, i);
      if(inlet[i]==true and periodicity[i]==true) {
-      error_msg = "warning: A inlet direction has to be non-periodicity";
+      error_msg = "warning: A inlet direction has to be non-periodic";
       PMToolBox::output_message(error_msg,comm_in);
       libmesh_error();
      }
@@ -189,6 +197,24 @@ void Copss::read_domain_info()
   //============== inlet pressure
   inlet_pressure.resize(input_file.vector_variable_size("inlet_pressure"));
   for (unsigned int i=0; i < inlet_pressure.size(); i++){ inlet_pressure[i] = input_file("inlet_pressure", 0, i); }
+
+  //============== shear
+  shear.resize(input_file.vector_variable_size("shear"));
+  if(shear.size() != dim*2){
+    cout <<"Warning: shear has to be defined for all dimensions and both upper wall and bottom wall" << endl;
+    libmesh_error();
+  }
+  for (unsigned int i=0; i < shear.size(); i++){ 
+     shear[i] = input_file("shear", false, i);
+     if(shear[i]==true and periodicity[int(i/2)]==true) {
+      error_msg = "warning: A shear direction has to be non-periodic";
+      PMToolBox::output_message(error_msg,comm_in);
+      libmesh_error();
+     }
+  }
+  // =============== shear rate
+  shear_rate.resize(input_file.vector_variable_size("shear_rate"));
+  for (unsigned int i=0; i < shear_rate.size(); i++){ shear_rate[i] = input_file("shear_rate", 0, i); }
 
   cout <<endl<< "##########################################################"<<endl
        << "#                  Geometry information                   " <<endl
@@ -201,11 +227,15 @@ void Copss::read_domain_info()
          cout << wall_params[i] <<"   ";
        }
        cout << endl;
-  cout << "-----------> Periodicity of the box: "<< std::boolalpha << periodicity[0] << ", "<<std::boolalpha << periodicity[1]<<", "<<std::boolalpha <<periodicity[2]<<endl
-       << "-----------> Inlet/Outlet of the box: "<< std::boolalpha << inlet[0] <<"(pressure = " <<inlet_pressure[0] <<" ), "
-      << std::boolalpha << inlet[1] <<"(pressure = " <<inlet_pressure[1] <<" ), " 
-      << std::boolalpha << inlet[2] <<"(pressure = " <<inlet_pressure[2] <<" )" << endl;
-
+  cout << "-----------> Periodicity of the box: ";
+  for (int i=0; i<dim; i++) cout << std::boolalpha <<periodicity[i] <<", ";
+  cout <<endl;
+  cout << "-----------> Inlet/Outlet of the box: ";
+  for (int i=0; i<dim; i++) cout << std::boolalpha << inlet[i] <<"(pressure = " <<inlet_pressure[i] <<" ), ";
+  cout <<endl;
+  cout << "-----------> shear of the box: ";
+  for (int i=0; i<dim*2; i++) cout << std::boolalpha << shear[i] <<"(shear_rate = " <<shear_rate[i] <<" ), ";
+  cout <<endl;
   cout <<endl<< "##########################################################"<<endl
        << "#                  Domain Mesh information                     " <<endl
        << "##########################################################"<<endl<<endl;
@@ -363,7 +393,11 @@ void Copss::read_run_info(){
     istart = 0;
     o_step = 0;
     real_time = 0.;
-  } 
+  }
+  // neighbor list update
+  neighbor_list_update_flag = true; // set this to be ture before simulation
+  update_neighbor_list_everyStep = input_file("update_neighbor_list_everyStep", true);
+  // total number of steps 
   nstep = input_file("nstep", 1);
   // write interval
   write_interval = input_file("write_interval", 1);
@@ -379,7 +413,7 @@ void Copss::read_run_info(){
        << "#                 Run information                      \n"
        << "##########################################################\n\n"
        << "-----------> adaptive_dt: " << std::boolalpha << adaptive_dt << endl
-       << "-----------> max_dr_coeff: " << max_dr_coeff << endl
+       << "-----------> max_dr_coeff (this value will be multiplied by hmin if with_brownian == false and with_hi == true): " << max_dr_coeff << endl
        << "-----------> debug_info: " << std::boolalpha << debug_info << endl; 
   if (with_hi) cout << "-----------> with_hi: " <<std::boolalpha <<with_hi <<endl;
   if (with_brownian){
@@ -650,6 +684,7 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                    ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
                    "************************************************************************\n\n";
       PMToolBox::output_message(output_msg, comm_in);
+      libmesh_error();
     }
   }
   /*** set PBC in y-direction ***/
@@ -682,6 +717,7 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                    ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
                    "************************************************************************\n\n";
       PMToolBox::output_message(output_msg, comm_in);
+      libmesh_error();
     }
   }
   /*** set PBC in z-direction ***/
@@ -709,6 +745,7 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                    ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
                    "************************************************************************\n\n";
       PMToolBox::output_message(output_msg, comm_in);
+      libmesh_error();
     }
   }  
 }
@@ -722,12 +759,8 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
    Compute undisturbed velocity field without particles.
    NOTE: We MUST re-init particle-mesh before solving Stokes
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  system.reinit_hi_system();
-  if (print_info) {
-    if (comm_in.rank() == 0){
-     point_mesh->print_point_info();
-    }
-  }
+  if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
+  system.reinit_hi_system(neighbor_list_update_flag); // neighbor_list_update is ture here
   reinit_stokes = true;
   system.solve_stokes("undisturbed",reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
@@ -786,8 +819,7 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 //==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
 {
- 
-   // get stokes system from equation systems
+  // get stokes system from equation systems
    PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
@@ -797,7 +829,15 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
       // Update the local values to reflect the solution on neighboring processors
       system.update();
-      system.reinit_hi_system();
+      if(update_neighbor_list_everyStep){
+        neighbor_list_update_flag = true;
+      }
+      else if (timestep_duration > neighbor_list_update_interval){
+         cout << "======> update neighbor list at timestep " << i << endl;
+         neighbor_list_update_flag = true;
+         timestep_duration = 0;
+      }
+      system.reinit_hi_system(neighbor_list_update_flag);
     }
     // compute undisturbed velocity of points 
     system.compute_point_velocity("undisturbed", vel0);
@@ -842,7 +882,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
      * last step before restart.
     -----------------------------------------------------------------------------------------*/
     if(i%write_interval == 0){
-
       cout << "\nStarting Fixman integration at step "<< i << endl;
       if (i != restart_step){
         /*
@@ -879,12 +918,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     if(adaptive_dt){
       Real vp_max = point_mesh->maximum_bead_velocity();
       Real vp_min = point_mesh->minimum_bead_velocity();
-      if(with_brownian) {
-        dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  
-      }
-      else {
-        dt = (vp_max <= 1.) ? (max_dr_coeff * hmin) : (max_dr_coeff * hmin / vp_max); 
-      }
+      dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  
       if(i % write_interval == 0){
         cout << "       ##############################################################################################################" << endl
              << "       # Max velocity magnitude is " << vp_max << endl
@@ -898,12 +932,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       } // end if (i% write_interval)  
     }
     else{
-      if(with_brownian) {
-        dt = max_dr_coeff * 1.; 
-      }
-      else {
-        dt = max_dr_coeff * hmin; 
-      } // end if (with brownian)
+      dt = max_dr_coeff * 1.; 
       if(i % write_interval == 0){
         cout << "       ##############################################################################################################" << endl
              << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl
@@ -1011,7 +1040,9 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
       *(system.solution) = *v0_ptr;       // re-assign the undisturbed solution
       system.update();
-      system.reinit_hi_system();
+      // comment the line below if not update neighbor list at each time step
+      if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;
+      system.reinit_hi_system(neighbor_list_update_flag);
       system.compute_point_velocity("undisturbed", vel0);
       reinit_stokes = false;
       system.solve_stokes("disturbed",reinit_stokes);   // solve the disturbed solution
@@ -1043,6 +1074,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
     } // end else (without_brownian)
     real_time += dt;
+    timestep_duration += 1;   
 }
 
 void Copss::langevin_integrate(EquationSystems& equation_systems,
@@ -1052,7 +1084,15 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
   if(i>0){
     system.update();
-    system.reinit_fd_system();
+    if(update_neighbor_list_everyStep){
+      neighbor_list_update_flag = true;
+    }
+    else if (timestep_duration > neighbor_list_update_interval){
+       neighbor_list_update_flag = true;
+       timestep_duration = 0;
+    }
+    // whether or not reinit neighbor list depends on the neighbor_list_update_flag
+    system.reinit_fd_system(neighbor_list_update_flag);
   }
   Point p_velocity(0.);
   for (std::size_t p_id = 0; p_id < NP; p_id++) {
@@ -1171,6 +1211,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
     VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
   } // end else (without_brownian)
   real_time += dt;
+  timestep_duration += 1;
 }
 
 

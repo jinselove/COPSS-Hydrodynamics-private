@@ -405,8 +405,9 @@ std::vector<Real> PMLinearImplicitSystem::point_velocity(const std::vector<Real>
 }
 
 // ==================================================================================
-void PMLinearImplicitSystem::reinit_hi_system()
+void PMLinearImplicitSystem::reinit_hi_system(bool& neighbor_list_update_flag)
 {
+  //PerfLog perf_log("reinit_hi_system");
   START_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
   
@@ -414,11 +415,16 @@ void PMLinearImplicitSystem::reinit_hi_system()
   // (1) build the point-point neighbor list according to search radius;
   // (2) build the element-point neighbor list according to search radius;
   // (3) evaluate forces
+  //perf_log.push("reinit point_mesh");
   const bool with_hi = true;
-  _point_mesh->reinit(with_hi);  
+  _point_mesh->reinit(with_hi, neighbor_list_update_flag);  
+  //perf_log.pop("reinit point_mesh");
+  //perf_log.push("fix compute");
   // update the tracking points position on the mesh if needed
   if(_particle_mesh != NULL){
+    // update node positions on particle mesh using updated point mesh information
     _point_mesh->update_particle_mesh(_particle_mesh);
+    // zero force density of each rigid particle
     _particle_mesh->zero_particle_force_density();
     // need to check if particles are on the pbc, if so, rebuild the particle mesh
     _fixes[0]->check_pbc_pre_fix();
@@ -451,12 +457,12 @@ void PMLinearImplicitSystem::reinit_hi_system()
       _fixes[i]->compute();
     }
   }   
-
+  //perf_log.pop("fix compute");
   STOP_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
 }
 
 // ==================================================================================
-void PMLinearImplicitSystem::reinit_fd_system()
+void PMLinearImplicitSystem::reinit_fd_system(bool& neighbor_list_update_flag)
 {
   START_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
@@ -465,7 +471,7 @@ void PMLinearImplicitSystem::reinit_fd_system()
   // (1) build the point-point neighbor list according to search radius;
   // (2) set the elem_id and proc_id for points
   const bool with_hi = false;
-  _point_mesh->reinit(with_hi);  
+  _point_mesh->reinit(with_hi, neighbor_list_update_flag);  
   for (std::size_t i = 0; i < _fixes.size(); i++){
     // _fixes[i]->print_fix();
     _fixes[i]->compute();
@@ -600,7 +606,7 @@ std::vector<Real> PMLinearImplicitSystem::global_self_exclusion(const std::size_
   
   
 // ==================================================================================
-void PMLinearImplicitSystem::test_l2_norm()
+void PMLinearImplicitSystem::test_l2_norm(bool& neighbor_list_update_flag)
 {
   START_LOG("test_l2_norm()", "PMLinearImplicitSystem");
   std::string msg = "--->test in PMLinearImplicitSystem::test_l2_norm(): \n";
@@ -609,7 +615,7 @@ void PMLinearImplicitSystem::test_l2_norm()
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Numerical solution: Global(FEM) + Local(Analytical)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  this->reinit_hi_system();       // re-init particle-mesh before start
+  this->reinit_hi_system(neighbor_list_update_flag);       // re-init particle-mesh before start
   const bool re_init = true;
   this->solve_stokes("disturbed",re_init);
   this->add_local_solution();
@@ -679,7 +685,7 @@ void PMLinearImplicitSystem::test_l2_norm()
 
   
 // ==================================================================================
-void PMLinearImplicitSystem::test_velocity_profile()
+void PMLinearImplicitSystem::test_velocity_profile(bool& neighbor_list_update_flag)
 {
   START_LOG("test_velocity_profile()", "PMLinearImplicitSystem");
   
@@ -688,8 +694,7 @@ void PMLinearImplicitSystem::test_velocity_profile()
    In this test, we assume that undisturbed velocity is zero!
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   std::cout<< "========>2. Test in PMLinearImplicitSystem::test_velocity_profile(): \n";
-  
-  this->reinit_hi_system();       // re-init particle-mesh before start
+  this->reinit_hi_system(neighbor_list_update_flag);       // re-init particle-mesh before start
   const bool re_init = true;
   this->solve_stokes("disturbed",re_init);
   

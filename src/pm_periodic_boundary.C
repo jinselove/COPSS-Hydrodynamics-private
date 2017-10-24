@@ -227,83 +227,83 @@ bool PMPeriodicBoundary::get_image_point(const Point& pt0,
       else if (box_max(i)-pt0(i) < search_radius)
       { im_pt(i) -= box_size(i);  has_image = true; }
     }
-    // check the image along the i-j corner direction
-    else if( i==_dim && _periodic_directions[0] && _periodic_directions[1] ) // xy direction
-    {
-      // check x-dir
-      bool xclose = false, yclose = false;
-      if (pt0(0)-box_min(0) <= search_radius)
-      { im_pt(0) += box_size(0);  xclose = true; }
-      else if (box_max(0)-pt0(0) < search_radius)
-      { im_pt(0) -= box_size(0);  xclose = true; }
+    // // check the image along the i-j corner direction
+    // else if( i==_dim && _periodic_directions[0] && _periodic_directions[1] ) // xy direction
+    // {
+    //   // check x-dir
+    //   bool xclose = false, yclose = false;
+    //   if (pt0(0)-box_min(0) <= search_radius)
+    //   { im_pt(0) += box_size(0);  xclose = true; }
+    //   else if (box_max(0)-pt0(0) < search_radius)
+    //   { im_pt(0) -= box_size(0);  xclose = true; }
       
-      // check y-dir
-      if (pt0(1)-box_min(1) <= search_radius)
-      { im_pt(1) += box_size(1);  yclose = true; }
-      else if (box_max(1)-pt0(1) < search_radius)
-      { im_pt(1) -= box_size(1);  yclose = true; }
+    //   // check y-dir
+    //   if (pt0(1)-box_min(1) <= search_radius)
+    //   { im_pt(1) += box_size(1);  yclose = true; }
+    //   else if (box_max(1)-pt0(1) < search_radius)
+    //   { im_pt(1) -= box_size(1);  yclose = true; }
       
-      if ( xclose && yclose ) has_image = true;
-    }
-    else if( i==_dim+1 && _periodic_directions[0] && _periodic_directions[2] ) // xz direction
-    {
-      // check x-dir
-      bool xclose = false, zclose = false;
-      if (pt0(0)-box_min(0) <= search_radius)
-      { im_pt(0) += box_size(0);  xclose = true; }
-      else if (box_max(0)-pt0(0) < search_radius)
-      { im_pt(0) -= box_size(0);  xclose = true; }
+    //   if ( xclose && yclose ) has_image = true;
+    // }
+    // else if( i==_dim+1 && _periodic_directions[0] && _periodic_directions[2] ) // xz direction
+    // {
+    //   // check x-dir
+    //   bool xclose = false, zclose = false;
+    //   if (pt0(0)-box_min(0) <= search_radius)
+    //   { im_pt(0) += box_size(0);  xclose = true; }
+    //   else if (box_max(0)-pt0(0) < search_radius)
+    //   { im_pt(0) -= box_size(0);  xclose = true; }
       
-      // check z-dir
-      if (pt0(2)-box_min(2) <= search_radius)
-      { im_pt(2) += box_size(2);  zclose = true; }
-      else if (box_max(2)-pt0(2) < search_radius)
-      { im_pt(2) -= box_size(2);  zclose = true; }
+    //   // check z-dir
+    //   if (pt0(2)-box_min(2) <= search_radius)
+    //   { im_pt(2) += box_size(2);  zclose = true; }
+    //   else if (box_max(2)-pt0(2) < search_radius)
+    //   { im_pt(2) -= box_size(2);  zclose = true; }
       
-      if ( xclose && zclose ) has_image = true;
-    }
-    else if( i==_dim+2 && _periodic_directions[2] && _periodic_directions[1] ) // yz direction
-    {
-      // check z-dir
-      bool zclose = false, yclose = false;
-      if (pt0(2)-box_min(2) <= search_radius)
-      { im_pt(2) += box_size(2);  zclose = true; }
-      else if (box_max(2)-pt0(2) < search_radius)
-      { im_pt(2) -= box_size(2);  zclose = true; }
+    //   if ( xclose && zclose ) has_image = true;
+    // }
+    // else if( i==_dim+2 && _periodic_directions[2] && _periodic_directions[1] ) // yz direction
+    // {
+    //   // check z-dir
+    //   bool zclose = false, yclose = false;
+    //   if (pt0(2)-box_min(2) <= search_radius)
+    //   { im_pt(2) += box_size(2);  zclose = true; }
+    //   else if (box_max(2)-pt0(2) < search_radius)
+    //   { im_pt(2) -= box_size(2);  zclose = true; }
       
-      // check y-dir
-      if (pt0(1)-box_min(1) <= search_radius)
-      { im_pt(1) += box_size(1);  yclose = true; }
-      else if (box_max(1)-pt0(1) < search_radius)
-      { im_pt(1) -= box_size(1);  yclose = true; }
+    //   // check y-dir
+    //   if (pt0(1)-box_min(1) <= search_radius)
+    //   { im_pt(1) += box_size(1);  yclose = true; }
+    //   else if (box_max(1)-pt0(1) < search_radius)
+    //   { im_pt(1) -= box_size(1);  yclose = true; }
       
-      if ( zclose && yclose ) has_image = true;
-    }
-    else if( i==_dim+3 &&                                        // xyz direction
-            _periodic_directions[0] && _periodic_directions[1] && _periodic_directions[2] )
-    {
-      // check x-dir
-      bool xclose = false, yclose = false, zclose = false;
-      if (pt0(0)-box_min(0) <= search_radius)
-      { im_pt(0) += box_size(0);  xclose = true; }
-      else if (box_max(0)-pt0(0) < search_radius)
-      { im_pt(0) -= box_size(0);  xclose = true; }
+    //   if ( zclose && yclose ) has_image = true;
+    // }
+    // else if( i==_dim+3 &&                                        // xyz direction
+    //         _periodic_directions[0] && _periodic_directions[1] && _periodic_directions[2] )
+    // {
+    //   // check x-dir
+    //   bool xclose = false, yclose = false, zclose = false;
+    //   if (pt0(0)-box_min(0) <= search_radius)
+    //   { im_pt(0) += box_size(0);  xclose = true; }
+    //   else if (box_max(0)-pt0(0) < search_radius)
+    //   { im_pt(0) -= box_size(0);  xclose = true; }
       
-      // check y-dir
-      if (pt0(1)-box_min(1) <= search_radius)
-      { im_pt(1) += box_size(1);  yclose = true; }
-      else if (box_max(1)-pt0(1) < search_radius)
-      { im_pt(1) -= box_size(1);  yclose = true; }
+    //   // check y-dir
+    //   if (pt0(1)-box_min(1) <= search_radius)
+    //   { im_pt(1) += box_size(1);  yclose = true; }
+    //   else if (box_max(1)-pt0(1) < search_radius)
+    //   { im_pt(1) -= box_size(1);  yclose = true; }
       
-      // check z-dir
-      if (pt0(2)-box_min(2) <= search_radius)
-      { im_pt(2) += box_size(2);  zclose = true; }
-      else if (box_max(2)-pt0(2) < search_radius)
-      { im_pt(2) -= box_size(2);  zclose = true; }
+    //   // check z-dir
+    //   if (pt0(2)-box_min(2) <= search_radius)
+    //   { im_pt(2) += box_size(2);  zclose = true; }
+    //   else if (box_max(2)-pt0(2) < search_radius)
+    //   { im_pt(2) -= box_size(2);  zclose = true; }
       
-      if ( xclose && yclose && zclose) has_image = true;
-    }
-    // end if-else
+    //   if ( xclose && yclose && zclose) has_image = true;
+    // }
+    // // end if-else
     
   } // end if (inbox)
   

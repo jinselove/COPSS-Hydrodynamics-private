@@ -195,7 +195,7 @@ public:
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    */
-  void reinit_hi_system();
+  void reinit_hi_system(bool& neighbor_list_update_flag);
 
   /*
    * Re-init free-draining system, including:
@@ -204,7 +204,7 @@ public:
    * (2) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    */
-  void reinit_fd_system();
+  void reinit_fd_system(bool& neighbor_list_update_flag);
   
   
   
@@ -245,13 +245,13 @@ public:
    * Compute the L2-error in an unbounded domain
    * This function will change the system solution vector by add local solution.
    */
-  void test_l2_norm();
+  void test_l2_norm(bool& neighbor_list_update_flag);
   
   
   /*
    * Test function. output velocity profile along x-y-z direction
    */
-  void test_velocity_profile();
+  void test_velocity_profile(bool& neighbor_list_update_flag);
 
   
   /*

@@ -147,12 +147,10 @@ void CopssPointParticleSystem::create_object_mesh(){
   this -> create_object();
 
   cout << "\n==>(4/4) Create point_mesh object \n";
-
   point_mesh = new PointMesh<3> (*mesh, *polymer_chain, search_radius_p, search_radius_e);
-
   point_mesh->add_periodic_boundary(*pm_periodic_boundary);
-
-  point_mesh->reinit(with_hi);
+  // reinit point mesh (including particles and neighbor list)
+  point_mesh->reinit(with_hi, neighbor_list_update_flag);
   cout <<"-------------> Reinit point mesh object, finished! \n"
             <<"- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
 		        <<"### The point-mesh info:\n"
@@ -233,6 +231,7 @@ void CopssPointParticleSystem::write_object(unsigned int step_id)
   } // end else
 }
 
+//============================================================================
 void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
@@ -245,6 +244,14 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   n_vec  = dim*NP;
   hmin = hminf;
   hmax = hmaxf;
+  if(with_brownian == false and with_hi == true) max_dr_coeff *= hmin; 
+  if(update_neighbor_list_everyStep){
+    std::cout << "====> neighbor_list is updated at every time step (including half step of fixman if available)\n";
+  }
+  else {
+    neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff);
+    std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n" << std::endl;
+  }
   // Get a better conformation of polymer chains before simulation.
   this -> update_object("in initial data input");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -253,12 +260,11 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   cout<<"==>(1/3) Compute the undisturbed velocity field"<<endl;
   if (with_hi){
-    perf_log.push ("solve undisturbed_system");
-    this -> solve_undisturbed_system(equation_systems); 
-    perf_log.pop ("solve undisturbed_system");
+    this->solve_undisturbed_system(equation_systems); 
   }
   else{
-    cout <<"HI is turned off, do nothing in this step. " << endl;
+    if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;
+    system.reinit_fd_system(neighbor_list_update_flag); // neighbor_list_update is ture here
   }
   // create Brownian system for simulation
   cout<<"==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"<<endl;

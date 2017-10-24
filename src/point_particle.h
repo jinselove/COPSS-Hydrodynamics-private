@@ -167,6 +167,11 @@ public:
   std::vector<std::pair<std::size_t,Real> > neighbor_list() const
   { return _neighbor_list;  };
   
+
+  /*
+   * Reinit neighbor list distances
+   */ 
+  void reinit_neighbor_distance();
   
   /*
    * Set the force vector on the particle
@@ -214,19 +219,19 @@ public:
   
   /*
    * Re-init the point particle quantities:
-   * _force = 0;
+   *  clean neighbor_list
    * _processor_id = -1;
    * _elem_id      = -1
-   * _neighbor_list.clear()
    * The following members are NOT changed during the reinit:
-   * (1)_center; (2)_counter; (3)_id; (4)_parent_id; (5)_point_type; (6)_orientation
+   * (1)_center; (2) force; (3)_counter; (4)_id; (5)_parent_id; (6)_point_type; (7)_orientation; 
    */
   void reinit_particle();
-  
+
+
   /*
    * Print information of this particle
    */
-  void print_info(const bool & print_neighbor_list = false) const;
+  void print_info(const bool & print_neighbor_list = true) const;
   
   
   

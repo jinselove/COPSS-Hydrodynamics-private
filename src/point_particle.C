@@ -143,24 +143,23 @@ void PointParticle::reinit_particle()
   // reset int
   _processor_id = -1;
   _elem_id      = -1;
-
-  // reinit vectors
-  this->zero_particle_force();
-
   _neighbor_list.clear();
-
-  // reinit orientation vector
-//  for(std::size_t i=0; i<_orientation.size(); ++i){
-//    _orientation[i] = 0.0;
-//  }
   STOP_LOG("PointParticle::reinit_particle()", "PointParticle");
-  
 }
+
 
 // ======================================================================
 void PointParticle::set_orientation(const std::vector<Real>& rot_vec)
 {
   _orientation = rot_vec;
+}
+
+//=======================================================================
+void PointParticle::reinit_neighbor_distance()
+{
+  for (unsigned int i=0; i<_neighbor_list.size(); i++){
+    //
+  }
 }
 
 // ======================================================================
@@ -195,10 +194,14 @@ void PointParticle::print_info(const bool & print_neighbor_list) const
   {
     if( _neighbor_list.size()>0 )
     {
-      printf("      its neighbor list includes(%lu): \n",_neighbor_list.size());
+      printf("      its neighbor list includes(%lu): ",_neighbor_list.size());
       for (std::size_t i=0; i<_neighbor_list.size(); ++i )
-        printf("      ---point %lu,   distance = %f\n",
-               _neighbor_list[i].first, _neighbor_list[i].second);
+//        printf("      ---point %lu,   distance = %f\n",
+//               _neighbor_list[i].first, _neighbor_list[i].second);
+       // this neighbor distance is not updated at every time step, thus, please do not print it
+        printf(" %lu; ",
+               _neighbor_list[i].first);
+      printf("\n");
     }
     else
       printf("      there are no neighbors around this point particle!\n");

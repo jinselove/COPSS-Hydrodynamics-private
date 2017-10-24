@@ -379,9 +379,10 @@ void PointMesh<KDDim>::build_particle_neighbor_list(const Point &tgt,
   if(_periodic_boundary != NULL)
   {
     // loop over each direction to find its images
-    std::size_t  NImage = 0;
-    if(KDDim==2) NImage = 3;
-    if(KDDim==3) NImage = 7;
+    // std::size_t  NImage = 0;
+    // if(KDDim==2) NImage = 3;
+    // if(KDDim==3) NImage = 7;
+    std::size_t NImage = 3;
     for (std::size_t i=0; i<NImage; ++i)
     {
       Point im_pt;
@@ -404,7 +405,6 @@ void PointMesh<KDDim>::build_particle_neighbor_list(const Point &tgt,
           IndicesDists_image[j].second = std::sqrt(IndicesDists_image[j].second);
           IndicesDists.push_back( IndicesDists_image[j] );
         }
-        
         // -------------------------- test --------------------------
 //        if (this->comm().rank()==0 && IndicesDists_image.size()>0)
 //        {
@@ -416,13 +416,10 @@ void PointMesh<KDDim>::build_particle_neighbor_list(const Point &tgt,
 //                   IndicesDists_image[j].first, IndicesDists_image[j].second);
 //        }
         // -------------------------- test --------------------------
-        
       } // end if (has_image)
-      
     } // end for i-loop
   } // end if(_periodic_boundary != NULL)
-  /* -----------------------------------------------------------------------*/
-  
+  /* -----------------------------------------------------------------------*/ 
   STOP_LOG ("build_particle_neighbor_list(point)", "PointMesh<KDDim>");
 #endif
 }
@@ -555,9 +552,10 @@ void PointMesh<KDDim>:: build_elem_neighbor_list(const Elem* elem,
   if(_periodic_boundary != NULL)
   {
     // loop over each direction to find its images
-    std::size_t  NImage = 0;
-    if(KDDim==2) NImage = 3;
-    if(KDDim==3) NImage = 7;
+    // std::size_t  NImage = 0;
+    // if(KDDim==2) NImage = 3;
+    // if(KDDim==3) NImage = 7;
+    std::size_t NImage = 3;
     for (std::size_t i=0; i<NImage; ++i)
     {
       Point im_pt;
@@ -811,69 +809,87 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
 
 // ======================================================================
 template <unsigned int KDDim>
-void PointMesh<KDDim>::reinit(const bool with_hi)
+void PointMesh<KDDim>::reinit(const bool& with_hi,
+                              bool& neighbor_list_update_flag)
 {
-  START_LOG ("reinit()", "PointMesh<KDDim>");  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   if the KD tree is already built, we need to re-construct the KD tree in reinit()
-   This is necessary at each time step when particles move!
-   FIXME: is this necessary when the total number of particles does not change?
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if ( _kd_tree.get() ) this->clear_kd_tree();
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Then we re-construct the kd-tree after clearing it!
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  this->construct_kd_tree();  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Construct the particle-particle, elem-particle neighbor list and particle force.
-   Loop over ALL particles to calculate their neighbor lists and forces.
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  
-  for (std::size_t j=0; j<_num_point_particles; ++j)
-  {
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Re-init the particle j
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    _particles[j]->reinit_particle();
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     get the neighbor indices & distance values
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    const Point &tgt( _particles[j]->point() );
+  START_LOG ("reinit()", "PointMesh<KDDim>");
 
-    std::vector<std::pair<std::size_t,Real> > IndicesDists0, IndicesDists;
-
-    this->build_particle_neighbor_list(tgt, _is_sorted, IndicesDists);
-    /* IndicesDists above returns <particle_id, distance>! */
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Exclude the current particle itself, so that the particle's neighbor list
-     does NOT contain itself.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    const std::size_t pid = _particles[j]->id();
-
-    for (std::size_t i=0; i<IndicesDists.size(); ++i){
-      if ( IndicesDists[i].first!= pid){
-        IndicesDists0.push_back( IndicesDists[i] );
-      }
-    }
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     set the neighbor list of the j-th particle
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    _particles[j]->set_neighbor_list (IndicesDists0);
-    
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     FIXME: Check if the j-th point particle is out of domain
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    
-  } // end for j-loop over particles
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Construct the element-particle neighbor list and particle-element id map
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if(with_hi){
-    this->build_elem_neighbor_list();
+  // zero particle force at every time step
+  for (std::size_t j=0; j<_num_point_particles; ++j){
+    _particles[j]->zero_particle_force();
   }
+
+  // when reinit_neighbor_list is set to be true, which is done every some diffusion
+  // steps instead of every time step, we need to reinit particle neighbor list
+  if(neighbor_list_update_flag){
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     if the KD tree is already built, we need to re-construct the KD tree in reinit()
+     This is necessary at each time step when particles move!
+     FIXME: is this necessary when the total number of particles does not change?
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    if ( _kd_tree.get() ) this->clear_kd_tree();
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Then we re-construct the kd-tree after clearing it!
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    this->construct_kd_tree();  
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Construct the particle-particle, elem-particle neighbor list and particle force.
+     Loop over ALL particles to calculate their neighbor lists and forces.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    for (std::size_t j=0; j<_num_point_particles; ++j)
+    {
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       Re-init the particle j 
+       This includes: set processor_id = -1
+                      set elem_id = -1
+                      clean neighbor_list
+       (note that, this reinit_particle function does not include
+       zero_particle_force())
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+      _particles[j]->reinit_particle();
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       get the neighbor indices & distance values
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+      const Point &tgt( _particles[j]->point() );
+
+      std::vector<std::pair<std::size_t,Real> > IndicesDists0, IndicesDists;
+
+      this->build_particle_neighbor_list(tgt, _is_sorted, IndicesDists);
+      /* IndicesDists above returns <particle_id, distance>! */
+
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       Exclude the current particle itself, so that the particle's neighbor list
+       does NOT contain itself.
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+      const std::size_t pid = _particles[j]->id();
+
+      for (std::size_t i=0; i<IndicesDists.size(); ++i){
+        if ( IndicesDists[i].first!= pid){
+          IndicesDists0.push_back( IndicesDists[i] );
+        }
+      }
+
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       set the neighbor list of the j-th particle
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+      _particles[j]->set_neighbor_list (IndicesDists0);
+      
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       FIXME: Check if the j-th point particle is out of domain
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    } // end for j-loop over particles
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Construct the element-particle neighbor list and particle-element id map
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    if(with_hi){
+      this->build_elem_neighbor_list();
+    }    
+    // after reinit neighbor list, set the flag to false
+    neighbor_list_update_flag = false;
+  } // end if (reinit_neighbor_list)
+
 
   STOP_LOG ("reinit()", "PointMesh<KDDim>");
 }
@@ -953,24 +969,24 @@ Real PointMesh<KDDim>::search_radius(const std::string & p_e) const
 template <unsigned int KDDim>
 void PointMesh<KDDim>::print_point_info() const
 {
-  const int o_precision = 9;
-  std::ofstream out_file; 
-  out_file.precision(o_precision); 
-  out_file.open("out.initial_force_field", std::ios_base::out);
-  out_file <<"bead_id pos_x pos_y pos_z force_x force_y force_z\n"; 
-  for (std::size_t i = 0; i<_num_point_particles; ++i){
-    out_file <<i <<" ";
-    for (int j=0; j<3; j++) out_file << _particles[i]->point()(j) <<" ";
-    for (int j=0; j<3; j++) out_file << _particles[i]->particle_force()[j] <<" ";        
-    out_file<<"\n";
-  }
-  out_file.close();
-  printf("==> done: output bead info after first system.reinit() to 'out.initial_force_field'\n");
- //  printf("======================= printing the point information: =======================\n\n");
- //  printf("There are totally %lu points (search radius = %f)\n",_particles.size(),_search_radius_p);
- //  for (std::size_t j=0; j<_particles.size(); ++j)
- //    _particles[j]->print_info();
- // printf("========================= end of the point information =========================\n\n");
+  // const int o_precision = 9;
+  // std::ofstream out_file; 
+  // out_file.precision(o_precision); 
+  // out_file.open("out.initial_force_field", std::ios_base::out);
+  // out_file <<"bead_id pos_x pos_y pos_z force_x force_y force_z\n"; 
+  // for (std::size_t i = 0; i<_num_point_particles; ++i){
+  //   out_file <<i <<" ";
+  //   for (int j=0; j<3; j++) out_file << _particles[i]->point()(j) <<" ";
+  //   for (int j=0; j<3; j++) out_file << _particles[i]->particle_force()[j] <<" ";        
+  //   out_file<<"\n";
+  // }
+  // out_file.close();
+  // printf("==> done: output bead info after first system.reinit() to 'out.initial_force_field'\n");
+  printf("======================= printing the point information: =======================\n\n");
+  printf("There are totally %lu points (search radius = %f)\n",_particles.size(),_search_radius_p);
+  for (std::size_t j=0; j<_particles.size(); ++j)
+    _particles[j]->print_info();
+ printf("========================= end of the point information =========================\n\n");
 
 }
 

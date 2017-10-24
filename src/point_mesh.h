@@ -381,7 +381,8 @@ public:
    * (3) set the elem_id and proc_id for points
    * ---- force recalculation is not reinitialized here, but in ForceField:
    */
-  void reinit(const bool with_hi);
+  void reinit(const bool& with_hi,
+              bool& neighbor_list_update_flag);
   
   
   

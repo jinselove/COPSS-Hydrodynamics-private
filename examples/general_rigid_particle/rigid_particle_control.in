@@ -51,6 +51,9 @@ periodicity = 'true true false'
 inlet = 'false false false'
 inlet_pressure = '0 0 0'
 
+# shear info#
+shear = 'false false false false false false'
+shear_rate = '0. 0. 0. 0. 0. 0.'
 #############################################
 #	Geometry Mesh info 
 #############################################
@@ -137,10 +140,11 @@ with_hi        = true
 with_brownian  = false
 adaptive_dt    = true
 max_dr_coeff   = 0.1
-nstep          = 1
+update_neighbor_list_everyStep = true
+nstep          = 5
 write_interval = 1
 restart        = false
 random_seed    = 123456789
-output_file    = 'equation_systems'
+output_file    = 'equation_systems particle_mesh trajectory'
 print_info     = false
 debug_info     = false

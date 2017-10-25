@@ -262,7 +262,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   cout<<"==>(1/3) Compute the undisturbed velocity field"<<endl;
   if (with_hi){
+    perf_log.push("solve undisturbed_system");
     this->solve_undisturbed_system(equation_systems); 
+    perf_log.pop("solve undisturbed_system"); 
   }
   else{
     if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;

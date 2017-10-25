@@ -132,10 +132,9 @@ void CopssRigidParticleSystem::create_object_mesh(){
 
   // No need to add periodic boundary, which is already included in particle_mesh
   // Reinit point_mesh
-  point_mesh->reinit(with_hi);
+  point_mesh->reinit(with_hi, neighbor_list_update_flag);
 
   // finish point_mesh, print information
-
   cout << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n";
   cout << "### The particle-mesh and point-mesh info:\n";
   cout << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n";
@@ -223,6 +222,17 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
   n_vec  = dim*NP;
   hmin = std::min(hmins, hminf);
   hmax = std::max(hmaxs, hmaxf);
+  // only when with_hi==true and with_brownian ==false, we can use a larger time step
+  if(with_brownian==false and with_hi==true) max_dr_coeff *= hmin;
+  if(update_neighbor_list_everyStep){
+    std::cout << "====> neighbor_list is updated at every time step (including half step of fixman if available)\n";
+  }
+  else {
+    neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff);
+    std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n\n" << std::endl;
+    std::cout << "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
+              << "updating neighborList at each step seems tiny, but we have not fully validated it." <<std::endl;
+  }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   Compute undisturbed velocity field without particles.
   NOTE: We MUST re-init particle-mesh before solving Stokes
@@ -234,7 +244,8 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
     perf_log.pop ("solve undisturbed_system");  
   }
   else{
-    cout << "HI is turned off, do nothing in this step";
+    if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;
+    system.reinit_fd_system(neighbor_list_update_flag); // neighbor_list_update is ture here
   }
   if(debug_info){
     for (int i = 0; i<num_rigid_particles; i++) particle_mesh->particles()[i]->debug_body_force();

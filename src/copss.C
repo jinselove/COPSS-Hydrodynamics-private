@@ -199,7 +199,7 @@ void Copss::read_domain_info()
   for (unsigned int i=0; i < inlet_pressure.size(); i++){ inlet_pressure[i] = input_file("inlet_pressure", 0, i); }
 
   //============== shear
-  std::cout << "\n\nWarning: shear flow has not been implemented \n\n" <<std::cout;
+  std::cout << "\n\nWarning: shear flow has not been implemented \n\n";
   shear.resize(input_file.vector_variable_size("shear"));
   if(shear.size() != dim*2){
     cout <<"Warning: shear has to be defined for all dimensions and both upper wall and bottom wall" << endl;
@@ -530,18 +530,19 @@ void Copss::create_domain_mesh()
     } 
   } // end else (generate mesh)
 
-  // initialize search radius
-  if(with_hi == false){
-    search_radius_p = input_file("search_radius_p", 0.0);
-    if (search_radius_p <= 0.) {
-      cout <<"  Warning: for Free draining systems, a search_radius_p(> 0) needs to be given to build particle-particle neighborlist" << endl;
-      libmesh_error();
-    }
-  }
-  else{
-    search_radius_p = 4.0/alpha;
-  }
-  search_radius_e = 0.5*hmaxf + search_radius_p;
+ // initialize search radius
+  // if(with_hi == false){
+  //   search_radius_p = input_file("search_radius_p", 0.0);
+  //   if (search_radius_p <= 0.) {
+  //     cout <<"  Warning: for Free draining systems, a search_radius_p(> 0) needs to be given to build particle-particle neighborlist" << endl;
+  //     libmesh_error();
+  //   }
+  // }
+  // else{
+  //   search_radius_p = 4.0/alpha;
+  // }
+  search_radius_p = 4./alpha; 
+  search_radius_e = 0.5*hmaxf + 4./alpha;
   // print mesh info
   mesh -> print_info();
 } // end function
@@ -556,7 +557,11 @@ void Copss::create_periodic_boundary(){
   }
   else if (wall_type == "sphere"){
     // check: No PBC, No inlet/outlet
-    if (periodicity[0] or periodicity[1] or periodicity [2] or inlet[0] or inlet[1] or inlet[2]){
+    bool error_flag = false;
+    for (int i=0; i<dim; i++){
+      if(periodicity[i] or inlet[i] or shear[2*i] or shear[2*i+1]) error_flag = true;
+    }
+    if (error_flag){
       cout << "spherical domain cannot have PBC or inlet/outlet, check control file" << endl;
       libmesh_error();
     }
@@ -762,6 +767,11 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
   system.reinit_hi_system(neighbor_list_update_flag); // neighbor_list_update is ture here
+  if(print_info){
+    cout << "print particle information after first reinit\n";
+    if(comm_in.rank()==0)
+    point_mesh->print_point_info();
+  }
   reinit_stokes = true;
   system.solve_stokes("undisturbed",reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
@@ -840,6 +850,10 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       }
       system.reinit_hi_system(neighbor_list_update_flag);
     }
+    if(print_info){
+    if(comm_in.rank()==0)
+      point_mesh->print_point_info();
+    }
     // compute undisturbed velocity of points 
     system.compute_point_velocity("undisturbed", vel0);
     reinit_stokes = false;
@@ -852,6 +866,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     brownian_sys->vector_transform(vel1, &U0, "forward");
     // assign vel1 to particle velocity
     point_mesh->set_bead_velocity(vel1);
+
     if (debug_info){
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        * ---> test: output the particle velocity

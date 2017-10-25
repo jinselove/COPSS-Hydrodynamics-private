@@ -410,7 +410,6 @@ void PMLinearImplicitSystem::reinit_hi_system(bool& neighbor_list_update_flag)
   //PerfLog perf_log("reinit_hi_system");
   START_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
-  
   // reinit point-mesh system, including
   // (1) build the point-point neighbor list according to search radius;
   // (2) build the element-point neighbor list according to search radius;
@@ -472,10 +471,43 @@ void PMLinearImplicitSystem::reinit_fd_system(bool& neighbor_list_update_flag)
   // (2) set the elem_id and proc_id for points
   const bool with_hi = false;
   _point_mesh->reinit(with_hi, neighbor_list_update_flag);  
-  for (std::size_t i = 0; i < _fixes.size(); i++){
-    // _fixes[i]->print_fix();
-    _fixes[i]->compute();
+  // update the tracking points position on the mesh if needed
+  if(_particle_mesh != NULL){
+    // update node positions on particle mesh using updated point mesh information
+    _point_mesh->update_particle_mesh(_particle_mesh);
+    // zero force density of each rigid particle
+    _particle_mesh->zero_particle_force_density();
+    // need to check if particles are on the pbc, if so, rebuild the particle mesh
+    _fixes[0]->check_pbc_pre_fix();
+    /*
+     * apply compute for all fixes
+     * FixRigidSurfaceConstraint::compute() applies surface constraint force on each node
+     * All the other fix::compute() only add a body force density to each particles
+     */
+    for (std::size_t i = 0; i < _fixes.size(); i++){
+      _fixes[i]->compute();
+    }
+    /* since all the other fix::compute() expect for FixRigidSurfaceConstraint::compute
+     * only add a body force density to each particle, we need to attach forces on each node
+     * using this force density
+     * Notice that: this attach_nodal() function only needs to be called once since the body force
+     * density is already the total one.
+     */
+    for (std::size_t i = 0; i<_fixes.size(); i++){
+      if (_fixes[i]->force_type != "surface_constraint"){
+       _fixes[i] -> attach_nodal();
+       break;
+      }
+    }
+    // need to restore particle mesh after applying all fixes if particles are on pbc
+    _fixes[0]->check_pbc_post_fix();
   }
+  else
+  {
+    for (std::size_t i = 0; i < _fixes.size(); i++){
+      _fixes[i]->compute();
+    }
+  }   
 
   STOP_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
 }

@@ -72,7 +72,6 @@ wall/lj_cut = '1. 1.2 1.346954458'
 #############################################
 # smoothing parameter in GGEM (non-unit) #
 alpha = 0.1
-#search_radius_p = 3.2
 
 #############################################
 #			   Solver info         			

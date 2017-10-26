@@ -56,7 +56,7 @@ _mesh(es.get_mesh())
 {
   // do nothing
   _dim  = es.get_mesh().mesh_dimension();
-  
+  _int_force.resize(1); // initialize _int_force matrix
 }
 
 
@@ -72,11 +72,11 @@ AssembleNS::~AssembleNS()
 
 
 
-
 // ==================================================================================
 void AssembleNS::assemble_global_K(const std::string& system_name,
                                    const std::string& option)
 {
+  START_LOG ("assemble_global_K()", "AssembleNS");
   /*! It is a good idea to make sure we are assembling the proper system.
   
   */
@@ -305,16 +305,40 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
   // }
   // -------------------------------------------------------------------------------------------
   return;
-  
+  STOP_LOG ("assemble_global_K()", "AssembleNS");
 }
 
-
+void AssembleNS::assemble_int_force(const Elem* elem,
+                                    const unsigned int n_u_dofs,
+                                    FEBase& fe_v)
+{
+  START_LOG("assemble_int_force()", "AssembleNS");
+  const std::vector<Real>& JxW                = fe_v.get_JxW();
+  const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
+  const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords of quad pts
+  //fe_v.reinit(elem);
+  const std::size_t elem_id = elem->id();
+  _int_force[elem_id].resize(n_u_dofs*q_xyz.size(),0.); // resize this row
+  _q_xyz[elem_id] = q_xyz;
+  for (unsigned int k=0; k<n_u_dofs; ++k){
+    // loop over all gauss quadrature points
+    for(unsigned int qp=0; qp<q_xyz.size(); qp++){
+      _int_force[elem_id][k*q_xyz.size()+qp] = JxW[qp]*phi[k][qp];
+    //  printf("_int_force[elem_id=%d][k*q_xyz.size()+qp=%d] = JxW[qp=%d]*phi[k=%d][qp=%d] = %f *%f = %f\n", elem_id, k*q_xyz.size()+qp, qp,k,qp, JxW[qp],phi[k][qp], _int_force[elem_id][k*q_xyz.size()+qp]);
+    }
+  }    
+  STOP_LOG("assemble_int_force()", "AssembleNS");
+  return;
+}
 
 
 // ==================================================================================
 void AssembleNS::assemble_global_F(const std::string& system_name,
                                    const std::string& option)
 {
+  START_LOG ("assemble_global_F()", "AssembleNS");  
+  // PerfLog perf_log("assemble_global_F");
+  // perf_log.push("preparation");
   // It is a good idea to make sure we are assembling the proper system.
   libmesh_assert_equal_to (system_name, "Stokes");
 //  const MeshBase& _mesh = _eqn_sys.get_mesh();
@@ -331,7 +355,7 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
   // Define Gauss quadrature rule for numerical integration.
   // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (_dim, fe_vel_type.default_quadrature_order());   //3^dim pts
-  //QGauss qrule (_dim, SIXTH);   // SIXTH
+//  QGauss qrule (_dim, FIFTH);   // SIXTH
   fe_vel->attach_quadrature_rule (&qrule);
   
   // build the face element for boundary traction
@@ -344,12 +368,10 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
   const std::vector<Real>& JxW                = fe_vel->get_JxW();
   const std::vector<std::vector<Real> >& phi  = fe_vel->get_phi();
   const std::vector<Point>& q_xyz             = fe_vel->get_xyz(); // xyz coords of quad pts
-  
   // A reference to the DofMap object for this system.
   const DofMap & dof_map = _pm_system.get_dof_map();
-  std::vector<dof_id_type> dof_indices;
-  std::vector<dof_id_type> dof_indices_u, dof_indices_p;
-  
+  // std::vector<dof_id_type> dof_indices;
+  // std::vector<dof_id_type> dof_indices_u, dof_indices_p;  
   
   // Define data structures to contain the element matrix Ke and vector Fe
   DenseMatrix<Number> Ke;
@@ -358,70 +380,131 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
   
   // retrieve system parameters
   const Real alpha   =  _eqn_sys.parameters.get<Real> ("alpha");
-  
-  // -------------------------------------------------------------------------------------------
-  //if(system.comm().rank()==0){
-  //  printf("\nassemble_global_F(): Start to assemble the global force vector F ...\n");
-  //}
-  // -------------------------------------------------------------------------------------------
 
+  // perf_log.pop("preparation");
+
+  // build _int_force vector at the beginning of simulation
+  if(_int_force.size() == 1){
   
+  // perf_log.push("compute_int_force");
+  if(_pm_system.comm().rank()==0){
+     printf("\nassemble_int_force() at the beginning of simulation\n");
+    }
+    const unsigned int n_mesh_elem = _mesh.n_elem(); 
+    _int_force.resize(n_mesh_elem);
+    _q_xyz.resize(n_mesh_elem);
+    _n_dofs.resize(n_mesh_elem);
+    _n_u_dofs.resize(n_mesh_elem);
+    _n_p_dofs.resize(n_mesh_elem);
+    _n_uvw_dofs.resize(n_mesh_elem);
+    _dof_indices.resize(n_mesh_elem);
+    _dof_indices_u.resize(n_mesh_elem);
+    _dof_indices_p.resize(n_mesh_elem);
+    // Now we will loop over all the elements in the mesh that live
+    // on the local processor, and compute the element matrix Ke.
+    MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
+    const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
+    for ( ; el != end_el; ++el)
+    {
+      // Store a pointer to the element we are currently working on.
+      const Elem* elem = *el;
+      const unsigned int elem_id = elem->id();
+      // Get the degree of freedom indices for the current element.
+      dof_map.dof_indices (elem, _dof_indices[elem_id]);
+      dof_map.dof_indices (elem, _dof_indices_u[elem_id], u_var);
+      dof_map.dof_indices (elem, _dof_indices_p[elem_id], p_var);
+      
+      _n_dofs[elem_id]   = _dof_indices[elem_id].size();
+      _n_u_dofs[elem_id] = _dof_indices_u[elem_id].size();
+      _n_p_dofs[elem_id] = _dof_indices_p[elem_id].size();
+    //  _n_uvw_dofs[elem_id] = _n_u_dofs[elem_id]*_dim;
+      Fe.resize (_n_dofs[elem_id]);
+      
+      // NOTE: here JxW and dphi and other element quantities are not computed up to now,
+      // and these will be done in the elem loop after fe->reinit()
+      fe_vel->reinit (elem);
+      //qrule.print_info();  
+      this->assemble_int_force(elem, _n_u_dofs[elem_id], *fe_vel);    
+    }
+  
+  // perf_log.pop("compute_int_force");
+  } 
+
+	  
   // Now we will loop over all the elements in the mesh that live
   // on the local processor, and compute the element matrix Ke.
   MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
   const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
   for ( ; el != end_el; ++el)
   {
+    // perf_log.push("preparation 2.1");
     // Store a pointer to the element we are currently working on.
     const Elem* elem = *el;
-    
+    const unsigned int elem_id = elem->id();
+    // perf_log.pop("preparation 2.1");
     // Get the degree of freedom indices for the current element.
-    dof_map.dof_indices (elem, dof_indices);
-    dof_map.dof_indices (elem, dof_indices_u, u_var);
-    dof_map.dof_indices (elem, dof_indices_p, p_var);
     
-    const unsigned int n_dofs   = dof_indices.size();
-    const unsigned int n_u_dofs = dof_indices_u.size();
-    const unsigned int n_p_dofs = dof_indices_p.size();
-    const unsigned int n_uvw_dofs = n_u_dofs*_dim;
-    Fe.resize (n_dofs);
+    // perf_log.push("preparation 2.2");
+  
+    /*
+     * why do we update need dof_indices again ?
+     */
+    dof_map.dof_indices (elem, _dof_indices[elem_id]);
+   // dof_map.dof_indices (elem, _dof_indices_u[elem_id], u_var);
+   // dof_map.dof_indices (elem, dof_indices_p, p_var);
     
+    // perf_log.pop("preparation 2.2");
+    // perf_log.push("preparation 2.3");
+    // const unsigned int n_dofs   = dof_indices.size();
+    // const unsigned int n_u_dofs = dof_indices_u.size();
+    // const unsigned int n_p_dofs = dof_indices_p.size();
+    // const unsigned int n_uvw_dofs = n_u_dofs*_dim;
+    Fe.resize (_n_dofs[elem_id]);
+    //Fe.resize(_n_dofs[elem_id]);
+    // perf_log.pop("preparation 2.3");
+    // perf_log.push("preparation 2.4");
     // NOTE: here JxW and dphi and other element quantities are not computed up to now,
     // and these will be done in the elem loop after fe->reinit()
-    fe_vel->reinit (elem);
+    //fe_vel->reinit (elem);
     //qrule.print_info();
-    
+    // perf_log.pop("preparation 2.4");    
     // if elem_neighbor_list is pre-built, we can access it directly
-    const std::vector<std::size_t> n_list = _pm_system.point_mesh()->elem_neighbor_list(elem);
-    
-    
+    const std::vector<std::size_t>& n_list = _pm_system.point_mesh()->elem_neighbor_list(elem);
     // Now compute Fe caused by the regularized point force and boundary traction.
     // if this elem has no neighboring particle or only the undisturbed field
     // is required, we turn the pf_flag to 'false'!
     bool pf_flag = true;                          // a flag for the point force
     if (n_list.size()==0)       pf_flag = false;  // No point force because no point list.
     if(option == "undisturbed") pf_flag = false;  // No point force
-    
-    this->compute_element_rhs(elem, n_u_dofs, *fe_vel, n_list,
+       
+    // perf_log.push("compute_element_rhs");
+    this->compute_element_rhs(elem, _n_u_dofs[elem_id], *fe_vel, n_list,
                               pf_flag, option, alpha, Fe);
     
     
+    // perf_log.pop("compute_element_rhs");
     // imposed the Dirichlet BC at no-slip walls & pressure jump at the inlet/outlet
     // via the penalty method.
+
+    // perf_log.push("apply_bc_by_penalty");
     this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
     
     
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
-    dof_map.constrain_element_vector (Fe, dof_indices);
+    // perf_log.push("finish");
+    dof_map.constrain_element_vector (Fe, _dof_indices[elem_id]);
     
     
     // Add the element matrix and rhs vector to the global system.
     //PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
     //PMToolBox::output_dense_vector(Fe);
-    _pm_system.rhs->add_vector (Fe, dof_indices);
-  } // end for elem-loop
+    _pm_system.rhs->add_vector (Fe,_dof_indices[elem_id]);
+
+    // perf_log.pop("finish");
+   } // end for elem-loop
   
+  STOP_LOG ("assemble_global_F()", "AssembleNS");  
   
   // ---------------------------------------------------------------------------------------------
   //if (_pm_system.comm().rank()==0){
@@ -456,12 +539,14 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
   const std::vector<Real>& _inlet_pressure = _pm_periodic_boundary->inlet_pressure();
   std::vector<PointParticle*> _particles = _point_mesh->particles();
  // The element Jacobian * quadrature weight at each quad pt(high order Qgauss).
-  const std::vector<Real>& JxW                = fe_v.get_JxW();
-  const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
-  const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords of quad pts
-  fe_v.reinit(elem);
-  
-  
+ // const std::vector<Real>& JxW                = fe_v.get_JxW();
+ // const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
+  // const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords of quad pts
+  //printf("q_xyz size = %d\n", q_xyz.size());
+  //fe_v.reinit(elem);
+  const unsigned int elem_id = elem->id();
+  const std::vector<Point>& q_xyz = _q_xyz[elem_id]; // xyz coords of quad pts
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    1. add the regularized point force for "disturbed" flow field!
    first examine if this element is "close to" the point force sources
@@ -476,37 +561,70 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
     Point np_pos(0.);
     std::vector<Real> np_force(_dim, 0.);
     Real r = 0. , force_val = 0.;
-    std::vector<Real> fvalues(_dim,0.);
-    for(unsigned int np=0; np<n_pts; ++np)
-    {
-      // force vector on each particle(note they are different!)
-     // std::vector<Real> pf(_dim,0.0);    // point force vector of the current particle
-     np_force = _particles[n_list[np]]->particle_force();
-     np_pos = _particles[n_list[np]]->point();  
-
-    // Next loop over gauss points
-      for (unsigned int qp=0; qp<q_xyz.size(); qp++)
-      {
+    unsigned int qp_size = q_xyz.size();
+ // printf("qp_size = %d\n", q_xyz.size());
+  for(unsigned int np = 0; np<n_pts; ++np){    
+    np_force = _particles[n_list[np]]->particle_force();
+    np_pos = _particles[n_list[np]]->point();  
+        for (unsigned int qp=0; qp<qp_size; qp++){
         // distance from Gaussian point to the force point
-        r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
-        
-        // evaluate the value of gauss force at this quad pt.
-        force_val = ggem_sys.smoothed_force_exp(r, alpha);
-        
-        // force magnitudes on each particle(note they are different!)
-        for (unsigned int j=0; j<_dim; ++j) {
-          fvalues[j] = np_force[j]*force_val;
+          r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
+          // evaluate the value of gauss force at this quad pt.
+          force_val = ggem_sys.smoothed_force_exp(r, alpha);
+	  for (unsigned int j=0; j<_dim; ++j){
+      		for (unsigned int k=0; k<n_u_dofs; ++k){
+    // compute element vector
+  //            Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues_j;
+            		Fe(j*n_u_dofs + k) += _int_force[elem_id][k*qp_size+qp]*force_val*np_force[j];
+          	}
+          }
         }
+  }
+
+  //   Real fvalues_j;
+  // for(unsigned int np = 0; np<n_pts; ++np){    
+  //   np_force = _particles[n_list[np]]->particle_force();
+  //   np_pos = _particles[n_list[np]]->point();  
+
+  //     for (unsigned int k=0; k<n_u_dofs; ++k){
+  //       for (unsigned int qp=0; qp<q_xyz.size(); qp++){
+  //       // distance from Gaussian point to the force point
+  //         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
+  //         // evaluate the value of gauss force at this quad pt.
+  //         force_val = ggem_sys.smoothed_force_exp(r, alpha);
+  //         // force magnitudes on each particle(note they are different!)
+  //         for (unsigned int j=0; j<_dim; ++j){
+  //           fvalues_j = np_force[j]*force_val;
+  //           // compute element vector
+  //           Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues_j;
+  //         }
+  //       }
+  //     }
+  //   }
+
+
+//     for(unsigned int np=0; np<n_pts; ++np)
+//     {
+//       // force vector on each particle(note they are different!)
+//      // std::vector<Real> pf(_dim,0.0);    // point force vector of the current particle
+//      np_force = _particles[n_list[np]]->particle_force();
+//      np_pos = _particles[n_list[np]]->point();  
+//    // // Next loop over gauss points
+//       for (unsigned int qp=0; qp<q_xyz.size(); qp++)
+//       {
+//         // distance from Gaussian point to the force point
+//         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
+//         // evaluate the value of gauss force at this quad pt.
+//         force_val = ggem_sys.smoothed_force_exp(r, alpha);
+//         // compute the element rhs vector
+//         for (unsigned int j=0; j<_dim; ++j){
+//           for(unsigned int k=0; k<n_u_dofs; ++k){
+//	     Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*np_force[j]*force_val;
+//           } // end for k-loop
+//         } // end for j-loop
         
-        // compute the element rhs vector
-        for (unsigned int j=0; j<_dim; ++j){
-          for(unsigned int k=0; k<n_u_dofs; ++k){
-            Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues[j];
-          } // end for k-loop
-        } // end for j-loop
-        
-      } // end for qp-loop
-    } // end for np-loop
+//       } // end for qp-loop
+//     } // end for np-loop
     
   } // end if( pf_flag )
 
@@ -544,7 +662,9 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
                         // traction jump at the inlet and outlet
                         for (unsigned int j=0; j<n_u_dofs; j++)
                         {
-                              Fe(i*n_u_dofs + j) += JxW_face[qp]* _inlet_pressure[i] * phi_face[j][qp];
+                          const dof_id_type& node_id = elem->node_id(j);
+//                          Fe(i*n_u_dofs + j) += JxW_face[qp]*  phi_face[j][qp]*_inlet_pressure[i] ;
+                          Fe(i*n_u_dofs + j) += _int_force[node_id][qp]*_inlet_pressure[i] ;
                         }
                     } // end for qp-loop
                    //PMToolBox::zero_filter_dense_vector(Fe,1E-10);

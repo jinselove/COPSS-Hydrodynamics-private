@@ -37,12 +37,11 @@
 #include "pm_toolbox.h"
 #include "ggem_system.h"
 #include "brownian_system.h"
-#include "force_field.h"
 #include "pm_linear_implicit_system.h"
 #include "analytical_solution.h"
 
 // assemble functions
-#include "assemble_navier_stokes.h"
+//#include "assemble_navier_stokes.h"
 
 namespace libMesh
 {
@@ -56,8 +55,7 @@ PMLinearImplicitSystem::PMLinearImplicitSystem(EquationSystems& es,
 : Parent (es, name, number),
   _stokes_solver(es),
   _point_mesh(NULL),
-  _particle_mesh(NULL),
-  _force_field(NULL)
+  _particle_mesh(NULL)
 {
   // Assemble Navier Stokes
   _assemble_ns = ( new AssembleNS(es) );
@@ -351,19 +349,19 @@ void PMLinearImplicitSystem::compute_point_velocity(const std::string& option,
     } // end for j-loop
 
     // ---------------------------- output for test -----------------------------
-//    if (this->comm().rank()==0 && option=="disturbed")
-//    {
-//      printf("\n--->test in compute_point_velocity(): output point velocity:\n");
-//      printf("i = %lu, point %lu: Uglobal (FEM) = (%E, %E, %E)\n",
-//             i, pid, _pv_send_list[dim*i], _pv_send_list[dim*i+1], _pv_send_list[dim*i+2] );
-//      printf("              Ulocal (Green Function) = (%E, %E, %E)\n",
-//             pvlocal[dim*i],pvlocal[dim*i+1],pvlocal[dim*i+2] );
-//      printf("              Uexc    = (%E, %E, %E)\n", Uex[0], Uex[1], Uex[2] );
-//      printf("       Stokes drag    = (%E, %E, %E)\n", fv[0], fv[1], fv[2] );
-//      printf("           ---Utotal  = (%E, %E, %E)\n\n",
-//             pv[dim*pid], pv[dim*pid+1], pv[dim*pid+2] );
-//    }
-    // --------------------------------------------------------------------------
+  //  if (this->comm().rank()==0 && option=="disturbed")
+  //  {
+  //    printf("\n--->test in compute_point_velocity(): output point velocity:\n");
+  //    printf("i = %lu, point %lu: Uglobal (FEM) = (%E, %E, %E)\n",
+  //           i, pid, _pv_send_list[dim*i], _pv_send_list[dim*i+1], _pv_send_list[dim*i+2] );
+  //    printf("              Ulocal (Green Function) = (%E, %E, %E)\n",
+  //           pvlocal[dim*i],pvlocal[dim*i+1],pvlocal[dim*i+2] );
+  //    printf("              Uexc    = (%E, %E, %E)\n", Uex[0], Uex[1], Uex[2] );
+  //    printf("       Stokes drag    = (%E, %E, %E)\n", fv[0], fv[1], fv[2] );
+  //    printf("           ---Utotal  = (%E, %E, %E)\n\n",
+  //           pv[dim*pid], pv[dim*pid+1], pv[dim*pid+2] );
+  //   }
+  //   // --------------------------------------------------------------------------
   } // end for i-loop
   //STOP_LOG("compute_point_velocity()", "PMLinearImplicitSystem");
 }
@@ -406,44 +404,113 @@ std::vector<Real> PMLinearImplicitSystem::point_velocity(const std::vector<Real>
   return point_v;
 }
 
+// ==================================================================================
+void PMLinearImplicitSystem::reinit_hi_system(bool& neighbor_list_update_flag)
+{
+  //PerfLog perf_log("reinit_hi_system");
+  START_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
+  this->comm().barrier(); // Is this at the beginning or the end necessary?
+  // reinit point-mesh system, including
+  // (1) build the point-point neighbor list according to search radius;
+  // (2) build the element-point neighbor list according to search radius;
+  // (3) evaluate forces
+  //perf_log.push("reinit point_mesh");
+  const bool with_hi = true;
+  _point_mesh->reinit(with_hi, neighbor_list_update_flag);  
+  //perf_log.pop("reinit point_mesh");
+  //perf_log.push("fix compute");
+  // update the tracking points position on the mesh if needed
+  if(_particle_mesh != NULL){
+    // update node positions on particle mesh using updated point mesh information
+    _point_mesh->update_particle_mesh(_particle_mesh);
+    // zero force density of each rigid particle
+    _particle_mesh->zero_particle_force_density();
+    // need to check if particles are on the pbc, if so, rebuild the particle mesh
+    _fixes[0]->check_pbc_pre_fix();
+    /*
+     * apply compute for all fixes
+     * FixRigidSurfaceConstraint::compute() applies surface constraint force on each node
+     * All the other fix::compute() only add a body force density to each particles
+     */
+    for (std::size_t i = 0; i < _fixes.size(); i++){
+      _fixes[i]->compute();
+    }
+    /* since all the other fix::compute() expect for FixRigidSurfaceConstraint::compute
+     * only add a body force density to each particle, we need to attach forces on each node
+     * using this force density
+     * Notice that: this attach_nodal() function only needs to be called once since the body force
+     * density is already the total one.
+     */
+    for (std::size_t i = 0; i<_fixes.size(); i++){
+      if (_fixes[i]->force_type != "surface_constraint"){
+       _fixes[i] -> attach_nodal();
+       break;
+      }
+    }
+    // need to restore particle mesh after applying all fixes if particles are on pbc
+    _fixes[0]->check_pbc_post_fix();
+  }
+  else
+  {
+    for (std::size_t i = 0; i < _fixes.size(); i++){
+      _fixes[i]->compute();
+    }
+  }   
+  //perf_log.pop("fix compute");
+  STOP_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
+}
 
 // ==================================================================================
-void PMLinearImplicitSystem::reinit_system(const std::vector<Real>* vel_last_step)
+void PMLinearImplicitSystem::reinit_fd_system(bool& neighbor_list_update_flag)
 {
-  START_LOG("reinit_system()", "PMLinearImplicitSystem");
+  START_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
   
   // reinit point-mesh system, including
   // (1) build the point-point neighbor list according to search radius;
-  // (2) build the element-point neighbor list according to search radius;
-  // (3) set the elem_id and proc_id for points
-  _point_mesh->reinit();  
+  // (2) set the elem_id and proc_id for points
+  const bool with_hi = false;
+  _point_mesh->reinit(with_hi, neighbor_list_update_flag);  
   // update the tracking points position on the mesh if needed
   if(_particle_mesh != NULL){
+    // update node positions on particle mesh using updated point mesh information
     _point_mesh->update_particle_mesh(_particle_mesh);
-  }   
-  // re-compute the force field if there is any force_field attached
-  if(_force_field != NULL)
-  {
-    if(vel_last_step == NULL){
-     _force_field->reinit_force_field();
+    // zero force density of each rigid particle
+    _particle_mesh->zero_particle_force_density();
+    // need to check if particles are on the pbc, if so, rebuild the particle mesh
+    _fixes[0]->check_pbc_pre_fix();
+    /*
+     * apply compute for all fixes
+     * FixRigidSurfaceConstraint::compute() applies surface constraint force on each node
+     * All the other fix::compute() only add a body force density to each particles
+     */
+    for (std::size_t i = 0; i < _fixes.size(); i++){
+      _fixes[i]->compute();
     }
-    else {
-      std::cout << "==========================warning=========================" << std::endl
-                << "'vel_last_step' is only used for calculating friction" << std::endl
-                << " However, no friction force has been implemented yet." << std::endl 
-                << " Consider using reinit_system() instead" << std::endl
-                << "==========================================================" <<std::endl;
-      //_force_field->reinit_force_field(*vel_last_step);
-      libmesh_error(); 
+    /* since all the other fix::compute() expect for FixRigidSurfaceConstraint::compute
+     * only add a body force density to each particle, we need to attach forces on each node
+     * using this force density
+     * Notice that: this attach_nodal() function only needs to be called once since the body force
+     * density is already the total one.
+     */
+    for (std::size_t i = 0; i<_fixes.size(); i++){
+      if (_fixes[i]->force_type != "surface_constraint"){
+       _fixes[i] -> attach_nodal();
+       break;
+      }
     }
-  //  std::cout << "   force_field reinitialized .." << std::endl;
+    // need to restore particle mesh after applying all fixes if particles are on pbc
+    _fixes[0]->check_pbc_post_fix();
   }
+  else
+  {
+    for (std::size_t i = 0; i < _fixes.size(); i++){
+      _fixes[i]->compute();
+    }
+  }   
 
-
-  STOP_LOG("reinit_system()", "PMLinearImplicitSystem");
+  STOP_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
 }
-
 
   
 
@@ -476,9 +543,9 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Point &p,
    For point particle simulation, there is no solid mesh. "hmin" actually is NOT used.
    For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
    ---------------------------------------------------------------------------------------- */
-  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("fluid mesh size");
+  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
   if(particle_type=="rigid_particle"){
-    hmin  =  this->get_equation_systems().parameters.get<Real> ("solid mesh size");
+    hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
   }
   
   
@@ -525,9 +592,9 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_bead(const std::size_
    For point particle simulation, there is no solid mesh. "hmin" actually is NOT used.
    For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
    ---------------------------------------------------------------------------------------- */
-  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("fluid mesh size");
-  if(particle_type!="point_particle"){
-    hmin  =  this->get_equation_systems().parameters.get<Real> ("solid mesh size");
+  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
+  if(particle_type == "rigid_particle"){
+    hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
   }
   
   
@@ -571,7 +638,7 @@ std::vector<Real> PMLinearImplicitSystem::global_self_exclusion(const std::size_
   
   
 // ==================================================================================
-void PMLinearImplicitSystem::test_l2_norm()
+void PMLinearImplicitSystem::test_l2_norm(bool& neighbor_list_update_flag)
 {
   START_LOG("test_l2_norm()", "PMLinearImplicitSystem");
   std::string msg = "--->test in PMLinearImplicitSystem::test_l2_norm(): \n";
@@ -580,7 +647,7 @@ void PMLinearImplicitSystem::test_l2_norm()
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Numerical solution: Global(FEM) + Local(Analytical)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  this->reinit_system();       // re-init particle-mesh before start
+  this->reinit_hi_system(neighbor_list_update_flag);       // re-init particle-mesh before start
   const bool re_init = true;
   this->solve_stokes("disturbed",re_init);
   this->add_local_solution();
@@ -650,7 +717,7 @@ void PMLinearImplicitSystem::test_l2_norm()
 
   
 // ==================================================================================
-void PMLinearImplicitSystem::test_velocity_profile()
+void PMLinearImplicitSystem::test_velocity_profile(bool& neighbor_list_update_flag)
 {
   START_LOG("test_velocity_profile()", "PMLinearImplicitSystem");
   
@@ -659,8 +726,7 @@ void PMLinearImplicitSystem::test_velocity_profile()
    In this test, we assume that undisturbed velocity is zero!
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   std::cout<< "========>2. Test in PMLinearImplicitSystem::test_velocity_profile(): \n";
-  
-  this->reinit_system();       // re-init particle-mesh before start
+  this->reinit_hi_system(neighbor_list_update_flag);       // re-init particle-mesh before start
   const bool re_init = true;
   this->solve_stokes("disturbed",re_init);
   

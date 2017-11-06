@@ -167,6 +167,11 @@ public:
   std::vector<std::pair<std::size_t,Real> > neighbor_list() const
   { return _neighbor_list;  };
   
+
+  /*
+   * Reinit neighbor list distances
+   */ 
+  void reinit_neighbor_distance();
   
   /*
    * Set the force vector on the particle
@@ -174,7 +179,7 @@ public:
    */
   void set_particle_force(const std::vector<Real>& pforce);
   
-  
+
   /*
    * Add the force vector
    */
@@ -192,7 +197,17 @@ public:
    * Return the force vector on the particle
    */
   const std::vector<Real>& particle_force() const {  return _force;  };
-  
+
+  /*
+   * Set particle velocity
+   */ 
+  void set_particle_velocity(const Point& p_velocity) {_velocity = p_velocity;};
+
+  /*
+   * Return the velocity vector of the particle
+   */
+  const Point& particle_velocity() const {return _velocity; };
+
   
   /*
    * Return the orientation vector of the particle
@@ -204,21 +219,19 @@ public:
   
   /*
    * Re-init the point particle quantities:
-   * _force = 0;
+   *  clean neighbor_list
    * _processor_id = -1;
    * _elem_id      = -1
-   * _neighbor_list.clear()
    * The following members are NOT changed during the reinit:
-   * (1)_center; (2)_counter; (3)_id; (4)_parent_id; (5)_point_type; (6)_orientation
+   * (1)_center; (2) force; (3)_counter; (4)_id; (5)_parent_id; (6)_point_type; (7)_orientation; 
    */
   void reinit_particle();
-  
-  
-  
+
+
   /*
    * Print information of this particle
    */
-  void print_info(const bool & print_neighbor_list = false) const;
+  void print_info(const bool & print_neighbor_list = true) const;
   
   
   
@@ -226,6 +239,9 @@ private:
   
   // The coordinate of the particle center
   Point _center;
+
+  // The velocity of the particle center
+  Point _velocity;
 
   // Count how many times the point has crossed a boundary
   // Used to unfold point's coordinate with periodic boundaries

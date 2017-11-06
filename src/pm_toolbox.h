@@ -103,7 +103,7 @@ public:
    * for x, y and z directions
    */
   static void coordinate_rotation(Point& pt,
-                                  const std::vector<Real>& angles);
+                                  const Point& angles);
   
   /*
    * Output a message on the screen
@@ -121,14 +121,14 @@ public:
    * Magnify mesh in the x/y/z directions according to the mag_factor
    */
   static void magnify_serial_mesh(SerialMesh& mesh,
-                                  const std::vector<Real>& mag_factor);
+                                  const Point& mag_factor);
   
   
   /*
    * Rotate mesh in the x/y/z axis according to the angles
    */
   static void rotate_serial_mesh(SerialMesh& mesh,
-                                 const std::vector<Real>& angles);
+                                 const Point& angles);
   
   
   /*

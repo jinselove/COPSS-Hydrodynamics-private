@@ -31,16 +31,14 @@
 #include "libmesh/reference_counted_object.h"
 
 
-#include "random_generator.h"
 
+#include "random_generator.h"
+#include "pm_linear_implicit_system.h"
+#include "fix/fix.h"
 // include SLEPc EPS solver, "libmesh/slepc_macro.h" must be included before this!
 EXTERN_C_FOR_SLEPC_BEGIN
 # include <slepceps.h>
 EXTERN_C_FOR_SLEPC_END
-
-//EXTERN_C_FOR_PETSC_BEGIN
-//# include <petscksp.h>
-//EXTERN_C_FOR_PETSC_END
 
 
 using namespace libMesh;
@@ -98,17 +96,6 @@ public:
    */
   EquationSystems& get_equation_systems()
   { return _equation_systems; };
-
-  
-  /*
-   * Return total number of particles in the brownian system
-   */
-  unsigned int num_points() const
-  {  return _n_points;  };
-  
- 
-  unsigned int num_chains() const
-  { return _n_chains; };
 
  
   /*
@@ -252,77 +239,6 @@ public:
                                           const Real tol_cheb,
                                           Vec* dw);
   
-  
-  /*
-   * Compute the mean square displacement
-   * The size of V0 and V1 must be dim*n_particles
-   * V0 and V1 are not changed in this function
-   * msd = 1/N * sum(x*x), where x = V1 - V0
-   */
-  Real mean_square_displacement(Vec V0,
-                                Vec V1) const;
-  
-  /*
-   * Compute the mean square displacement according to the inital center of mass Rc0
-   * and position vector V1
-   * See eqn (25) in Jendrejack et al. J Chem Phys (2003)
-   */
-  Point mean_square_displacement(const Point& Rc0,
-                                 const Point& Rc1) const;
-  
-  
-  /*
-   * Mean-square end-to-end distance
-   */
-//  Real mean_square_end_to_end_distance(Vec R0) const;
-
-  
-  /*
-   * Compute the center-of-mass from a given position vector R
-   */
-  std::vector<Point> center_of_mass(Vec R0) const;
-  
-  
-  /*
-   * Compute the radius_of_gyration Rg from a given position vector R
-   */
-  std::vector<Real> radius_of_gyration(Vec R0) const;
-  
-  
-  /*
-   * Compute the radius_of_gyration Rg from a given position vector R
-   * and the center of mass.
-   */
-  std::vector<Real> radius_of_gyration(Vec R0,
-                          const std::vector<Point>& center) const;
-  
-  
-  /*
-   * Maximum molecular stretch of a chain along x,y,z directions
-   */
-  std::vector<Point> chain_stretch(Vec R0) const;   // position vector of a chain
- 
-
-  /*
-   * Write mean square displacement, center of mass, chain stretch, chain gyration
-   * at step 0 (origin) to data file
-   */
-  void output_statistics_step0(bool out_msd_flag, bool out_stretch_flag,
-                               bool out_gyration_flag, bool out_com_flag,
-                               Vec RIN);
-
-
-  /*
-   * Write mean square displacement, center of mass, chain stretch, chain gyration
-   * at step i (in dynamic process) to data file
-   */
-  void output_statistics_stepi(bool out_msd_flag, bool out_stretch_flag,
-                               bool out_gyration_flag, bool out_com_flag,
-                               unsigned int i, Real real_time,
-                               const std::vector<Point> center0,
-                               Vec ROUT);
-
-
   /*
    * A wrap-up Stokes solver that simply call _MatMult_Stokes() to compute
    * the particle velocity vector provided that the force vector is given.
@@ -359,14 +275,19 @@ private:
   // total number of points
   unsigned int _n_points;
 
-  // total number of chains
-  unsigned int _n_chains;
+  // point mesh
+  PointMesh<3>* _point_mesh;
+
+  // fixes
+  std::vector<Fix*> _fixes;
 
   // dimension of mesh
   unsigned int _dim;  
+  
   // Random generator from C++ std library
   RandomGenerator _random_generator;
   
+
   // friend class/function, so that it can reach the members in the current class.
   friend PetscErrorCode _MatMult_Stokes(Mat M, Vec f, Vec u);
 

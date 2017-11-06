@@ -7,7 +7,6 @@
 #############################################
 
 test_name = general
-print_info = true
 
 #############################################
 #			   Physical parameters         			
@@ -51,6 +50,9 @@ periodicity = 'true false false'
 inlet = 'false false false'
 inlet_pressure = '0 0 0'
 
+# shear info #
+shear = 'false false false false false false'
+shear_rate = '0. 0. 0. 0. 0. 0.'
 
 #############################################
 #			   Mesh info         			
@@ -59,22 +61,17 @@ generate_mesh = true
 n_mesh = '37 37 4'
 
 #############################################
-#	 Force info (particle-particle force)         			
+#	 Force info         			
 #############################################
-particle_particle_force_types = 'pp_ev_lj_repulsive'
-pp_ev_lj_repulsive = '1. 2.1'
-#############################################
-#	 Force info (particle-wall force)
-#############################################
-particle_wall_force_types = 'pw_ev_lj_repulsive'
-pw_ev_lj_repulsive = '1. 1.05'
+force_field = 'lj_cut wall/lj_cut'
+lj_cut = '1. 2.2 2.469416506'
+wall/lj_cut = '1. 1.2 1.346954458'
 
 #############################################
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.3
-
+alpha = 0.1
 
 #############################################
 #			   Solver info         			
@@ -118,6 +115,12 @@ schur_pc_type = SMp
 #############################################
 #	Chebyshev info (only for brownian system)         			
 #############################################
+# compute_eigen 
+compute_eigen = true
+
+# specify eig_min and eig_max if compute_eigen=false
+# eig_min = 
+# eig_max = 
 
 # max number of chebyshev polynomial #
 max_n_cheb = 50
@@ -135,14 +138,15 @@ tol_eigen = 0.01
 #############################################
 #			   Run info
 #############################################
-with_brownian  = false
+with_hi	       = true
+with_brownian  = true
 adaptive_dt    = true
 max_dr_coeff   = 0.1
-write_interval = 1
+update_neighbor_list_everyStep = true
 restart        = false
-restart_step   = 5
-restart_time   = 0.5
 random_seed    = 123456789
-nstep          = 1
+nstep          = 5
+write_interval = 1
+output_file    = 'equation_systems trajectory center_of_mass mean_square_displacement' 
 debug_info     = false
-
+print_info = false

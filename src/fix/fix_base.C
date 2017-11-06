@@ -23,10 +23,10 @@
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/equation_systems.h"
 
-#include "particle_mesh.h"
-#include "point_mesh.h"
-#include "pm_periodic_boundary.h"
-#include "force_field_base.h"
+#include "../particle_mesh.h"
+#include "../point_mesh.h"
+#include "../pm_periodic_boundary.h"
+#include "fix_base.h"
 
 
 using namespace libMesh;
@@ -34,14 +34,14 @@ using namespace libMesh;
 
 
 // ======================================================================
-ForceFieldBase::ForceFieldBase()
+FixBase::FixBase()
 {
   // Do nothing
 }
 
 
 // ======================================================================
-//ForceFieldBase::ForceFieldBase(PMLinearImplicitSystem& pm_sys)
+//FixBase::FixBase(PMLinearImplicitSystem& pm_sys)
 //: _pm_system(pm_sys)
 //{
 //  // initialize the private memebers
@@ -50,7 +50,7 @@ ForceFieldBase::ForceFieldBase()
 
 
 // ======================================================================
-ForceFieldBase::~ForceFieldBase()
+FixBase::~FixBase()
 {
   // do nothing
 }
@@ -58,11 +58,11 @@ ForceFieldBase::~ForceFieldBase()
 
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::spring_force_wls(const Point& pt_ij,
+std::vector<Real> FixBase::spring_force_wls(const Point& pt_ij,
                                                    const Real&  c1,
                                                    const Real&  Ls) const
 {
-  START_LOG ("spring_force_wls(pt_ij)", "ForceFieldBase");
+  START_LOG ("spring_force_wls(pt_ij)", "FixBase");
 
   std::vector<Real> fij(3);
     
@@ -81,18 +81,18 @@ std::vector<Real> ForceFieldBase::spring_force_wls(const Point& pt_ij,
     fij[j] = F_ij(j);
   }
   
-  STOP_LOG ("spring_force_wls(pt_ij)", "ForceFieldBase");
+  STOP_LOG ("spring_force_wls(pt_ij)", "FixBase");
   return fij;
 }
 
 
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::spring_force_fene(const Point& pt_ij,
+std::vector<Real> FixBase::spring_force_fene(const Point& pt_ij,
                                                     const Real&  c1,
                                                     const Real&  Ls) const
 {
-  START_LOG ("spring_force_fene(pt_ij)", "ForceFieldBase");
+  START_LOG ("spring_force_fene(pt_ij)", "FixBase");
   std::vector<Real> fij(3);  
   
   // The spring force: pt_ij = ptj - pti(with periodicity), R_ij = |pt_ij|
@@ -109,18 +109,18 @@ std::vector<Real> ForceFieldBase::spring_force_fene(const Point& pt_ij,
     fij[j] = F_ij(j);
   }
   
-  STOP_LOG ("spring_force_fene(pt_ij)", "ForceFieldBase");
+  STOP_LOG ("spring_force_fene(pt_ij)", "FixBase");
   return fij;
 }
 
 
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::spring_force_ud(const Point& pt_ij,
+std::vector<Real> FixBase::spring_force_ud(const Point& pt_ij,
                                                   const Real&  c1,
                                                   const Real&  Ls) const
 {
-  START_LOG ("spring_force_ud(pt_ij)", "ForceFieldBase");
+  START_LOG ("spring_force_ud(pt_ij)", "FixBase");
   
   std::vector<Real> fij(3);
   // The spring force: pt_ij = ptj - pti(with periodicity), R_ij = |pt_ij|
@@ -143,18 +143,18 @@ std::vector<Real> ForceFieldBase::spring_force_ud(const Point& pt_ij,
     fij[j] = F_ij(j);
   }
   
-  STOP_LOG ("spring_force_ud(pt_ij)", "ForceFieldBase");
+  STOP_LOG ("spring_force_ud(pt_ij)", "FixBase");
   return fij;
 }
 
 
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::spring_force_lhs(const Point& pt_ij,
+std::vector<Real> FixBase::spring_force_lhs(const Point& pt_ij,
                                                    const Real&  l0,
                                                    const Real&  k0) const
 {
-  START_LOG ("spring_force_lhs(pt_ij)", "ForceFieldBase");
+  START_LOG ("spring_force_lhs(pt_ij)", "FixBase");
   
   //f_ij = k0*( |R_ij| - l0 )  * R_ij/|R_ij|
   std::vector<Real> fij(3);
@@ -172,18 +172,18 @@ std::vector<Real> ForceFieldBase::spring_force_lhs(const Point& pt_ij,
     fij[j] = F_ij(j);
   }
   
-  STOP_LOG ("spring_force_lhs(pt_ij)", "ForceFieldBase");
+  STOP_LOG ("spring_force_lhs(pt_ij)", "FixBase");
   return fij;
 }
 
 
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::gaussian_force(const Point& r_ij,
+std::vector<Real> FixBase::gaussian_force(const Point& r_ij,
                                                         const Real&  c1,
                                                         const Real&  c2) const
 {
-  START_LOG ("gaussian_force(pt_ij)", "ForceFieldBase");
+  START_LOG ("gaussian_force(pt_ij)", "FixBase");
  
   // f_ij = c1*c2* exp( -c2*|r_ij|^2 ) * r_ij
   std::vector<Real> fij(3);  
@@ -194,16 +194,16 @@ std::vector<Real> ForceFieldBase::gaussian_force(const Point& r_ij,
     fij[j] = force(j);
   }
   
-  STOP_LOG ("gaussian_force(pt_ij)", "ForceFieldBase");
+  STOP_LOG ("gaussian_force(pt_ij)", "FixBase");
   return fij;
 }
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::lj_force(const Point& r_ij, // direction vector
+std::vector<Real> FixBase::lj_force(const Point& r_ij, // direction vector
                                          const Real& epsilon, // energy coefficient
                                          const Real& sigma) const // distance coefficient
 {
-  START_LOG("lj_force(&r_ij, &epsilon, &sigma)","ForceFieldBase");
+  START_LOG("lj_force(&r_ij, &epsilon, &sigma)","FixBase");
   // f_ij = -24 * epsilon * (2*(sigma/|r_ij|)^12 - (sigma/|r_ij|)^6 ) * r_ij / |r_ij|^2
   std::vector<Real> fij(3);
  
@@ -216,16 +216,16 @@ std::vector<Real> ForceFieldBase::lj_force(const Point& r_ij, // direction vecto
   for (std::size_t j=0; j<3; ++j){
     fij[j] = force(j);
   }
-  STOP_LOG("lj_force(&r_ij), &epsilon, &sigma", "ForceFieldBase");
+  STOP_LOG("lj_force(&r_ij), &epsilon, &sigma", "FixBase");
   return fij;
 }
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::harmonic_force(const Point& r_ij,
+std::vector<Real> FixBase::harmonic_force(const Point& r_ij,
                                                  const Real& k,
                                                  const Real& r0) const
 {
-  START_LOG("harmonic_force(&r_ij, &r0, &k)","ForceFieldBase");
+  START_LOG("harmonic_force(&r_ij, &r0, &k)","FixBase");
 
   std::vector<Real> fij(3);
 
@@ -233,16 +233,16 @@ std::vector<Real> ForceFieldBase::harmonic_force(const Point& r_ij,
   for (std::size_t j=0; j<3; ++j){
     fij[j] = force(j);
   }
-  STOP_LOG("harmonic_force(&r_ij, &r0, &k)","ForceFieldBase");
+  STOP_LOG("harmonic_force(&r_ij, &r0, &k)","FixBase");
   return fij;
 }
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::polymer_wall_empirical_force(const Point&  r_ij,   //vector from particle to wall, r_j-r_i
+std::vector<Real> FixBase::polymer_wall_empirical_force(const Point&  r_ij,   //vector from particle to wall, r_j-r_i
                                                       const Real&  c0,        // constant 1:
-                                                      const Real&  d0) const  // constant 2:
+                                                      const Real&  d0) const // constant 2:
 {
-  START_LOG ("polymer_wall_empirical_force(pt_ij)", "ForceFieldBase");
+  START_LOG ("polymer_wall_empirical_force(pt_ij)", "FixBase");
   
   /* 
    * f_i = c0*( 1 - y0/d0 )^2, must be > 0
@@ -256,14 +256,14 @@ std::vector<Real> ForceFieldBase::polymer_wall_empirical_force(const Point&  r_i
       fij[_dim] = f_i(_dim);
     }
   }  
-  STOP_LOG ("polymer_wall_empiricalforce(pt_ij)", "ForceFieldBase");
+  STOP_LOG ("polymer_wall_empiricalforce(pt_ij)", "FixBase");
   return fij;
 }
 
 
 
 // ======================================================================
-std::vector<Real> ForceFieldBase::friction_force(const Point& bead_1,
+std::vector<Real> FixBase::friction_force(const Point& bead_1,
                                                  const Point& bead_2,
                                                  const std::vector<Real>& v1,
                                                  const std::vector<Real>& v2,
@@ -271,7 +271,7 @@ std::vector<Real> ForceFieldBase::friction_force(const Point& bead_1,
                                                  const Real& Hf,
                                                  const Real& dmin) const
 {
-  START_LOG ("friction_force()", "ForceFieldBase");
+  START_LOG ("friction_force()", "FixBase");
 
   std::vector<Real> fij(3);
   
@@ -300,7 +300,7 @@ std::vector<Real> ForceFieldBase::friction_force(const Point& bead_1,
     fij[i] = Hf*f_12_norm*v_12(i)/v_12_norm;
   }
   
-  STOP_LOG ("friction_force()", "ForceFieldBase");
+  STOP_LOG ("friction_force()", "FixBase");
   return fij;
 }
 
@@ -311,12 +311,12 @@ std::vector<Real> ForceFieldBase::friction_force(const Point& bead_1,
 
 
 //// ======================================================================
-//std::vector<Real> ForceFieldBase::particle_wall_force(const Point& pti,       // bead i
+//std::vector<Real> FixBase::particle_wall_force(const Point& pti,       // bead i
 //                                                      const Point& dist,      // distance to the wall
 //                                                      const Real&  c0,        // constant 1:
 //                                                      const Real&  d0) const  // constant 2:
 //{
-//  START_LOG ("particle_wall_force(pti, dist)", "ForceFieldBase");
+//  START_LOG ("particle_wall_force(pti, dist)", "FixBase");
 //  
 //  //  retrieve the box boundary
 //  const Point box_min = _pm_system.point_mesh()->pm_periodic_boundary()->box_min();
@@ -360,7 +360,7 @@ std::vector<Real> ForceFieldBase::friction_force(const Point& bead_1,
 //    
 //  } // end for j-loop
 //  
-//  STOP_LOG ("particle_wall_force(pti, dist)", "ForceFieldBase");
+//  STOP_LOG ("particle_wall_force(pti, dist)", "FixBase");
 //  return fij;
 //}
 

@@ -17,8 +17,8 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #pragma once
 
-#include "copss.h"
-#include "polymer_chain.h"
+#include "../copss.h"
+#include "../polymer_chain.h"
 
 using std::cout;
 using std::endl;
@@ -56,7 +56,6 @@ protected:
 	Real max_spring_len;
 	bool chain_broken;
 
-	//void read_data(std::string control_file){};
 	// override read_particle_parameters() function in Copss class
 	void read_particle_info () override;
 
@@ -74,6 +73,9 @@ protected:
 
 	// update object due to PBC after check_wall()
 	void update_object(std::string stage) override;
+        
+    // write object to output file
+    void write_object(unsigned int step_id) override;
 
 
 

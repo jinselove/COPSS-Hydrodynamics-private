@@ -52,7 +52,7 @@ ParticleMesh<KDDim>::ParticleMesh(MeshBase& mesh)
     _is_sorted(true),
     _periodic_boundary(NULL)
 {
-  // do nothing
+  _dim = _mesh.mesh_dimension();
 }
 
 
@@ -70,7 +70,7 @@ ParticleMesh<KDDim>::ParticleMesh(MeshBase& mesh,
   _is_sorted(true),
   _periodic_boundary(NULL)
 {
-  // do nothing
+  _dim = _mesh.mesh_dimension();
 }
 
   
@@ -108,15 +108,12 @@ ParticleMesh<KDDim>::~ParticleMesh()
 }
 
 
- 
 // ======================================================================
 template <unsigned int KDDim>
 void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
-                                              const std::string& particle_mesh_type,
-                                              const std::vector<std::string>& particle_mesh_file)
+                                              const std::string& particle_mesh_type)
 {
   std::cout << std::endl << "###particle coordinate filename = " << filename << std::endl;
- 
   // Check the existence of the particle input file
   std::ifstream infile;
   infile.open (filename, std::ios_base::in);
@@ -126,70 +123,76 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
     libmesh_error();
   }
 
-  /* --------------------------------------------------------------------------
-   * Check if the mesh files exist. If the surface mesh file does NOT exist,
-   * it will be extracted from the volume mesh file. However, the volume mesh
-   * file MUST exist. Otherwise, print the error message.
-   * --------------------------------------------------------------------------*/
-  const unsigned int n_types = particle_mesh_file.size(); // Number of particle types
+  // init variables
+  const std::size_t dim = _mesh.mesh_dimension(); // fluid mesh dimension
+  unsigned int p_id;
+  unsigned  p_type;
+  Point p_center;
+  Point mag;
+  Point rot;
+  Real charge=0., epsilon_in=0.;  // parameters for Electrostatics
+  Point sedimentation_body_force_density;
+  std::size_t n1;
 
-  std::vector<bool> particle_mesh_exist;
-  particle_mesh_exist.resize( n_types );
+  // Read file line by line
+  std::string line_str, str_tmpt;
+  std::getline(infile, line_str); // 0. Header line
+  infile >> _n_rigid_particles >> line_str; // # number of particles
+  infile >> _n_rigid_particle_types >> line_str >> str_tmpt; // # number of particle type ( == number of mesh types == number of mesh files)
 
-  for (unsigned int i=0; i < n_types; i++){
-    particle_mesh_exist[i] = PMToolBox::file_exist(particle_mesh_file[i]);
-    if( !particle_mesh_exist[i] )
-    {
-      std::cout << "***error in read_particles_data(): particle mesh file '" << particle_mesh_file[i] << "' does NOT exist!" << std::endl;
-      libmesh_error();
-    }
+  // init
+  _mass.resize(_n_rigid_particle_types);
+  _particles.resize(_n_rigid_particles);
+  _rigid_particle_mesh_files.resize(_n_rigid_particle_types);
+
+  // Read the particle mass
+  while (std::getline(infile, line_str)){
+    if(line_str=="Masses") break;
+  }
+  std::getline(infile, line_str); // skip the empty line
+  for(std::size_t i=0; i<_n_rigid_particle_types; ++i)
+  {
+    infile >> n1 >> _mass[i];
   }
 
-  /* --------------------------------------------------------------------------
-   * initialize: particle (x,y,z), radius and density
-   * --------------------------------------------------------------------------*/
-  const std::size_t dim = _mesh.mesh_dimension(); // fluid mesh dimension
-  unsigned int n_particles = 0, p_type = 0;
-  Real x=0., y=0., z=0.;      // xyz
-  Real mgx=0, mgy=0, mgz=0;   // parameters for magnification
-  Real th0=0, th1=0, th2=0;   // parameters for rotation
-  Real charge=0., epsilon_in=0.;  // parameters for Electrostatics
- 
- 
-  /* --------------------------------------------------------------------------
-   * read particle data, and generate particle surface mesh for rigid particles
-   * --------------------------------------------------------------------------*/
-  infile >> n_particles;  // total number of particles
-  _particles.resize(n_particles);
-  for (std::size_t i=0; i<n_particles; ++i)
+  // Read mesh files
+  while (std::getline(infile, line_str)){
+    if(line_str=="Particle Meshes") break;
+  }
+  std::getline(infile, line_str); // skip the empty line
+  for(std::size_t i=0; i<_n_rigid_particle_types; ++i)
   {
-    // Read in one line
-    infile >> p_type >> x >> y >> z >> mgx >> mgy >> mgz >> th0 >> th1 >> th2 >> charge >> epsilon_in;
-    std::vector<Real> mag_factor(KDDim), angles(KDDim);
-    mag_factor[0] = mgx;  mag_factor[1] = mgy;  mag_factor[2] = mgz;
-    angles[0]     = th0;  angles[1]     = th1;  angles[2]     = th2;
-
-    std::cout << "--->TEST in read_particle_data(): " << i << "-th particle position = (" << x << "," << y << "," << z << ")" << std::endl;
- 
-    // Create new RigidParticle
-    if (KDDim==2 || dim==2) z = 0.0;
-    Point pt(x,y,z);
-    const Real r = mgx, den = 0.0;
-    RigidParticle* particle = new RigidParticle(pt, i, r, den, charge, epsilon_in, this->comm());
- 
+    infile >> n1 >> _rigid_particle_mesh_files[i];
+  }
+  // Read the rigid particles
+  while (std::getline(infile, line_str)){
+    if(line_str=="Particles") break;
+  }
+  std::getline(infile, line_str); // skip the empty line
+  for (std::size_t i=0; i<_n_rigid_particles; ++i)
+  {   
+    infile >> p_id
+           >> p_type 
+           >> p_center(0) >> p_center(1) >> p_center(2) 
+           >> mag(0) >> mag(1) >> mag(2) 
+           >> rot(0) >> rot(1) >> rot(2) 
+           >> charge 
+           >> epsilon_in 
+           >> sedimentation_body_force_density(0) >> sedimentation_body_force_density(1) >>sedimentation_body_force_density(2);
+    RigidParticle* particle = new RigidParticle(p_id-1, p_type-1, p_center, mag, rot, charge, epsilon_in, sedimentation_body_force_density, this->comm());
     // When particles have different shapes, read mesh from different mesh files!
       //if( (!smesh_exist[p_type]) || i==0 )  particle->extract_surface_mesh( vmesh_file[p_type], smesh_file[p_type] );
     if(particle_mesh_type == "surface_mesh" or particle_mesh_type == "volume_mesh"){
-      if (p_type==0) {
-        particle->read_mesh_sphere(particle_mesh_file[p_type], particle_mesh_type);
-      }
-      else if (p_type==1) {
-        particle->read_mesh_cylinder(particle_mesh_file[p_type], particle_mesh_type, mag_factor, angles);
-      }
-      else {
-        std::cout << "***error in read_particles_data() read particle mesh: invalid particle type!" << std::endl;
+      const std::string& particle_mesh_filename = _rigid_particle_mesh_files[p_type-1];
+      bool particle_mesh_exist = PMToolBox::file_exist(particle_mesh_filename);
+      if( !particle_mesh_exist )
+      {
+        std::cout << "***error in read_particles_data(): particle mesh file '" << particle_mesh_filename << "' does NOT exist!" << std::endl;
         libmesh_error();
       }
+      else{
+        particle->read_mesh(particle_mesh_filename, particle_mesh_type); 
+      } 
     } // end if
     else
     {
@@ -197,129 +200,128 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
       libmesh_error();
     } // end else
     // Assignment
-    _particles[i] = particle;
- 
+    _particles[i] = particle; 
    // --------------------- test ------------------------------------------
-   if(this->comm().rank()==0 )
-   {
-     printf("ParticleMesh::read_particles_data: x = %f, y = %f, z = %f. \n",x, y, z );
-     printf("        radius = %f, relative density = %f. \n",r, den );
-     printf("        mgx = %f, mgy = %f, mgz = %f. \n",mgx, mgy, mgz);
-     printf("        rotation angle = (%f, %f, %f). \n",th0, th1, th1 );
-     printf("        charge = %f, relative_permittivity = %f. \n", charge, epsilon_in );
-     printf("        MPI_rank = %d\n",this->comm().rank() );
-     printf("        # of elements is %u\n",particle->mesh().n_elem() );
-     printf("        # of nodes is %u\n",particle->mesh().n_nodes() );
-   }
+   // if(this->comm().rank()==0 )
+   // {
+   //   printf("ParticleMesh::read_particles_data: x = %f, y = %f, z = %f. \n",x, y, z );
+   //   printf("        radius = %f, relative density = %f. \n",r, den );
+   //   printf("        mgx = %f, mgy = %f, mgz = %f. \n",mgx, mgy, mgz);
+   //   printf("        rotation angle = (%f, %f, %f). \n",th0, th1, th1 );
+   //   printf("        charge = %f, relative_permittivity = %f. \n", charge, epsilon_in );
+   //   printf("        MPI_rank = %d\n",this->comm().rank() );
+   //   printf("        # of elements is %u\n",particle->mesh().n_elem() );
+   //   printf("        # of nodes is %u\n",particle->mesh().n_nodes() );
+   // }
   } // end for i-loop
-  
   // Close the file and end the function
   infile.close();
   this->comm().barrier();
   std::cout << "Reading particle data from "<<filename<<" is completed!" << std::endl << std::endl;
 }
 
+
  
 
 // ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::read_chromatin_data(const std::string& filename,
-                                              const std::string& vmesh_file,
-                                              const std::string& smesh_file,
-                                              const std::string& mesh_type)
-{
-  std::cout <<"\n### chromatin coordinate filename = "<<filename <<std::endl;
+// template <unsigned int KDDim>
+// void ParticleMesh<KDDim>::read_chromatin_data(const std::string& filename,
+//                                               const std::string& vmesh_file,
+//                                               const std::string& smesh_file,
+//                                               const std::string& mesh_type)
+// {
+//   std::cout <<"\n### chromatin coordinate filename = "<<filename <<std::endl;
   
-  /* --------------------------------------------------------------------------
-   * Check if the mesh files exist. If the surface mesh file does NOT exist,
-   * it will be extracted from the volume mesh file. However, the volume mesh
-   * file MUST exist. Otherwise, print the error message.
-   * --------------------------------------------------------------------------*/
-  const bool smesh_exist = PMToolBox::file_exist(smesh_file);
-  const bool vmesh_exist = PMToolBox::file_exist(vmesh_file);
-  if( !vmesh_exist )
-  {
-    printf("***error in read_chromatin_data(): volume mesh file does NOT exist!");
-    libmesh_error();
-  }
-  
-  
-  /* --------------------------------------------------------------------------
-   * check the existance of the particle input file
-   * --------------------------------------------------------------------------*/
-  std::ifstream infile;
-  infile.open (filename, std::ios_base::in);
-  if( !infile.good() )
-  {
-    printf("***error in read_chromatin_data(): particle coordinate file does NOT exist!");
-    libmesh_error();
-  }
+//   /* --------------------------------------------------------------------------
+//    * Check if the mesh files exist. If the surface mesh file does NOT exist,
+//    * it will be extracted from the volume mesh file. However, the volume mesh
+//    * file MUST exist. Otherwise, print the error message.
+//    * --------------------------------------------------------------------------*/
+//   const bool smesh_exist = PMToolBox::file_exist(smesh_file);
+//   const bool vmesh_exist = PMToolBox::file_exist(vmesh_file);
+//   if( !vmesh_exist )
+//   {
+//     printf("***error in read_chromatin_data(): volume mesh file does NOT exist!");
+//     libmesh_error();
+//   }
   
   
-  /* --------------------------------------------------------------------------
-   * initialize: particle (x,y,z), radius and density
-   * --------------------------------------------------------------------------*/
-  const std::size_t dim = _mesh.mesh_dimension();
-  unsigned int n_particles = 0;
-  Real x=0., y=0., z=0., r=0., h=0, den=0., th0=0, th1=0, th2=0;
+//   /* --------------------------------------------------------------------------
+//    * check the existance of the particle input file
+//    * --------------------------------------------------------------------------*/
+//   std::ifstream infile;
+//   infile.open (filename, std::ios_base::in);
+//   if( !infile.good() )
+//   {
+//     printf("***error in read_chromatin_data(): particle coordinate file does NOT exist!");
+//     libmesh_error();
+//   }
   
   
-  /* --------------------------------------------------------------------------
-   * read particle data, and generate particle surface mesh for rigid particles
-   * --------------------------------------------------------------------------*/
-  infile >> n_particles;  // total number of particles
-  _particles.resize(n_particles);
-  for (std::size_t i=0; i<n_particles; ++i)
-  {
-    infile >> x >> y >> z >> r >> h >> den >> th0 >> th1 >> th2;
-    if (KDDim==2 || dim==2) z = 0.0;
-    Point pt(x,y,z);
-    RigidParticle* particle = new RigidParticle(pt, i, den, this->comm());
+//   /* --------------------------------------------------------------------------
+//    * initialize: particle (x,y,z), radius and density
+//    * --------------------------------------------------------------------------*/
+//   const std::size_t dim = _mesh.mesh_dimension();
+//   unsigned int n_particles = 0;
+//   Real x=0., y=0., z=0., r=0., h=0, den=0., th0=0, th1=0, th2=0;
+  
+  
+//   /* --------------------------------------------------------------------------
+//    * read particle data, and generate particle surface mesh for rigid particles
+//    * --------------------------------------------------------------------------*/
+//   infile >> n_particles;  // total number of particles
+//   _particles.resize(n_particles);
+//   for (std::size_t i=0; i<n_particles; ++i)
+//   {
+//     infile >> x >> y >> z >> r >> h >> den >> th0 >> th1 >> th2;
+//     if (KDDim==2 || dim==2) z = 0.0;
+//     Point pt(x,y,z);
+//     RigidParticle* particle = new RigidParticle(pt, i, den, this->comm());
     
-    // the magnification factor and rotation angles
-    std::vector<Real> mag_factor(KDDim), angles(KDDim);
-    mag_factor[0] = r;  mag_factor[1] = r;  mag_factor[2] = h/2.;
-    angles[0]  =  th0;  angles[1]  =  th1;  angles[2]  =  th2;
+//     // the magnification factor and rotation angles
+//     std::vector<Real> mag_factor(KDDim), angles(KDDim);
+//     mag_factor[0] = r;  mag_factor[1] = r;  mag_factor[2] = h/2.;
+//     angles[0]  =  th0;  angles[1]  =  th1;  angles[2]  =  th2;
     
-    if(mesh_type=="surface_mesh")
-    {
-      if( (!smesh_exist) || i==0 )
-        particle->extract_surface_mesh(vmesh_file,smesh_file);
+//     if(mesh_type=="surface_mesh")
+//     {
+//       if( (!smesh_exist) || i==0 )
+//         particle->extract_surface_mesh(vmesh_file,smesh_file);
       
-      particle->read_mesh_cylinder(smesh_file,mesh_type, mag_factor, angles);
-    }
-    else if(mesh_type=="volume_mesh")
-    {
-      particle->read_mesh_cylinder(smesh_file,mesh_type, mag_factor, angles);
-    }
-    else
-    {
-      printf("***error in read_chromatin_data(): invalid mesh type!");
-      libmesh_error();
-    }
-    _particles[i] = particle;
+//       particle->read_mesh_cylinder(smesh_file,mesh_type, mag_factor, angles);
+//     }
+//     else if(mesh_type=="volume_mesh")
+//     {
+//       particle->read_mesh_cylinder(smesh_file,mesh_type, mag_factor, angles);
+//     }
+//     else
+//     {
+//       printf("***error in read_chromatin_data(): invalid mesh type!");
+//       libmesh_error();
+//     }
+//     _particles[i] = particle;
     
-    // --------------------- test ------------------------------------------
-    if(this->comm().rank()==0 )
-    {
-      printf("ParticleMesh::read_chromatin_data: x = %f, y = %f, z = %f. \n",x, y, z );
-      printf("        radius = %f, height = %f, relative density = %f. \n",r, h, den );
-      printf("        rotation angle = (%f, %f, %f). \n",th0, th1, th1 );
-      printf("        MPI_rank = %d\n",this->comm().rank() );
-      printf("        # of elements is %u\n",particle->mesh().n_elem() );
-      printf("        # of nodes is %u\n",particle->mesh().n_nodes() );
-    }
-    // --------------------- test ------------------------------------------
-  } // end for i-loop
+//     // --------------------- test ------------------------------------------
+//     if(this->comm().rank()==0 )
+//     {
+//       printf("ParticleMesh::read_chromatin_data: x = %f, y = %f, z = %f. \n",x, y, z );
+//       printf("        radius = %f, height = %f, relative density = %f. \n",r, h, den );
+//       printf("        rotation angle = (%f, %f, %f). \n",th0, th1, th1 );
+//       printf("        MPI_rank = %d\n",this->comm().rank() );
+//       printf("        # of elements is %u\n",particle->mesh().n_elem() );
+//       printf("        # of nodes is %u\n",particle->mesh().n_nodes() );
+//     }
+//     // --------------------- test ------------------------------------------
+//   } // end for i-loop
   
   
-  /* --------------------------------------------------------------------------
-   * close the file and end the function
-   * --------------------------------------------------------------------------*/
-  infile.close();
-  this->comm().barrier();
-  std::cout << "Reading particle data from "<<filename<<" is completed!\n\n";
-}
+//   /* --------------------------------------------------------------------------
+//    * close the file and end the function
+//    * --------------------------------------------------------------------------*/
+//   infile.close();
+//   this->comm().barrier();
+//   std::cout << "Reading particle data from "<<filename<<" is completed!\n\n";
+// }
   
   
   
@@ -524,7 +526,7 @@ void ParticleMesh<KDDim>::build_particle_neighbor_list()
   for (std::size_t j=0; j<_particles.size(); ++j)
   {
     // get the neighbor indices & distance values
-    const Point &tgt( _particles[j]->center() );
+    const Point &tgt( _particles[j]->get_centroid() );
     std::vector<std::pair<std::size_t,Real> > IndicesDists0, IndicesDists;
     this->build_particle_neighbor_list(tgt, _is_sorted, IndicesDists);
     /* IndicesDists above returns <particle_id, distance>! */
@@ -554,10 +556,10 @@ void ParticleMesh<KDDim>::build_particle_neighbor_list_naively()
   {
     std::vector<std::pair<std::size_t,Real> > IndicesDists;
     
-    const Point pt0( _particles[i]->center() );
+    const Point pt0( _particles[i]->get_centroid() );
     for (std::size_t j=0; j<_particles.size(); ++j)
     {
-      const Point ptj( _particles[j]->center() );
+      const Point ptj( _particles[j]->get_centroid() );
       const Point pt_ij = ptj - pt0;
       const Real dist = pt_ij.norm(); // the real distance
       
@@ -746,7 +748,7 @@ void ParticleMesh<KDDim>::build_elem_neighbor_list()
     for (std::size_t j=0; j<n_list.size(); ++j)
     {
       const std::size_t pid = n_list[j];
-      const Point pt        = _particles[pid]->center();
+      const Point pt        = _particles[pid]->get_centroid();
       const bool  inside    = elem->contains_point(pt);
 //      printf("--->debug: ParticleMesh::build_elem_neighbor_list()1 p_id = %lu, pt = (%f,%f,%f)\n",
 //             elem_id, pt(0), pt(1), pt(2) );
@@ -901,7 +903,7 @@ void ParticleMesh<KDDim>::reinit()
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      get the neighbor indices & distance values
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    const Point &tgt( _particles[j]->center() );
+    const Point &tgt( _particles[j]->get_centroid() );
     std::vector<std::pair<std::size_t,Real> > IndicesDists0, IndicesDists;
     this->build_particle_neighbor_list(tgt, _is_sorted, IndicesDists);
     /* IndicesDists above returns <particle_id, distance>! */
@@ -1006,7 +1008,7 @@ void ParticleMesh<KDDim>::print_elem_neighbor_list(std::ostream &out) const
       
       if (!n_list.empty())
         for (std::size_t i=0; i<n_list.size(); ++i)  //printf("%lu    ", n_list[i]);
-          _particles[ n_list[i] ]->print_info(false);
+          _particles[ n_list[i] ]->print_info();
       else
         out << "There is no neighboring particle around this element! \n";
       printf("\n");
@@ -1125,6 +1127,17 @@ void ParticleMesh<KDDim>::update_particle_mesh(const PointMesh<KDDim>* point_mes
   
   STOP_LOG ("update_particle_mesh()", "ParticleMesh<KDDim>");
 }
+
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::zero_particle_force_density()
+{
+  START_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
+  for (int i=0; i<_n_rigid_particles;i++) _particles[i]->zero_force_density();
+  
+  STOP_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
+}
   
   
   
@@ -1157,50 +1170,205 @@ std::vector<Real> ParticleMesh<KDDim>::mesh_size() const
   
 // ======================================================================
 template <unsigned int KDDim>
-void ParticleMesh<KDDim>::volume_conservation(const std::string& mesh_type)
+void ParticleMesh<KDDim>::volume_conservation()
 {
   START_LOG ("volume_conservation()", "ParticleMesh<KDDim>");
   
   // Loop over all the particles, and update their nodal values
   for (std::size_t i=0; i<_particles.size(); ++i)
   {
-    _particles[i]->volume_conservation(mesh_type);
+    _particles[i]->volume_conservation();
   }
   
   STOP_LOG ("volume_conservation()", "ParticleMesh<KDDim>");
 }
   
-  
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::initial_particle_center_of_mass(std::vector<Point>& center0) const
+{
+  START_LOG("initial_center_of_mass()", "ParticleMesh<KDDim>");
+  center0.resize(_n_rigid_particles);
+  for (std::size_t i=0; i<_n_rigid_particles; i++){
+    center0[i] = _particles[i]->get_centroid0();
+  }
+  STOP_LOG("initial_center_of_mass()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_particle(const unsigned int& step_id,
+                                          const unsigned int& o_step,
+                                          const Real& real_time,
+                                          const std::vector<std::string>& output_file,
+                                          unsigned int comm_in_rank) const
+{
+  START_LOG("write_particle()", "ParticleMesh<KDDim>");
+  this->write_time(step_id, o_step, real_time, comm_in_rank);
+  for (int i = 0; i < output_file.size(); i++){
+    if(output_file[i] == "equation_systems") {
+      // this output has been written in Copss.C
+    }
+    else if(output_file[i] == "trajectory") this -> write_particle_trajectory(o_step, comm_in_rank);
+    else if (output_file[i] == "particle_mesh") this->write_particle_mesh(step_id, o_step);
+    else if(output_file[i] == "mean_square_displacement"){
+        std::cout <<"Error: there is difficulty to calculate msd of rigid particles from ROUT, fix it before output msd" << std::endl;
+        libmesh_error();
+        // this -> write_particle_msd(step_id, o_step,center0, lvec, comm_in_rank);
+      
+    }
+    else {
+      std::cout << "unsupported output_file content: (" << output_file[i] <<")" << std::endl; 
+      libmesh_error();
+    }
+  }  
+
+  STOP_LOG("write_particle()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_time(const unsigned int& step_id,
+                              const unsigned int& o_step,
+                              const Real& real_time,
+                              unsigned int comm_in_rank) const
+{
+  // write step and real time
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if(step_id == 0){
+      out_file.open("out.time", std::ios_base::out);
+      out_file << "step_id" <<"  " <<"o_step" <<"  " << "real_time" << "\n";      
+    }
+    else{
+      out_file.open("out.time", std::ios_base::app);
+    }
+    out_file.precision(o_precision);
+    out_file <<step_id <<"  "<< o_step <<"  " <<real_time <<"\n";
+    out_file.close();  
+  }
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
+                                                    unsigned int comm_in_rank) const
+{
+  START_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
+  std::ostringstream oss;
+  oss << "output_particle_" << o_step <<".csv";
+  std::ofstream out_file;
+  if (comm_in_rank == 0){
+    out_file.open(oss.str(), std::ios_base::out);
+    // write out the csv file  
+    // POINT data
+    out_file <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
+    out_file.precision(o_precision);
+    for(std::size_t i=0; i<_n_rigid_particles; ++i)
+    {
+      out_file << i << " ";
+      // write position
+      for(std::size_t j=0; j<_dim; ++j){
+        out_file << _particles[i]->get_centroid()(j) << " ";
+      }
+      // write velocity
+      for (std::size_t j=0; j<_dim; ++j){
+        out_file <<_particles[i]->compute_centroid_velocity()(j) << " ";
+      }
+      // write force
+      for (std::size_t j=0; j<_dim; ++j){
+        out_file <<_particles[i]->get_centroid_force()(j) <<" ";
+      }
+      out_file <<"\n";
+    }
+    out_file << "\n";
+    out_file.close();
+  } // end if comm_in_rank == 0
+
+  STOP_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+// template <unsigned int KDDim>
+// void ParticleMesh<KDDim>::write_particle_msd(const unsigned int& step_id,
+//                                             const unsigned int& o_step,
+//                                             const std::vector<Point>& center0,
+//                                             const std::vector<Real>& lvec,
+//                                             unsigned int comm_in_rank) const
+// {
+//   /*
+//    * Fix me: the unwrapped position of all surface nodes are in lvec, however,
+//    * it is hard to calculate the unwrapped centroid position of each rigid particle
+//    * since the calculation requires the mesh configuration (refer to RigidParticle::compute_centroid)
+//    * one way to fix this might be: create another mesh to hold unwrapped node information in each rigid_particle
+//    */
+
+
+
+//   // START_LOG("write_particle_msd()", "ParticleMesh<KDDim>");
+//   // //get centers of all surface nodes
+//   // std::vector<Point> centeri(_n_rigid_particles);
+//   // Point node_center;
+//   // for (unsigned int i = 0; i < _n_rigid_particles; i++){
+//   //   const unsigned int n_nodes = _particles[i]->num_mesh_nodes();
+//   //   for (unsigned int j=0; j<n_nodes; j++){
+//   //     for (int k = 0; k <_dim; k++){
+//   //       node_center(k) = lvec[(i*n_nodes+j)*_dim+k];
+//   //     } 
+//   //     centeri[i] += node_center;     
+//   //   }
+
+//   // }
+//   // // compute mean square displacement
+//   // Point msd;
+//   // this->compute_mean_square_displacement(center0, centeri, msd);
+//   // // write mean square displacment to out.mean_square_displacement
+//   // std::ofstream out_file;  
+//   // if(comm_in_rank == 0){
+//   //   if(step_id == 0){
+//   //     out_file.open("out.mean_square_displacement", std::ios_base::out);
+//   //     out_file << "o_step" <<"  " << "mean_square_displacement" << "\n";      
+//   //   }
+//   //   else{
+//   //     out_file.open("out.mean_square_displacement", std::ios_base::app);
+//   //   }
+//   //   out_file.precision(o_precision);
+//   //   out_file << o_step <<"  ";
+//   //   for (int i = 0; i < _dim; i++){
+//   //     out_file <<msd(i) <<"  ";
+//   //   }
+//   //   out_file<<"\n";
+//   //   out_file.close();       
+//   // }// end if comm_in_rank == 0  
+
+//   // STOP_LOG("write_particle_msd()", "ParticleMesh<KDDim>");
+// }
+
+
   
 // ======================================================================
 template <unsigned int KDDim>
-void ParticleMesh<KDDim>::write_particle_mesh(const std::string& mesh_name)
+void ParticleMesh<KDDim>::write_particle_mesh(const unsigned int& step_id,
+                                              const unsigned int& o_step) const
 {
   START_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
-  
   this->comm().barrier();
-  const std::size_t n_particles = this->num_particles();
-  if(n_particles == 0)
-  {
-    printf("--->ParticleMesh::write_particle_mesh():\n");
-    printf("    Warning: The total number of particles is zero. Write nothing!\n");
+  std::ostringstream surface_mesh_file_name;
+  if(step_id == 0){
+    surface_mesh_file_name<< "particle_surface_mesh.e";  
   }
-  else if(n_particles == 1)
-  {
-    _particles[0]->mesh().write(mesh_name);
+  else{
+    surface_mesh_file_name <<"particle_surface_mesh.e"<< "-s."
+                          << std::setw(8) << std::setfill('0') << std::right << o_step;
   }
-  else
+  SerialMesh stitch_mesh (_particles[0]->mesh());
+  for(std::size_t i=1; i<_n_rigid_particles; ++i)
   {
-    SerialMesh stitch_mesh (_particles[0]->mesh());
-    for(std::size_t i=1; i<this->num_particles(); ++i)
-    {
-      stitch_mesh.stitch_meshes(_particles[i]->mesh(),0,0);
-    }
-    
-    // output the stitched mesh
-    stitch_mesh.write(mesh_name);
-  }
-  
+    stitch_mesh.stitch_meshes(_particles[i]->mesh(),0,0);
+  }    
+  // output the stitched mesh
+  stitch_mesh.write(surface_mesh_file_name.str());
   STOP_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
 }
   
@@ -1285,7 +1453,7 @@ template class ParticleMesh<3>;
 //  std::vector<Real>         ret_dist_sqr(num_closest);
 //  for (std::size_t j=0; j<_particles.size(); ++j)
 //  {
-//    const Point &tgt( _particles[j]->center() );
+//    const Point &tgt( _particles[j]->get_centroid() );
 //    const Real query_pt[] = { tgt(0), tgt(1), tgt(2) };
 //    
 //    // Find the 'num_results' nearest particles around the query_pt

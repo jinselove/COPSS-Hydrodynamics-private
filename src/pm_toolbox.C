@@ -208,7 +208,7 @@ bool PMToolBox::file_exist(const std::string& filename)
 
 // =============================================================================================
 void PMToolBox::coordinate_rotation(Point& pt,
-                                    const std::vector<Real>& angles)
+                                    const Point& angles)
 {
   START_LOG("coordinate_rotation()", "PMToolBox");
   
@@ -218,7 +218,7 @@ void PMToolBox::coordinate_rotation(Point& pt,
   Real s_a = 0., c_a = 0.;  // store sin & cos values
   std::vector<Real> theta(3);
   for(unsigned int i=0; i<3; ++i) {
-    theta[i] = angles[i]/180.*libMesh::pi;
+    theta[i] = angles(i)/180.*libMesh::pi;
   }
   
   // Rx
@@ -331,7 +331,7 @@ std::vector<Real> PMToolBox::mesh_size(const MeshBase& _mesh)
 
 // =============================================================================================
 void PMToolBox::magnify_serial_mesh(SerialMesh& mesh,
-                                    const std::vector<Real>& mag_factor)
+                                    const Point& mag_factor)
 {
   START_LOG("magnify_serial_mesh()", "PMToolBox");
   
@@ -348,7 +348,7 @@ void PMToolBox::magnify_serial_mesh(SerialMesh& mesh,
     
     // magnify x&y coordinates by R0, and z by H0
     for(unsigned int i=0; i<dim; ++i){
-      (*node)(i) =  (*node)(i)*mag_factor[i] ;
+      (*node)(i) =  (*node)(i)*mag_factor(i) ;
     }
   } // end for nd-loop
   
@@ -359,7 +359,7 @@ void PMToolBox::magnify_serial_mesh(SerialMesh& mesh,
 
 // =============================================================================================
 void PMToolBox::rotate_serial_mesh(SerialMesh& mesh,
-                                   const std::vector<Real>& angles)
+                                   const Point& angles)
 {
   
   START_LOG("rotate_serial_mesh()", "PMToolBox");

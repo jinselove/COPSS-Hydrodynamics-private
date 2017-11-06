@@ -48,7 +48,7 @@ namespace libMesh
  * point forces due to particles using mixed FEM.
  */
   
-class ForceField;
+class Fix;
 
   
 class PMLinearImplicitSystem : public LinearImplicitSystem
@@ -195,16 +195,25 @@ public:
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    */
-  void reinit_system(const std::vector<Real>* vel_last_step = NULL);
+  void reinit_hi_system(bool& neighbor_list_update_flag);
+
+  /*
+   * Re-init free-draining system, including:
+   * (1) reinit() reinit point particles
+   *              build_particle_neighbor_list()
+   * (2) compute particle force (by force field)
+   *             modify the force field according to the vel_last_step.
+   */
+  void reinit_fd_system(bool& neighbor_list_update_flag);
   
   
   
   /*
    * Attach the ForceField
    */
-  void attach_force_field(ForceField* force_field){ _force_field = force_field;  };
-  ForceField* force_field() { return _force_field; };
-  ForceField* force_field() const {  return _force_field; };
+  void attach_fixes(std::vector<Fix*> fixes){ _fixes = fixes;  };
+  std::vector<Fix*> fixes() { return _fixes; };
+  std::vector<Fix*> fixes() const {  return _fixes; };
   
   
   /**
@@ -236,13 +245,13 @@ public:
    * Compute the L2-error in an unbounded domain
    * This function will change the system solution vector by add local solution.
    */
-  void test_l2_norm();
+  void test_l2_norm(bool& neighbor_list_update_flag);
   
   
   /*
    * Test function. output velocity profile along x-y-z direction
    */
-  void test_velocity_profile();
+  void test_velocity_profile(bool& neighbor_list_update_flag);
 
   
   /*
@@ -318,7 +327,7 @@ private:
   ParticleMesh<3>* _particle_mesh;
   
   // force field for particle/points
-  ForceField* _force_field;
+  std::vector<Fix*> _fixes;
   
   // Stokes solver
   StokesSolver _stokes_solver;

@@ -124,7 +124,7 @@ protected:
       libmesh_assert_less (idx_p2, _pts.size());
       
       // retrieve the point data with index = idx_p2
-      const Point &p2( _pts[idx_p2]->center() );
+      const Point &p2( _pts[idx_p2]->get_centroid() );
       
       switch (size)
       {
@@ -166,7 +166,7 @@ protected:
       libmesh_assert_less (idx, _pts.size());
       libmesh_assert_less (dim, 3);
       
-      const Point &p(_pts[idx]->center() );
+      const Point &p(_pts[idx]->get_centroid() );
       if (dim==0) return p(0);
       if (dim==1) return p(1);
       return p(2);
@@ -234,18 +234,17 @@ public:
    * defaulty, we turn the "Electrostatics" off
    */
    void read_particles_data(const std::string& filename,      // particle xyz file
-                            const std::string& particle_mesh_type,
-                            const std::vector<std::string>& particle_mesh_file);    // mesh type of the particle);
+                            const std::string& particle_mesh_type);    // mesh type of the particle);
   
   
   /**
    * Read chromatin data (cylinder particle) from the local file.
    * mesh_type = "surface_mesh" or "volume_mesh"
    */
-  void read_chromatin_data(const std::string& filename,      // particle xyz file
-                           const std::string& vmesh_file,    // volume mesh file name
-                           const std::string& smesh_file,    // surface mesh file name
-                           const std::string& mesh_type);    // mesh type of the particle
+  // void read_chromatin_data(const std::string& filename,      // particle xyz file
+  //                          const std::string& vmesh_file,    // volume mesh file name
+  //                          const std::string& smesh_file,    // surface mesh file name
+  //                          const std::string& mesh_type);    // mesh type of the particle
   
   
   /**
@@ -273,7 +272,7 @@ public:
   /**
    * Return the total number of particles
    */
-  std::size_t num_particles() const {  return _particles.size();  }
+  std::size_t num_particles() const {  return _n_rigid_particles;  }
   
   
   /**
@@ -466,6 +465,12 @@ public:
    */
   void update_particle_mesh(const PointMesh<KDDim>* point_mesh);
   
+
+  /*
+   * zero particle force density
+   */
+  void zero_particle_force_density();
+
   
   /*
    * Return the mesh size (hmin/hmax) associated with this particle
@@ -477,21 +482,55 @@ public:
    * Correct the position of tracking points to avoid volume change!
    * NOTE: this is only for surface mesh.
    */
-  void volume_conservation(const std::string& mesh_type);
+  void volume_conservation();
   
   
+  /*
+   * compute center of mass at step 0: center0, for rigid particles
+   */
+  void initial_particle_center_of_mass(std::vector<Point>& center0) const;
+
+  /*
+   * Write particle
+   */ 
+  void write_particle(const unsigned int& step_id,
+                      const unsigned int& o_step,
+                      const Real& real_time,
+                      const std::vector<std::string>& output_file,
+                      unsigned int comm_in_rank) const;
+
+  /*
+   * write out step and real time
+   */
+  void write_time(const unsigned int& step_id,
+                  const unsigned int& o_step,
+                  const Real& real_time,
+                  unsigned int comm_in_rank) const;
+
+  /*
+   * Write out particle trajectories && forces && velocity to csv files
+   * "output_bead_o_step.csv"
+   */
+  void write_particle_trajectory(const unsigned int& o_step,
+                                 unsigned int comm_in_rank) const;
+
+  /*
+   * Write out mean square displacement of rigid particles
+   * Average over all rigidparticles
+   * "out.mean_sqaure_displacement"
+   */
+  // void write_particle_msd(const unsigned int& step_id,
+  //                     const unsigned int& o_step,
+  //                     const std::vector<Point>& center0,
+  //                     const std::vector<Real>& lvec,
+  //                     unsigned int comm_in_rank) const;
   
   /*
    * Write out the particle's mesh(either surface mesh or volume mesh)
    */
-  void write_particle_mesh(const std::string& mesh_name);
+  void write_particle_mesh(const unsigned int & step_id,
+                           const unsigned int& o_step) const;
   
-
-  /*
-   * Write out the particle data
-   */
-  void write_particle_data(const std::string& data_file_name);
-
   /*  
    * Return a stitched mesh associated with all particles for electrostatic solver
    * and assign particle's id to subdomain_id
@@ -500,18 +539,32 @@ public:
 
 
 private:
-  
+  // number of rigid particles
+  std::size_t _n_rigid_particles;
+
+  // number of rigid particle types
+  std::size_t _n_rigid_particle_types;
+
+  // mass values of rigid particles
+  std::vector<Real> _mass;
+
+  // mesh files
+  std::vector<std::string> _rigid_particle_mesh_files;
+
+    // A vector that store the pointers to Particle
+  std::vector<RigidParticle*> _particles;
+
   // Mesh base: this is the domain(fluid) mesh, not the particle's mesh
   MeshBase& _mesh;
+
+  // dimension
+  std::size_t _dim;
   
   // Search radius (around a particle)
   Real _search_radius_p;
   
   // Search radius (around an element)
   Real _search_radius_e;
-
-  // A vector that store the pointers to Particle
-  std::vector<RigidParticle*> _particles;
   
   // The point list adapter
   // - interface to the nanoflann in order to construct KD-Tree
@@ -529,6 +582,9 @@ private:
   
   // Pointer to the Periodic boundary condition
   PMPeriodicBoundary* _periodic_boundary;
+
+  // precision of output
+  const int o_precision = 9;
 };
 
 

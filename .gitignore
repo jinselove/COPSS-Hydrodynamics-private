@@ -1,6 +1,6 @@
 *.o
 *.depend
-*example-opt
+*-opt
 examples/*/run.sh
 examples/*/zclean.sh
 examples/*/*.txt
@@ -8,3 +8,7 @@ doxygen/html/
 doxygen/latex/
 examples/*/rcc.sh
 examples/*/*.e
+
+
+src/stable/
+

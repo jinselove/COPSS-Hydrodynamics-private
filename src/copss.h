@@ -52,7 +52,6 @@
 #include "point_particle.h"
 #include "particle_mesh.h"
 #include "point_mesh.h"
-#include "force_field.h"
 #include "pm_linear_implicit_system.h"
 #include "brownian_system.h"
 #include "pm_periodic_boundary.h"
@@ -63,6 +62,9 @@
 #include "stokes_solver.h"
 #include "ggem_system.h"
 #include "copss_init.h"
+#include "fix/fix_factory.h"
+#include "fix/fix.h"
+
 
 
 /*! This file serves as a template to build\solve a Stokes system
@@ -105,7 +107,7 @@ public:
   Real tc; // characteristic time (diffusion time) (s)
   Real uc; // characteristic velocity (um/s)
   Real fc; // characteristic force (N)
-  Real muc; // non-dimensional viscosity
+  Real muc; // non-dimension viscosity
 
   // Geometry information
   unsigned int dim; // dimension of the box
@@ -114,19 +116,22 @@ public:
   std::vector<bool> periodicity; // periodicity of the box
   std::vector<bool> inlet; // inlet direction of the box
   std::vector<Real> inlet_pressure; // inlet pressure
+  std::vector<bool> shear;
+  std::vector<Real> shear_rate;
 
   // Mesh information
   bool generate_mesh; // flag to generate mesh or load mesh
   std::string domain_mesh_file; // domain mesh filename
   std::vector<unsigned int> n_mesh; // mesh size in all directions
 
-  // Force information
-  unsigned int num_pp_force;
-  std::vector<std::string> pp_force_type;
-  std::vector<ForceField::type_force> pp_force;
-  unsigned int num_pw_force;
-  std::vector<std::string> pw_force_type;
-  std::vector<ForceField::type_force> pw_force;
+  // Fix
+  std::vector<Fix*> fixes;
+  FixFactory* fix_factory;
+  unsigned int numForceTypes;
+  std::vector<std::string> forceTypes;
+  std::vector<Fix::type_force> forces;
+  // map force_type to Fix Pointers
+
 
   // GGEM information
   Real alpha;
@@ -151,19 +156,19 @@ public:
   bool compute_eigen; // if compute eigen value; initially set it true
 
   // Run time info
+  bool with_hi;
   bool with_brownian; // if consider brownian motion
   std::size_t random_seed;
   bool adaptive_dt; // if use adaptive time step (essential for brownian systems)
-  Real dt0; // timestep when brownian system starts (step1)
   Real max_dr_coeff; // max displacement per step
+  Real max_dr;
   bool restart; // if restart
   std::size_t restart_step; // restart step
-  Real restart_time; // real time at restart step
   unsigned int nstep; // totol number of steps to run
+  bool debug_info;
+  // ouput file 
   unsigned int write_interval; // output file write interval
-  bool debug_info, write_es, out_msd_flag, out_stretch_flag, out_gyration_flag, out_com_flag;
-  std::ostringstream oss;
-
+  std::vector<std::string> output_file;
   // mesh
   SerialMesh* mesh;
   PointMesh<3>* point_mesh;
@@ -175,8 +180,6 @@ public:
   PMPeriodicBoundary* pm_periodic_boundary;
   //std::unique_ptr<PMPeriodicBoundary> pm_periodic_boundary;
 
-  //force field
-  ForceField* force_field;
   // equation system
   unsigned int u_var, v_var, w_var, p_var;
 
@@ -185,11 +188,11 @@ public:
   bool reinit_stokes;
   unsigned int NP;
   unsigned int n_vec;
-  Real hmin;
+  Real hminf, hmaxf; // fluid mesh minimum
+  Real hmin, hmax; // all mesh minimum
   bool cheb_converge;
   Real eig_min = 0, eig_max = 0;
-  Real real_time;
-  std::string out_system_filename = "output_pm_system";
+  const std::string out_system_filename = "output_pm_system.e";
   UniquePtr<NumericVector<Real>> v0_ptr;
   ExodusII_IO* exodus_ptr;
 
@@ -210,7 +213,13 @@ public:
   std::vector<Point> center0;
 
   //variables in integrator
+  unsigned int istart;
   unsigned int o_step;
+  Real real_time; // real time
+  bool update_neighbor_list_everyStep;
+  unsigned int neighbor_list_update_interval = 0; // how often to update neighbor list
+  unsigned int timestep_duration; // how many steps elapsed since last neighbor_list update
+  bool neighbor_list_update_flag;
   std::vector<Real> vel0;
   std::vector<Real> vel1;
 
@@ -301,6 +310,7 @@ public:
   */
   virtual void run(EquationSystems& equation_systems) = 0;
 
+
   /*!
    * destroy PETSC objects
    */
@@ -321,6 +331,7 @@ protected:
   void read_stokes_solver_info(); 
   void read_chebyshev_info(); 
   void read_run_info(); 
+  void read_restart_time();
 
   /*!
    * Steps for create_object_mesh()
@@ -335,6 +346,9 @@ protected:
   virtual void attach_object_mesh(PMLinearImplicitSystem& system) = 0;
   void attach_period_boundary(PMLinearImplicitSystem& system);
   virtual void set_parameters(EquationSystems& equation_systems) = 0;
+
+  // force field
+  void attach_fixes(PMLinearImplicitSystem& system);
 
   /*!
    * Steps for integrate()
@@ -355,9 +369,15 @@ protected:
    * Integrate particle motions using Fixman's midpoint scheme
    */
   void fixman_integrate(EquationSystems& equation_systems, unsigned int i);
+
+  /*!
+   * Integrate particle motions using overdamped Langevin(Brownian dynamics) scheme
+   */
+  void langevin_integrate(EquationSystems& equation_systems, unsigned int i);
+
   // update object positions due to PBS
   virtual void update_object(std::string stage) = 0;
-
+  virtual void write_object(unsigned int step_id) =0;
 };
 
 } // end namespace libMesh

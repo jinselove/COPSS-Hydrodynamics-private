@@ -74,7 +74,13 @@ public:
   void assemble_global_K(const std::string& system_name,
                          const std::string& option);
   
-  
+ 
+  /*! \bried Assemble int_force matrix 
+
+  */
+  void assemble_int_force(const Elem*     elem,
+                          const unsigned int n_u_dofs,
+                          FEBase& fe_v);
   /*! \brief Assemble the Global force vector F
   
     @param[in] system_name Name of the system (should be "Stokes")
@@ -178,11 +184,32 @@ private:
 
   // mesh
   MeshBase& _mesh;
-  // the particle-mesh (linear implicit) system
 
   // Boundary ids - build_square(): (2D);  build_cube(): (3D)
   const std::vector<boundary_id_type> _boundary_id_3D = {4,2,1,3,0,5}; // left_id(x-)=4, right_id(x+)=2, bottom_id=1(y-), top_id=3(y+), back_id=0(z-), top_id=5(z+)
 
   const std::vector<std::string> _boundary_name_3D = {"left", "right", "bottom", "top", "back", "front"};
+
+  // int_force matrix
+  // this matrix stores the product of JxW[qp] * phi[k][qp]
+  // size = num_elem * (n_u_dofs * n_quad_points) 
+  std::vector<std::vector<Real>> _int_force;
+
+  // vector stores q_xyz size
+  // size = num_elem * q_xyz.size()
+  std::vector<std::vector<Point> >_q_xyz;
+
+  // vector stores dof sizes for all elems
+  std::vector<unsigned int> _n_dofs;
+  std::vector<unsigned int> _n_u_dofs;
+  std::vector<unsigned int> _n_p_dofs;
+  std::vector<unsigned int> _n_uvw_dofs;
+
+  // dof indices
+  std::vector<std::vector<dof_id_type> > _dof_indices;
+  std::vector<std::vector<dof_id_type> > _dof_indices_u;
+  std::vector<std::vector<dof_id_type> > _dof_indices_p;
+
+
 };
 

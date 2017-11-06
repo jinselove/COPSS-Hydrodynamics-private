@@ -5,16 +5,20 @@
 # include the library options determined by configure
 include $(LIBMESH_DIR)/Make.common
 
-target     := ./example-$(METHOD)
+
+package ?= POINTPARTICLE
+
+target     := ./copss-$(package)-$(METHOD)
 
 
 ###############################################################################
 # File management.  This is where the source, header, and object files are
 # defined
 
-#
+
+
 # source files
-srcfiles 	:= $(wildcard *.C)
+srcfiles 	:= $(wildcard *.C  fix/*.C $(package)/*.C)
 
 #
 # object files

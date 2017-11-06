@@ -32,9 +32,9 @@
 
 // Local Includes   -----------------------------------
 #include "point_particle.h"
-//#include "particle_mesh.h"
 #include "polymer_chain.h"
 #include "pm_periodic_boundary.h"
+#include "rigid_particle.h"
 
 // C++ Includes   -------------------------------------
 //#include <stdio.h>
@@ -189,22 +189,6 @@ protected:
   
 public:
   /* Constructor
-   * Note if this is used to construct the object,
-   * users are responsible to set the search radius
-   * using the member function set_search_radius().
-  */
-  PointMesh(MeshBase& mesh);
-  
-  
-  /*
-   * Constructor
-   */
-  PointMesh(MeshBase& mesh,
-            const Real& search_radius_p,
-            const Real& search_radius_e);
-  
-  
-  /* Constructor
    * This creates the PointMesh class using the ParticleMesh object,
    * but does NOT change the ParticleMesh
    */
@@ -243,22 +227,22 @@ public:
   /*
    * Read points coordinate data from file
    */
-  void read_points_data(const std::string& filename);
+  // void read_points_data(const std::string& filename);
   
   
   /**
    * Generate random point data within the bounding box
    * and write the data to a local file "random_points_data.txt"
    */
-  void generate_random_points(const std::size_t N,
-                              const Real bbox_XA, const Real bbox_XB,
-                              const Real bbox_YA, const Real bbox_YB,
-                              const Real bbox_ZA, const Real bbox_ZB);
+  // void generate_random_points(const std::size_t N,
+  //                             const Real bbox_XA, const Real bbox_XB,
+  //                             const Real bbox_YA, const Real bbox_YB,
+  //                             const Real bbox_ZA, const Real bbox_ZB);
   
   
-  void generate_random_points(const std::size_t N,
-                              const Point& bbox_min,
-                              const Point& bbox_max);
+  // void generate_random_points(const std::size_t N,
+  //                             const Point& bbox_min,
+  //                             const Point& bbox_max);
 
 
 
@@ -397,7 +381,8 @@ public:
    * (3) set the elem_id and proc_id for points
    * ---- force recalculation is not reinitialized here, but in ForceField:
    */
-  void reinit();
+  void reinit(const bool& with_hi,
+              bool& neighbor_list_update_flag);
   
   
   
@@ -456,7 +441,31 @@ public:
    */
   PMPeriodicBoundary* pm_periodic_boundary()
   { return _periodic_boundary;  }
-  
+
+  /**
+   * Set particle (bead or surface node) velocity
+   * vel.size() = nui
+   */
+  void set_bead_velocity(const std::vector<Real>& vel);
+
+  /**
+   * Set rigid particle velocity
+   * vel.size() = nui
+   */
+ // void set_rigid_particle_velocity();
+
+
+
+  /**
+   * Calculate maximum point particle (or rigid particle surface nodes) velocity
+   */
+  const Real& maximum_bead_velocity() const {return _max_velocity_magnitude;};
+
+  /**
+   * Calculate minimum point particle (or rigid particle surface nodes) velocity
+   */
+  const Real& minimum_bead_velocity() const {return _min_velocity_magnitude;};
+   
   
 private:
   
@@ -471,6 +480,15 @@ private:
   
   // A vector that store the pointers to PointParticle(save storage)
   std::vector<PointParticle*> _particles;
+
+  // A vector that store the pointers to RigidParticle(save storage)
+  std::vector<RigidParticle*> _rigid_particles;
+
+  // number of point particles
+  std::size_t _num_point_particles;
+
+  // number of rigid particles
+  std::size_t _num_rigid_particles;
 
   // Polymer chain
   PolymerChain* _polymer_chain;
@@ -491,6 +509,14 @@ private:
   // Pointer to the Periodic boundary condition
   PMPeriodicBoundary* _periodic_boundary;
   
+  // bead velocity magniture array
+  std::vector<Real> _velocity_magnitude;
+
+  // maximum bead/surface node velocity magniture
+  Real _max_velocity_magnitude;
+
+  // minimum bead/surface node velocity magniture
+  Real _min_velocity_magnitude;
 };  // end of the class
 
 

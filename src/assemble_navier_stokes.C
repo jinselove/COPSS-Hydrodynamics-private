@@ -531,7 +531,7 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
 
     // perf_log.push("apply_bc_by_penalty");
     this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
-    
+    // perf_log.pop("apply_bc_by_penalty");
     
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.

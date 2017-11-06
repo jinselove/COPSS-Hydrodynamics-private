@@ -155,7 +155,7 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
                                            const bool& re_init)
 {
   START_LOG("solve_stokes()", "PMLinearImplicitSystem");
-//  PerfLog perf_log("solve_stokes");
+// PerfLog perf_log("solve_stokes");
 //  Real t1, t2;
   //std::string msg = "---> solve Stokes";
   //PMToolBox::output_message(msg, this->comm());
@@ -190,9 +190,9 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
    assemble the rhs vector, and record the CPU wall time.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 //  t1 = MPI_Wtime();
-//  perf_log.push("assemble_rhs");
+// perf_log.push("assemble_rhs");
   this->assemble_rhs ("Stokes",option);
-//  perf_log.pop("assemble_rhs");
+// perf_log.pop("assemble_rhs");
 
 //  t2 = MPI_Wtime();
   //std::cout << "Time used to assemble the right-hand-side vector is " <<t2-t1<<" s\n";
@@ -201,10 +201,9 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    solve the problem
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//  perf_log.push("solve()");
-
+// perf_log.push("solve()");
   _stokes_solver.solve();
-//  perf_log.pop("solve()");
+ // perf_log.pop("solve()");
 
   
   STOP_LOG("solve_stokes()", "PMLinearImplicitSystem");

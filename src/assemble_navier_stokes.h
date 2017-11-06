@@ -75,12 +75,18 @@ public:
                          const std::string& option);
   
  
-  /*! \bried Assemble int_force matrix 
+  /*! \brief Assemble int_force matrix 
 
   */
   void assemble_int_force(const Elem*     elem,
                           const unsigned int n_u_dofs,
                           FEBase& fe_v);
+
+  /*! \brief select sides on the boundary for all elements
+   * 
+   */
+  void select_boundary_side(const Elem* elem);
+
   /*! \brief Assemble the Global force vector F
   
     @param[in] system_name Name of the system (should be "Stokes")
@@ -210,6 +216,8 @@ private:
   std::vector<std::vector<dof_id_type> > _dof_indices_u;
   std::vector<std::vector<dof_id_type> > _dof_indices_p;
 
+  // sides on the boundary
+  std::vector<std::vector<unsigned int> > _boundary_sides;
 
 };
 

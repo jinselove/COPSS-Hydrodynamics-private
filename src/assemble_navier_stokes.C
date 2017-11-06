@@ -57,6 +57,7 @@ _mesh(es.get_mesh())
   // do nothing
   _dim  = es.get_mesh().mesh_dimension();
   _int_force.resize(1); // initialize _int_force matrix
+  _boundary_sides.resize(1); // intialize _boundary_sides matrix
 }
 
 
@@ -81,7 +82,7 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
   
   */
   libmesh_assert_equal_to (system_name, "Stokes");
-//  const MeshBase& _mesh = _eqn_sys.get_mesh();
+  const unsigned int n_mesh_elem = _mesh.n_elem(); 
   PMLinearImplicitSystem& _pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> (system_name);
   // Numeric ids corresponding to each variable in the system
   const unsigned int  u_var = _pm_system.variable_number ("u");      // u_var = 0
@@ -147,13 +148,20 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
   const std::string schur_pc_type =  _eqn_sys.parameters.get<std::string> ("schur_pc_type");
   const bool user_defined_pc      =  _eqn_sys.parameters.get<bool>        ("user_defined_pc");
   const Real mu                   =  _eqn_sys.parameters.get<Real>        ("viscosity_0");
-  
-  // -------------------------------------------------------------------------------------------
-  //if(system.comm().rank()==0){
-  //  printf("assemble_global_K(): Start to assemble the global matrix K ...\n");
-  //}
-  // -------------------------------------------------------------------------------------------
-  
+
+  // build _int_force vector at the beginning of simulation
+  if(_boundary_sides.size() == 1){
+    _boundary_sides.resize(n_mesh_elem);
+    MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
+    const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
+    for ( ; el != end_el; ++el)
+    {
+      // Store a pointer to the element we are currently working on.
+      const Elem* elem = *el;
+      this->select_boundary_side(elem);
+      // printf("finished select_boundary_side\n");
+    }
+  } 
   
   // Now we will loop over all the elements in the mesh that live
   // on the local processor. We will compute the element matrix Ke. In case users
@@ -161,7 +169,6 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
   // consider the active elements; hence we use a variant of the active_elem_iterator
   MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
   const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
-  
 
   for ( ; el != end_el; ++el)
   {
@@ -324,11 +331,46 @@ void AssembleNS::assemble_int_force(const Elem* elem,
     // loop over all gauss quadrature points
     for(unsigned int qp=0; qp<q_xyz.size(); qp++){
       _int_force[elem_id][k*q_xyz.size()+qp] = JxW[qp]*phi[k][qp];
+    //  _int_force[elem_id][k] += JxW[qp]*phi[k][qp];
     //  printf("_int_force[elem_id=%d][k*q_xyz.size()+qp=%d] = JxW[qp=%d]*phi[k=%d][qp=%d] = %f *%f = %f\n", elem_id, k*q_xyz.size()+qp, qp,k,qp, JxW[qp],phi[k][qp], _int_force[elem_id][k*q_xyz.size()+qp]);
     }
   }    
   STOP_LOG("assemble_int_force()", "AssembleNS");
   return;
+}
+
+void AssembleNS::select_boundary_side(const Elem* elem)
+{
+  START_LOG("select_boundary_side()", "AssembleNS");
+
+  // Get a reference to the Particle-Mesh linear implicit system object.
+  PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
+  const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
+  const std::vector<bool>& inlet_direction = pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
+  const std::size_t elem_id = elem->id();
+   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   The following loops over the sides of the element. If the element has NO
+   neighbors on a side then that side MUST live on a boundary of the domain.
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+  for (unsigned int s=0; s<elem->n_sides(); s++)
+  {
+    bool apply_bc = false;
+    if (elem->neighbor(s) == NULL)
+    {
+      apply_bc = true; 
+      // if this side is on the periodic side or pressure side, don't apply penalty
+      for (int i = 0; i < _dim; i++)
+      {
+        if(periodicity[i] or inlet_direction[i]){
+          if (_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
+              _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
+          { apply_bc = false; }
+        }
+      }   
+    }
+    if (apply_bc) _boundary_sides[elem_id].push_back(s);
+  }
+  STOP_LOG("select_boundary_side()", "AssembleNS");
 }
 
 
@@ -388,7 +430,7 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
   
   // perf_log.push("compute_int_force");
   if(_pm_system.comm().rank()==0){
-     printf("\nassemble_int_force() at the beginning of simulation\n");
+     printf("\nassemble_int_force() at the beginning of simulation\n\n");
     }
     const unsigned int n_mesh_elem = _mesh.n_elem(); 
     _int_force.resize(n_mesh_elem);
@@ -424,7 +466,8 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
       // and these will be done in the elem loop after fe->reinit()
       fe_vel->reinit (elem);
       //qrule.print_info();  
-      this->assemble_int_force(elem, _n_u_dofs[elem_id], *fe_vel);    
+      this->assemble_int_force(elem, _n_u_dofs[elem_id], *fe_vel);
+      // printf("finished assemble_int_force\n");
     }
   
   // perf_log.pop("compute_int_force");
@@ -562,72 +605,25 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
     std::vector<Real> np_force(_dim, 0.);
     Real r = 0. , force_val = 0.;
     unsigned int qp_size = q_xyz.size();
- // printf("qp_size = %d\n", q_xyz.size());
-  for(unsigned int np = 0; np<n_pts; ++np){    
-    np_force = _particles[n_list[np]]->particle_force();
-    np_pos = _particles[n_list[np]]->point();  
-        for (unsigned int qp=0; qp<qp_size; qp++){
-        // distance from Gaussian point to the force point
-          r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
-          // evaluate the value of gauss force at this quad pt.
-          force_val = ggem_sys.smoothed_force_exp(r, alpha);
-	  for (unsigned int j=0; j<_dim; ++j){
-      		for (unsigned int k=0; k<n_u_dofs; ++k){
-    // compute element vector
-  //            Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues_j;
-            		Fe(j*n_u_dofs + k) += _int_force[elem_id][k*qp_size+qp]*force_val*np_force[j];
-          	}
-          }
-        }
-  }
-
-  //   Real fvalues_j;
-  // for(unsigned int np = 0; np<n_pts; ++np){    
-  //   np_force = _particles[n_list[np]]->particle_force();
-  //   np_pos = _particles[n_list[np]]->point();  
-
-  //     for (unsigned int k=0; k<n_u_dofs; ++k){
-  //       for (unsigned int qp=0; qp<q_xyz.size(); qp++){
-  //       // distance from Gaussian point to the force point
-  //         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
-  //         // evaluate the value of gauss force at this quad pt.
-  //         force_val = ggem_sys.smoothed_force_exp(r, alpha);
-  //         // force magnitudes on each particle(note they are different!)
-  //         for (unsigned int j=0; j<_dim; ++j){
-  //           fvalues_j = np_force[j]*force_val;
-  //           // compute element vector
-  //           Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues_j;
-  //         }
-  //       }
-  //     }
-  //   }
-
-
-//     for(unsigned int np=0; np<n_pts; ++np)
-//     {
-//       // force vector on each particle(note they are different!)
-//      // std::vector<Real> pf(_dim,0.0);    // point force vector of the current particle
-//      np_force = _particles[n_list[np]]->particle_force();
-//      np_pos = _particles[n_list[np]]->point();  
-//    // // Next loop over gauss points
-//       for (unsigned int qp=0; qp<q_xyz.size(); qp++)
-//       {
-//         // distance from Gaussian point to the force point
-//         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
-//         // evaluate the value of gauss force at this quad pt.
-//         force_val = ggem_sys.smoothed_force_exp(r, alpha);
-//         // compute the element rhs vector
-//         for (unsigned int j=0; j<_dim; ++j){
-//           for(unsigned int k=0; k<n_u_dofs; ++k){
-//	     Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*np_force[j]*force_val;
-//           } // end for k-loop
-//         } // end for j-loop
-        
-//       } // end for qp-loop
-//     } // end for np-loop
-    
+   // printf("qp_size = %d\n", q_xyz.size());
+    for(unsigned int np = 0; np<n_pts; ++np){    
+      np_force = _particles[n_list[np]]->particle_force();
+      np_pos = _particles[n_list[np]]->point();  
+      for (unsigned int qp=0; qp<qp_size; qp++){
+      // distance from Gaussian point to the force point
+        r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
+        // evaluate the value of gauss force at this quad pt.
+        force_val = ggem_sys.smoothed_force_exp(r, alpha);
+        for (unsigned int j=0; j<_dim; ++j){
+        	for (unsigned int k=0; k<n_u_dofs; ++k){
+//            Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues_j;
+        		 Fe(j*n_u_dofs + k) += _int_force[elem_id][k*qp_size+qp]*force_val*np_force[j];
+//              Fe(j*n_u_dofs + k) += _int_force[elem_id][k]*force_val*np_force[j];
+         	} // end loop over nodes
+        }// end loop over dimensions
+      } // end loop over gaussian points
+    } // end loop over beads
   } // end if( pf_flag )
-
   if( option == "undisturbed" )
   {
     FEType fe_vel_type = fe_v.get_fe_type();
@@ -639,40 +635,35 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
     const std::vector<Real>&                JxW_face = fe_face->get_JxW();
     const std::vector<Point>&             q_xyz_face = fe_face->get_xyz(); // xyz of quad pts
 
-            // The following loops over the sides of the element. If the element has NO
-            // neighbors on a side then that side MUST live on a boundary of the domain.
-            for (unsigned int s=0; s<elem->n_sides(); s++)
+    // The following loops over the sides of the element. If the element has NO
+    // neighbors on a side then that side MUST live on a boundary of the domain.
+    for (unsigned int s=0; s<elem->n_sides(); s++)
+    {
+      if (elem->neighbor(s) == NULL)
+      {
+        for (int j = 0; j < _dim; j++)
+        {
+          // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+          // This operation applies the traction jump on the inlet and outlet boundaries.
+          // when s is on either face in direction i and inlet_direction[i]==true
+          //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+          if((_mesh.get_boundary_info().has_boundary_id(elem,s,_boundary_id_3D[2*j]) or
+              _mesh.get_boundary_info().has_boundary_id(elem,s,_boundary_id_3D[2*j+1])) and
+              _inlet_direction[j]){
+            fe_face->reinit(elem, s);  
+            // traction: t = sigma*n.
+            for (unsigned int qp=0; qp<JxW_face.size(); qp++)
             {
-              if (elem->neighbor(s) == NULL)
-              {
-                for (int i = 0; i < _dim; i++)
+                // traction jump at the inlet and outlet
+                for (unsigned int k=0; k<n_u_dofs; k++)
                 {
-                  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-                  // This operation applies the traction jump on the inlet and outlet boundaries.
-                  // when s is on either face in direction i and inlet_direction[i]==true
-                  //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-                  if((_mesh.get_boundary_info().has_boundary_id(elem,s,_boundary_id_3D[2*i]) or
-		      _mesh.get_boundary_info().has_boundary_id(elem,s,_boundary_id_3D[2*i+1])) and
-		      _inlet_direction[i])
-		  {
-                    fe_face->reinit(elem, s);  
-                    // traction: t = sigma*n.
-                    for (unsigned int qp=0; qp<JxW_face.size(); qp++)
-                    {
-                        // traction jump at the inlet and outlet
-                        for (unsigned int j=0; j<n_u_dofs; j++)
-                        {
-                          const dof_id_type& node_id = elem->node_id(j);
-//                          Fe(i*n_u_dofs + j) += JxW_face[qp]*  phi_face[j][qp]*_inlet_pressure[i] ;
-                          Fe(i*n_u_dofs + j) += _int_force[node_id][qp]*_inlet_pressure[i] ;
-                        }
-                    } // end for qp-loop
-                   //PMToolBox::zero_filter_dense_vector(Fe,1E-10);
-                   //PMToolBox::output_dense_vector(Fe);
-                  }
-                }
-              } // end if(elem->neighbor(s) == NULL)     
-            } // end for s-loop
+                  Fe(j*n_u_dofs + k) += JxW_face[qp]*  phi_face[k][qp]*_inlet_pressure[j] ;
+                } // end loops over n_u_dofs
+            } // end for qp-loop
+          }
+        } // end loops over dim
+      } // end if(elem->neighbor(s) == NULL)     
+    } // end for s-loop
   } // end if( option == "undisturbed" )
 
   STOP_LOG("compute_element_rhs()", "AssembleNS");
@@ -770,37 +761,20 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
   const Real penalty     = 1E6;    // The penalty value.
   const Real tol         = 1E-6;   // The tolerence value.
   const unsigned int n_nodes = elem->n_nodes();
+  const std::size_t elem_id = elem->id();
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::vector<bool>& inlet_direction = pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
   AnalyticalSolution analytical_solution(pm_system);
-   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   The following loops over the sides of the element. If the element has NO
-   neighbors on a side then that side MUST live on a boundary of the domain.
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  for (unsigned int s=0; s<elem->n_sides(); s++)
+  for (unsigned int s=0; s<_boundary_sides[elem_id].size(); s++)
   {
-    
-    if (elem->neighbor(s) == NULL)
-    { 
-      bool _continue = false;
-      for (int i = 0; i < _dim; i++)
-      {
-        if(periodicity[i] or inlet_direction[i]){
-          if (_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
-              _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
-          { _continue = true; }
-        }
-      }   
-      // For any other periodic boundaries, which is not a wall, we do nothing
-      if(_continue) continue;
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        // if this is neither the inlet nor the outlet, it MUST be no-slip walls
        // the following part -2- will impose the no-slip BC by penalty method.
        
        // -2.- build the full-order side element for "vel" Dirichlet BC at the walls.
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-      UniquePtr<Elem> side (elem->build_side(s));
-      for (unsigned int ns=0; ns<side->n_nodes(); ns++)
+      UniquePtr<Elem> side (elem->build_side(_boundary_sides[elem_id][s]));
+      for (unsigned int nn=0; nn<side->n_nodes(); nn++)
       {
         // Otherwise if this is the wall of the channel, set u/v/w = 0
         std::vector<Real> uvw(_dim,0.0);
@@ -810,7 +784,7 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
         // Note this only influence the rhs vector
         if(option=="disturbed")
         {
-          const Point ptx = side->point(ns);
+          const Point ptx = side->point(nn);
           const std::vector<Real> u_local = pm_system.local_velocity_fluid(ptx,"regularized");
           // ---------------- setup for validation test 01 -------------
           if(_eqn_sys.parameters.get<std::string> ("test_name") == "ggem_validation")
@@ -829,22 +803,17 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
         // That defined where in the element matrix the BC will be applied.
         for (unsigned int n=0; n<elem->n_nodes(); n++)
         {
-          if (elem->node(n) == side->node(ns))
+          if (elem->node(n) == side->node(nn))
           {
             // Penalize u, v and w at the current node.
             for(unsigned int k=0;k<_dim;++k){
               this->penalize_elem_matrix_vector(Ke,Fe,matrix_or_vector,k,n,n_nodes,penalty,uvw[k]);
             } // end for k-loop
-          } // end if (elem->node(n) == side->node(ns))
+          } // end if (elem->node(n) == side->node(nn))
         } // enf for n-loop
-        
-        
-      } // end for ns-loop
       
-    } // end if (elem->neighbor(side) == NULL)
-    
-  } // end for s-loop
-  
+      } // end for nn-loop
+  } // end for s-loop  
   STOP_LOG("apply_bc_by_penalty()", "AssembleNS");
 } // end of function apply_bc_by_penalty()
 

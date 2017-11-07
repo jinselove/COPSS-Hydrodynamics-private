@@ -1131,10 +1131,10 @@ void ParticleMesh<KDDim>::update_particle_mesh(const PointMesh<KDDim>* point_mes
 
 // ======================================================================
 template <unsigned int KDDim>
-void ParticleMesh<KDDim>::zero_particle_force_density()
+void ParticleMesh<KDDim>::zero_node_force()
 {
   START_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
-  for (int i=0; i<_n_rigid_particles;i++) _particles[i]->zero_force_density();
+  for (int i=0; i<_n_rigid_particles;i++) _particles[i]->zero_node_force();
   
   STOP_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
 }
@@ -1278,7 +1278,7 @@ void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
       }
       // write force
       for (std::size_t j=0; j<_dim; ++j){
-        out_file <<_particles[i]->get_centroid_force()(j) <<" ";
+        out_file <<_particles[i]->compute_centroid_force()(j) <<" ";
       }
       out_file <<"\n";
     }

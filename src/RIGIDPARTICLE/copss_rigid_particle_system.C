@@ -247,9 +247,9 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
     if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;
     system.reinit_fd_system(neighbor_list_update_flag); // neighbor_list_update is ture here
   }
-  if(debug_info){
-    for (int i = 0; i<num_rigid_particles; i++) particle_mesh->particles()[i]->debug_body_force();
-  }
+  // if(debug_info){
+  //   for (int i = 0; i<num_rigid_particles; i++) particle_mesh->particles()[i]->debug_body_force();
+  // }
 
   cout<<"==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"<<endl;
   this -> create_brownian_system(equation_systems);

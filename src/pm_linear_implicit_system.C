@@ -423,7 +423,7 @@ void PMLinearImplicitSystem::reinit_hi_system(bool& neighbor_list_update_flag)
     // update node positions on particle mesh using updated point mesh information
     _point_mesh->update_particle_mesh(_particle_mesh);
     // zero force density of each rigid particle
-    _particle_mesh->zero_particle_force_density();
+    _particle_mesh->zero_node_force();
     // need to check if particles are on the pbc, if so, rebuild the particle mesh
     _fixes[0]->check_pbc_pre_fix();
     /*
@@ -440,12 +440,9 @@ void PMLinearImplicitSystem::reinit_hi_system(bool& neighbor_list_update_flag)
      * Notice that: this attach_nodal() function only needs to be called once since the body force
      * density is already the total one.
      */
-    for (std::size_t i = 0; i<_fixes.size(); i++){
-      if (_fixes[i]->force_type != "surface_constraint"){
-       _fixes[i] -> attach_nodal();
-       break;
-      }
-    }
+    // for (std::size_t i = 0; i<_fixes.size(); i++){
+      _fixes[0] -> attach_nodal();
+    // }
     // need to restore particle mesh after applying all fixes if particles are on pbc
     _fixes[0]->check_pbc_post_fix();
   }
@@ -475,7 +472,7 @@ void PMLinearImplicitSystem::reinit_fd_system(bool& neighbor_list_update_flag)
     // update node positions on particle mesh using updated point mesh information
     _point_mesh->update_particle_mesh(_particle_mesh);
     // zero force density of each rigid particle
-    _particle_mesh->zero_particle_force_density();
+    _particle_mesh->zero_node_force();
     // need to check if particles are on the pbc, if so, rebuild the particle mesh
     _fixes[0]->check_pbc_pre_fix();
     /*
@@ -493,10 +490,10 @@ void PMLinearImplicitSystem::reinit_fd_system(bool& neighbor_list_update_flag)
      * density is already the total one.
      */
     for (std::size_t i = 0; i<_fixes.size(); i++){
-      if (_fixes[i]->force_type != "surface_constraint"){
+      // if (_fixes[i]->force_type != "surface_constraint"){
        _fixes[i] -> attach_nodal();
-       break;
-      }
+       // break;
+      // }
     }
     // need to restore particle mesh after applying all fixes if particles are on pbc
     _fixes[0]->check_pbc_post_fix();

@@ -43,36 +43,8 @@ void FixRigidSurfaceConstraint::compute()
     // compute the rigid constraint force on each node
     std::vector<Point> constraint_force;
     this->compute_constraint_force(i,constraint_force);
-    /*
-     * Loop over each node through node iterator
-     */
-    const std::size_t n_nodes = rigid_particles[i]->num_mesh_nodes();
-    MeshBase& p_mesh = rigid_particles[i]->mesh();
-    MeshBase::node_iterator       nd     = p_mesh.active_nodes_begin();
-    const MeshBase::node_iterator end_nd = p_mesh.active_nodes_end();
-    for ( ; nd != end_nd; ++nd)
-    {
-      // Store a pointer to the element we are currently working on.
-      Node* node = *nd;
-      const dof_id_type node_id = node->id();
-      // get the dof numbers at this node (only for force vector)
-      std::vector<Real> gforce(dim,0.);
-      for(std::size_t k=0; k<dim; ++k){
-        gforce[k] = constraint_force[node_id](k);
-      } // end k-loop
-      // ------------------ TEST: print out the surface constraint force ----------------------
-      // if(pm_system->comm().rank()==0){
-      //   printf("--->TEST:FixRigidSurfaceConstraint::compute() -> gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
-      //   printf("         constraint_force = (%f,%f,%f)\n",
-      //          constraint_force[node_id](0),constraint_force[node_id](1),constraint_force[node_id](2));
-      // }
-      // -------------------------------------------------------------------------
-      point_particles[point_start_id+node_id]->add_particle_force(gforce);
-    } // end for nd-loop
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     update the point start id
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    point_start_id += n_nodes;
+    // add this constraint force to nodes
+    rigid_particles[i]->add_node_force(constraint_force);
   } // end for i-loop
  STOP_LOG("FixRigidSurfaceConstraint::compute()", "FixRigidSurfaceConstraint");  
 }

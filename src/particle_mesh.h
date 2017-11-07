@@ -469,7 +469,7 @@ public:
   /*
    * zero particle force density
    */
-  void zero_particle_force_density();
+  void zero_node_force();
 
   
   /*

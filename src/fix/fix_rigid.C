@@ -183,7 +183,7 @@ void FixRigid::attach_nodal()
   for(std::size_t i=0; i < num_rigid_particles; ++i)
   {
     std::vector<Point> nodal_force;
-    rigid_particles[i]->build_nodal_force(nodal_force); 
+    rigid_particles[i]->get_node_force(nodal_force); 
     /*
      * Loop over each node through node iterator
      * Compute the gravitational force vector on each node
@@ -203,7 +203,7 @@ void FixRigid::attach_nodal()
         gforce[k] = nodal_force[node_id](k);
       } // end k-loop
       point_mesh->particles()[point_start_id+node_id]->add_particle_force(gforce);
-      // ------------------ TEST: print out the nodal force ----------------------
+    //  ------------------ TEST: print out the nodal force ----------------------
       // if(_pm_system->comm().rank()==0){
       //   printf("--->TEST:reinit_force_field() gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
       //   printf("         nodal force = (%f,%f,%f)\n",
@@ -213,12 +213,16 @@ void FixRigid::attach_nodal()
       // }
       // -------------------------------------------------------------------------    
     } // end for nd-loop
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Point test_centroid_force;
+    // for (int test_i=0; test_i<point_mesh->num_particles(); test_i++){
+    //   for(int test_dim = 0; test_dim<3; test_dim++) test_centroid_force(test_dim) += point_mesh->particles()[test_i]->particle_force()[test_dim];
+    // }
+    // printf("Debug: for particle %d, test_centroid_force = (%f, %f, %f)\n",i, test_centroid_force(0), test_centroid_force(1), test_centroid_force(2) );
+     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      update the point start id
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     point_start_id += n_nodes;
   } // end for i-loop
   STOP_LOG("FixRigid::attach_nodal()", "FixRigid");
 }
-
 

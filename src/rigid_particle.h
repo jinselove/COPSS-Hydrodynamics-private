@@ -154,15 +154,11 @@ public:
   { return _neighbor_list;  };
   
   /*
-   * Return the force and torque vector on the particle
-   */
-  std::vector<Real>& compute_particle_force();
-  
-  /*
    * Attach MeshSpringNetwork & return the pointer
    */
   void attach_mesh_spring_network(MeshSpringNetwork* msn)
   { _mesh_spring_network = msn;  }
+
   
   MeshSpringNetwork* mesh_spring_network() const {  return _mesh_spring_network;  }
   
@@ -296,7 +292,7 @@ public:
    * It is an area density for surface mesh, and volume density of volume mesh!
    * NOTE: we don't use "()" const for constructing es
    */
-  void build_nodal_force(std::vector<Point>& nf);
+  void build_nodal_sedimentation_force();
   
   /*
    * This function adds forces to the center of mass of rigid particles
@@ -402,51 +398,40 @@ public:
   void print_info() const;
 
   /*
-   * set centroid force from outside
-   */
-  void add_body_force_density(Point& body_force_density);
-
-
-  /*
-   * zero force density
-   */
-  void zero_force_density(){_surface_force_density.zero(); _body_force_density.zero();}
-  /*
-   * add sedimentation body force density
-   */
-  void add_sedimentation_body_force_density();
-
-  /*
-   * get body force (for debug purpose)
-   */
-  void debug_body_force() const;
-
-  /*
-   * get body force
-   */
-  const Point& get_centroid_force() const {return _centroid_force;};
-
-  /*
    * set node velocity
    */
   void set_node_velocity(std::vector<Point>& node_velocity) {
       _node_velocity = node_velocity;
   };
-  /*
-   * set body velocity
+  
+
+  /*! \brief force on surface nodes
+   *
+   */
+  void zero_node_force();
+
+  /*! \brief add force to surface nodes
+  *
+  */
+  void add_node_force(std::vector<Point>& node_force);
+
+  /*! \brief get force on surface nodes
+  *
+  */
+  void get_node_force(std::vector<Point>& node_force) const {node_force = _node_force;};
+
+  /*! \brief compute body velocity
    * each node of this rigid particle does not have member velocity
    * so we can only calculate centroid_velocity in point_mesh.C and assign it
    * to this rigid particle
    */
-  Point& compute_centroid_velocity() {
-    _centroid_velocity.zero();
-    for (int i=0; i<_node_velocity.size(); i++){
-      _centroid_velocity += _node_velocity[i];              
-    }
-    _centroid_velocity /= _node_velocity.size(); 
-    return _centroid_velocity;
-  };  
+  Point& compute_centroid_velocity();
   
+  /*! \brief compute body force
+   *
+   */
+  Point& compute_centroid_force();
+
 private:
     
   // particle id
@@ -514,26 +499,31 @@ private:
   // check if particle is on the periodic boundary
   bool _on_pb;
 
-  // body force density
-  Point _body_force_density;
+  // // body force density
+  // Point _body_force_density;
 
-  // surface force density
-  Point _surface_force_density;
+  // // surface force density
+  // Point _surface_force_density;
+  // sedimentation force
+  Point _sedimentation_force;
 
   // sedimentation body force density
-  Point _sedimentation_body_force_density;
+  Point _body_sedimentation_force_density;
+
+  // sedimentation surface force density
+  Point _surface_sedimentation_force_density;
 
   // forces on each nodes
-  std::vector<Point> _nf;
-
-  // force acting on the centroid (which is a sum of node forces)
-  Point _centroid_force;
+  std::vector<Point> _node_force;
 
   // velocity of each nodes
   std::vector<Point> _node_velocity;
 
   // velocity of the centroid (mean over all node velocity)
   Point _centroid_velocity;
+
+  // force if the centroid (mean over all node force)
+  Point _centroid_force;
 }; // end of class defination
   
   

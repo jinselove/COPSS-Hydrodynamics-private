@@ -62,7 +62,7 @@ RigidParticle::RigidParticle(const dof_id_type& particle_id,
   _mag(mag),
   _rot(rot),
   _charge(charge), _epsilon_in(epsilon_in),
-  _sedimentation_body_force_density(sedimentation_body_force_density),
+  _body_sedimentation_force_density(sedimentation_body_force_density),
   _volume0(0.), _area0(0.),
   _processor_id(-1),
   _mesh(comm_in),
@@ -88,6 +88,8 @@ void RigidParticle::init()
   _area0 = _area;
   _volume0 = _volume;
   _centroid0 = _centroid;
+  _node_force.resize(_mesh.n_nodes());
+  _node_velocity.resize(_mesh.n_nodes());
   STOP_LOG("init()", "RigidParticle");
 }
   
@@ -494,32 +496,18 @@ void RigidParticle::restore_periodic_mesh()
 //   }
 // }
 
-void RigidParticle::add_body_force_density(Point& body_force_density) 
-{
-  START_LOG("RigidParticle::add_body_force_density()", "RigidParticle");
-  _body_force_density += body_force_density;
-  STOP_LOG("RigidParticle::add_body_force_density()", "RigidParticle");
-}
-
-void RigidParticle::add_sedimentation_body_force_density()
-{
-  START_LOG("RigidParticle::add_sedimentation_body_force_density()", "RigidParticle");
-  _body_force_density += _sedimentation_body_force_density;
-  STOP_LOG("RigidParticle::add_sedimentation_body_force_density()", "RigidParticle");
-}
   
 // ======================================================================
-void RigidParticle::build_nodal_force(std::vector<Point>& nf)
+void RigidParticle::build_nodal_sedimentation_force()
 {
-  START_LOG("build_nodal_force()", "RigidParticle");
+  START_LOG("build_nodal_sedimentation_force()", "RigidParticle");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    We will build the nodal force vector through the EquationSystems.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  _surface_force_density = _body_force_density * _volume0 / _area0;
-  _centroid_force = _body_force_density * _volume0;
+  _sedimentation_force =  _body_sedimentation_force_density * _volume0;
+  _surface_sedimentation_force_density = _sedimentation_force / _area0;
   EquationSystems equation_systems (_mesh);
   ExplicitSystem& system = equation_systems.add_system<ExplicitSystem>("Elasticity");
-
   unsigned int u_var = 0, v_var = 0, w_var = 0;
   u_var = system.add_variable ("U", FIRST);
   v_var = system.add_variable ("V", FIRST);
@@ -527,8 +515,6 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
   equation_systems.init();
   system.rhs->zero();
   // equation_systems.print_info();
-  
-  
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Build a FEBase object and qrule (typedef FEGenericBase<Real> FEBase)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -594,9 +580,9 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
       // Assemble the subvector
       for (unsigned int i=0; i<n_u_dofs; i++)
       {
-        Fu(i) += JxW[qp]*phi[i][qp]*_surface_force_density(0);
-        Fv(i) += JxW[qp]*phi[i][qp]*_surface_force_density(1);
-        if(_dim==3) Fw(i) += JxW[qp]*phi[i][qp]*_surface_force_density(2);
+        Fu(i) += JxW[qp]*phi[i][qp]*_surface_sedimentation_force_density(0);
+        Fv(i) += JxW[qp]*phi[i][qp]*_surface_sedimentation_force_density(1);
+        if(_dim==3) Fw(i) += JxW[qp]*phi[i][qp]*_surface_sedimentation_force_density(2);
       }
     }
     
@@ -617,12 +603,9 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
   std::vector<Real> local_f;
   system.rhs->localize(local_f);
-  
-  
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    convert it to the output format
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  nf.resize(_mesh.n_nodes());
   MeshBase::node_iterator       nd     = _mesh.active_nodes_begin();
   const MeshBase::node_iterator end_nd = _mesh.active_nodes_end();
   for ( ; nd != end_nd; ++nd)
@@ -634,11 +617,10 @@ void RigidParticle::build_nodal_force(std::vector<Point>& nf)
     // get the dof numbers at this node
     for(unsigned int k=0; k<_dim; ++k){ // sys#; var(k) = 0, 1, 2; component=0
       const dof_id_type dof_num = node->dof_number(0,k,0);
-      nf[node_id](k) = local_f[dof_num];
+      _node_force[node_id](k) += local_f[dof_num];
     }
   }
-  _nf = nf;
-  STOP_LOG("build_nodal_force()", "RigidParticle");
+  STOP_LOG("build_nodal_sedimentation_force()", "RigidParticle");
 }
 
 
@@ -968,45 +950,52 @@ void RigidParticle::volume_conservation()
   STOP_LOG("volume_conservation()", "RigidParticle");
 }
 
-
-// ======================================================================  
-void RigidParticle::debug_body_force() const
+//==========================================================================
+void RigidParticle::zero_node_force()
 {
-  START_LOG("RigidParticle::debug_body_force()", "RigidParticle");
-  std::cout << "============debug_body_force()================= " <<std::endl;
-  std::cout << "==> 1) body force density = ";
-  for (int i=0; i<_dim; i++){
-    std::cout <<_body_force_density(i) <<"; ";
+  MeshBase::node_iterator       nd     = _mesh.active_nodes_begin();
+  const MeshBase::node_iterator end_nd = _mesh.active_nodes_end();
+  for ( ; nd != end_nd; ++nd)
+  {
+    // Store a pointer to the element we are currently working on.
+    Node* node = *nd;
+    const dof_id_type node_id = node->id();
+    _node_force[node_id].zero();
   }
-  std::cout << "\n total force = _body_force_density * _volume0 = ";
-  for (int i=0; i<_dim; i++){
-    std::cout <<_centroid_force(i) << "; ";
-  }
-  std::cout << std::endl;
-
-  std::cout << "==> 2) surface force density = _surface_force_density * _area0 = ";
-  for (int i=0; i<_dim; i++){
-    std::cout <<_surface_force_density(i) <<"; ";
-  }
-  std::cout << "\n total force = ";
-  for (int i=0; i<_dim; i++){
-    std::cout <<_surface_force_density(i) * _area0 << "; ";
-  }
-  std::cout << std::endl;
-
-
-  Point total_force;
-  for (int i =0; i<_nf.size(); i++) total_force += _nf[i];
-  std::cout << "==> 3) total force by adding up node force = sum (_node_force) = ";
-  for(int i=0; i<_dim; i++){
-    std::cout << total_force(i) << ";";
-  }    
-  std::cout << std::endl;
-
-  STOP_LOG("RigidParticle::debug_body_force()", "RigidParticle");
 }
 
+//==========================================================================
+void RigidParticle::add_node_force(std::vector<Point>& node_force)
+{
+  MeshBase::node_iterator       nd     = _mesh.active_nodes_begin();
+  const MeshBase::node_iterator end_nd = _mesh.active_nodes_end();
+  for ( ; nd != end_nd; ++nd)
+  {
+    // Store a pointer to the element we are currently working on.
+    Node* node = *nd;
+    const dof_id_type node_id = node->id();
+    _node_force[node_id] += node_force[node_id];
+  }
+}
 
+//=======================================================================
+Point& RigidParticle::compute_centroid_velocity() {
+  _centroid_velocity.zero();
+  for (int i=0; i<_node_velocity.size(); i++){
+    _centroid_velocity += _node_velocity[i];              
+  }
+  _centroid_velocity /= _node_velocity.size(); 
+  return _centroid_velocity;
+}  
+
+//========================================================================
+Point& RigidParticle::compute_centroid_force(){
+  _centroid_force.zero();
+  for (int i=0; i<_node_force.size(); i++){
+    _centroid_force += _node_force[i];              
+  }
+  return _centroid_force;
+}
 
 // ======================================================================
 void RigidParticle::print_info() const

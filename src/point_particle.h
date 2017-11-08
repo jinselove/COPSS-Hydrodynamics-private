@@ -85,6 +85,7 @@ public:
    */
   Point& point()  {  return _center;  };
   Point& center() {  return _center;  };
+
  
 
   /*
@@ -177,26 +178,24 @@ public:
    * Set the force vector on the particle
    * This is set by the member function in the class "ParticleMesh"
    */
-  void set_particle_force(const std::vector<Real>& pforce);
+  void set_particle_force(const Point& pforce);
   
 
   /*
    * Add the force vector
    */
-  void add_particle_force(const std::vector<Real>& pforce);
+  void add_particle_force(const Point& pforce);
   
   
   /*
    * set the force vector equal to zeros
    */
   void zero_particle_force();
-  
-  
-  
-  /*
-   * Return the force vector on the particle
-   */
-  const std::vector<Real>& particle_force() const {  return _force;  };
+
+  /*!\ brief particle force
+   *
+   */  
+  const Point& particle_force() {return _force;};
 
   /*
    * Set particle velocity
@@ -207,6 +206,7 @@ public:
    * Return the velocity vector of the particle
    */
   const Point& particle_velocity() const {return _velocity; };
+
 
   
   /*
@@ -243,6 +243,10 @@ private:
   // The velocity of the particle center
   Point _velocity;
 
+  // the force vector excerted on this particle(non-hydrodynamic and non-Brownian)
+  Point _force;
+  
+
   // Count how many times the point has crossed a boundary
   // Used to unfold point's coordinate with periodic boundaries
   std::vector<int> _counter;
@@ -273,10 +277,7 @@ private:
   // neighbor particles around the present particle: particle id and distance value.
   std::vector<std::pair<std::size_t,Real> > _neighbor_list;
   
-  
-  // the force vector excerted on this particle(non-hydrodynamic and non-Brownian)
-  std::vector<Real> _force;
-  
+
   
   // Define the orientation of this point(bending, torque)
   // Use the definition of quaternions to describe the orientation

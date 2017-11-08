@@ -59,7 +59,7 @@ START_LOG("FixPointSlitWallEmpiricalDNA::compute()", "FixPointSlitWallEmpiricalD
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   for(std::size_t i=0; i<num_points; ++i)
   {
-    std::vector<Real> pforce(dim);
+    Point pforce(0.);
     //  retrieve bead position and the box boundary
     const Point pti = point_particles[i]->point();
     // compute the particle-wall interaction force
@@ -71,8 +71,8 @@ START_LOG("FixPointSlitWallEmpiricalDNA::compute()", "FixPointSlitWallEmpiricalD
       r_i_lo(j) = box_min(j) - pti(j) ; 
       r_i_hi(j) = box_max(j) - pti(j);       
       // bead-wall interaction force
-      pforce[j] += fix_base.polymer_wall_empirical_force(r_i_lo, c0, d0)[j];
-      pforce[j] += fix_base.polymer_wall_empirical_force(r_i_hi, c0, d0)[j];
+      pforce(j) += fix_base.polymer_wall_empirical_force(r_i_lo, c0, d0)(j);
+      pforce(j) += fix_base.polymer_wall_empirical_force(r_i_hi, c0, d0)(j);
     } // end if
   } // end for j-loop    
     point_particles[i]->add_particle_force(pforce);    

@@ -90,6 +90,9 @@ void RigidParticle::init()
   _centroid0 = _centroid;
   _node_force.resize(_mesh.n_nodes());
   _node_velocity.resize(_mesh.n_nodes());
+  _num_mesh_node = _mesh.n_nodes();
+  _num_mesh_elem = _mesh.n_elem();
+  _mesh_size = PMToolBox::mesh_size(_mesh);
   STOP_LOG("init()", "RigidParticle");
 }
   
@@ -249,7 +252,8 @@ void RigidParticle::write_mesh(const std::string& filename)
   
   
 // ======================================================================
-void RigidParticle::update_mesh(const std::vector<Point>& nodal_vec)
+void RigidParticle::update_mesh(const std::vector<Point>& nodal_pos,
+                                const std::vector<Point>& nodal_vel)
 {
   START_LOG("update_mesh()", "RigidParticle");
   
@@ -265,11 +269,14 @@ void RigidParticle::update_mesh(const std::vector<Point>& nodal_vec)
     Node* node = *nd;
     const dof_id_type n_id = node->id();
     for(unsigned int i=0; i<_dim; ++i) {
-      (*node)(i) = nodal_vec[n_id](i);
+      (*node)(i) = nodal_pos[n_id](i);
     }
+    _node_velocity[n_id] = nodal_vel[n_id];
   } // end for
   // update particle centroid
   this->compute_centroid();
+  this->compute_centroid_velocity();
+  this->compute_centroid_force();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Algorithm II:
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -280,6 +287,34 @@ void RigidParticle::update_mesh(const std::vector<Point>& nodal_vec)
 //    for(unsigned int j=0; j<3; ++j)
 //      node(j) = nodal_vec[i](j);
 //  }
+  
+  STOP_LOG("update_mesh()", "RigidParticle");
+}
+
+  
+  
+// ======================================================================
+void RigidParticle::update_mesh(const std::vector<Point>& nodal_pos)
+{
+  START_LOG("update_mesh()", "RigidParticle");
+  
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   We update the position of nodes on the surface mesh. Algorithm I:
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+  MeshBase::node_iterator       nd     = _mesh.active_nodes_begin();
+  const MeshBase::node_iterator end_nd = _mesh.active_nodes_end();
+  for ( ; nd != end_nd; ++nd)
+  {
+    
+    // Store a pointer to the current node
+    Node* node = *nd;
+    const dof_id_type n_id = node->id();
+    for(unsigned int i=0; i<_dim; ++i) {
+      (*node)(i) = nodal_pos[n_id](i);
+    }
+  } // end for
+  // update particle centroid
+  this->compute_centroid();
   
   STOP_LOG("update_mesh()", "RigidParticle");
 }
@@ -343,7 +378,7 @@ SerialMesh& RigidParticle::mesh()
 // ======================================================================
 std::vector<Real> RigidParticle::mesh_size() const
 {
-  return PMToolBox::mesh_size(_mesh);
+  return _mesh_size;
 }
 
   
@@ -358,7 +393,7 @@ const Point& RigidParticle::mesh_point(const std::size_t i) const
 // ======================================================================
 std::size_t RigidParticle::num_mesh_nodes() const
 {
-  return _mesh.n_nodes();
+  return _num_mesh_node;
 }
 
 
@@ -366,7 +401,7 @@ std::size_t RigidParticle::num_mesh_nodes() const
 // ======================================================================
 std::size_t RigidParticle::num_mesh_elem() const
 {
-  return _mesh.n_elem();
+  return _num_mesh_elem;
 }
 
 
@@ -979,22 +1014,20 @@ void RigidParticle::add_node_force(std::vector<Point>& node_force)
 }
 
 //=======================================================================
-Point& RigidParticle::compute_centroid_velocity() {
+void RigidParticle::compute_centroid_velocity() {
   _centroid_velocity.zero();
   for (int i=0; i<_node_velocity.size(); i++){
     _centroid_velocity += _node_velocity[i];              
   }
   _centroid_velocity /= _node_velocity.size(); 
-  return _centroid_velocity;
 }  
 
 //========================================================================
-Point& RigidParticle::compute_centroid_force(){
+void RigidParticle::compute_centroid_force(){
   _centroid_force.zero();
   for (int i=0; i<_node_force.size(); i++){
     _centroid_force += _node_force[i];              
   }
-  return _centroid_force;
 }
 
 // ======================================================================

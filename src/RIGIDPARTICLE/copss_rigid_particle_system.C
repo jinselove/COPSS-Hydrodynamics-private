@@ -191,14 +191,6 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
 
 }
 
-void CopssRigidParticleSystem::update_object(std::string stage)
-{
-  point_mesh->update_particle_mesh(particle_mesh);
-  if(debug_info == true){
-    std::cout << "particle meshes are updated " << stage << endl;
-  }
-}
-
 void CopssRigidParticleSystem::write_object(unsigned int step_id)
 {
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -206,6 +198,7 @@ void CopssRigidParticleSystem::write_object(unsigned int step_id)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   // std::vector<Real> lvec;
   // brownian_sys->vector_transform(lvec,&ROUT, "backward"); // ROUT -> lvec
+  point_mesh->update_particle_mesh(particle_mesh);
   particle_mesh->write_particle(step_id, o_step, real_time, output_file, comm_in.rank());
 }
 

@@ -36,7 +36,7 @@ void FixPointLJCut::compute()
   for(std::size_t p_id=0; p_id<num_points; ++p_id)
   {  
     // apply lj force on particle i
-    std::vector<Real> pforce(dim);
+    Point pforce;
     const Point pti   = point_particles[p_id]->point();
     std::vector<std::pair<std::size_t,Real> > n_list = point_particles[p_id]->neighbor_list();
     // Loop over each neigbhor
@@ -48,8 +48,8 @@ void FixPointLJCut::compute()
       const Point ptj   = point_particles[n_id]->point();
       const Point r_ij  = point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
       if(r_ij.norm() <= rCut){
-        std::vector<Real> f_ij = fix_base.lj_force(r_ij, epsilon, sigma);
-        for (std::size_t _dim=0; _dim<dim; ++_dim) pforce[_dim] += f_ij[_dim];
+        Point f_ij = fix_base.lj_force(r_ij, epsilon, sigma);
+        pforce += f_ij;
       }
      } // end if
     } // end loop over neighbors 

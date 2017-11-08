@@ -38,7 +38,7 @@ public:
 
 	void compute();
 
-protected:
+private:
 	Real epsilon;
 	Real sigma;
 	Real rCut;

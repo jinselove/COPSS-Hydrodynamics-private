@@ -63,8 +63,9 @@ n_mesh = '15 15 15'
 #############################################
 #	 Force field 
 #############################################
-force_field = 'surface_constraint sedimentation'
+force_field = 'surface_constraint sedimentation lj_cut'
 surface_constraint = '250. 250.'
+lj_cut = '1. 2.2 2.5'
 
 #############################################
 #			   GGEM info
@@ -141,7 +142,7 @@ with_brownian  = false
 adaptive_dt    = true
 max_dr_coeff   = 0.1
 update_neighbor_list_everyStep = true
-nstep          = 5
+nstep          = 10
 write_interval = 1
 restart        = false
 random_seed    = 123456789

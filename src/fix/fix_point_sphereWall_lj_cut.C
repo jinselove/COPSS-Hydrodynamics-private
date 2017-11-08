@@ -44,7 +44,7 @@ void FixPointSphereWallLJCut::compute()
 START_LOG("FixPointSphereWallLJCut::compute()", "FixPointSphereWallLJCut");
   for(std::size_t i=0; i<num_points; ++i)
   {
-    std::vector<Real> pforce(dim);
+    Point pforce(0.);
     const Point pti = point_particles[i] -> point();
     // Retrieve wall_info
     Real cavity_radius = wall_params[0];

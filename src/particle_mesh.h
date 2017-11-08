@@ -279,7 +279,170 @@ public:
    * Check if the neighbor list is constructed sortedly
    */
   bool is_sorted() const {  return _is_sorted;  }
+
   
+  
+  /** Should we move this and above function to the ParticleMeshSystem???
+   ** Because we need dist-function to calculate the particle-wall force!
+   * Reinit the particle-mesh system. This includes:
+   * (1) build the particle-particle neighbor list according to search radius;
+   * (2) compute the force vectors on particles;
+   * (3) build the element-particle neighbor list according to search radius;
+   * (4) set the elem_id and proc_id for particles
+   * ---- not incorporated:
+   *   particle-wall repulsive force, 
+   *   which will be rebuilt in PMLinearSystem::reinit_particle_mesh()
+   */
+  void reinit();
+  
+  
+  /**
+   * print out the particle information
+   */
+  void print_particle_info() const;
+  
+  
+  /**
+   * Set the values of search radii
+   */
+  void set_search_radius(const Real rp, const Real re)
+  { _search_radius_p = rp;  _search_radius_e = re;  };
+  
+  
+  /**
+   * Return the search radius
+   */
+  Real search_radius(const std::string & p_e) const;
+  
+  
+  /**
+   * Add periodic boundary condition
+   */
+  void add_periodic_boundary(PMPeriodicBoundary& _periodic_bdry)
+  {  _periodic_boundary = &_periodic_bdry; }
+  
+  
+  /**
+   * Retrun the pointer to the periodic boundary for use
+   */
+  PMPeriodicBoundary* pm_periodic_boundary()
+  { return _periodic_boundary;  }
+  
+  
+  /*
+   * Return the Mesh
+   */
+  MeshBase& mesh(){  return _mesh;   }
+  
+  
+  /*
+   * Total number of the tracking points on the mesh,
+   * which is the sum of number of nodes on each particle's mesh
+   */
+  std::size_t num_mesh_points() const;
+  
+  
+  /*
+   * Update the mesh for each particle
+   * This is achieved by updating each nodal coordinates.
+   */
+  void update_mesh(const std::vector<Point>& nodal_pos,
+                   const std::vector<Point>& nodal_vel);
+  // void update_mesh(const std::vector<Real> & nodal_vec);
+  
+  
+  // /*
+  //  * update the (input) point_mesh object according to the particle_mesh
+  //  * particle_mesh doesn't change, but point_mesh is changed.
+  //  *
+  //  * This function updates the input class, but doesn't change its own data.
+  //  */
+  // void update_point_mesh(PointMesh<KDDim>* point_mesh) const;
+  
+  
+  // /*
+  //  * update the particle_mesh object according to the (input) point_mesh
+  //  * The input point_mesh doesn't change, but particle_mesh is changed.
+  //  */
+  // void update_particle_mesh(const PointMesh<KDDim>* point_mesh);
+  
+
+  /*
+   * zero particle force density
+   */
+  void zero_node_force();
+
+  
+  /*
+   * Return the mesh size (hmin/hmax) associated with this particle
+   */
+  std::vector<Real> mesh_size() const;
+  
+  
+  /*
+   * Correct the position of tracking points to avoid volume change!
+   * NOTE: this is only for surface mesh.
+   */
+  void volume_conservation();
+  
+  
+  /*
+   * compute center of mass at step 0: center0, for rigid particles
+   */
+  void initial_particle_center_of_mass(std::vector<Point>& center0) const;
+
+  /*
+   * Write particle
+   */ 
+  void write_particle(const unsigned int& step_id,
+                      const unsigned int& o_step,
+                      const Real& real_time,
+                      const std::vector<std::string>& output_file,
+                      unsigned int comm_in_rank) const;
+
+  /*
+   * write out step and real time
+   */
+  void write_time(const unsigned int& step_id,
+                  const unsigned int& o_step,
+                  const Real& real_time,
+                  unsigned int comm_in_rank) const;
+
+  /*
+   * Write out particle trajectories && forces && velocity to csv files
+   * "output_bead_o_step.csv"
+   */
+  void write_particle_trajectory(const unsigned int& o_step,
+                                 unsigned int comm_in_rank) const;
+
+  /*
+   * Write out mean square displacement of rigid particles
+   * Average over all rigidparticles
+   * "out.mean_sqaure_displacement"
+   */
+  // void write_particle_msd(const unsigned int& step_id,
+  //                     const unsigned int& o_step,
+  //                     const std::vector<Point>& center0,
+  //                     const std::vector<Real>& lvec,
+  //                     unsigned int comm_in_rank) const;
+  
+  /*
+   * Write out the particle's mesh(either surface mesh or volume mesh)
+   */
+  void write_particle_mesh(const unsigned int & step_id,
+                           const unsigned int& o_step) const;
+  
+  /*  
+   * Return a stitched mesh associated with all particles for electrostatic solver
+   * and assign particle's id to subdomain_id
+   */
+  SerialMesh& stitched_mesh();
+
+
+/********************************************************************************
+    Uncomment play around the section below to construct neighbor_list for 
+    rigidParticle-rigidParticle and rigidParticle-elem
+********************************************************************************/    
   
   /**
    * Return the information of element neighbor list
@@ -372,170 +535,14 @@ public:
    * NOTE this takes advantage of KD Tree
    */
   virtual void build_elem_neighbor_list();
-  
-  
-  
-  /** Should we move this and above function to the ParticleMeshSystem???
-   ** Because we need dist-function to calculate the particle-wall force!
-   * Reinit the particle-mesh system. This includes:
-   * (1) build the particle-particle neighbor list according to search radius;
-   * (2) compute the force vectors on particles;
-   * (3) build the element-particle neighbor list according to search radius;
-   * (4) set the elem_id and proc_id for particles
-   * ---- not incorporated:
-   *   particle-wall repulsive force, 
-   *   which will be rebuilt in PMLinearSystem::reinit_particle_mesh()
-   */
-  void reinit();
-  
-  
-  /**
-   * print out the particle information
-   */
-  void print_particle_info() const;
-  
-  
-  /**
+
+    /**
    * print out the element neighbor list information
    */
   void print_elem_neighbor_list(std::ostream & out = libMesh::out) const;
   
 
   
-  /**
-   * Set the values of search radii
-   */
-  void set_search_radius(const Real rp, const Real re)
-  { _search_radius_p = rp;  _search_radius_e = re;  };
-  
-  
-  /**
-   * Return the search radius
-   */
-  Real search_radius(const std::string & p_e) const;
-  
-  
-  /**
-   * Add periodic boundary condition
-   */
-  void add_periodic_boundary(PMPeriodicBoundary& _periodic_bdry)
-  {  _periodic_boundary = &_periodic_bdry; }
-  
-  
-  /**
-   * Retrun the pointer to the periodic boundary for use
-   */
-  PMPeriodicBoundary* pm_periodic_boundary()
-  { return _periodic_boundary;  }
-  
-  
-  /*
-   * Return the Mesh
-   */
-  MeshBase& mesh(){  return _mesh;   }
-  
-  
-  /*
-   * Total number of the tracking points on the mesh,
-   * which is the sum of number of nodes on each particle's mesh
-   */
-  std::size_t num_mesh_points() const;
-  
-  
-  /*
-   * Update the mesh for each particle
-   * This is achieved by updating each nodal coordinates.
-   */
-  void update_mesh(const std::vector<Point>& nodal_vec);
-  void update_mesh(const std::vector<Real> & nodal_vec);
-  
-  
-  /*
-   * update the (input) point_mesh object according to the particle_mesh
-   * particle_mesh doesn't change, but point_mesh is changed.
-   *
-   * This function updates the input class, but doesn't change its own data.
-   */
-  void update_point_mesh(PointMesh<KDDim>* point_mesh) const;
-  
-  
-  /*
-   * update the particle_mesh object according to the (input) point_mesh
-   * The input point_mesh doesn't change, but particle_mesh is changed.
-   */
-  void update_particle_mesh(const PointMesh<KDDim>* point_mesh);
-  
-
-  /*
-   * zero particle force density
-   */
-  void zero_node_force();
-
-  
-  /*
-   * Return the mesh size (hmin/hmax) associated with this particle
-   */
-  std::vector<Real> mesh_size() const;
-  
-  
-  /*
-   * Correct the position of tracking points to avoid volume change!
-   * NOTE: this is only for surface mesh.
-   */
-  void volume_conservation();
-  
-  
-  /*
-   * compute center of mass at step 0: center0, for rigid particles
-   */
-  void initial_particle_center_of_mass(std::vector<Point>& center0) const;
-
-  /*
-   * Write particle
-   */ 
-  void write_particle(const unsigned int& step_id,
-                      const unsigned int& o_step,
-                      const Real& real_time,
-                      const std::vector<std::string>& output_file,
-                      unsigned int comm_in_rank) const;
-
-  /*
-   * write out step and real time
-   */
-  void write_time(const unsigned int& step_id,
-                  const unsigned int& o_step,
-                  const Real& real_time,
-                  unsigned int comm_in_rank) const;
-
-  /*
-   * Write out particle trajectories && forces && velocity to csv files
-   * "output_bead_o_step.csv"
-   */
-  void write_particle_trajectory(const unsigned int& o_step,
-                                 unsigned int comm_in_rank) const;
-
-  /*
-   * Write out mean square displacement of rigid particles
-   * Average over all rigidparticles
-   * "out.mean_sqaure_displacement"
-   */
-  // void write_particle_msd(const unsigned int& step_id,
-  //                     const unsigned int& o_step,
-  //                     const std::vector<Point>& center0,
-  //                     const std::vector<Real>& lvec,
-  //                     unsigned int comm_in_rank) const;
-  
-  /*
-   * Write out the particle's mesh(either surface mesh or volume mesh)
-   */
-  void write_particle_mesh(const unsigned int & step_id,
-                           const unsigned int& o_step) const;
-  
-  /*  
-   * Return a stitched mesh associated with all particles for electrostatic solver
-   * and assign particle's id to subdomain_id
-   */
-  SerialMesh& stitched_mesh();
 
 
 private:

@@ -874,7 +874,6 @@ void PointMesh<KDDim>::reinit(const bool& with_hi,
        set the neighbor list of the j-th particle
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
       _particles[j]->set_neighbor_list (IndicesDists0);
-      
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        FIXME: Check if the j-th point particle is out of domain
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -904,44 +903,46 @@ void PointMesh<KDDim>::update_particle_mesh(ParticleMesh<KDDim>* particle_mesh) 
   
   // Extract the point coordinates from the point_mesh object
   std::vector<Point> nodal_vec(_num_point_particles);
+  std::vector<Point> nodal_force(_num_point_particles);
   for(std::size_t i=0; i<_num_point_particles; ++i){
     nodal_vec[i] = _particles[i]->point();
+    nodal_force[i] = _particles[i]->particle_velocity();
   }
-  particle_mesh->update_mesh(nodal_vec);
+  particle_mesh->update_mesh(nodal_vec, nodal_force);
   
   STOP_LOG("update_particle_mesh()", "PointMesh<KDDim>");
 }
   
   
   
-// ======================================================================
-template <unsigned int KDDim>
-void PointMesh<KDDim>::update_point_mesh(const ParticleMesh<KDDim>* particle_mesh)
-{
-  START_LOG("update_point_mesh()", "PointMesh<KDDim>");
+// // ======================================================================
+// template <unsigned int KDDim>
+// void PointMesh<KDDim>::update_point_mesh(const ParticleMesh<KDDim>* particle_mesh)
+// {
+//   START_LOG("update_point_mesh()", "PointMesh<KDDim>");
   
-  // Loop over each Particle
-  const std::size_t n_rigid_particles = particle_mesh->num_particles();
-  std::size_t start_id = 0;
-  for(std::size_t i=0; i<n_rigid_particles; ++i)
-  {
-    // Extract the point(node) coordiantes from particle_mesh
-    std::vector<Point> node_xyz;
-    particle_mesh->particles()[i]->extract_nodes(node_xyz);
+//   // Loop over each Particle
+//   const std::size_t n_rigid_particles = particle_mesh->num_particles();
+//   std::size_t start_id = 0;
+//   for(std::size_t i=0; i<n_rigid_particles; ++i)
+//   {
+//     // Extract the point(node) coordiantes from particle_mesh
+//     std::vector<Point> node_xyz;
+//     particle_mesh->particles()[i]->extract_nodes(node_xyz);
     
-    // Assign the values to the point_mesh
-    const std::size_t n_points = node_xyz.size();
-    for(std::size_t j=0; j<n_points; ++j)
-    {
-      _particles[start_id+j]->point() = node_xyz[j];
-    }
+//     // Assign the values to the point_mesh
+//     const std::size_t n_points = node_xyz.size();
+//     for(std::size_t j=0; j<n_points; ++j)
+//     {
+//       _particles[start_id+j]->point() = node_xyz[j];
+//     }
     
-    // Update the start id
-    start_id += n_points;
-  }
+//     // Update the start id
+//     start_id += n_points;
+//   }
   
-  STOP_LOG("update_point_mesh()", "PointMesh<KDDim>");
-}
+//   STOP_LOG("update_point_mesh()", "PointMesh<KDDim>");
+// }
   
   
   
@@ -1043,21 +1044,6 @@ void PointMesh<KDDim>::set_bead_velocity(const std::vector<Real>& vel)
   auto minmax_velocity_magniture = std::minmax_element(_velocity_magnitude.begin(), _velocity_magnitude.end());
   _min_velocity_magnitude = std::sqrt(*minmax_velocity_magniture.first);
   _max_velocity_magnitude = std::sqrt(*minmax_velocity_magniture.second);
-
-  // calculate rigid particle centroid velocity if there are rigid particles
-  // create point particle list
-  std::size_t point_id = 0;
-  for (std::size_t i=0; i<_rigid_particles.size(); ++i)
-  {
-    const std::size_t n_nodes = _rigid_particles[i]->num_mesh_nodes();
-    std::vector<Point> node_velocity(n_nodes);
-    for (std::size_t j=0; j<n_nodes; ++j)
-    {
-      node_velocity[j]=_particles[point_id+j]->particle_velocity();
-    } // enf for j-loop
-    _rigid_particles[i]->set_node_velocity(node_velocity);
-    point_id += n_nodes;
-  } // enf for i-loop
   STOP_LOG("PointMesh::set_bead_velocity()", "PointMesh");
 }
 

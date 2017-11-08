@@ -376,8 +376,8 @@ protected:
   void langevin_integrate(EquationSystems& equation_systems, unsigned int i);
 
   // update object positions due to PBS
-  virtual void update_object(std::string stage) = 0;
-  virtual void write_object(unsigned int step_id) =0;
+  virtual void update_object() {};
+  virtual void write_object(unsigned int step_id) = 0;
 };
 
 } // end namespace libMesh

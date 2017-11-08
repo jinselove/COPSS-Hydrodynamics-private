@@ -397,7 +397,7 @@ public:
    * update the point_mesh object according to the (input) particle_mesh.
    * This function updates the class itself only, but doesn't change the input
    */
-  void update_point_mesh(const ParticleMesh<KDDim>* particle_mesh);
+  // void update_point_mesh(const ParticleMesh<KDDim>* particle_mesh);
   
   
   /**

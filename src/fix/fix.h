@@ -128,10 +128,10 @@ public:
    */
   virtual void check_pbc_post_fix() {}
 
-  /* use this for rigid particle fixes
-   * attach nodal force on particle nodes once given nodal_force_density, which will be calculate in each sub-fix
+  /*
+   * sync force from nodes to point mesh
    */
-  virtual void attach_nodal() {}
+  virtual void sync_node_to_pointmesh(){}
 
 
   // the particle-mesh (linear implicit) system

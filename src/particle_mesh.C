@@ -217,7 +217,7 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
   // Close the file and end the function
   infile.close();
   this->comm().barrier();
-  std::cout << "Reading particle data from "<<filename<<" is completed!" << std::endl << std::endl;
+  std::cout << "Reading particle data from "<<filename<<" is completed!" << std::endl << std::endl; 
 }
 
 
@@ -389,7 +389,493 @@ void ParticleMesh<KDDim>:: generate_random_particles(const std::size_t N,
 }
   
 
+
   
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::reinit()
+{
+  START_LOG ("reinit()", "ParticleMesh<KDDim>");
+  
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   if the KD tree is already built, we need to re-construct the KD tree in reinit()
+   This is necessary at each time step when particles move!
+   FIXME: is this necessary when the total number of particles does not change?
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  if ( _kd_tree.get() )
+    this->clear_kd_tree();
+  
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Then we re-construct the kd-tree after clearing it!
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  this->construct_kd_tree();
+  
+  
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Construct the particle-particle, elem-particle neighbor list and particle force.
+   Loop over ALL particles to calculate their neighbor lists and forces.
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  for (std::size_t j=0; j<_particles.size(); ++j)
+  {
+   //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     //get the neighbor indices & distance values
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+    const Point &tgt( _particles[j]->get_centroid() );
+    std::vector<std::pair<std::size_t,Real> > IndicesDists0, IndicesDists;
+    this->build_particle_neighbor_list(tgt, _is_sorted, IndicesDists);
+    /* IndicesDists above returns <particle_id, distance>! */
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Exclude the current particle itself, so that the particle's neighbor list
+     does NOT contain itself.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    const std::size_t pid = _particles[j]->id();
+    for (std::size_t i=0; i<IndicesDists.size(); ++i)
+      if ( IndicesDists[i].first!= pid)
+        IndicesDists0.push_back( IndicesDists[i] );
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     set the neighbor list of the j-th particle
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    _particles[j]->set_neighbor_list (IndicesDists0);
+    
+  } // end for j-loop over particles
+  //printf("--->debug: ParticleMesh::reinit() I am here 000 \n");
+  
+  
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Construct the element-particle neighbor list and particle-element id map
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  //this->build_elem_neighbor_list();
+  
+  
+  STOP_LOG ("reinit()", "ParticleMesh<KDDim>");
+}
+  
+  
+  
+// ======================================================================
+template <unsigned int KDDim>
+Real ParticleMesh<KDDim>::search_radius(const std::string & p_e) const
+{
+  if (p_e=="p") return _search_radius_p;
+  else if (p_e=="e") return _search_radius_e;
+  else
+  {
+    printf("ParticleMesh::search_radius(): the input option must be either p or e!\n");
+    libmesh_error();
+  }
+}
+  
+  
+  
+// ======================================================================
+template <unsigned int KDDim>
+std::size_t ParticleMesh<KDDim>::num_mesh_points() const
+{
+  START_LOG ("num_mesh_points()", "ParticleMesh<KDDim>");
+  
+  std::size_t n_points = 0;
+  for (std::size_t i=0; i<_particles.size(); ++i)
+    n_points += _particles[i]->num_mesh_nodes();
+  
+  STOP_LOG ("num_mesh_points()", "ParticleMesh<KDDim>");
+  return n_points;
+}
+
+  
+  
+// ======================================================================
+// =========================== print functions ==========================
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::print_particle_info() const
+{
+  printf("======================= printing the particle information: =======================\n\n");
+  printf("There are totally %lu particles (search radius = %f)\n",_particles.size(),_search_radius_p);
+  for (std::size_t j=0; j<_particles.size(); ++j)
+    _particles[j]->print_info();
+  
+  printf("========================= end of the particle information =========================\n\n");
+} 
+  
+  
+
+  
+  
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::update_mesh(const std::vector<Point>& nodal_pos,
+                                      const std::vector<Point>& nodal_vel)
+{
+  START_LOG ("update_mesh()", "ParticleMesh<KDDim>");
+  // loop over all rigid particles
+  std::size_t node_start_id = 0;
+  for (int particle_id = 0; particle_id < _n_rigid_particles; particle_id++){
+    std::size_t num_mesh_nodes = _particles[particle_id]->num_mesh_nodes();
+    std::vector<Point> nodal_points(num_mesh_nodes);
+    std::vector<Point> nodal_velocities(num_mesh_nodes);
+    // extract positions from nodal_pos to nodal_points vector
+    for (int node_id = 0; node_id < num_mesh_nodes; node_id++){
+      nodal_points[node_id] = nodal_pos[node_start_id+node_id];
+      nodal_velocities[node_id] = nodal_vel[node_start_id+node_id];
+    } // end loop over node id
+    _particles[particle_id]->update_mesh(nodal_points, nodal_velocities);
+    node_start_id+=num_mesh_nodes;
+  }//end loop over particle id
+
+  STOP_LOG ("update_mesh()", "ParticleMesh<KDDim>");
+}
+  
+// // ======================================================================
+// template <unsigned int KDDim>
+// void ParticleMesh<KDDim>::update_point_mesh(PointMesh<KDDim>* point_mesh) const
+// {
+//   START_LOG ("update_point_mesh()", "ParticleMesh<KDDim>");
+  
+//   // Loop over each Particle
+//   const std::size_t n_particles = this->num_particles();
+//   std::size_t start_id = 0;
+//   for(std::size_t i=0; i<n_particles; ++i)
+//   {
+//     // Extract the point(node) coordiantes from particle_mesh
+//     std::vector<Point> node_xyz;
+//     _particles[i]->extract_nodes(node_xyz);
+    
+//     // Assign the values to the point_mesh
+//     const std::size_t n_points = node_xyz.size();
+//     for(std::size_t j=0; j<n_points; ++j)
+//     {
+//       point_mesh->particles()[start_id+j]->point() = node_xyz[j];
+//     }
+    
+//     // Update the start id
+//     start_id += n_points;
+//   }
+  
+  
+//   STOP_LOG ("update_point_mesh()", "ParticleMesh<KDDim>");
+// }
+  
+  
+  
+// // ======================================================================
+// template <unsigned int KDDim>
+// void ParticleMesh<KDDim>::update_particle_mesh(const PointMesh<KDDim>* point_mesh)
+// {
+//   START_LOG ("update_particle_mesh()", "ParticleMesh<KDDim>");
+  
+//   // Extract the point coordinates from the point_mesh object
+//   const std::size_t  n_points = point_mesh->num_particles();
+//   std::vector<Point> nodal_vec(n_points);
+//   for(std::size_t i=0; i<n_points; ++i){
+//     nodal_vec[i] = point_mesh->particles()[i]->point();
+//   }
+  
+//   // Update the mesh nodes using the extracted values
+//   this->update_mesh(nodal_vec);
+  
+//   STOP_LOG ("update_particle_mesh()", "ParticleMesh<KDDim>");
+// }
+
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::zero_node_force()
+{
+  START_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
+  for (int i=0; i<_n_rigid_particles;i++) _particles[i]->zero_node_force();
+  
+  STOP_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
+}
+  
+  
+  
+// ======================================================================
+template <unsigned int KDDim>
+std::vector<Real> ParticleMesh<KDDim>::mesh_size() const
+{
+  START_LOG ("mesh_size()", "ParticleMesh<KDDim>");
+  
+  const std::size_t np = this->num_particles();
+  std::vector<Real> hmin_max(2);  // store hmin and hmax
+  for(std::size_t i=0; i<np; ++i)
+  {
+    if(i==0){
+      hmin_max = _particles[i]->mesh_size();
+    }
+    else{
+      const std::vector<Real> vals = _particles[i]->mesh_size();
+      if( vals[0]<hmin_max[0] ) hmin_max[0] = vals[0];
+      if( vals[1]>hmin_max[1] ) hmin_max[1] = vals[1];
+    }
+  }
+  
+  STOP_LOG ("mesh_size()", "ParticleMesh<KDDim>");
+  return hmin_max;
+}
+  
+  
+  
+  
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::volume_conservation()
+{
+  START_LOG ("volume_conservation()", "ParticleMesh<KDDim>");
+  
+  // Loop over all the particles, and update their nodal values
+  for (std::size_t i=0; i<_particles.size(); ++i)
+  {
+    _particles[i]->volume_conservation();
+  }
+  
+  STOP_LOG ("volume_conservation()", "ParticleMesh<KDDim>");
+}
+  
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::initial_particle_center_of_mass(std::vector<Point>& center0) const
+{
+  START_LOG("initial_center_of_mass()", "ParticleMesh<KDDim>");
+  center0.resize(_n_rigid_particles);
+  for (std::size_t i=0; i<_n_rigid_particles; i++){
+    center0[i] = _particles[i]->get_centroid0();
+  }
+  STOP_LOG("initial_center_of_mass()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_particle(const unsigned int& step_id,
+                                          const unsigned int& o_step,
+                                          const Real& real_time,
+                                          const std::vector<std::string>& output_file,
+                                          unsigned int comm_in_rank) const
+{
+  START_LOG("write_particle()", "ParticleMesh<KDDim>");
+  this->write_time(step_id, o_step, real_time, comm_in_rank);
+  for (int i = 0; i < output_file.size(); i++){
+    if(output_file[i] == "equation_systems") {
+      // this output has been written in Copss.C
+    }
+    else if(output_file[i] == "trajectory") this -> write_particle_trajectory(o_step, comm_in_rank);
+    else if (output_file[i] == "particle_mesh") this->write_particle_mesh(step_id, o_step);
+    else if(output_file[i] == "mean_square_displacement"){
+        std::cout <<"Error: there is difficulty to calculate msd of rigid particles from ROUT, fix it before output msd" << std::endl;
+        libmesh_error();
+        // this -> write_particle_msd(step_id, o_step,center0, lvec, comm_in_rank);
+      
+    }
+    else {
+      std::cout << "unsupported output_file content: (" << output_file[i] <<")" << std::endl; 
+      libmesh_error();
+    }
+  }  
+
+  STOP_LOG("write_particle()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_time(const unsigned int& step_id,
+                              const unsigned int& o_step,
+                              const Real& real_time,
+                              unsigned int comm_in_rank) const
+{
+  // write step and real time
+  std::ofstream out_file;  
+  if(comm_in_rank == 0){
+    if(step_id == 0){
+      out_file.open("out.time", std::ios_base::out);
+      out_file << "step_id" <<"  " <<"o_step" <<"  " << "real_time" << "\n";      
+    }
+    else{
+      out_file.open("out.time", std::ios_base::app);
+    }
+    out_file.precision(o_precision);
+    out_file <<step_id <<"  "<< o_step <<"  " <<real_time <<"\n";
+    out_file.close();  
+  }
+}
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
+                                                    unsigned int comm_in_rank) const
+{
+  START_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
+  std::ostringstream oss;
+  oss << "output_particle_" << o_step <<".csv";
+  std::ofstream out_file;
+  if (comm_in_rank == 0){
+    out_file.open(oss.str(), std::ios_base::out);
+    // write out the csv file  
+    // POINT data
+    out_file <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
+    out_file.precision(o_precision);
+    for(std::size_t i=0; i<_n_rigid_particles; ++i)
+    {
+      out_file << i << " ";
+      // write position
+      for(std::size_t j=0; j<_dim; ++j){
+        out_file << _particles[i]->get_centroid()(j) << " ";
+      }
+      // write velocity
+      for (std::size_t j=0; j<_dim; ++j){
+        out_file <<_particles[i]->centroid_velocity()(j) << " ";
+      }
+      // write force
+      for (std::size_t j=0; j<_dim; ++j){
+        out_file <<_particles[i]->centroid_force()(j) <<" ";
+      }
+      out_file <<"\n";
+    }
+    out_file << "\n";
+    out_file.close();
+  } // end if comm_in_rank == 0
+
+  STOP_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
+}
+
+// ======================================================================
+// template <unsigned int KDDim>
+// void ParticleMesh<KDDim>::write_particle_msd(const unsigned int& step_id,
+//                                             const unsigned int& o_step,
+//                                             const std::vector<Point>& center0,
+//                                             const std::vector<Real>& lvec,
+//                                             unsigned int comm_in_rank) const
+// {
+//   /*
+//    * Fix me: the unwrapped position of all surface nodes are in lvec, however,
+//    * it is hard to calculate the unwrapped centroid position of each rigid particle
+//    * since the calculation requires the mesh configuration (refer to RigidParticle::compute_centroid)
+//    * one way to fix this might be: create another mesh to hold unwrapped node information in each rigid_particle
+//    */
+
+
+
+//   // START_LOG("write_particle_msd()", "ParticleMesh<KDDim>");
+//   // //get centers of all surface nodes
+//   // std::vector<Point> centeri(_n_rigid_particles);
+//   // Point node_center;
+//   // for (unsigned int i = 0; i < _n_rigid_particles; i++){
+//   //   const unsigned int n_nodes = _particles[i]->num_mesh_nodes();
+//   //   for (unsigned int j=0; j<n_nodes; j++){
+//   //     for (int k = 0; k <_dim; k++){
+//   //       node_center(k) = lvec[(i*n_nodes+j)*_dim+k];
+//   //     } 
+//   //     centeri[i] += node_center;     
+//   //   }
+
+//   // }
+//   // // compute mean square displacement
+//   // Point msd;
+//   // this->compute_mean_square_displacement(center0, centeri, msd);
+//   // // write mean square displacment to out.mean_square_displacement
+//   // std::ofstream out_file;  
+//   // if(comm_in_rank == 0){
+//   //   if(step_id == 0){
+//   //     out_file.open("out.mean_square_displacement", std::ios_base::out);
+//   //     out_file << "o_step" <<"  " << "mean_square_displacement" << "\n";      
+//   //   }
+//   //   else{
+//   //     out_file.open("out.mean_square_displacement", std::ios_base::app);
+//   //   }
+//   //   out_file.precision(o_precision);
+//   //   out_file << o_step <<"  ";
+//   //   for (int i = 0; i < _dim; i++){
+//   //     out_file <<msd(i) <<"  ";
+//   //   }
+//   //   out_file<<"\n";
+//   //   out_file.close();       
+//   // }// end if comm_in_rank == 0  
+
+//   // STOP_LOG("write_particle_msd()", "ParticleMesh<KDDim>");
+// }
+
+
+  
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_particle_mesh(const unsigned int& step_id,
+                                              const unsigned int& o_step) const
+{
+  START_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
+  this->comm().barrier();
+  std::ostringstream surface_mesh_file_name;
+  if(step_id == 0){
+    surface_mesh_file_name<< "particle_surface_mesh.e";  
+  }
+  else{
+    surface_mesh_file_name <<"particle_surface_mesh.e"<< "-s."
+                          << std::setw(8) << std::setfill('0') << std::right << o_step;
+  }
+  SerialMesh stitch_mesh (_particles[0]->mesh());
+  for(std::size_t i=1; i<_n_rigid_particles; ++i)
+  {
+    stitch_mesh.stitch_meshes(_particles[i]->mesh(),0,0);
+  }    
+  // output the stitched mesh
+  stitch_mesh.write(surface_mesh_file_name.str());
+  STOP_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
+}
+  
+  
+
+// ======================================================================
+template <unsigned int KDDim>
+SerialMesh& ParticleMesh<KDDim>::stitched_mesh()
+{
+  START_LOG ("merge_particle_mesh()", "ParticleMesh<KDDim>");
+
+  SerialMesh& _particles_mesh (_particles[0]->mesh());
+
+  // assign subdomain_id of 1st particle to 0
+  MeshBase::element_iterator     el = _particles_mesh.elements_begin();
+  MeshBase::element_iterator end_el = _particles_mesh.elements_end();
+  for ( ; el != end_el; ++el)
+  {
+     Elem* elem = *el;
+     elem->subdomain_id() = 0;
+  }
+
+  const std::size_t n_particles = this->num_particles();
+  if(n_particles>1)
+  {
+    for(std::size_t i=1; i<this->num_particles(); ++i)
+    {
+      // intermediate mesh to store each particle's mesh
+      SerialMesh mesh(_particles[i]->mesh());
+
+      // assign subdomain_id to particle_id
+      el     = mesh.elements_begin();
+      end_el = mesh.elements_end();
+
+      for ( ; el != end_el; ++el)
+      {
+         Elem* elem = *el;
+         elem->subdomain_id() = i;
+      }
+
+      _particles_mesh.stitch_meshes(mesh,0,0);
+    }
+  }
+
+  STOP_LOG ("merge_particle_mesh()", "ParticleMesh<KDDim>");
+
+  // return the stitched mesh
+  return _particles_mesh;
+}
+  
+
+/********************************************************************************
+    Uncomment play around the section below to construct neighbor_list for 
+    rigidParticle-rigidParticle and rigidParticle-elem
+********************************************************************************/    
+   
+   
 // ======================================================================
 template <unsigned int KDDim>
 void ParticleMesh<KDDim>::construct_kd_tree ()
@@ -872,118 +1358,6 @@ void ParticleMesh<KDDim>::build_elem_neighbor_list()
   STOP_LOG ("build_elem_neighbor_list()", "ParticleMesh<KDDim>");
 }
   
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::reinit()
-{
-  START_LOG ("reinit()", "ParticleMesh<KDDim>");
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   if the KD tree is already built, we need to re-construct the KD tree in reinit()
-   This is necessary at each time step when particles move!
-   FIXME: is this necessary when the total number of particles does not change?
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if ( _kd_tree.get() )
-    this->clear_kd_tree();
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Then we re-construct the kd-tree after clearing it!
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  this->construct_kd_tree();
-  
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Construct the particle-particle, elem-particle neighbor list and particle force.
-   Loop over ALL particles to calculate their neighbor lists and forces.
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  for (std::size_t j=0; j<_particles.size(); ++j)
-  {
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     get the neighbor indices & distance values
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    const Point &tgt( _particles[j]->get_centroid() );
-    std::vector<std::pair<std::size_t,Real> > IndicesDists0, IndicesDists;
-    this->build_particle_neighbor_list(tgt, _is_sorted, IndicesDists);
-    /* IndicesDists above returns <particle_id, distance>! */
-    
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Exclude the current particle itself, so that the particle's neighbor list
-     does NOT contain itself.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    const std::size_t pid = _particles[j]->id();
-    for (std::size_t i=0; i<IndicesDists.size(); ++i)
-      if ( IndicesDists[i].first!= pid)
-        IndicesDists0.push_back( IndicesDists[i] );
-    
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     set the neighbor list of the j-th particle
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    _particles[j]->set_neighbor_list (IndicesDists0);
-    
-  } // end for j-loop over particles
-  //printf("--->debug: ParticleMesh::reinit() I am here 000 \n");
-  
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Construct the element-particle neighbor list and particle-element id map
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  //this->build_elem_neighbor_list();
-  
-  
-  STOP_LOG ("reinit()", "ParticleMesh<KDDim>");
-}
-  
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-Real ParticleMesh<KDDim>::search_radius(const std::string & p_e) const
-{
-  if (p_e=="p") return _search_radius_p;
-  else if (p_e=="e") return _search_radius_e;
-  else
-  {
-    printf("ParticleMesh::search_radius(): the input option must be either p or e!\n");
-    libmesh_error();
-  }
-}
-  
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-std::size_t ParticleMesh<KDDim>::num_mesh_points() const
-{
-  START_LOG ("num_mesh_points()", "ParticleMesh<KDDim>");
-  
-  std::size_t n_points = 0;
-  for (std::size_t i=0; i<_particles.size(); ++i)
-    n_points += _particles[i]->num_mesh_nodes();
-  
-  STOP_LOG ("num_mesh_points()", "ParticleMesh<KDDim>");
-  return n_points;
-}
-
-  
-  
-// ======================================================================
-// =========================== print functions ==========================
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::print_particle_info() const
-{
-  printf("======================= printing the particle information: =======================\n\n");
-  printf("There are totally %lu particles (search radius = %f)\n",_particles.size(),_search_radius_p);
-  for (std::size_t j=0; j<_particles.size(); ++j)
-    _particles[j]->print_info();
-  
-  printf("========================= end of the particle information =========================\n\n");
-}
-  
-  
-  
 // ======================================================================
 template <unsigned int KDDim>
 void ParticleMesh<KDDim>::print_elem_neighbor_list(std::ostream &out) const
@@ -1017,410 +1391,7 @@ void ParticleMesh<KDDim>::print_elem_neighbor_list(std::ostream &out) const
   } // end for p-loop
   printf("======================= end of the element neighbor list ======================\n\n");
 }
-  
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::update_mesh(const std::vector<Point>& nodal_vec)
-{
-  START_LOG ("update_mesh()", "ParticleMesh<KDDim>");
-
-  // Loop over all the particles, and update their nodal values
-  std::size_t start_points = 0;
-  for (std::size_t i=0; i<_particles.size(); ++i)
-  {
-    const std::size_t n_points = _particles[i]->num_mesh_nodes();
-    std::vector<Point> nodal_vec_pi(n_points);
-    for(std::size_t j=0; j<n_points; ++j)
-    {
-      nodal_vec_pi[j] = nodal_vec[start_points + j];
-    }
-    _particles[i]->update_mesh(nodal_vec_pi);
-    
-    start_points += n_points;
-  }
-  
-  STOP_LOG ("update_mesh()", "ParticleMesh<KDDim>");
-}
-  
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::update_mesh(const std::vector<Real>& nodal_vec)
-{
-  START_LOG ("update_mesh()", "ParticleMesh<KDDim>");
-  
-  // Check the vector size
-  const std::size_t n_points = this->num_mesh_points();
-  if ( !(n_points*KDDim == nodal_vec.size()) )
-  {
-    libMesh::err << "*** The vector size is inconsistant with particle coordinates!\n";
-    libmesh_here();
-    libmesh_error();
-  }
-  
-  // Convert std::vector<Real>  to  std::vector<Point>
-  std::vector<Point> nodal_points(n_points);
-  for(std::size_t i=0; i<n_points; ++i)
-  {
-    for(std::size_t j=0; j<KDDim; ++j)
-      nodal_points[i](j) = nodal_vec[i*KDDim + j];
-  }
-  
-  // Call the other member function to update surface mesh
-  this->update_mesh(nodal_points);
-  
-  STOP_LOG ("update_mesh()", "ParticleMesh<KDDim>");
-}
-
-  
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::update_point_mesh(PointMesh<KDDim>* point_mesh) const
-{
-  START_LOG ("update_point_mesh()", "ParticleMesh<KDDim>");
-  
-  // Loop over each Particle
-  const std::size_t n_particles = this->num_particles();
-  std::size_t start_id = 0;
-  for(std::size_t i=0; i<n_particles; ++i)
-  {
-    // Extract the point(node) coordiantes from particle_mesh
-    std::vector<Point> node_xyz;
-    _particles[i]->extract_nodes(node_xyz);
-    
-    // Assign the values to the point_mesh
-    const std::size_t n_points = node_xyz.size();
-    for(std::size_t j=0; j<n_points; ++j)
-    {
-      point_mesh->particles()[start_id+j]->point() = node_xyz[j];
-    }
-    
-    // Update the start id
-    start_id += n_points;
-  }
-  
-  
-  STOP_LOG ("update_point_mesh()", "ParticleMesh<KDDim>");
-}
-  
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::update_particle_mesh(const PointMesh<KDDim>* point_mesh)
-{
-  START_LOG ("update_particle_mesh()", "ParticleMesh<KDDim>");
-  
-  
-  // Extract the point coordinates from the point_mesh object
-  const std::size_t  n_points = point_mesh->num_particles();
-  std::vector<Point> nodal_vec(n_points);
-  for(std::size_t i=0; i<n_points; ++i){
-    nodal_vec[i] = point_mesh->particles()[i]->point();
-  }
-  
-  // Update the mesh nodes using the extracted values
-  this->update_mesh(nodal_vec);
-  
-  STOP_LOG ("update_particle_mesh()", "ParticleMesh<KDDim>");
-}
-
-
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::zero_node_force()
-{
-  START_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
-  for (int i=0; i<_n_rigid_particles;i++) _particles[i]->zero_node_force();
-  
-  STOP_LOG ("zero_particle_force_density", "ParticleMesh<KDDim>");
-}
-  
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-std::vector<Real> ParticleMesh<KDDim>::mesh_size() const
-{
-  START_LOG ("mesh_size()", "ParticleMesh<KDDim>");
-  
-  const std::size_t np = this->num_particles();
-  std::vector<Real> hmin_max(2);  // store hmin and hmax
-  for(std::size_t i=0; i<np; ++i)
-  {
-    if(i==0){
-      hmin_max = _particles[i]->mesh_size();
-    }
-    else{
-      const std::vector<Real> vals = _particles[i]->mesh_size();
-      if( vals[0]<hmin_max[0] ) hmin_max[0] = vals[0];
-      if( vals[1]>hmin_max[1] ) hmin_max[1] = vals[1];
-    }
-  }
-  
-  STOP_LOG ("mesh_size()", "ParticleMesh<KDDim>");
-  return hmin_max;
-}
-  
-  
-  
-  
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::volume_conservation()
-{
-  START_LOG ("volume_conservation()", "ParticleMesh<KDDim>");
-  
-  // Loop over all the particles, and update their nodal values
-  for (std::size_t i=0; i<_particles.size(); ++i)
-  {
-    _particles[i]->volume_conservation();
-  }
-  
-  STOP_LOG ("volume_conservation()", "ParticleMesh<KDDim>");
-}
-  
-
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::initial_particle_center_of_mass(std::vector<Point>& center0) const
-{
-  START_LOG("initial_center_of_mass()", "ParticleMesh<KDDim>");
-  center0.resize(_n_rigid_particles);
-  for (std::size_t i=0; i<_n_rigid_particles; i++){
-    center0[i] = _particles[i]->get_centroid0();
-  }
-  STOP_LOG("initial_center_of_mass()", "ParticleMesh<KDDim>");
-}
-
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::write_particle(const unsigned int& step_id,
-                                          const unsigned int& o_step,
-                                          const Real& real_time,
-                                          const std::vector<std::string>& output_file,
-                                          unsigned int comm_in_rank) const
-{
-  START_LOG("write_particle()", "ParticleMesh<KDDim>");
-  this->write_time(step_id, o_step, real_time, comm_in_rank);
-  for (int i = 0; i < output_file.size(); i++){
-    if(output_file[i] == "equation_systems") {
-      // this output has been written in Copss.C
-    }
-    else if(output_file[i] == "trajectory") this -> write_particle_trajectory(o_step, comm_in_rank);
-    else if (output_file[i] == "particle_mesh") this->write_particle_mesh(step_id, o_step);
-    else if(output_file[i] == "mean_square_displacement"){
-        std::cout <<"Error: there is difficulty to calculate msd of rigid particles from ROUT, fix it before output msd" << std::endl;
-        libmesh_error();
-        // this -> write_particle_msd(step_id, o_step,center0, lvec, comm_in_rank);
-      
-    }
-    else {
-      std::cout << "unsupported output_file content: (" << output_file[i] <<")" << std::endl; 
-      libmesh_error();
-    }
-  }  
-
-  STOP_LOG("write_particle()", "ParticleMesh<KDDim>");
-}
-
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::write_time(const unsigned int& step_id,
-                              const unsigned int& o_step,
-                              const Real& real_time,
-                              unsigned int comm_in_rank) const
-{
-  // write step and real time
-  std::ofstream out_file;  
-  if(comm_in_rank == 0){
-    if(step_id == 0){
-      out_file.open("out.time", std::ios_base::out);
-      out_file << "step_id" <<"  " <<"o_step" <<"  " << "real_time" << "\n";      
-    }
-    else{
-      out_file.open("out.time", std::ios_base::app);
-    }
-    out_file.precision(o_precision);
-    out_file <<step_id <<"  "<< o_step <<"  " <<real_time <<"\n";
-    out_file.close();  
-  }
-}
-
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
-                                                    unsigned int comm_in_rank) const
-{
-  START_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
-  std::ostringstream oss;
-  oss << "output_particle_" << o_step <<".csv";
-  std::ofstream out_file;
-  if (comm_in_rank == 0){
-    out_file.open(oss.str(), std::ios_base::out);
-    // write out the csv file  
-    // POINT data
-    out_file <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
-    out_file.precision(o_precision);
-    for(std::size_t i=0; i<_n_rigid_particles; ++i)
-    {
-      out_file << i << " ";
-      // write position
-      for(std::size_t j=0; j<_dim; ++j){
-        out_file << _particles[i]->get_centroid()(j) << " ";
-      }
-      // write velocity
-      for (std::size_t j=0; j<_dim; ++j){
-        out_file <<_particles[i]->compute_centroid_velocity()(j) << " ";
-      }
-      // write force
-      for (std::size_t j=0; j<_dim; ++j){
-        out_file <<_particles[i]->compute_centroid_force()(j) <<" ";
-      }
-      out_file <<"\n";
-    }
-    out_file << "\n";
-    out_file.close();
-  } // end if comm_in_rank == 0
-
-  STOP_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
-}
-
-// ======================================================================
-// template <unsigned int KDDim>
-// void ParticleMesh<KDDim>::write_particle_msd(const unsigned int& step_id,
-//                                             const unsigned int& o_step,
-//                                             const std::vector<Point>& center0,
-//                                             const std::vector<Real>& lvec,
-//                                             unsigned int comm_in_rank) const
-// {
-//   /*
-//    * Fix me: the unwrapped position of all surface nodes are in lvec, however,
-//    * it is hard to calculate the unwrapped centroid position of each rigid particle
-//    * since the calculation requires the mesh configuration (refer to RigidParticle::compute_centroid)
-//    * one way to fix this might be: create another mesh to hold unwrapped node information in each rigid_particle
-//    */
-
-
-
-//   // START_LOG("write_particle_msd()", "ParticleMesh<KDDim>");
-//   // //get centers of all surface nodes
-//   // std::vector<Point> centeri(_n_rigid_particles);
-//   // Point node_center;
-//   // for (unsigned int i = 0; i < _n_rigid_particles; i++){
-//   //   const unsigned int n_nodes = _particles[i]->num_mesh_nodes();
-//   //   for (unsigned int j=0; j<n_nodes; j++){
-//   //     for (int k = 0; k <_dim; k++){
-//   //       node_center(k) = lvec[(i*n_nodes+j)*_dim+k];
-//   //     } 
-//   //     centeri[i] += node_center;     
-//   //   }
-
-//   // }
-//   // // compute mean square displacement
-//   // Point msd;
-//   // this->compute_mean_square_displacement(center0, centeri, msd);
-//   // // write mean square displacment to out.mean_square_displacement
-//   // std::ofstream out_file;  
-//   // if(comm_in_rank == 0){
-//   //   if(step_id == 0){
-//   //     out_file.open("out.mean_square_displacement", std::ios_base::out);
-//   //     out_file << "o_step" <<"  " << "mean_square_displacement" << "\n";      
-//   //   }
-//   //   else{
-//   //     out_file.open("out.mean_square_displacement", std::ios_base::app);
-//   //   }
-//   //   out_file.precision(o_precision);
-//   //   out_file << o_step <<"  ";
-//   //   for (int i = 0; i < _dim; i++){
-//   //     out_file <<msd(i) <<"  ";
-//   //   }
-//   //   out_file<<"\n";
-//   //   out_file.close();       
-//   // }// end if comm_in_rank == 0  
-
-//   // STOP_LOG("write_particle_msd()", "ParticleMesh<KDDim>");
-// }
-
-
-  
-// ======================================================================
-template <unsigned int KDDim>
-void ParticleMesh<KDDim>::write_particle_mesh(const unsigned int& step_id,
-                                              const unsigned int& o_step) const
-{
-  START_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
-  this->comm().barrier();
-  std::ostringstream surface_mesh_file_name;
-  if(step_id == 0){
-    surface_mesh_file_name<< "particle_surface_mesh.e";  
-  }
-  else{
-    surface_mesh_file_name <<"particle_surface_mesh.e"<< "-s."
-                          << std::setw(8) << std::setfill('0') << std::right << o_step;
-  }
-  SerialMesh stitch_mesh (_particles[0]->mesh());
-  for(std::size_t i=1; i<_n_rigid_particles; ++i)
-  {
-    stitch_mesh.stitch_meshes(_particles[i]->mesh(),0,0);
-  }    
-  // output the stitched mesh
-  stitch_mesh.write(surface_mesh_file_name.str());
-  STOP_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
-}
-  
-  
-
-// ======================================================================
-template <unsigned int KDDim>
-SerialMesh& ParticleMesh<KDDim>::stitched_mesh()
-{
-  START_LOG ("merge_particle_mesh()", "ParticleMesh<KDDim>");
-
-  SerialMesh& _particles_mesh (_particles[0]->mesh());
-
-  // assign subdomain_id of 1st particle to 0
-  MeshBase::element_iterator     el = _particles_mesh.elements_begin();
-  MeshBase::element_iterator end_el = _particles_mesh.elements_end();
-  for ( ; el != end_el; ++el)
-  {
-     Elem* elem = *el;
-     elem->subdomain_id() = 0;
-  }
-
-  const std::size_t n_particles = this->num_particles();
-  if(n_particles>1)
-  {
-    for(std::size_t i=1; i<this->num_particles(); ++i)
-    {
-      // intermediate mesh to store each particle's mesh
-      SerialMesh mesh(_particles[i]->mesh());
-
-      // assign subdomain_id to particle_id
-      el     = mesh.elements_begin();
-      end_el = mesh.elements_end();
-
-      for ( ; el != end_el; ++el)
-      {
-         Elem* elem = *el;
-         elem->subdomain_id() = i;
-      }
-
-      _particles_mesh.stitch_meshes(mesh,0,0);
-    }
-  }
-
-  STOP_LOG ("merge_particle_mesh()", "ParticleMesh<KDDim>");
-
-  // return the stitched mesh
-  return _particles_mesh;
-}
-  
-  
-  
+   
 
 // ------------------------------------------------------------
 // Explicit Instantiations
@@ -1429,50 +1400,4 @@ template class ParticleMesh<2>;
 template class ParticleMesh<3>;
 
 } // end of namespace
-
-
-
-
-
-
-// ======================================================================
-//// KNN search to build neighbor list, NOT used in this program
-//template <unsigned int KDDim>
-//void ParticleMesh<KDDim>::build_particle_neighbor_list()
-//{
-//#ifdef LIBMESH_HAVE_NANOFLANN
-//  START_LOG ("build_particle_neighbor_list()", "ParticleMesh<KDDim>");
-//  
-//  // if the KD tree is not built, construct the KD tree first
-//  if (_kd_tree.get() == NULL)
-//    this->construct_kd_tree();
-//  
-//  // do a knn (k-nearest neighbors) search
-//  const std::size_t num_closest = 5;
-//  std::vector<std::size_t>  ret_index(num_closest);
-//  std::vector<Real>         ret_dist_sqr(num_closest);
-//  for (std::size_t j=0; j<_particles.size(); ++j)
-//  {
-//    const Point &tgt( _particles[j]->get_centroid() );
-//    const Real query_pt[] = { tgt(0), tgt(1), tgt(2) };
-//    
-//    // Find the 'num_results' nearest particles around the query_pt
-//    // return the indices (ret_index) and the distance square (ret_dist_sqr)
-//    _kd_tree->knnSearch(&query_pt[0], num_closest, &ret_index[0], &ret_dist_sqr[0]);
-//
-//    // output knn Search results:
-//    libMesh::out << "knnSearch(): num_closest = " << num_closest << "\n";
-//    for (std::size_t i=0;i<num_closest;i++)
-//    {
-//      libMesh::out<< "idx[" << i << "]=" << std::setw(6) << ret_index[i]
-//      << "\t dist["<< i << "]=" << ret_dist_sqr[i] << std::endl;
-//    }
-//    libMesh::out << "\n";
-//    
-//  } // end for j-loop over particles
-//  
-//  STOP_LOG ("build_particle_neighbor_list()", "InverseDistanceInterpolation<>");
-//#endif
-//} // end of build_particle_neighbor_list
-// ======================================================================
 

@@ -41,15 +41,15 @@ START_LOG("FixPointDiscretizedWallLJCut::compute()", "FixPointDiscretizedWallLJC
   for(std::size_t p_id=0; p_id<num_points; ++p_id)
   {  
     // apply lj force on particle i
-    std::vector<Real> pforce(dim);
+    Point pforce(0.);
     const Point pti   = point_particles[p_id]->point();
     // Loop over each wall_particle
     for (std::size_t j=0; j<wall_particle_pos.size(); ++j)
     {
       const Point r_ij  = point_mesh->pm_periodic_boundary()->point_vector(pti,wall_particle_pos[j]);
       if(r_ij.norm() <= rCut){
-        std::vector<Real> f_ij = fix_base.lj_force(r_ij, epsilon, sigma);
-        for (std::size_t _dim=0; _dim<dim; ++_dim) pforce[_dim] += f_ij[_dim];
+        Point f_ij = fix_base.lj_force(r_ij, epsilon, sigma);
+        pforce += f_ij;
       }
     } // end loop over neighbors 
     point_particles[p_id]->add_particle_force(pforce);

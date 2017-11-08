@@ -201,14 +201,13 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
 }
 
-void CopssPointParticleSystem::update_object(std::string stage)
+void CopssPointParticleSystem::update_object()
 {
   if(point_particle_model == "polymer_chain")
   {
     chain_broken = polymer_chain->check_chain(max_spring_len);
     if(chain_broken) {
-      output_msg = "   ********** warning: Polymer chain is broken " + stage +"\n"+
-                   "   ********** warning: bead position is corrected by scaling the chain length and moving the particle according to periodicity";
+      output_msg = "   ********** warning: Polymer chain is broken ---> bead position is corrected by scaling the chain length and moving the particle according to periodicity";
       PMToolBox::output_message(output_msg, comm_in);
     }
   }  
@@ -255,7 +254,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
               << "updating neighborList at each step seems tiny, but we have not fully validated it." <<std::endl;
   }
   // Get a better conformation of polymer chains before simulation.
-  this -> update_object("in initial data input");
+  this -> update_object();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   Compute undisturbed velocity field without particles.
   NOTE: We MUST re-init particle-mesh before solving Stokes

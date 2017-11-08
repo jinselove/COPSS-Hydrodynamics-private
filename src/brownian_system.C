@@ -75,9 +75,9 @@ PetscErrorCode _MatMult_Stokes(Mat M,Vec f,Vec u)
   //ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&rank);CHKERRQ(ierr);
   //for (std::size_t i=0; i<_n_points; ++i)
   //{
-  //  std::vector<Real> pforce = particles[i]->particle_force();
+  //  Point pforce = particles[i]->particle_force();
   //  printf("the %lu-th particle force = (%f, %f, %f) on the rank = %d\n",
-  //         i, pforce[0], pforce[1], pforce[2],rank );
+  //         i, pforce(0), pforce(1), pforce(2),rank );
   //}
   
   
@@ -233,15 +233,15 @@ PetscErrorCode BrownianSystem::extract_particle_vector(Vec* x,
   {
     for (std::size_t i=0; i<_n_points; ++i)
     {
-      std::vector<Real> pforce(_dim);
+      Point pforce(0.);
       if(mode=="extract")
       {
         pforce = point_particles[i]->particle_force();
-        for(std::size_t j=0; j<_dim; ++j) px[i*_dim+j] = pforce[j];
+        for(std::size_t j=0; j<_dim; ++j) px[i*_dim+j] = pforce(j);
       }
       else if(mode=="assign")
       {
-        for(std::size_t j=0; j<_dim; ++j) pforce[j] = px[i*_dim+j];
+        for(std::size_t j=0; j<_dim; ++j) pforce(j) = px[i*_dim+j];
         point_particles[i]->set_particle_force(pforce);
       }
       else

@@ -72,7 +72,7 @@ protected:
 	void set_parameters(EquationSystems& equation_systems) override;
 
 	// update object due to PBC after check_wall()
-	void update_object(std::string stage) override;
+	void update_object();
         
     // write object to output file
     void write_object(unsigned int step_id) override;

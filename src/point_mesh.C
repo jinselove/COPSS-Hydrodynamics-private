@@ -1047,6 +1047,34 @@ void PointMesh<KDDim>::set_bead_velocity(const std::vector<Real>& vel)
   STOP_LOG("PointMesh::set_bead_velocity()", "PointMesh");
 }
 
+// ======================================================================
+template <unsigned int KDDim>
+const void PointMesh<KDDim>::write_bead_pos() const
+{ 
+  std::ostringstream oss;
+  oss << "output_initial_bead_position.csv";
+  std::ofstream out_file;
+  if (this->comm().rank() == 0){
+    out_file.open(oss.str(), std::ios_base::out);
+    // write out the csv file  
+    // POINT data
+    out_file <<"scalar x_coord y_coord z_coord\n";
+    out_file.precision(6);
+    for(std::size_t i=0; i<_num_point_particles; ++i)
+    {
+      out_file << i << " ";
+      // write position
+      for(std::size_t j=0; j<KDDim; ++j){
+        out_file << _particles[i]->center()(j) << " ";
+      }
+      out_file <<"\n";
+    }
+    out_file << "\n";
+    out_file.close();
+  } // end if comm_in_rank == 0
+}
+
+
 // ------------------------------------------------------------
 // Explicit Instantiations
 template class PointMesh<1>;

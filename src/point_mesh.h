@@ -465,6 +465,11 @@ public:
    * Calculate minimum point particle (or rigid particle surface nodes) velocity
    */
   const Real& minimum_bead_velocity() const {return _min_velocity_magnitude;};
+
+  /** 
+   * Write bead positions to csv file
+   */
+  const void write_bead_pos() const;
    
   
 private:

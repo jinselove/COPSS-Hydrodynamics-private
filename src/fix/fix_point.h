@@ -53,7 +53,7 @@ public:
   */
   void initParticleType();
 
-  virtual void initPointParticleType() {}
+  virtual void initPointParticleType() {};
 
   void check_walls();
 

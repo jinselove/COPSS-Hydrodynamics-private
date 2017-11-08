@@ -71,29 +71,25 @@ void FixRigidSurfaceConstraint::compute_constraint_force(const std::size_t& i,
     node_neighbors    = mesh_spring->nodes_neighbors(j);
     const Point& pt0  = rigid_particles[i]->mesh_point(j);
     // 2. Loop over each neighboring nodes and compute the SPRING forces
-    std::vector<Real> spring_f(dim,0.);
+    Point spring_f(0.);
     for(std::size_t k=0; k<node_neighbors.size(); ++k)
     {
       const std::size_t& neigh_id = node_neighbors[k].first;
       const Real&        neigh_l0 = node_neighbors[k].second;
       const Point& ptk = rigid_particles[i]->mesh_point(neigh_id);
       const Point R_ij = particle_mesh->pm_periodic_boundary()->point_vector(pt0,ptk);
-      // if(R_ij.size() != neigh_l0) {
-      //   std::cout << "Error: initial surface mesh distance is not equal to initial bond length" <<std::endl;
-      //   std::cout << "|R_ij| = " <<R_ij.size() <<"; neigh_l0 = " <<neigh_l0 << std::endl;
-      // }
-      std::vector<Real> sf  = fix_base.spring_force_lhs(R_ij,neigh_l0,surface_spring_constant);
-      for(std::size_t l=0; l<dim; ++l) spring_f[l] += sf[l];
+      Point sf  = fix_base.spring_force_lhs(R_ij,neigh_l0,surface_spring_constant);
+      spring_f += sf;
     } // end for k-loop
     // 3. compute the Spring force between the node the the particle center
     const Real  lc0    = mesh_spring->node_center_equilibrium_dist(j);
     const Point Rc_ij  = particle_mesh->pm_periodic_boundary()->point_vector(pt0,p_centroid);
-    std::vector<Real> sfc  = fix_base.spring_force_lhs(Rc_ij,lc0,center_spring_constant);
+    Point sfc  = fix_base.spring_force_lhs(Rc_ij,lc0,center_spring_constant);
     
     //std::cout << "|Rc_ij| = " <<Rc_ij.size() <<"; lc0 = " <<lc0 << std::endl;
-    for(std::size_t k=0; k<dim; ++k) spring_f[k] += sfc[k];
+    spring_f += sfc;
     // 4. convert the point local id to the global id, and apply forces.
-    for(std::size_t k=0; k<dim; ++k) nodal_force[j](k) = spring_f[k];
+    nodal_force[j] = spring_f;
     /* - - - - - - - - - - - - - - - - - - - - - - - - - -- - - - -
      * test: print out the spring force on each node.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -101,9 +97,9 @@ void FixRigidSurfaceConstraint::compute_constraint_force(const std::size_t& i,
    // {
    //   printf("--->test in ForceField::rigid_constraint_force(), Particle %lu\n",i);
    //   printf("--->Spring force (surface+center=total) on node %lu is fs = (%f,%f,%f)\n",
-   //          j,spring_f[0],spring_f[1],spring_f[2]);
+   //          j,spring_f(0),spring_f(1),spring_f(2);
    //   printf("--->Spring force (center) on node %lu is               fs = (%f,%f,%f)\n",
-   //          j,sfc[0],sfc[1],sfc[2]);
+   //          j,sfc(0),sfc(1),sfc(2);
    // }
     
   } // end for j-loop

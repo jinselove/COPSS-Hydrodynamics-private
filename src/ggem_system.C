@@ -393,12 +393,12 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
     // end if-else
     
     // 2. compute the force vector of particle-v
-    const std::vector<Real> fv = point_mesh->particles()[p_id]->particle_force();
+    const Point fv = point_mesh->particles()[p_id]->particle_force();
     
     // 3. compute u due to this particle
     for (std::size_t i=0; i<dim; ++i)
       for (std::size_t j=0; j<dim; ++j)
-        u[i] += GT(i,j)*fv[j];
+        u[i] += GT(i,j)*fv(j);
     
     // ================ test output of GT, fv, and u ===========
 //    printf("--------------------------- output matrix GT ---------------------------\n");
@@ -469,12 +469,12 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
     // end if-else
     
     // 2. compute the force vector of particle-v
-    const std::vector<Real> fv = point_mesh->particles()[p_id]->particle_force();
+    const Point fv = point_mesh->particles()[p_id]->particle_force();
     
     // 3. compute u due to this particle
     for (std::size_t i=0; i<dim; ++i)
       for (std::size_t j=0; j<dim; ++j)
-        u[i] += GT(i,j)*fv[j];
+        u[i] += GT(i,j)*fv(j);
   } // end for v-loop
   
   
@@ -496,12 +496,12 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
     // end if-else
     
     // 2. compute the force vector of this particle
-    const std::vector<Real> fv = point_mesh->particles()[pid0]->particle_force();
+    const Point fv = point_mesh->particles()[pid0]->particle_force();
     
     // 3. compute u due to this particle
     for (std::size_t i=0; i<dim; ++i)
       for (std::size_t j=0; j<dim; ++j)
-        u[i] += GT(i,j)*fv[j];
+        u[i] += GT(i,j)*fv(j);
   }
   
   
@@ -521,13 +521,13 @@ std::vector<Real> GGEMSystem::global_self_exclusion(PointMesh<3>* point_mesh,
   START_LOG ("self_exclusion()", "GGEMSystem");
   
   // 1. compute the force vector of the particle
-  const std::vector<Real> fv = point_mesh->particles()[pid0]->particle_force();
+  const Point fv = point_mesh->particles()[pid0]->particle_force();
   const Real   c0 = 1.0/(8.*PI*mu);
   
   // 2. compute the self exclusion term at the position of the i-th bead
   std::vector<Real> self_v(dim);
   for (std::size_t i=0; i<dim; ++i)
-    self_v[i] = c0*4.0*alpha/sqrt_pi*fv[i];
+    self_v[i] = c0*4.0*alpha/sqrt_pi*fv(i);
   
   STOP_LOG ("self_exclusion()", "GGEMSystem");
   

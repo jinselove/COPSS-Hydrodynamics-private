@@ -212,7 +212,16 @@ public:
    * Update the particle position, which is achieved
    * by updating the coordinates of each node on the mesh.
    */
-  void update_mesh(const std::vector<Point>& nodal_vec);
+  void update_mesh(const std::vector<Point>& nodal_pos,
+                   const std::vector<Point>& nodal_vel);
+
+  
+  /*
+   * Update the particle position, which is achieved
+   * by updating the coordinates of each node on the mesh.
+   */
+  void update_mesh(const std::vector<Point>& nodal_pos);
+
 
   /*
    * Rebuild mesh when rigidparticle is forced to make a translation move
@@ -425,12 +434,22 @@ public:
    * so we can only calculate centroid_velocity in point_mesh.C and assign it
    * to this rigid particle
    */
-  Point& compute_centroid_velocity();
+  void compute_centroid_velocity();
+
+  /*! \brief get centroid velocity
+  *
+  */
+  const Point& centroid_velocity() {return _centroid_velocity;};
   
   /*! \brief compute body force
    *
    */
-  Point& compute_centroid_force();
+  void compute_centroid_force();
+
+  /*! get centroid force
+  *
+  */
+  const Point& centroid_force() {return _centroid_force;}; 
 
 private:
     
@@ -439,6 +458,15 @@ private:
 
   // particle type
   int _particle_type;
+
+  // number of surface nodes
+  std::size_t _num_mesh_node;
+
+  // number of surface element
+  std::size_t _num_mesh_elem;
+
+  // mesh size
+  std::vector<Real> _mesh_size;
 
   // dim
   std::size_t _dim;

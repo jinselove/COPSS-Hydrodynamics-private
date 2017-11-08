@@ -69,7 +69,7 @@ public:
    * If force is normalized by bead radius a, we have 
    * c1 = a/(2bk), and c2 = q0/a = Nks*bk/a
    */
-  std::vector<Real> spring_force_wls(const Point& R_ij,      // direction vector
+  Point spring_force_wls(const Point& R_ij,      // direction vector
                                              const Real&  c1,        // constant 1
                                              const Real&  Ls) const; // constant 2
   
@@ -85,10 +85,10 @@ public:
    * If force is normalized by bead radius a, we have
    * c1 = 3a/bk, and c2 = q0/a = Nks*bk/a
    */
-  std::vector<Real> spring_force_fene(const Point& R_ij,      // direction vector
-                                              const Real&  c1,        // constant 1:
-                                              const Real&  Ls) const; // constant 2:
-  
+  Point spring_force_fene(const Point& R_ij,      // direction vector
+                          const Real&  c1,        // constant 1:
+                          const Real&  Ls) const; // constant 2:
+
   
   
   /*
@@ -102,9 +102,9 @@ public:
    *     c1 input is chi = 1/Nks, 
    *     Ls is q0 (max spring extension) or normalized q0 = q0/a = Nks*bk/a
    */
-  std::vector<Real> spring_force_ud(const Point& R_ij,      // direction vector
-                                            const Real&  c1,        // constant 1:
-                                            const Real&  Ls) const; // constant 2:
+  Point spring_force_ud(const Point& R_ij,      // direction vector
+                        const Real&  c1,        // constant 1:
+                        const Real&  Ls) const; // constant 2:
   
   
   /*
@@ -113,9 +113,9 @@ public:
    *
    * f_ij = k0*( |R_ij| - l0 )  * R_ij/|R_ij|
    */
-  std::vector<Real> spring_force_lhs(const Point& R_ij,      // direction vector
-                                             const Real&  l0,        // equilibrium distance
-                                             const Real&  k0) const; // spring constant
+  Point spring_force_lhs(const Point& R_ij,      // direction vector
+                         const Real&  l0,        // equilibrium distance
+                         const Real&  k0) const; // spring constant
   
   
   
@@ -129,9 +129,10 @@ public:
    * there is a negative sign before the force because r_ij = r_j - r_i, which has
    * an opposite direction as f_ij
    */
-  std::vector<Real> gaussian_force(const Point& r_ij,      // direction vector
-                                           const Real&  c1,        // constant 1: coefficient
-                                           const Real&  c2) const; // constant 2: exp coef
+  Point gaussian_force(const Point& r_ij,      // direction vector
+                       const Real&  c1,        // constant 1: coefficient
+                       const Real&  c2) const; // constant 2: exp coef
+
   /*
    * Compute the force acting on bead i
    * Dimensionless form:
@@ -142,9 +143,9 @@ public:
    * epsilon is dimensionless : epsilon = EPSILON / kBT
    * @ http://www.physics.buffalo.edu/phy516/jan28.pdf
    */
-  std::vector<Real> lj_force(const Point& r_ij, // direction vector
-                                         const Real& epsilon, // energy coefficient
-                                         const Real& sigma) const; // distance coefficient
+  Point lj_force(const Point& r_ij, // direction vector
+                 const Real& epsilon, // energy coefficient
+                 const Real& sigma) const; // distance coefficient
 
   /*
    * Compute the force acting on bead i
@@ -157,10 +158,10 @@ public:
    * k is dimensionless: k = K /kBT
    * @ Edmond Chow and Jeffrey Skolnick (2015), www.pnas.org/cgi/doi/10.1073/pnas.1514757112
    */
-  std::vector<Real> harmonic_force(const Point& r_ij, // direction vector
-                                           const Real& k, // equilibrium distance
-                                           const Real& r0) const; // energy coefficient
-  
+  Point harmonic_force(const Point& r_ij, // direction vector
+                       const Real& k, // equilibrium distance
+                       const Real& r0) const; // energy coefficient
+
   
   /*
    * Compute the force on the bead i, whose direction is from i to j
@@ -169,10 +170,10 @@ public:
    * force    : f_i = -dUw/dy = -c0*( 1 - y/dwall )^2 * r_ij.unit(), where c0 > 0 and r_ij = rj - ri
    * Jendrejack, R. M., Schwartz, D. C., Graham, M. D., & de Pablo, J. J. (2003). Effect of confinement on DNA dynamics in microfluidic devices. The Journal of Chemical Physics, 119(2), 1165–10. http://doi.org/10.1063/1.1575200
    */
-  std::vector<Real> polymer_wall_empirical_force(const Point& r_ij,    // vector from particle to wall (or particle i to particle j, r_j-r_i)
-                                                const Real&  c0,        // constant 1:
-                                                const Real&  d0) const; // constant 2:
-  
+  Point polymer_wall_empirical_force(const Point& r_ij,    // vector from particle to wall (or particle i to particle j, r_j-r_i)
+                                    const Real&  c0,        // constant 1:
+                                    const Real&  d0) const; // constant 2:
+
   
   
   /*
@@ -180,14 +181,14 @@ public:
    * Ref:
    * Londono-Hurtado et al. J Reinforced Plastic&Composites 30(9) 781-790(2011)
    */
-  std::vector<Real> friction_force(const Point& bead_1,       // position of bead 1
-                                           const Point& bead_2,       // position of bead 2
-                                           const std::vector<Real>& v1, // velocity of bead 1
-                                           const std::vector<Real>& v2, // velocity of bead 2
-                                           const std::vector<Real>& fxv_12, // excluded vol force
-                                           const Real& Hf,            // friction coef
-                                           const Real& dmin) const;   // minimum distance
-  
+  Point friction_force(const Point& bead_1,       // position of bead 1
+                       const Point& bead_2,       // position of bead 2
+                       const std::vector<Real>& v1, // velocity of bead 1
+                       const std::vector<Real>& v2, // velocity of bead 2
+                       const std::vector<Real>& fxv_12, // excluded vol force
+                       const Real& Hf,            // friction coef
+                       const Real& dmin) const;   // minimum distance
+
   
   
   

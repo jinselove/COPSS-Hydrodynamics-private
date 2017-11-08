@@ -602,7 +602,7 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
     // Now we will build the element RHS using high order gauss quadrature.
     // first loop over all neighboring particles near this element
     Point np_pos(0.);
-    std::vector<Real> np_force(_dim, 0.);
+    Point np_force(0.);
     Real r = 0. , force_val = 0.;
     unsigned int qp_size = q_xyz.size();
    // printf("qp_size = %d\n", q_xyz.size());
@@ -617,8 +617,8 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
         for (unsigned int j=0; j<_dim; ++j){
         	for (unsigned int k=0; k<n_u_dofs; ++k){
 //            Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues_j;
-        		 Fe(j*n_u_dofs + k) += _int_force[elem_id][k*qp_size+qp]*force_val*np_force[j];
-//              Fe(j*n_u_dofs + k) += _int_force[elem_id][k]*force_val*np_force[j];
+        		 Fe(j*n_u_dofs + k) += _int_force[elem_id][k*qp_size+qp]*force_val*np_force(j);
+//              Fe(j*n_u_dofs + k) += _int_force[elem_id][k]*force_val*np_force(j);
          	} // end loop over nodes
         }// end loop over dimensions
       } // end loop over gaussian points

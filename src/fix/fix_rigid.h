@@ -80,9 +80,10 @@ public:
   void check_pbc_post_fix();
 
   /*
-   * attach nodal force on particle nodes once given nodal_force_density, which will be calculate in each sub-fix
+   * sync force from nodes to point mesh
    */
-  void attach_nodal();
+  void sync_node_to_pointmesh();
+
 
 protected:
   // The elastic system for solids

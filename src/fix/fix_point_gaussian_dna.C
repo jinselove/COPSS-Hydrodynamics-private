@@ -56,7 +56,7 @@ void FixPointGaussianDNA::compute()
   for(std::size_t p_id=0; p_id < num_points; ++p_id)
   {  
     // apply the excluded volume force to each particle i
-    std::vector<Real> pforce(dim);
+    Point pforce(0.);
     const Point pti   = point_particles[p_id]->point();
     std::vector<std::pair<std::size_t,Real> > n_list = point_particles[p_id]->neighbor_list();    
     // Loop over each neigbhor
@@ -67,8 +67,8 @@ void FixPointGaussianDNA::compute()
       {
         const Point ptj   = point_particles[n_id]->point();
         const Point r_ij  = point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-        std::vector<Real> f_ij = fix_base.gaussian_force(r_ij, c1, c2);
-        for (std::size_t _dim=0; _dim < dim; ++_dim) pforce[_dim] += f_ij[_dim];
+        Point f_ij = fix_base.gaussian_force(r_ij, c1, c2);
+        pforce += f_ij;
       } // end if
     } // end for i-loop    
     point_particles[p_id]->add_particle_force(pforce);

@@ -173,15 +173,18 @@ void FixRigid::check_pbc_post_fix()
 }
 
 //===================================================================
-void FixRigid::attach_nodal()
+void FixRigid::sync_node_to_pointmesh()
 {
-  START_LOG("FixRigid::attach_nodal()", "FixRigid");
+  START_LOG("FixRigid::sync_node_to_pointmesh()", "FixRigid");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop over each particle, and add the body force to each node.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+  // printf("debug 1\n");
   std::size_t point_start_id = 0;
   for(std::size_t i=0; i < num_rigid_particles; ++i)
   {
+  // printf("particle %d debug 1\n", i);
+
     std::vector<Point> nodal_force;
     rigid_particles[i]->get_node_force(nodal_force); 
     /*
@@ -197,21 +200,16 @@ void FixRigid::attach_nodal()
       // Store a pointer to the element we are currently working on.
       Node* node = *nd;
       const dof_id_type node_id = node->id();
-      // get the dof numbers at this node (only for force vector)
-      std::vector<Real> gforce(dim,0.);
-      for(std::size_t k=0; k<dim; ++k){
-        gforce[k] = nodal_force[node_id](k);
-      } // end k-loop
+      // printf("node id %d\n", node_id );
+      Point gforce = nodal_force[node_id];
       point_mesh->particles()[point_start_id+node_id]->add_particle_force(gforce);
     //  ------------------ TEST: print out the nodal force ----------------------
-      // if(_pm_system->comm().rank()==0){
-      //   printf("--->TEST:reinit_force_field() gforce = (%f,%f,%f)\n",gforce[0],gforce[1],gforce[2]);
+      // if(pm_system->comm().rank()==0){
+      //   printf("--->TEST:reinit_force_field() gforce = (%f,%f,%f)\n",gforce(0),gforce(1),gforce(2));
       //   printf("         nodal force = (%f,%f,%f)\n",
       //          nodal_force[node_id](0),nodal_force[node_id](1),nodal_force[node_id](2));
-      //   printf("         rigid_nodal_force = (%f,%f,%f)\n",
-      //          rigid_nodal_force[node_id](0),rigid_nodal_force[node_id](1),rigid_nodal_force[node_id](2));
       // }
-      // -------------------------------------------------------------------------    
+    //  -------------------------------------------------------------------------    
     } // end for nd-loop
     // Point test_centroid_force;
     // for (int test_i=0; test_i<point_mesh->num_particles(); test_i++){
@@ -223,6 +221,6 @@ void FixRigid::attach_nodal()
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     point_start_id += n_nodes;
   } // end for i-loop
-  STOP_LOG("FixRigid::attach_nodal()", "FixRigid");
+  STOP_LOG("FixRigid::sync_node_to_pointmesh()", "FixRigid");
 }
 

@@ -320,7 +320,7 @@ void PMLinearImplicitSystem::compute_point_velocity(const std::string& option,
   {
     // id and position for the current bead
     const std::size_t pid      = _pid_send_list[i];
-    const std::vector<Real> fv = _point_mesh->particles()[pid]->particle_force();
+    const Point fv = _point_mesh->particles()[pid]->particle_force();
     const PointType point_type = _point_mesh->particles()[pid]->point_type();
     
     // exclusion of "self-term" for the global (FEM) solution
@@ -331,7 +331,7 @@ void PMLinearImplicitSystem::compute_point_velocity(const std::string& option,
     {
       if (option=="disturbed") {
         if(point_type==POLYMER_BEAD) {          // the point is "bead"
-          pv[dim*pid+j] = _pv_send_list[dim*i+j] + pvlocal[dim*pid+j]  - Uex[j] + fv[j]/drag0;
+          pv[dim*pid+j] = _pv_send_list[dim*i+j] + pvlocal[dim*pid+j]  - Uex[j] + fv(j)/drag0;
         }
         else if(point_type==LAGRANGIAN_POINT) { // the point is a tracking point
 //          const Real hmin   = this->get_equation_systems().parameters.get<Real> ("solid mesh size");
@@ -356,7 +356,7 @@ void PMLinearImplicitSystem::compute_point_velocity(const std::string& option,
   //    printf("              Ulocal (Green Function) = (%E, %E, %E)\n",
   //           pvlocal[dim*i],pvlocal[dim*i+1],pvlocal[dim*i+2] );
   //    printf("              Uexc    = (%E, %E, %E)\n", Uex[0], Uex[1], Uex[2] );
-  //    printf("       Stokes drag    = (%E, %E, %E)\n", fv[0], fv[1], fv[2] );
+  //    printf("       Stokes drag    = (%E, %E, %E)\n", fv(0), fv(1), fv(2) );
   //    printf("           ---Utotal  = (%E, %E, %E)\n\n",
   //           pv[dim*pid], pv[dim*pid+1], pv[dim*pid+2] );
   //   }
@@ -426,23 +426,13 @@ void PMLinearImplicitSystem::reinit_hi_system(bool& neighbor_list_update_flag)
     _particle_mesh->zero_node_force();
     // need to check if particles are on the pbc, if so, rebuild the particle mesh
     _fixes[0]->check_pbc_pre_fix();
-    /*
-     * apply compute for all fixes
-     * FixRigidSurfaceConstraint::compute() applies surface constraint force on each node
-     * All the other fix::compute() only add a body force density to each particles
-     */
+    // compute forces on surface nodes
     for (std::size_t i = 0; i < _fixes.size(); i++){
+     // _fixes[i]->print_fix();
       _fixes[i]->compute();
     }
-    /* since all the other fix::compute() expect for FixRigidSurfaceConstraint::compute
-     * only add a body force density to each particle, we need to attach forces on each node
-     * using this force density
-     * Notice that: this attach_nodal() function only needs to be called once since the body force
-     * density is already the total one.
-     */
-    // for (std::size_t i = 0; i<_fixes.size(); i++){
-      _fixes[0] -> attach_nodal();
-    // }
+    // sync forces on nodes to PointParticles in point mesh 
+    _fixes[0] -> sync_node_to_pointmesh();
     // need to restore particle mesh after applying all fixes if particles are on pbc
     _fixes[0]->check_pbc_post_fix();
   }
@@ -475,26 +465,12 @@ void PMLinearImplicitSystem::reinit_fd_system(bool& neighbor_list_update_flag)
     _particle_mesh->zero_node_force();
     // need to check if particles are on the pbc, if so, rebuild the particle mesh
     _fixes[0]->check_pbc_pre_fix();
-    /*
-     * apply compute for all fixes
-     * FixRigidSurfaceConstraint::compute() applies surface constraint force on each node
-     * All the other fix::compute() only add a body force density to each particles
-     */
+    // compute forces on surface nodes
     for (std::size_t i = 0; i < _fixes.size(); i++){
       _fixes[i]->compute();
     }
-    /* since all the other fix::compute() expect for FixRigidSurfaceConstraint::compute
-     * only add a body force density to each particle, we need to attach forces on each node
-     * using this force density
-     * Notice that: this attach_nodal() function only needs to be called once since the body force
-     * density is already the total one.
-     */
-    for (std::size_t i = 0; i<_fixes.size(); i++){
-      // if (_fixes[i]->force_type != "surface_constraint"){
-       _fixes[i] -> attach_nodal();
-       // break;
-      // }
-    }
+    // sync forces on nodes to PointParticles in point mesh
+    _fixes[0] -> sync_node_to_pointmesh();
     // need to restore particle mesh after applying all fixes if particles are on pbc
     _fixes[0]->check_pbc_post_fix();
   }

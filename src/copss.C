@@ -1047,7 +1047,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       coef = 0.5;                    // coefficient. sqrt(2) is introduced when generating dw
       VecAXPY(R_mid,coef,dw_mid);    // R_mid = R_mid + 0.5*sqrt(2)*D*B^-1*dw
       brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
-      this -> update_object("after midpoint at step"+std::to_string(i)); 
+      this -> update_object(); 
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Update the particle mesh for the mid-point step,
        and recompute U0 + U1_mid, D_mid*(B^-1*dw)
@@ -1074,7 +1074,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       VecWAXPY(R_mid,dt,U0,R0);         // R_mid = R0 + dt*U0_mid
       VecAXPY(R_mid,2.0*coef,dw_mid); // R_mid = R_mid + sqrt(2)*D_mid*B^-1*dw
       brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
-      this -> update_object("after step "+std::to_string(i));
+      this -> update_object();
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
       VecAXPY(ROUT,2.0*coef,dw_mid);  // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
@@ -1085,7 +1085,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
       VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
       brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords 
-      this -> update_object("after step "+std::to_string(i));
+      this -> update_object();
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
     } // end else (without_brownian)
@@ -1113,7 +1113,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
   Point p_velocity(0.);
   for (std::size_t p_id = 0; p_id < NP; p_id++) {
     for (int _dim = 0; _dim < dim; _dim++){
-      p_velocity(_dim) = point_mesh->particles()[p_id]->particle_force()[_dim];        
+      p_velocity(_dim) = point_mesh->particles()[p_id]->particle_force()(_dim);        
       vel1[dim*p_id+_dim] = p_velocity(_dim);
     } 
   }
@@ -1211,7 +1211,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
     coef = 1.;                    // coefficient. 
     VecAXPY(R_mid,coef,dw);    // R_mid = R_mid + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1
     brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
-    this -> update_object("after midpoint at step"+std::to_string(i)); 
+    this -> update_object(); 
     // Update ROUT (position vector excluding pbc) at the i-th step
     VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
     VecAXPY(ROUT,coef,dw);   // ROUT = ROUT + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1
@@ -1222,7 +1222,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems,
     brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
     VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
     brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords
-    this -> update_object("after step "+std::to_string(i));
+    this -> update_object();
     // Update ROUT (position vector excluding pbc) at the i-th step
     VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
   } // end else (without_brownian)

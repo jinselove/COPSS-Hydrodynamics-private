@@ -75,13 +75,13 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
     
     // use ksi instead of alpha
     GT = ggem_system.green_tensor_exp(x,ksi,muc,dim,zero_limit);
-    const std::vector<Real> fv = _pm_system.point_mesh()->particles()[i]->particle_force();
-    //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv[0],fv[1],fv[2]);
+    const Point fv = _pm_system.point_mesh()->particles()[i]->particle_force();
+    //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv(0),fv(1),fv(2);
     
     // 3. compute u due to this particle
     for (std::size_t k=0; k<dim; ++k){
       for (std::size_t l=0; l<dim; ++l){
-        UA[k] += GT(k,l)*fv[l];
+        UA[k] += GT(k,l)*fv(l);
       } // end for l
     } // end for k
   } // end for i

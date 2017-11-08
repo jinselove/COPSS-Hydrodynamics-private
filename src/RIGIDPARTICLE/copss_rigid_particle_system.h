@@ -63,8 +63,8 @@ protected:
 	// set parameters for equations systems
 	void set_parameters(EquationSystems& equation_systems) override;
 
-	// update object due to PBC after check_wall()
-	void update_object(std::string stage) override;
+	// // update object due to PBC after check_wall()
+	void update_object() override {};
 
 	// write object to object file
 	void write_object(unsigned int step_id) override;

@@ -220,7 +220,30 @@ public:
                                          const Real&    hs,       /* mesh size of solids */
                                          const std::size_t& dim,  /*dim==3*/
                                          const std::string& force_type) const;
-  
+
+  /* Compute the local vel-solution of the fluid at a given point ptx
+   * due to smoothed/regularized point forces.
+   * force_type: regularized, smooth
+   *
+   * NOTE: due to the fast convergence of gaussian function, only a small group of 
+   * particles within the neighbor list are considered. There are two ways
+   * to construct this neighbor list:
+   * (1) element independent: directly search particles near the given point using KDTree;
+   * (2) element dependent: directly use the neighbor list of the parent element;
+   * this function implement method (1), which contains a short neighbor list
+   *
+   * Eqn (33) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
+   */
+  std::vector<Real> local_velocity_fluid(PointMesh<3>*  point_mesh,
+                                         const Elem* elem,
+                                         const Point&   ptx,      /* a pt in space */
+                                         const Real&    alpha,    /* alpha parameter */
+                                         const Real&    mu,       /* kinematic viscosity */
+                                         const Real&    br0,      /* normalized bead radius */
+                                         const Real&    hs,       /* mesh size of solids */
+                                         const std::size_t& dim,  /*dim==3*/
+                                         const std::string& force_type) const;
+    
   
   /*
    * Compute the local velocity of a point/bead with point_id = pid0.

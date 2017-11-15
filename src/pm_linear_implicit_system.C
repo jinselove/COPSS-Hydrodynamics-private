@@ -135,14 +135,20 @@ void PMLinearImplicitSystem::assemble_rhs(const std::string& system_name,
   libmesh_assert (this->rhs->initialized());
   
   START_LOG("assemble_rhs()", "PMLinearImplicitSystem");
-  
+ PerfLog perf_log("assemble_rhs"); 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    init, assemble, and close the rhs vector
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+perf_log.push("zero");
   this->rhs->zero();
+perf_log.pop("zero");
   //assemble_rhs_sedimentation_ex1 (this->get_equation_systems(), system_name, option);
+perf_log.push("assemble");
   _assemble_ns->assemble_global_F(system_name, option);
+perf_log.pop("assemble");
+perf_log.push("close");
   this->rhs->close();
+perf_log.pop("close");
   
   STOP_LOG("assemble_rhs()", "PMLinearImplicitSystem");
 }
@@ -155,7 +161,7 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
                                            const bool& re_init)
 {
   START_LOG("solve_stokes()", "PMLinearImplicitSystem");
-// PerfLog perf_log("solve_stokes");
+ PerfLog perf_log("solve_stokes");
 //  Real t1, t2;
   //std::string msg = "---> solve Stokes";
   //PMToolBox::output_message(msg, this->comm());
@@ -190,9 +196,9 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
    assemble the rhs vector, and record the CPU wall time.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 //  t1 = MPI_Wtime();
-// perf_log.push("assemble_rhs");
+ perf_log.push("assemble_rhs");
   this->assemble_rhs ("Stokes",option);
-// perf_log.pop("assemble_rhs");
+ perf_log.pop("assemble_rhs");
 
 //  t2 = MPI_Wtime();
   //std::cout << "Time used to assemble the right-hand-side vector is " <<t2-t1<<" s\n";
@@ -201,9 +207,9 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    solve the problem
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-// perf_log.push("solve()");
+ perf_log.push("solve()");
   _stokes_solver.solve();
- // perf_log.pop("solve()");
+ perf_log.pop("solve()");
 
   
   STOP_LOG("solve_stokes()", "PMLinearImplicitSystem");
@@ -484,8 +490,6 @@ void PMLinearImplicitSystem::reinit_fd_system(bool& neighbor_list_update_flag)
   STOP_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
 }
 
-  
-
 // ==================================================================================
 std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Point &p,
                                                                  const std::string& force_type) const
@@ -526,6 +530,54 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Point &p,
    ---------------------------------------------------------------------------------------- */
   GGEMSystem ggem_sys;
   std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,p,alpha,mu,bead_r0,
+                                                           hmin,dim,force_type);
+ 
+  
+  STOP_LOG("local_velocity_fluid()", "PMLinearImplicitSystem");
+  return Ulocal;
+}  
+
+// ==================================================================================
+std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Elem* elem,
+                                                                 const Point &p,
+                                                                 const std::string& force_type) const
+{
+  START_LOG("local_velocity_fluid()", "PMLinearImplicitSystem");
+  
+  /* ----------------------------------------------------------------------------------------
+   * get parameters of equation systems:
+   * mu = 1/(6*PI) and bead_r0 = 1 are normalized viscosity and bead radius, respectively!
+   ---------------------------------------------------------------------------------------- */
+  const std::size_t dim  =  this->get_mesh().mesh_dimension();
+  const Real         mu  =  this->get_equation_systems().parameters.get<Real> ("viscosity_0");
+  const Real      alpha  =  this->get_equation_systems().parameters.get<Real> ("alpha");
+  const Real    bead_r0  =  this->get_equation_systems().parameters.get<Real> ("br0");
+  
+  
+  /* ----------------------------------------------------------------------------------------
+   FIXME: When system contains different "particle_type", for example, interaction of
+   particle and polymer chain, this becomes invalid!
+   ---------------------------------------------------------------------------------------- */
+  const std::string particle_type
+           = this->get_equation_systems().parameters.get<std::string> ("particle_type");
+  
+  
+  /* ----------------------------------------------------------------------------------------
+   Mesh size for fluid and solid, which will be used to get the local solution.
+   For point particle simulation, there is no solid mesh. "hmin" actually is NOT used.
+   For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
+   ---------------------------------------------------------------------------------------- */
+  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
+  if(particle_type=="rigid_particle"){
+    hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
+  }
+  
+  
+  /* ----------------------------------------------------------------------------------------
+   compute the local velocity corresponding to the unbounded domain
+   ---------------------------------------------------------------------------------------- */
+  GGEMSystem ggem_sys;
+  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,elem,p,alpha,mu,bead_r0,
                                                            hmin,dim,force_type);
  
   

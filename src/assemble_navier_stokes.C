@@ -785,7 +785,8 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
         if(option=="disturbed")
         {
           const Point ptx = side->point(nn);
-          const std::vector<Real> u_local = pm_system.local_velocity_fluid(ptx,"regularized");
+          const std::vector<Real> u_local = pm_system.local_velocity_fluid(elem, ptx,"regularized");
+          // const std::vector<Real> u_local = pm_system.local_velocity_fluid(ptx,"regularized");
           // ---------------- setup for validation test 01 -------------
           if(_eqn_sys.parameters.get<std::string> ("test_name") == "ggem_validation")
           {

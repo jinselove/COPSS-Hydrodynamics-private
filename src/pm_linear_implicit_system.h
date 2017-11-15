@@ -223,7 +223,15 @@ public:
    */
   std::vector<Real> local_velocity_fluid(const Point &p,
                                          const std::string& force_type) const;
-  
+
+  /**
+   * Local velocity of a fluid point in an unbounded space,
+   * which is computed from Green's function
+   * force_type: "regularized" or "smooth"
+   */
+  std::vector<Real> local_velocity_fluid(const Elem* elem,
+                                         const Point &p,
+                                         const std::string& force_type) const;  
   
   /**
    * Local velocity of a bead in an unbounded space,

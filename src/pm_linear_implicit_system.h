@@ -238,14 +238,14 @@ public:
    * which is computed from Green's function.
    * force_type: "regularized"  or "smooth"
    */
-  std::vector<Real> local_velocity_bead(const std::size_t& bead_id,
+  Point local_velocity_bead(const std::size_t& bead_id,
                                         const std::string& force_type) const;
   
   
   /*
    * Self-exclusion term for the velocity at the i-th bead
    */
-  std::vector<Real> global_self_exclusion(const std::size_t p_id) const;
+  Point global_self_exclusion(const std::size_t p_id) const;
   
   
   

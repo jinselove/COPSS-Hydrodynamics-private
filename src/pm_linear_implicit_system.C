@@ -222,17 +222,23 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
 void PMLinearImplicitSystem::compute_point_velocity(const std::string& option,
                                                     std::vector<Real>& pv)
 {
-  //START_LOG("compute_point_velocity()", "PMLinearImplicitSystem");
-  
+  START_LOG("compute_point_velocity()", "PMLinearImplicitSystem");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    dim*NP: size of the velocity vector
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  const MeshBase& mesh = this->get_mesh();
   const std::size_t NP     =  _point_mesh->num_particles();
-  const std::size_t dim    =  this->get_mesh().mesh_dimension();
-  const dof_id_type n_elem =  this->get_mesh().n_elem();
-  std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
+  const std::size_t dim    = mesh.mesh_dimension();
+  const dof_id_type n_elem = mesh.n_elem();
+//  std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
   std::vector<Real> _pv_send_list;                      // point velocity send list
+  std::vector<Real> _pglobal_send_list;
+  std::vector<Real> _plocal_send_list;
   std::vector<std::size_t> _pid_send_list;              // point id send list
+  const unsigned int u_var = this->variable_number ("u");      // u_var = 0
+  const unsigned int v_var = this->variable_number ("v");      // v_var = 1
+  const unsigned int w_var = this->variable_number ("w");      // w_var = 2
+  const std::string force_type = "regularized";
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop over each point, and compute its velocity.
    Collect the global velocity from FEM through Allgather operation
@@ -242,133 +248,97 @@ void PMLinearImplicitSystem::compute_point_velocity(const std::string& option,
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      0. point coordinates & residing element
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    const Point pt            = _point_mesh->particles()[i]->point();
+    const Point pt  = _point_mesh->particles()[i]->point();
+    const Point fv  = _point_mesh->particles()[i]->particle_force();
+    const PointType point_type = _point_mesh->particles()[i]->point_type(); 
     const dof_id_type elem_id = _point_mesh->particles()[i]->elem_id();
     if(elem_id>n_elem)
     {
-      printf("--->error in PMLinearImplicitSystem::compute_point_velocity() :\n");
-      printf("    Point id = %u, elem id = %u, is out of simulation domain!\n",
-             _point_mesh->particles()[i]->id(),elem_id);
-      printf("    Total number of element in this mesh is %u!\n", n_elem);
+      std::cout << "---> Error in PMLinearImplicitSystem::compute_point_velocity():\n"
+                << "      "<<i<<"-th particle (position = "<<pt(0) <<", "<<pt(1) <<", "<<pt(2)<<") is out of domain"
+                <<std::endl<<std::endl;
     }
-    const Elem* elem          = this->get_mesh().elem(elem_id);
-    
-    
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     1. Global(FEM) solution at the current point. This is done on local processors
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    std::vector<Real> Uglobal(dim);
-    if(elem && (elem->processor_id()==this->processor_id()) )
+    const Elem* elem          = mesh.elem(elem_id);    
+    // 1. Global(FEM) solution at the current point. This is done on local processors
+    Point Uglobal;
+    // 2. Local velocity of particle i, This is also done on local processors
+    Point Ulocal;
+    // 3. total velocity
+    Point U;
+    if(elem->processor_id()==this->processor_id())
     {
-//      printf("--->test in compute_particle_velocity() particle id = %lu: (%f, %f, %f) rank = %i\n",
-//             i,pt(0),pt(1),pt(2),this->processor_id() );
-      
-      // Numeric ids corresponding to each variable in the system
-      const unsigned int u_var = this->variable_number ("u");      // u_var = 0
-      const unsigned int v_var = this->variable_number ("v");      // v_var = 1
-      Uglobal[0] = this->point_value(u_var, pt, *elem);
-      Uglobal[1] = this->point_value(v_var, pt, *elem);
-      if(dim==3)
-      {
-        const unsigned int w_var = this->variable_number ("w");      // w_var = 2
-        Uglobal[2] = this->point_value(w_var, pt, *elem);
+      // get global_velocity
+      Uglobal(0) = this->point_value(u_var, pt, *elem);
+      Uglobal(1) = this->point_value(v_var, pt, *elem);
+      Uglobal(2) = this->point_value(w_var, pt, *elem);
+      // get local velocity
+      if(option=="disturbed"){
+        Ulocal = this->local_velocity_bead(i, force_type);
+        // exclude self exclusioon term for point_type = "POLYMER_BEAD"
+        if(point_type==POLYMER_BEAD){
+          const Point Uex = this->global_self_exclusion(i);
+          U = Uglobal + Ulocal - Uex + fv; // drag0 by default = 1.
+        }
+        else if(point_type==LAGRANGIAN_POINT)
+          U = Uglobal + Ulocal;
       }
-      
-      // Pack the particle id and its velocity
+      else if(option=="undisturbed"){
+        U = Uglobal;
+      }
+      else{
+        libmesh_error();
+      }
+      // pack particle id and its velocity
       _pid_send_list.push_back(i);
-      for(std::size_t j=0; j<dim; ++j)
-        _pv_send_list.push_back(Uglobal[j]);
-      
-      //printf("particle id = %lu  on processor %i\n", i, this->processor_id() );
-      //printf("      Uglobal = (%f, %f, %f)\n", Uglobal[0], Uglobal[1], Uglobal[2]);
-    } // end if
-    
-    
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     2. get the Free space solution (local solution) on all processors!
-     No need to exclude the "self-term" for the local solution. => set "false"
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    if (option=="disturbed")
-    {
-      const std::string force_type = "regularized";
-      const std::vector<Real> Ulocal = this->local_velocity_bead(i,force_type);
-
-      // pass Ulacal to pvlocal
-      for(std::size_t j=0; j<dim; ++j)
-        pvlocal[dim*i+j] = Ulocal[j];
-    } // end if(option)
-    
+      for(int j=0; j<dim; j++){
+        _pv_send_list.push_back(U(j));
+        // _pglobal_send_list.push_back(Uglobal(j));
+        // _plocal_send_list.push_back(Ulocal(j));
+      }
+    // printf("i = %i, processor_id = %i, Ulocal = %f, %f, %f\n", i, this->processor_id(), Ulocal(0), Ulocal(1), Ulocal(2));
+    } // end if (elem->processor_id() == this->processor_id)
   } // end for i-loop
-
-  
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Check the size of local_pv and the size of list on each process after allgather
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   this->comm().allgather(_pid_send_list); // allgather the particle id
   this->comm().allgather(_pv_send_list);  // allgather the particle velocity
+  // this->comm().allgather(_pglobal_send_list);
+  // this->comm().allgather(_plocal_send_list);
   if (_pid_send_list.size() != NP)
   {
-    libmesh_assert("*** error in PMLinearImplicitSystem::compute_particle_velocity()!");
+    std::cout<<"---> Error in PMLinearImplicitSystem::compute_point_velocity: \n"
+             <<"       _pid_send_list.size() != NP"
+             <<std::endl <<std::endl;
     libmesh_error();
   }
-//  printf("size of _pv_send_list is %lu, _pid_send_list.size() = %lu on the processor %i\n",
-//         _pv_send_list.size(), _pid_send_list.size(), this->comm().rank() );
-  
-  
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Obtain the particle velocity vector excluding the global self exclusion.
-   FIXME: Polymer beads and tracking points have the same radius value (=1)???
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  //const Real mu0    = this->get_equation_systems().parameters.get<Real>("viscosity_0");
-  const Real drag0  = 1.0;  // nondimensional drag coef = 6*PI*mu0*a where mu0 = 1/(6*PI), a=1
-  for(std::size_t i=0; i<NP; ++i)
-  {
-    // id and position for the current bead
-    const std::size_t pid      = _pid_send_list[i];
-    const Point fv = _point_mesh->particles()[pid]->particle_force();
-    const PointType point_type = _point_mesh->particles()[pid]->point_type();
-    
-    // exclusion of "self-term" for the global (FEM) solution
-    const std::vector<Real> Uex = this->global_self_exclusion(pid);
-    
-    // Ug + Ul - U_self + Stokes drag
-    for(std::size_t j=0; j<dim; ++j)
-    {
-      if (option=="disturbed") {
-        if(point_type==POLYMER_BEAD) {          // the point is "bead"
-          pv[dim*pid+j] = _pv_send_list[dim*i+j] + pvlocal[dim*pid+j]  - Uex[j] + fv(j)/drag0;
-        }
-        else if(point_type==LAGRANGIAN_POINT) { // the point is a tracking point
-//          const Real hmin   = this->get_equation_systems().parameters.get<Real> ("solid mesh size");
-//          const Real bead_r = std::sqrt(libMesh::pi)*hmin/4.0;
-          pv[dim*pid+j] = _pv_send_list[dim*i+j] + pvlocal[dim*pid+j];// + fv[j]/(drag0*bead_r);
-        }
-      }
-      else if (option=="undisturbed") {
-        pv[dim*pid+j] = _pv_send_list[dim*i+j];
-      }
-      else {
-        libmesh_error();
-      } // end if-else
-    } // end for j-loop
 
-    // ---------------------------- output for test -----------------------------
-  //  if (this->comm().rank()==0 && option=="disturbed")
-  //  {
-  //    printf("\n--->test in compute_point_velocity(): output point velocity:\n");
-  //    printf("i = %lu, point %lu: Uglobal (FEM) = (%E, %E, %E)\n",
-  //           i, pid, _pv_send_list[dim*i], _pv_send_list[dim*i+1], _pv_send_list[dim*i+2] );
-  //    printf("              Ulocal (Green Function) = (%E, %E, %E)\n",
-  //           pvlocal[dim*i],pvlocal[dim*i+1],pvlocal[dim*i+2] );
-  //    printf("              Uexc    = (%E, %E, %E)\n", Uex[0], Uex[1], Uex[2] );
-  //    printf("       Stokes drag    = (%E, %E, %E)\n", fv(0), fv(1), fv(2) );
-  //    printf("           ---Utotal  = (%E, %E, %E)\n\n",
-  //           pv[dim*pid], pv[dim*pid+1], pv[dim*pid+2] );
-  //   }
-  //   // --------------------------------------------------------------------------
-  } // end for i-loop
-  //STOP_LOG("compute_point_velocity()", "PMLinearImplicitSystem");
+  for(std::size_t i=0; i<NP; ++i){
+    const std::size_t p_id = _pid_send_list[i];
+    for(int j=0; j<dim; ++j){
+      pv[dim*p_id+j] = _pv_send_list[i*dim+j];
+    }
+    //     // ---------------------------- output for test -----------------------------
+    // if (this->comm().rank()==0 && option=="disturbed")
+    // {    
+    //   printf("\n--->test in compute_point_velocity(): output point velocity:\n");
+    //   printf("point %lu: Uglobal (FEM) = (%E, %E, %E)\n",
+    //          p_id, _pglobal_send_list[dim*i], _pglobal_send_list[dim*i+1], _pglobal_send_list[dim*i+2] );
+    //   printf("              Ulocal (Green Function) = (%E, %E, %E)\n",
+    //          _plocal_send_list[dim*i],_plocal_send_list[dim*i+1],_plocal_send_list[dim*i+2] );
+    // //  printf("              Uexc    = (%E, %E, %E)\n", Uex[0], Uex[1], Uex[2] );
+    // //  printf("       Stokes drag    = (%E, %E, %E)\n", fv[0], fv[1], fv[2] );
+    // //  printf("           ---Utotal  = (%E, %E, %E)\n\n",
+    //   //       pv[dim*pid], pv[dim*pid+1], pv[dim*pid+2] );
+    // }    
+  }
+  // std::cout <<"pv = ";
+  // for(std::size_t i=0; i<pv.size(); i++){
+  //   std::cout << pv[i] <<";";
+  // }
+  // std::cout<<std::endl;
+
+  STOP_LOG("compute_point_velocity()", "PMLinearImplicitSystem");
 }
   
   
@@ -588,8 +558,8 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Elem* ele
   
 
 // ==================================================================================
-std::vector<Number> PMLinearImplicitSystem::local_velocity_bead(const std::size_t& bead_id,
-                                                                const std::string& force_type) const
+Point PMLinearImplicitSystem::local_velocity_bead(const std::size_t& bead_id,
+                                                  const std::string& force_type) const
 {
   START_LOG("local_velocity_bead()", "PMLinearImplicitSystem");
   
@@ -619,17 +589,13 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_bead(const std::size_
   Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
   if(particle_type == "rigid_particle"){
     hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
-  }
-  
-  
+  }  
   /* ----------------------------------------------------------------------------------------
    compute the local velocity corresponding to the unbounded domain
    ---------------------------------------------------------------------------------------- */
   GGEMSystem ggem_sys;
-  std::vector<Real> Ulocal = ggem_sys.local_velocity_bead(_point_mesh,bead_id,alpha,mu,bead_r0,
+  Point Ulocal = ggem_sys.local_velocity_bead(_point_mesh,bead_id,alpha,mu,bead_r0,
                                                           hmin,dim,force_type);
-  
-  
   STOP_LOG("local_velocity_bead()", "PMLinearImplicitSystem");
   return Ulocal;
 }
@@ -637,7 +603,7 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_bead(const std::size_
   
 
 // ==================================================================================
-std::vector<Real> PMLinearImplicitSystem::global_self_exclusion(const std::size_t p_id) const
+Point PMLinearImplicitSystem::global_self_exclusion(const std::size_t p_id) const
 {
   START_LOG("global_self_exclusion()", "PMLinearImplicitSystem");
   
@@ -653,7 +619,7 @@ std::vector<Real> PMLinearImplicitSystem::global_self_exclusion(const std::size_
    compute the global self-exclusion velocity
    ---------------------------------------------------------------------------------------- */
   GGEMSystem ggem_sys;
-  std::vector<Real> self_v = ggem_sys.global_self_exclusion(_point_mesh,p_id,alpha,mu,dim);
+  Point self_v = ggem_sys.global_self_exclusion(_point_mesh,p_id,alpha,mu,dim);
   
   STOP_LOG("global_self_exclusion()", "PMLinearImplicitSystem");
   return self_v;

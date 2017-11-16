@@ -500,14 +500,14 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
 
   
 // ======================================================================
-std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
-                                                  const std::size_t& pid0,
-                                                  const Real&   alpha,
-                                                  const Real&   mu,
-                                                  const Real&   br0,
-                                                  const Real&   hmin,
-                                                  const std::size_t& dim,
-                                                  const std::string& force_type) const
+Point GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
+                                      const std::size_t& pid0,
+                                      const Real&   alpha,
+                                      const Real&   mu,
+                                      const Real&   br0,
+                                      const Real&   hmin,
+                                      const std::size_t& dim,
+                                      const std::string& force_type) const
 {
   START_LOG ("local_velocity_bead()", "GGEMSystem");
   
@@ -526,7 +526,7 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
    zero_limit = false, because the neighbor list does NOT include itself.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   bool  zero_limit    = false;    // this will be changed to "true" for tracking points
-  std::vector<Real>   u(dim,0.0);
+  Point u;
   DenseMatrix<Number> GT;         // Green function Tesnosr has the size: dim x dim
   const Real ksi = this->regularization_parameter(hmin, br0, point_type0);
   for (std::size_t v=0; v<IndicesDists.size(); ++v)
@@ -549,7 +549,7 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
     // 3. compute u due to this particle
     for (std::size_t i=0; i<dim; ++i)
       for (std::size_t j=0; j<dim; ++j)
-        u[i] += GT(i,j)*fv(j);
+        u(i) += GT(i,j)*fv(j);
   } // end for v-loop
   
   
@@ -573,7 +573,7 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
     // 3. compute u due to this particle
     for (std::size_t i=0; i<dim; ++i)
       for (std::size_t j=0; j<dim; ++j)
-        u[i] += GT(i,j)*fv(j);
+        u(i) += GT(i,j)*fv(j);
   }
   
   
@@ -584,7 +584,7 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
   
 
 // ======================================================================
-std::vector<Real> GGEMSystem::global_self_exclusion(PointMesh<3>* point_mesh,
+Point GGEMSystem::global_self_exclusion(PointMesh<3>* point_mesh,
                                                     const std::size_t&  pid0,
                                                     const Real& alpha,
                                                     const Real& mu,
@@ -597,10 +597,10 @@ std::vector<Real> GGEMSystem::global_self_exclusion(PointMesh<3>* point_mesh,
   const Real   c0 = 1.0/(8.*PI*mu);
   
   // 2. compute the self exclusion term at the position of the i-th bead
-  std::vector<Real> self_v(dim);
+  Point self_v;
   for (std::size_t i=0; i<dim; ++i)
-    self_v[i] = c0*4.0*alpha/sqrt_pi*fv(i);
-  
+    self_v(i) = c0*4.0*alpha/sqrt_pi*fv(i);
+
   STOP_LOG ("self_exclusion()", "GGEMSystem");
   
   return self_v;  // done and return

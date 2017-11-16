@@ -251,7 +251,7 @@ public:
    *
    * Eqn (34)&(35) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
    */
-  std::vector<Real> local_velocity_bead(PointMesh<3>*  point_mesh,
+  Point local_velocity_bead(PointMesh<3>*  point_mesh,
                                         const std::size_t& pid0,  /* point id */
                                         const Real&    alpha,     /* alpha parameter */
                                         const Real&    mu,        /* kinematic viscosity */
@@ -285,7 +285,7 @@ public:
   /*
    * Self-exclusion term for the GLOBAL velocity at the i-th bead
    */
-  std::vector<Real> global_self_exclusion(PointMesh<3>* point_mesh,
+  Point global_self_exclusion(PointMesh<3>* point_mesh,
                                           const std::size_t&  pid0,
                                           const Real& alpha,
                                           const Real& mu,

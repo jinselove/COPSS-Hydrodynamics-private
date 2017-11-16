@@ -37,19 +37,11 @@ void FixPointGaussian::compute()
   {  
     // apply the excluded volume force to each particle i
     Point pforce(0.);
-    const Point pti   = point_particles[p_id]->point();
-    std::vector<std::pair<std::size_t,Real> > n_list = point_particles[p_id]->neighbor_list();    
+    const std::vector<Point>& neighbor_vector = point_particles[p_id]->neighbor_vector();    
     // Loop over each neigbhor
-    for (std::size_t j=0; j<n_list.size(); ++j)
+    for (std::size_t j=0; j<neighbor_vector.size(); ++j)
     {
-      const std::size_t n_id  = n_list[j].first;
-      if(p_id != n_id)  // make sure this bead and the neighboring bead are not the same bead.
-      {
-        const Point ptj   = point_particles[n_id]->point();
-        const Point r_ij  = point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-        Point f_ij = fix_base.gaussian_force(r_ij, c1, c2);
-        pforce += f_ij;
-      } // end if
+        pforce += fix_base.gaussian_force(neighbor_vector[j], c1, c2);
     } // end for i-loop    
     point_particles[p_id]->add_particle_force(pforce);
   }

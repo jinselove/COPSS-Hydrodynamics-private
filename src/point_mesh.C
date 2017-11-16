@@ -506,6 +506,24 @@ void PointMesh<KDDim>::build_particle_neighbor_list_naively()
   STOP_LOG ("build_particle_neighbor_list_naively()", "PointMesh<KDDim>");
 }
 
+// ======================================================================
+template <unsigned int KDDim>
+void PointMesh<KDDim>::reinit_neighbor_vector()
+{
+  START_LOG("reinit_neighbor_vector()", "PointMesh<KDDim>");
+  for (std::size_t p_id=0; p_id < _num_point_particles; p_id++){
+    const Point pti = _particles[p_id]->point();
+    std::vector<std::pair<std::size_t,Real> > n_list = _particles[p_id]->neighbor_list();
+    std::vector<Point> r_ij (n_list.size());
+    for(std::size_t j=0; j<n_list.size(); j++){
+      const std::size_t& n_id = n_list[j].first;
+      const Point ptj = _particles[n_id]->point();
+      r_ij[j] = _periodic_boundary->point_vector(pti, ptj);
+    }
+    _particles[p_id]->set_neighbor_vector(r_ij);
+  }
+  STOP_LOG("reinit_neighbor_vector()", "PointMesh<KDDim>");
+}
 
 
 // ======================================================================
@@ -888,8 +906,8 @@ void PointMesh<KDDim>::reinit(const bool& with_hi,
     // after reinit neighbor list, set the flag to false
     neighbor_list_update_flag = false;
   } // end if (reinit_neighbor_list)
-
-
+  // update particle neighbor distance at each reinit step
+  this->reinit_neighbor_vector();
   STOP_LOG ("reinit()", "PointMesh<KDDim>");
 }
 

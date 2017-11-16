@@ -349,7 +349,11 @@ public:
    ***/
   virtual void build_particle_neighbor_list_naively();
   
-  
+  /**
+   * reinit neighbor distance for all particles
+   */
+  virtual void reinit_neighbor_vector();
+
   /**
    * Build the neighbor list of partilces for a given elem
    * Output the n_list,

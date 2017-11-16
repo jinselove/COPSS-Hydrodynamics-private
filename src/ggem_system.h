@@ -316,6 +316,9 @@ public:
                                       const Real& a,      /* bead radius */
                                       const std::size_t& dim) const; /*dim==3*/
   
+private:
+
+  std::vector<std::vector<Real>> _kronecker_delta;
   
 };
 

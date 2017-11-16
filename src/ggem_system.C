@@ -36,6 +36,8 @@ namespace libMesh
 // ======================================================================
 GGEMSystem::GGEMSystem()
 {
+  _kronecker_delta.resize(3, std::vector<Real>(3,0.));
+  for(int i=0; i<3; i++) _kronecker_delta[i][i] = 1.;
   // do nothing
 }
 
@@ -156,7 +158,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_exact(const Point& x,
   DenseMatrix<Number> G(dim,dim);
   for (std::size_t i=0; i<dim; ++i){
     for (std::size_t j=0; j<dim; ++j){
-      G(i,j) = c0*( kronecker_delta(i,j) + x(i)*x(j)/r2 );
+      G(i,j) = c0*( _kronecker_delta[i][j] + x(i)*x(j)/r2 );
     }
   }
   
@@ -186,7 +188,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_exp(const Point& x,
   {
     for (std::size_t i=0; i<dim; ++i)
       for (std::size_t j=0; j<dim; ++j)
-        G(i,j) = c0*4.0*alpha/sqrt_pi*kronecker_delta(i,j);
+        G(i,j) = c0*4.0*alpha/sqrt_pi*_kronecker_delta[i][j];
   } // end if()
   else
   {
@@ -200,8 +202,8 @@ DenseMatrix<Number> GGEMSystem::green_tensor_exp(const Point& x,
     {
       for (std::size_t j=0; j<dim; ++j)
       {
-        Real tmp1 = ( kronecker_delta(i,j) + x(i)*x(j)/r2 )*c1;
-        Real tmp2 = ( kronecker_delta(i,j) - x(i)*x(j)/r2 )*c2;
+        Real tmp1 = ( _kronecker_delta[i][j] + x(i)*x(j)/r2 )*c1;
+        Real tmp2 = ( _kronecker_delta[i][j] - x(i)*x(j)/r2 )*c2;
         G(i,j) = c0*( tmp1 + tmp2 );
       } // end for j-loop
     } // end for i-loop
@@ -233,7 +235,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_local(const Point& x,
   {
     for (std::size_t i=0; i<dim; ++i)
     for (std::size_t j=0; j<dim; ++j)
-    G(i,j) = c0*4.0*alpha/sqrt_pi*kronecker_delta(i,j);
+    G(i,j) = c0*4.0*alpha/sqrt_pi*_kronecker_delta[i][j];
   } // end if()
   else
   {
@@ -247,8 +249,8 @@ DenseMatrix<Number> GGEMSystem::green_tensor_local(const Point& x,
     {
       for (std::size_t j=0; j<dim; ++j)
       {
-        Real tmp1 = ( kronecker_delta(i,j) + x(i)*x(j)/r2 )*c1;
-        Real tmp2 = ( kronecker_delta(i,j) - x(i)*x(j)/r2 )*c2;
+        Real tmp1 = ( _kronecker_delta[i][j] + x(i)*x(j)/r2 )*c1;
+        Real tmp2 = ( _kronecker_delta[i][j] - x(i)*x(j)/r2 )*c2;
         G(i,j) = c0*( tmp1 - tmp2 );
       } // end for j-loop
     } // end for i-loop
@@ -279,7 +281,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_regularized(const Point& x,
   {
     for (std::size_t i=0; i<dim; ++i)
       for (std::size_t j=0; j<dim; ++j)
-        G(i,j) = c0*4.0/sqrt_pi*(ksi - alpha)*kronecker_delta(i,j);
+        G(i,j) = c0*4.0/sqrt_pi*(ksi - alpha)*_kronecker_delta[i][j];
   } // end if()
   else
   {
@@ -295,8 +297,8 @@ DenseMatrix<Number> GGEMSystem::green_tensor_regularized(const Point& x,
     {
       for (std::size_t j=0; j<dim; ++j)
       {
-        Real tmp1 = ( kronecker_delta(i,j) + x(i)*x(j)/r2 )*c1;
-        Real tmp2 = ( kronecker_delta(i,j) - x(i)*x(j)/r2 )*c2;
+        Real tmp1 = ( _kronecker_delta[i][j] + x(i)*x(j)/r2 )*c1;
+        Real tmp2 = ( _kronecker_delta[i][j] - x(i)*x(j)/r2 )*c2;
         G(i,j) = c0*( tmp1 + tmp2 );
       } // end for j-loop
     } // end for i-loop
@@ -386,10 +388,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
     
     // 1. compute the Green function (Oseen Tensor) of particle-v
     DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
-    if (force_type=="regularized")
-      GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
-    else
-      libmesh_assert ("GGEMSystem::local_velocity_fluid, wrong force_type!");
+    GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
     // end if-else
     
     // 2. compute the force vector of particle-v
@@ -516,8 +515,7 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
   const PointType point_type0 = point_mesh->particles()[pid0]->point_type();
   std::vector<std::pair<std::size_t,Real> > IndicesDists;
   IndicesDists          = point_mesh->particles()[pid0]->neighbor_list();
-  
-  
+  const std::vector<Point>& neighbor_vector= point_mesh->particles()[pid0]->neighbor_vector();    
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Loop over all the neighbor list beads, and compute the local velocity:
    u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*f_v(j)
@@ -526,22 +524,15 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
   bool  zero_limit    = false;    // this will be changed to "true" for tracking points
   std::vector<Real>   u(dim,0.0);
   DenseMatrix<Number> GT;         // Green function Tesnosr has the size: dim x dim
+  const Real ksi = this->regularization_parameter(hmin, br0, point_type0);
   for (std::size_t v=0; v<IndicesDists.size(); ++v)
   {
     // 0. particle id and position, vector x = ptx - pt0
-    const std::size_t p_id = IndicesDists[v].first;
-    const Point pt0 = point_mesh->particles()[p_id]->point();
-    const Point x   = point_mesh->pm_periodic_boundary()->point_vector(pt0,ptx);
-    
+    const Point x = neighbor_vector[v];
     // Determine the regularization parameter ksi according to the point type.
-    const PointType point_type = point_mesh->particles()[p_id]->point_type();
-    const Real ksi     = this->regularization_parameter(hmin,br0,point_type);
-    
+    // const Real ksi     = this->regularization_parameter(hmin,br0,point_type);    
     // 1. compute the Green function (Oseen Tensor) of particle-v
-    if (force_type=="regularized")
-      GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
-    else
-      libmesh_assert ("GGEMSystem::local_velocity_bead, wrong force_type!");
+    GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
     // end if-else
     
     // 2. compute the force vector of particle-v
@@ -565,10 +556,7 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
     // 1. compute the Green function (Oseen Tensor) when x-->0
     zero_limit      = true;
     const Real ksi0 = this->regularization_parameter(hmin,br0,point_type0);
-    if (force_type=="regularized")
-      GT = this->green_tensor_regularized(ptx,alpha,mu,ksi0,dim,zero_limit);
-    else
-      libmesh_assert ("GGEMSystem::local_velocity_bead, wrong force_type!");
+    GT = this->green_tensor_regularized(ptx,alpha,mu,ksi0,dim,zero_limit);
     // end if-else
     
     // 2. compute the force vector of this particle
@@ -646,7 +634,7 @@ DenseMatrix<Number> GGEMSystem::rpy_tensor(const Point& x,  /* vector x = pt1 - 
           C1 = 1.0 - (9.0*r)/(32.0*a);
           C2 = (3.0*r)/(32.0*a);
         }
-        const Real dij = kronecker_delta(i,j);
+        const Real dij = _kronecker_delta[i][j];
         G(i,j) = c0*( C1*dij + C2*x(i)*x(j)/r2 );
       } // end j-loop
     } // end i-loop
@@ -677,7 +665,7 @@ DenseMatrix<Number> GGEMSystem::mobility_tensor(const Point& x,     /* vector x 
   {
     for (std::size_t i=0; i<dim; ++i) {
       for (std::size_t j=0; j<dim; ++j) {
-        const Real dij = kronecker_delta(i,j);
+        const Real dij = _kronecker_delta[i][j];
         M(i,j) = t1*dij;
       }
     }

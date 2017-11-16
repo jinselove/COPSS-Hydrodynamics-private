@@ -388,7 +388,11 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
     
     // 1. compute the Green function (Oseen Tensor) of particle-v
     DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
-    GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
+    if(force_type == "regularized")
+      GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
+    else
+      libmesh_assert ("GGEMSystem::local_velocity_fluid, wrong force_type!");
+
     // end if-else
     
     // 2. compute the force vector of particle-v
@@ -529,10 +533,14 @@ std::vector<Real> GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
   {
     // 0. particle id and position, vector x = ptx - pt0
     const Point x = neighbor_vector[v];
+    const unsigned int p_id = IndicesDists[v].first;
     // Determine the regularization parameter ksi according to the point type.
     // const Real ksi     = this->regularization_parameter(hmin,br0,point_type);    
     // 1. compute the Green function (Oseen Tensor) of particle-v
-    GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
+    if(force_type=="regularized")
+      GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
+    else
+      libmesh_assert("GGEMSystem::local_velocity_bead, wrong force_type");
     // end if-else
     
     // 2. compute the force vector of particle-v

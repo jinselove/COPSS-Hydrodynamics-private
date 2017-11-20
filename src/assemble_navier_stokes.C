@@ -106,7 +106,7 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
    
   // A Gauss quadrature rule for numerical integration.
   // Let the FEType object decide what order rule is appropriate.
-  QGauss qrule (_dim, fe_vel_type.default_quadrature_order());   //3^dim pts
+  QGauss qrule (_dim, SECOND);   //3^dim pts
   
   // Tell the finite element objects to use our quadrature rule.
   fe_vel ->attach_quadrature_rule (&qrule);
@@ -396,13 +396,13 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
   
   // Define Gauss quadrature rule for numerical integration.
   // Let the FEType object decide what order rule is appropriate.
-  QGauss qrule (_dim, fe_vel_type.default_quadrature_order());   //3^dim pts
+  QGauss qrule (_dim, SECOND);   //3^dim pts
 //  QGauss qrule (_dim, FIFTH);   // SIXTH
   fe_vel->attach_quadrature_rule (&qrule);
   
   // build the face element for boundary traction
   UniquePtr<FEBase> fe_face (FEBase::build(_dim, fe_vel_type));
-  QGauss qface(_dim-1, fe_vel_type.default_quadrature_order());
+  QGauss qface(_dim-1, SECOND);
   fe_face->attach_quadrature_rule (&qface);
   
   
@@ -628,7 +628,7 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
   {
     FEType fe_vel_type = fe_v.get_fe_type();
     UniquePtr<FEBase> fe_face (FEBase::build(_dim, fe_vel_type));
-    QGauss qface(_dim-1, fe_vel_type.default_quadrature_order());
+    QGauss qface(_dim-1, SECOND);
     fe_face->attach_quadrature_rule (&qface);
      
     const std::vector<std::vector<Real> >&  phi_face = fe_face->get_phi();

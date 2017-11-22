@@ -293,8 +293,8 @@ std::vector<Real> PMToolBox::mesh_size(const MeshBase& _mesh)
    Loop over all the elements in the mesh that live
    on the local processor, and compute the element size.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
+  MeshBase::const_element_iterator       el     = _mesh.active_elements_begin();
+  const MeshBase::const_element_iterator end_el = _mesh.active_elements_end();
   for ( ; el != end_el; ++el)
   {
     // Store a pointer to the element we are currently working on.

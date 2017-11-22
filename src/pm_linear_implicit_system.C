@@ -490,8 +490,10 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Point &p,
    For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
    ---------------------------------------------------------------------------------------- */
   Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
+  Real ibm_beta = 0.;
   if(particle_type=="rigid_particle"){
     hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
+    ibm_beta = this->get_equation_systems().parameters.get<Real> ("ibm_beta");
   }
   
   
@@ -499,7 +501,7 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Point &p,
    compute the local velocity corresponding to the unbounded domain
    ---------------------------------------------------------------------------------------- */
   GGEMSystem ggem_sys;
-  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,p,alpha,mu,bead_r0,
+  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,p,alpha, ibm_beta, mu,bead_r0,
                                                            hmin,dim,force_type);
  
   
@@ -538,8 +540,10 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Elem* ele
    For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
    ---------------------------------------------------------------------------------------- */
   Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
+  Real ibm_beta = 0.;
   if(particle_type=="rigid_particle"){
     hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
+    ibm_beta = this->get_equation_systems().parameters.get<Real> ("ibm_beta");
   }
   
   
@@ -547,7 +551,7 @@ std::vector<Number> PMLinearImplicitSystem::local_velocity_fluid(const Elem* ele
    compute the local velocity corresponding to the unbounded domain
    ---------------------------------------------------------------------------------------- */
   GGEMSystem ggem_sys;
-  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,elem,p,alpha,mu,bead_r0,
+  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,elem,p,alpha,ibm_beta, mu,bead_r0,
                                                            hmin,dim,force_type);
  
   
@@ -587,14 +591,16 @@ Point PMLinearImplicitSystem::local_velocity_bead(const std::size_t& bead_id,
    For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
    ---------------------------------------------------------------------------------------- */
   Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
+  Real ibm_beta = 0.;
   if(particle_type == "rigid_particle"){
     hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
+    ibm_beta = this->get_equation_systems().parameters.get<Real> ("ibm_beta");
   }  
   /* ----------------------------------------------------------------------------------------
    compute the local velocity corresponding to the unbounded domain
    ---------------------------------------------------------------------------------------- */
   GGEMSystem ggem_sys;
-  Point Ulocal = ggem_sys.local_velocity_bead(_point_mesh,bead_id,alpha,mu,bead_r0,
+  Point Ulocal = ggem_sys.local_velocity_bead(_point_mesh,bead_id,alpha, ibm_beta, mu,bead_r0,
                                                           hmin,dim,force_type);
   STOP_LOG("local_velocity_bead()", "PMLinearImplicitSystem");
   return Ulocal;

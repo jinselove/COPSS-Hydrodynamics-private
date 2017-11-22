@@ -287,19 +287,6 @@ void Copss::read_force_info(){
 } // end read_force_info()
 
 /*
- * read GGEM info
- */
-void Copss::read_ggem_info(){
-  alpha                = input_file("alpha", 0.1);
-  cout << endl<<"##########################################################"<<endl
-       << "#                 GGEM information                      " <<endl
-       << "##########################################################"<<endl<<endl;
-  
-  cout << "-----------> the smoothing parameter in GGEM alpha = " << alpha << endl; 
-  cout << "-----------> recommend meshsize <= " << 1./(std::sqrt(2)*alpha) <<endl;
-}
-
-/*
  * read Stokes Solver  
  */
 void Copss::read_stokes_solver_info(){

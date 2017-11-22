@@ -52,6 +52,7 @@ GGEMSystem::~GGEMSystem()
 
 // ======================================================================
 Real GGEMSystem::regularization_parameter(const Real& hc,
+                                          const Real& ibm_beta,
                                           const Real& R0,
                                           const PointType& point_type) const
 {
@@ -67,7 +68,7 @@ Real GGEMSystem::regularization_parameter(const Real& hc,
     }
     case LAGRANGIAN_POINT:  // Case II: Lagrangian point of immersed body
     {
-      val = 1.0/(0.75*hc);  // original value 0.75
+      val = 1.0/(ibm_beta*hc);  // default value of ibm_beta is 0.75, which needs to be optimized for different number of nodes
       break;
     }
     case POINT_PARTICLE:    // Case III: point particle
@@ -345,6 +346,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_diff(const Point& x,
 std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
                                                    const Point& ptx,
                                                    const Real& alpha,
+                                                   const Real& ibm_beta,
                                                    const Real& mu,
                                                    const Real& br0,
                                                    const Real& hmin,
@@ -384,7 +386,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
     
     // Determine the regularization parameter ksi according to the point type.
     const PointType point_type = point_mesh->particles()[p_id]->point_type();
-    const Real ksi     = this->regularization_parameter(hmin,br0,point_type);
+    const Real ksi     = this->regularization_parameter(hmin,ibm_beta,br0,point_type);
     
     // 1. compute the Green function (Oseen Tensor) of particle-v
     DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
@@ -426,6 +428,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
                                                    const Elem* elem,
                                                    const Point& ptx,
                                                    const Real& alpha,
+                                                   const Real& ibm_beta,
                                                    const Real& mu,
                                                    const Real& br0,
                                                    const Real& hmin,
@@ -462,7 +465,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
     
     // Determine the regularization parameter ksi according to the point type.
     const PointType point_type = point_mesh->particles()[p_id]->point_type();
-    const Real ksi     = this->regularization_parameter(hmin,br0,point_type);
+    const Real ksi     = this->regularization_parameter(hmin,ibm_beta,br0,point_type);
     
     // 1. compute the Green function (Oseen Tensor) of particle-v
     DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
@@ -503,6 +506,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
 Point GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
                                       const std::size_t& pid0,
                                       const Real&   alpha,
+                                      const Real&   ibm_beta,
                                       const Real&   mu,
                                       const Real&   br0,
                                       const Real&   hmin,
@@ -528,7 +532,7 @@ Point GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
   bool  zero_limit    = false;    // this will be changed to "true" for tracking points
   Point u;
   DenseMatrix<Number> GT;         // Green function Tesnosr has the size: dim x dim
-  const Real ksi = this->regularization_parameter(hmin, br0, point_type0);
+  const Real ksi = this->regularization_parameter(hmin, ibm_beta, br0, point_type0);
   for (std::size_t v=0; v<IndicesDists.size(); ++v)
   {
     // 0. particle id and position, vector x = ptx - pt0
@@ -563,7 +567,7 @@ Point GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
   {
     // 1. compute the Green function (Oseen Tensor) when x-->0
     zero_limit      = true;
-    const Real ksi0 = this->regularization_parameter(hmin,br0,point_type0);
+    const Real ksi0 = this->regularization_parameter(hmin,ibm_beta,br0,point_type0);
     GT = this->green_tensor_regularized(ptx,alpha,mu,ksi0,dim,zero_limit);
     // end if-else
     

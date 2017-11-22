@@ -105,6 +105,7 @@ public:
    * See Phys. Fluids 22, 123103(2010) Pranay et al., in which they took (ksi*hc)^-1=0.75
    */
   Real regularization_parameter(const Real& hc,
+                                const Real& ibm_beta,
                                 const Real& R0,
                                 const PointType& point_type) const;
   
@@ -215,6 +216,7 @@ public:
   std::vector<Real> local_velocity_fluid(PointMesh<3>*  point_mesh,
                                          const Point&   ptx,      /* a pt in space */
                                          const Real&    alpha,    /* alpha parameter */
+                                         const Real&    ibm_beta,  /* beta paramter for IBM particles*/
                                          const Real&    mu,       /* kinematic viscosity */
                                          const Real&    br0,      /* normalized bead radius */
                                          const Real&    hs,       /* mesh size of solids */
@@ -238,6 +240,7 @@ public:
                                          const Elem* elem,
                                          const Point&   ptx,      /* a pt in space */
                                          const Real&    alpha,    /* alpha parameter */
+                                         const Real&    ibm_beta, /* beta parameter for IBM particles*/ 
                                          const Real&    mu,       /* kinematic viscosity */
                                          const Real&    br0,      /* normalized bead radius */
                                          const Real&    hs,       /* mesh size of solids */
@@ -254,6 +257,7 @@ public:
   Point local_velocity_bead(PointMesh<3>*  point_mesh,
                                         const std::size_t& pid0,  /* point id */
                                         const Real&    alpha,     /* alpha parameter */
+                                        const Real&    ibm_beta,  /* beta paramter for IBM particles*/
                                         const Real&    mu,        /* kinematic viscosity */
                                         const Real&    br0,       /* normalized bead radius */
                                         const Real&    hs,        /* mesh size of solids*/

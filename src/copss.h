@@ -327,7 +327,7 @@ protected:
   virtual void read_particle_info() = 0;
   void read_domain_info(); 
   void read_force_info(); 
-  void read_ggem_info(); 
+  virtual void read_ggem_info() = 0; 
   void read_stokes_solver_info(); 
   void read_chebyshev_info(); 
   void read_run_info(); 

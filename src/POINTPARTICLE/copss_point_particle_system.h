@@ -59,6 +59,9 @@ protected:
 	// override read_particle_parameters() function in Copss class
 	void read_particle_info () override;
 
+	// read ggem and ibm info
+	void read_ggem_info () override;
+	
 	// create objects, polymer chains
 	void create_object() override;
 

@@ -167,13 +167,20 @@ public:
    */
   std::vector<std::pair<std::size_t,Real> > neighbor_list() const
   { return _neighbor_list;  };
-  
 
-  /*
-   * Reinit neighbor list distances
-   */ 
-  void reinit_neighbor_distance();
+
+  /**
+   * set neighbor distances
+   */
+  void set_neighbor_vector(std::vector<Point>& neighbor_vector) 
+  { _neighbor_vector = neighbor_vector;};
   
+  /**
+   * neighbor distance
+   */
+  const std::vector<Point> neighbor_vector() const{
+    return _neighbor_vector;
+  }
   /*
    * Set the force vector on the particle
    * This is set by the member function in the class "ParticleMesh"
@@ -276,7 +283,9 @@ private:
   
   // neighbor particles around the present particle: particle id and distance value.
   std::vector<std::pair<std::size_t,Real> > _neighbor_list;
-  
+
+  // neighbor distance
+  std::vector<Point> _neighbor_vector;
 
   
   // Define the orientation of this point(bending, torque)

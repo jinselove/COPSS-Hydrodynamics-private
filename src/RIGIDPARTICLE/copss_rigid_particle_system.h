@@ -42,6 +42,9 @@ protected:
 	// override read_particle_info() function in Copss class
 	void read_particle_info () override;
 
+	// read ggem and ibm info
+	void read_ggem_info () override;
+
 	// create objects, polymer chains
 	void create_object() override;
 
@@ -81,6 +84,8 @@ private:
 	std::vector<Real> surface_constraint;
 	
 	std::vector<Real> hsize_solid;
+
+	Real ibm_beta; // beta to calcualte GGEM-IBM ksi
 
 	Real hmins; // surface mesh hmin
 

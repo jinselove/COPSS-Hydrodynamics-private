@@ -287,19 +287,6 @@ void Copss::read_force_info(){
 } // end read_force_info()
 
 /*
- * read GGEM info
- */
-void Copss::read_ggem_info(){
-  alpha                = input_file("alpha", 0.1);
-  cout << endl<<"##########################################################"<<endl
-       << "#                 GGEM information                      " <<endl
-       << "##########################################################"<<endl<<endl;
-  
-  cout << "-----------> the smoothing parameter in GGEM alpha = " << alpha << endl; 
-  cout << "-----------> recommend meshsize <= " << 1./(std::sqrt(2)*alpha) <<endl;
-}
-
-/*
  * read Stokes Solver  
  */
 void Copss::read_stokes_solver_info(){
@@ -830,12 +817,14 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 //==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
 {
+  PerfLog perf_log("integration");
   // get stokes system from equation systems
    PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
+   perf_log.push("reinit sytem");
     if(i>0){
       *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
       // Update the local values to reflect the solution on neighboring processors
@@ -854,12 +843,26 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     if(comm_in.rank()==0)
       point_mesh->print_point_info();
     }
+   perf_log.pop("reinit sytem");
+   perf_log.push("compute_point_velocity undisturbed");
     // compute undisturbed velocity of points 
     system.compute_point_velocity("undisturbed", vel0);
+   perf_log.pop("compute_point_velocity undisturbed");
+
     reinit_stokes = false;
+   perf_log.push("solve_stokes disturbed");
+
     system.solve_stokes("disturbed",reinit_stokes); // Using StokesSolver
+   perf_log.pop("solve_stokes disturbed");
+
     // compute distrubed velocity of points
+   perf_log.push("compute_point_velocity disturbed");
+
     system.compute_point_velocity("disturbed", vel1);
+   perf_log.pop("compute_point_velocity disturbed");
+
+   perf_log.push("other");
+
     // add up undistrubed and disturbed velocity of points
     for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
    // transform total point velocity to U0 in Brownian_system
@@ -1091,6 +1094,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
     } // end else (without_brownian)
     real_time += dt;
     timestep_duration += 1;   
+   perf_log.pop("other");
+
 }
 
 void Copss::langevin_integrate(EquationSystems& equation_systems,

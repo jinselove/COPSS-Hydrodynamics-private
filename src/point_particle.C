@@ -148,14 +148,6 @@ void PointParticle::set_orientation(const std::vector<Real>& rot_vec)
   _orientation = rot_vec;
 }
 
-//=======================================================================
-void PointParticle::reinit_neighbor_distance()
-{
-  for (unsigned int i=0; i<_neighbor_list.size(); i++){
-    //
-  }
-}
-
 // ======================================================================
 void PointParticle::print_info(const bool & print_neighbor_list) const
 {

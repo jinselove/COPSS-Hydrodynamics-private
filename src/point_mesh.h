@@ -349,7 +349,11 @@ public:
    ***/
   virtual void build_particle_neighbor_list_naively();
   
-  
+  /**
+   * reinit neighbor distance for all particles
+   */
+  virtual void reinit_neighbor_vector();
+
   /**
    * Build the neighbor list of partilces for a given elem
    * Output the n_list,
@@ -465,6 +469,11 @@ public:
    * Calculate minimum point particle (or rigid particle surface nodes) velocity
    */
   const Real& minimum_bead_velocity() const {return _min_velocity_magnitude;};
+
+  /** 
+   * Write bead positions to csv file
+   */
+  const void write_bead_pos() const;
    
   
 private:

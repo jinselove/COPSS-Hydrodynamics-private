@@ -105,6 +105,7 @@ public:
    * See Phys. Fluids 22, 123103(2010) Pranay et al., in which they took (ksi*hc)^-1=0.75
    */
   Real regularization_parameter(const Real& hc,
+                                const Real& ibm_beta,
                                 const Real& R0,
                                 const PointType& point_type) const;
   
@@ -215,12 +216,37 @@ public:
   std::vector<Real> local_velocity_fluid(PointMesh<3>*  point_mesh,
                                          const Point&   ptx,      /* a pt in space */
                                          const Real&    alpha,    /* alpha parameter */
+                                         const Real&    ibm_beta,  /* beta paramter for IBM particles*/
                                          const Real&    mu,       /* kinematic viscosity */
                                          const Real&    br0,      /* normalized bead radius */
                                          const Real&    hs,       /* mesh size of solids */
                                          const std::size_t& dim,  /*dim==3*/
                                          const std::string& force_type) const;
-  
+
+  /* Compute the local vel-solution of the fluid at a given point ptx
+   * due to smoothed/regularized point forces.
+   * force_type: regularized, smooth
+   *
+   * NOTE: due to the fast convergence of gaussian function, only a small group of 
+   * particles within the neighbor list are considered. There are two ways
+   * to construct this neighbor list:
+   * (1) element independent: directly search particles near the given point using KDTree;
+   * (2) element dependent: directly use the neighbor list of the parent element;
+   * this function implement method (1), which contains a short neighbor list
+   *
+   * Eqn (33) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
+   */
+  std::vector<Real> local_velocity_fluid(PointMesh<3>*  point_mesh,
+                                         const Elem* elem,
+                                         const Point&   ptx,      /* a pt in space */
+                                         const Real&    alpha,    /* alpha parameter */
+                                         const Real&    ibm_beta, /* beta parameter for IBM particles*/ 
+                                         const Real&    mu,       /* kinematic viscosity */
+                                         const Real&    br0,      /* normalized bead radius */
+                                         const Real&    hs,       /* mesh size of solids */
+                                         const std::size_t& dim,  /*dim==3*/
+                                         const std::string& force_type) const;
+    
   
   /*
    * Compute the local velocity of a point/bead with point_id = pid0.
@@ -228,9 +254,10 @@ public:
    *
    * Eqn (34)&(35) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
    */
-  std::vector<Real> local_velocity_bead(PointMesh<3>*  point_mesh,
+  Point local_velocity_bead(PointMesh<3>*  point_mesh,
                                         const std::size_t& pid0,  /* point id */
                                         const Real&    alpha,     /* alpha parameter */
+                                        const Real&    ibm_beta,  /* beta paramter for IBM particles*/
                                         const Real&    mu,        /* kinematic viscosity */
                                         const Real&    br0,       /* normalized bead radius */
                                         const Real&    hs,        /* mesh size of solids*/
@@ -262,7 +289,7 @@ public:
   /*
    * Self-exclusion term for the GLOBAL velocity at the i-th bead
    */
-  std::vector<Real> global_self_exclusion(PointMesh<3>* point_mesh,
+  Point global_self_exclusion(PointMesh<3>* point_mesh,
                                           const std::size_t&  pid0,
                                           const Real& alpha,
                                           const Real& mu,
@@ -293,6 +320,9 @@ public:
                                       const Real& a,      /* bead radius */
                                       const std::size_t& dim) const; /*dim==3*/
   
+private:
+
+  std::vector<std::vector<Real>> _kronecker_delta;
   
 };
 

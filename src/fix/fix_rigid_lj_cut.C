@@ -54,22 +54,19 @@ void FixRigidLJCut::compute()
       // get point particle
       const Point pti = point_particles[point_id]->point();
       // get neighbor list of this point
+      const std::vector<Point>& neighbor_vector = point_particles[point_id]->neighbor_vector();
       std::vector<std::pair<std::size_t,Real> > n_list = point_particles[point_id]->neighbor_list();
       // Loop over each neigbhor
-      for (std::size_t j=0; j<n_list.size(); ++j)
+      for (std::size_t j=0; j<neighbor_vector.size(); ++j)
       {
        const std::size_t n_id  = n_list[j].first;
        // if n_id is not on the same rigid particle and n_id != point_id
       //   printf("point_id = %d, n_id = %d, node_start_id = %d, node_start_id+n_nodes = %d\n",point_id, n_id, node_start_id, node_start_id+n_nodes );
-       if(point_id != n_id
-          and (n_id < node_start_id or n_id > node_start_id+n_nodes))  // make sure this bead and the neighboring bead are not the same bead.
+       if(n_id < node_start_id or n_id > node_start_id+n_nodes)  // make sure this bead and the neighboring bead are not the same bead.
        {
         // printf("something is wrong, point_id = %d, n_id = %d, node_start_id = %d, node_start_id+n_nodes = %d\n",point_id, n_id, node_start_id, node_start_id+n_nodes );
-        const Point ptj   = point_particles[n_id]->point();
-        const Point r_ij  = point_mesh->pm_periodic_boundary()->point_vector(pti,ptj);
-        if(r_ij.norm() <= rCut){
-          Point f_ij = fix_base.lj_force(r_ij, epsilon, sigma);
-          pforce[node_id] += f_ij;
+        if(neighbor_vector[j].norm() <= rCut){
+          pforce[node_id] += fix_base.lj_force(neighbor_vector[j], epsilon, sigma);
         }
        } // end if
       } // end loop over neighbors 

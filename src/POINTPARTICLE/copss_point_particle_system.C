@@ -37,6 +37,16 @@ CopssPointParticleSystem::~CopssPointParticleSystem(){
 
 
 //==========================================================================
+void CopssPointParticleSystem::read_ggem_info(){
+  alpha                = input_file("alpha", 0.1);
+  cout << endl<<"##########################################################"<<endl
+       << "#                 GGEM information                      " <<endl
+       << "##########################################################"<<endl<<endl;
+  cout << "-----------> the smoothing parameter in GGEM alpha = " << alpha << endl; 
+  cout << "-----------> recommend meshsize <= " << 1./(std::sqrt(2)*alpha) <<endl;
+}
+
+//==========================================================================
 void CopssPointParticleSystem::read_particle_info(){
   particle_type = input_file("particle_type", "other");
 	if (particle_type != "point_particle"){

@@ -39,6 +39,18 @@ CopssRigidParticleSystem::~CopssRigidParticleSystem(){
    mesh_spring_network.clear();
 }
 
+//==========================================================================
+void CopssRigidParticleSystem::read_ggem_info(){
+  alpha                = input_file("alpha", 0.1);
+  ibm_beta             = input_file("ibm_beta", 0.75);
+  cout << endl<<"##########################################################"<<endl
+       << "#                 GGEM information                      " <<endl
+       << "##########################################################"<<endl<<endl;
+  cout << "-----------> the smoothing parameter in GGEM alpha = " << alpha << endl; 
+  cout << "-----------> recommend meshsize <= " << 1./(std::sqrt(2)*alpha) <<endl;
+  cout << "-----------> the ibm beta = "<<ibm_beta <<"    (IBM-GGEM ksi = 1./(beta*hmins), the optimized value of this variable depends on number of surface nodes"<<endl;
+}
+
 
 //==========================================================================
 void CopssRigidParticleSystem::read_particle_info(){
@@ -129,7 +141,8 @@ void CopssRigidParticleSystem::create_object_mesh(){
   cout << "\n==>(4/4) Create point_mesh object \n";
   // Create object mesh
   point_mesh = new PointMesh<3> (*particle_mesh, search_radius_p, search_radius_e);
-
+  // visualize mesh points if needed
+  point_mesh->write_bead_pos(); 
   // No need to add periodic boundary, which is already included in particle_mesh
   // Reinit point_mesh
   point_mesh->reinit(with_hi, neighbor_list_update_flag);
@@ -173,6 +186,7 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<StokesSolverType> ("solver_type") = solver_type;
   equation_systems.parameters.set<Real>              ("alpha") = alpha;
   equation_systems.parameters.set<Real>         ("kBT")        = kBT;
+  equation_systems.parameters.set<Real>         ("ibm_beta")   = ibm_beta;
   equation_systems.parameters.set<Real>   ("minimum fluid mesh size") = hminf;
   equation_systems.parameters.set<Real>   ("minimum solid mesh size") = hmins;
   equation_systems.parameters.set<Real>   ("minimum mesh size") = hmin;
@@ -188,7 +202,6 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<string> ("test_name") = test_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
-
 }
 
 void CopssRigidParticleSystem::write_object(unsigned int step_id)

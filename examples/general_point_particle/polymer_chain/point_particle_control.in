@@ -154,6 +154,7 @@ update_neighbor_list_everyStep = true
 restart        = false
 random_seed    = 123456789
 nstep          = 5
+n_relax_step   = 1
 write_interval = 1
 output_file = 'equation_systems trajectory center_of_mass chain_stretch radius_of_gyration mean_square_displacement'
 debug_info = false

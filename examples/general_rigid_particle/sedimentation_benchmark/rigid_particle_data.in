@@ -1,0 +1,18 @@
+### Copss Rigid particle data file
+1 particles
+1 particle types
+
+Masses
+
+1 1.0
+
+Particle Meshes
+
+1 surface_mesh_sphere_triMesh_0.4.e
+
+Particles
+
+1 1 0.00000   0.000000   0.000000 5.0 5.0 5.0 0 0 0 0 1 1. 0. 0.
+
+#Data format of particles:
+#particle_id p_type x  y z magx magy magz th0 th1 th2 Q0 e_in G_x G_y G_z

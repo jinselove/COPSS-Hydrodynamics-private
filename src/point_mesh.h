@@ -473,7 +473,7 @@ public:
   /** 
    * Write bead positions to csv file
    */
-  const void write_bead_pos() const;
+  const void write_initial_surface_node_pos() const;
    
   
 private:

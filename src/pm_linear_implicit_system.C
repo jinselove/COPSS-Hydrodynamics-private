@@ -135,20 +135,20 @@ void PMLinearImplicitSystem::assemble_rhs(const std::string& system_name,
   libmesh_assert (this->rhs->initialized());
   
   START_LOG("assemble_rhs()", "PMLinearImplicitSystem");
- PerfLog perf_log("assemble_rhs"); 
+// PerfLog perf_log("assemble_rhs"); 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    init, assemble, and close the rhs vector
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-perf_log.push("zero");
+//perf_log.push("zero");
   this->rhs->zero();
-perf_log.pop("zero");
+//perf_log.pop("zero");
   //assemble_rhs_sedimentation_ex1 (this->get_equation_systems(), system_name, option);
-perf_log.push("assemble");
+//perf_log.push("assemble");
   _assemble_ns->assemble_global_F(system_name, option);
-perf_log.pop("assemble");
-perf_log.push("close");
+//perf_log.pop("assemble");
+//perf_log.push("close");
   this->rhs->close();
-perf_log.pop("close");
+//perf_log.pop("close");
   
   STOP_LOG("assemble_rhs()", "PMLinearImplicitSystem");
 }
@@ -161,7 +161,7 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
                                            const bool& re_init)
 {
   START_LOG("solve_stokes()", "PMLinearImplicitSystem");
- PerfLog perf_log("solve_stokes");
+// PerfLog perf_log("solve_stokes");
 //  Real t1, t2;
   //std::string msg = "---> solve Stokes";
   //PMToolBox::output_message(msg, this->comm());
@@ -196,9 +196,9 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
    assemble the rhs vector, and record the CPU wall time.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 //  t1 = MPI_Wtime();
- perf_log.push("assemble_rhs");
+// perf_log.push("assemble_rhs");
   this->assemble_rhs ("Stokes",option);
- perf_log.pop("assemble_rhs");
+// perf_log.pop("assemble_rhs");
 
 //  t2 = MPI_Wtime();
   //std::cout << "Time used to assemble the right-hand-side vector is " <<t2-t1<<" s\n";
@@ -207,9 +207,9 @@ void PMLinearImplicitSystem::solve_stokes (const std::string& option,
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    solve the problem
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
- perf_log.push("solve()");
+// perf_log.push("solve()");
   _stokes_solver.solve();
- perf_log.pop("solve()");
+// perf_log.pop("solve()");
 
   
   STOP_LOG("solve_stokes()", "PMLinearImplicitSystem");

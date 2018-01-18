@@ -1067,7 +1067,7 @@ void PointMesh<KDDim>::set_bead_velocity(const std::vector<Real>& vel)
 
 // ======================================================================
 template <unsigned int KDDim>
-const void PointMesh<KDDim>::write_bead_pos() const
+const void PointMesh<KDDim>::write_initial_surface_node_pos() const
 { 
   std::ostringstream oss;
   oss << "output_initial_bead_position.csv";
@@ -1076,18 +1076,21 @@ const void PointMesh<KDDim>::write_bead_pos() const
     out_file.open(oss.str(), std::ios_base::out);
     // write out the csv file  
     // POINT data
-    out_file <<"scalar x_coord y_coord z_coord\n";
+    out_file <<"rigid_particle_id node_id x_coord y_coord z_coord\n";
     out_file.precision(6);
-    for(std::size_t i=0; i<_num_point_particles; ++i)
-    {
-      out_file << i << " ";
-      // write position
-      for(std::size_t j=0; j<KDDim; ++j){
-        out_file << _particles[i]->center()(j) << " ";
+    for (int k=0; k<_num_rigid_particles; k++){
+      RigidParticle* rigid_particle = _rigid_particles[k];
+      for(std::size_t i=0; i<rigid_particle->num_mesh_nodes(); ++i)
+      {
+        const Point node_pos = rigid_particle->mesh_point(i);
+        out_file << k << " "<<i <<" ";
+        // write position
+        for(std::size_t j=0; j<KDDim; ++j){
+          out_file << node_pos(j) << " ";
+        }
+        out_file <<"\n";
       }
-      out_file <<"\n";
     }
-    out_file << "\n";
     out_file.close();
   } // end if comm_in_rank == 0
 }

@@ -387,6 +387,8 @@ void Copss::read_run_info(){
   update_neighbor_list_everyStep = input_file("update_neighbor_list_everyStep", true);
   // total number of steps 
   nstep = input_file("nstep", 1);
+  // free-draining steps when Chebysheve cannot converge even when eigenvalue is recomputed
+  n_relax_step = input_file("n_relax_step", 10);
   // write interval
   write_interval = input_file("write_interval", 1);
   //output file flags
@@ -815,232 +817,241 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 }
 
 //==============================================================================================
-void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
+void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
 //  PerfLog perf_log("integration");
   // get stokes system from equation systems
-   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
- /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
+  PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
 //   perf_log.push("reinit sytem");
-    if(i>0){
-      *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
-      // Update the local values to reflect the solution on neighboring processors
-      system.update();
-      if(update_neighbor_list_everyStep){
-        neighbor_list_update_flag = true;
-      }
-      else if (timestep_duration > neighbor_list_update_interval){
-         cout << "======> update neighbor list at timestep " << i << endl;
-         neighbor_list_update_flag = true;
-         timestep_duration = 0;
-      }
-      system.reinit_hi_system(neighbor_list_update_flag);
+  if(i>0){
+    *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
+    // Update the local values to reflect the solution on neighboring processors
+    system.update();
+    if(update_neighbor_list_everyStep){
+      neighbor_list_update_flag = true;
     }
-    if(print_info){
-    if(comm_in.rank()==0)
-      point_mesh->print_point_info();
+    else if (timestep_duration > neighbor_list_update_interval){
+       cout << "======> update neighbor list at timestep " << i << endl;
+       neighbor_list_update_flag = true;
+       timestep_duration = 0;
     }
+    system.reinit_hi_system(neighbor_list_update_flag);
+  }
+  if(print_info){
+  if(comm_in.rank()==0)
+    point_mesh->print_point_info();
+  }
 //   perf_log.pop("reinit sytem");
 //   perf_log.push("compute_point_velocity undisturbed");
-    // compute undisturbed velocity of points 
-    system.compute_point_velocity("undisturbed", vel0);
+  // compute undisturbed velocity of points 
+  system.compute_point_velocity("undisturbed", vel0);
 //   perf_log.pop("compute_point_velocity undisturbed");
 
-    reinit_stokes = false;
+  reinit_stokes = false;
 //   perf_log.push("solve_stokes disturbed");
 
-    system.solve_stokes("disturbed",reinit_stokes); // Using StokesSolver
+  system.solve_stokes("disturbed",reinit_stokes); // Using StokesSolver
 //   perf_log.pop("solve_stokes disturbed");
 
-    // compute distrubed velocity of points
+  // compute distrubed velocity of points
 //   perf_log.push("compute_point_velocity disturbed");
 
 
-    system.compute_point_velocity("disturbed", vel1);
+  system.compute_point_velocity("disturbed", vel1);
 //   perf_log.pop("compute_point_velocity disturbed");
 
 //   perf_log.push("other");
 
-    // add up undistrubed and disturbed velocity of points
-    for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
-   // transform total point velocity to U0 in Brownian_system
-    brownian_sys->vector_transform(vel1, &U0, "forward");
-    // assign vel1 to particle velocity
-    point_mesh->set_bead_velocity(vel1);
+  // add up undistrubed and disturbed velocity of points
+  for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
+ // transform total point velocity to U0 in Brownian_system
+  brownian_sys->vector_transform(vel1, &U0, "forward");
+  // assign vel1 to particle velocity
+  point_mesh->set_bead_velocity(vel1);
 
-    if (debug_info){
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       * ---> test: output the particle velocity
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      const Real v0_min = v0_ptr->min();
-      const Real v0_max = v0_ptr->max();
-      const Real v0_sum = v0_ptr->sum();
-      if(comm_in.rank()==0){
-        for(unsigned int j=0; j<NP;++j)
-        {    
-          std::vector<Real> vtest0(dim), vtest1(dim);
-          for(std::size_t k=0; k<dim;++k){
-            vtest0[k] = vel0[j*dim+k];
-            vtest1[k] = vel1[j*dim+k];
-          }
-          Point vtest2 = point_mesh->particles()[j]->particle_velocity();
-          printf("--->test in test_move_particles(): velocity on the %u-th point:\n",j);
-          printf("            U0 = (%.12e,%.12e,%.12e)\n",   vtest0[0],vtest0[1],vtest0[2]);
-          printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n", vtest1[0],vtest1[1],vtest1[2]);
-          printf("     bead velocity(should be equal to U0+U1) = (%.12e,%.12e,%.12e)\n\n", vtest2(0), vtest2(1), vtest2(2));
-        }    
-        printf("fluid field v0_min = %.12e, v0_max = %.12e, v0_sum = %.12e)\n",v0_min,v0_max,v0_sum);
-      }    
-    }
-    /*---------------------------------------------------------------------------------------
-     * write equation system at step i
-     * print out information at step 0
-     * do not print out information at the first step when restart since it is identical to the 
-     * last step before restart.
-    -----------------------------------------------------------------------------------------*/
-    if(i%write_interval == 0){
-      cout << "\nStarting Fixman integration at step "<< i << endl;
-      if (i != restart_step){
-        /*
-         * write equation system to output file
-         */
-        if (i != 0){
-          if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end())
-          {
-            system.add_local_solution();  // add local solution for the disturbed system
-            system.solution->add(*v0_ptr);// add the undisturbed solution
-    #ifdef LIBMESH_HAVE_EXODUS_API
-            exodus_ptr->append(true);
-            exodus_ptr->write_timestep(out_system_filename,equation_systems,o_step,o_step);
-    #endif
-          } // end if (write es)  
-        }
-        /*
-         * write particle to output file
-         */ 
-        this -> write_object(i);
-        /*----------------------------------------------------------------------------------------------------
-         * Write out ROUT for restart mode at step i
-         ----------------------------------------------------------------------------------------------------*/
-        PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-        VecView(ROUT,viewer);        
-      }
-      // update o_step
-      o_step++;
-    } // end if (i % write_interval == 0 )
+  if (debug_info){
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Adaptive time step.
+     * ---> test: output the particle velocity
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    Real dt = 0;
-    if(adaptive_dt){
-      Real vp_max = point_mesh->maximum_bead_velocity();
-      Real vp_min = point_mesh->minimum_bead_velocity();
-      dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  
-      if(i % write_interval == 0){
-        cout << "       ##############################################################################################################" << endl
-             << "       # Max velocity magnitude is " << vp_max << endl
-             << "       # Min velocity magnitude is " << vp_min << endl
-             << "       # minimum mesh size = " << hmin << endl
-             << "       # The adaptive time increment at step "<< i << " is dt = " << dt<<endl
-             << "       # max_dr_coeff = " << max_dr_coeff <<endl 
-             << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
-             << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i) "<<endl      
-             << "       ##############################################################################################################" << endl;
-      } // end if (i% write_interval)  
+    const Real v0_min = v0_ptr->min();
+    const Real v0_max = v0_ptr->max();
+    const Real v0_sum = v0_ptr->sum();
+    if(comm_in.rank()==0){
+      for(unsigned int j=0; j<NP;++j)
+      {    
+        std::vector<Real> vtest0(dim), vtest1(dim);
+        for(std::size_t k=0; k<dim;++k){
+          vtest0[k] = vel0[j*dim+k];
+          vtest1[k] = vel1[j*dim+k];
+        }
+        Point vtest2 = point_mesh->particles()[j]->particle_velocity();
+        printf("--->test in test_move_particles(): velocity on the %u-th point:\n",j);
+        printf("            U0 = (%.12e,%.12e,%.12e)\n",   vtest0[0],vtest0[1],vtest0[2]);
+        printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n", vtest1[0],vtest1[1],vtest1[2]);
+        printf("     bead velocity(should be equal to U0+U1) = (%.12e,%.12e,%.12e)\n\n", vtest2(0), vtest2(1), vtest2(2));
+      }    
+      printf("fluid field v0_min = %.12e, v0_max = %.12e, v0_sum = %.12e)\n",v0_min,v0_max,v0_sum);
+    }    
+  }
+  /*---------------------------------------------------------------------------------------
+   * write equation system at step i
+   * print out information at step 0
+   * do not print out information at the first step when restart since it is identical to the 
+   * last step before restart.
+  -----------------------------------------------------------------------------------------*/
+  if(i%write_interval == 0){
+    cout << "\nStarting Fixman integration at step "<< i << endl;
+    if (i != restart_step){
+      /*
+       * write equation system to output file
+       */
+      if (i != 0){
+        if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end())
+        {
+          system.add_local_solution();  // add local solution for the disturbed system
+          system.solution->add(*v0_ptr);// add the undisturbed solution
+  #ifdef LIBMESH_HAVE_EXODUS_API
+          exodus_ptr->append(true);
+          exodus_ptr->write_timestep(out_system_filename,equation_systems,o_step,o_step);
+  #endif
+        } // end if (write es)  
+      }
+      /*
+       * write particle to output file
+       */ 
+      this -> write_object(i);
+      /*----------------------------------------------------------------------------------------------------
+       * Write out ROUT for restart mode at step i
+       ----------------------------------------------------------------------------------------------------*/
+      PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
+      VecView(ROUT,viewer);        
     }
-    else{
-      dt = max_dr_coeff * 1.; 
-      if(i % write_interval == 0){
-        cout << "       ##############################################################################################################" << endl
-             << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl
-             << "       # max_dr_coeff = " << max_dr_coeff << endl
-       	     << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
-             << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0 "<<endl
-             << "       ##############################################################################################################" << endl;
-      } // end if (i % write_interval == 0)
-    } // end if (adaptive_dt)
+    // update o_step
+    o_step++;
+  } // end if (i % write_interval == 0 )
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   Adaptive time step.
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  Real dt = 0;
+  if(adaptive_dt){
+    Real vp_max = point_mesh->maximum_bead_velocity();
+    Real vp_min = point_mesh->minimum_bead_velocity();
+    dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  
+    if(i % write_interval == 0){
+      cout << "       ##############################################################################################################" << endl
+           << "       # Max velocity magnitude is " << vp_max << endl
+           << "       # Min velocity magnitude is " << vp_min << endl
+           << "       # minimum mesh size = " << hmin << endl
+           << "       # The adaptive time increment at step "<< i << " is dt = " << dt<<endl
+           << "       # max_dr_coeff = " << max_dr_coeff <<endl 
+           << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
+           << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i) "<<endl      
+           << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
+           << "       ##############################################################################################################" << endl;
+    } // end if (i% write_interval)  
+  }
+  else{
+    dt = max_dr_coeff * 1.; 
+    if(i % write_interval == 0){
+      cout << "       ##############################################################################################################" << endl
+           << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl
+           << "       # max_dr_coeff = " << max_dr_coeff << endl
+     	     << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
+           << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0 "<<endl
+           << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
+           << "       ##############################################################################################################" << endl;
+    } // end if (i % write_interval == 0)
+  } // end if (adaptive_dt)
 
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    If with Brownian motion, we use midpoint scheme
+    If without Brownian motion, we use normal stepping: dR = Utotal*dt
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
+  if (with_brownian)
+  {
+ //   perf_log.push("bd");
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-      If with Brownian motion, we use midpoint scheme
-      If without Brownian motion, we use normal stepping: dR = Utotal*dt
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
-    if (with_brownian)
-    {
-   //   perf_log.push("bd");
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
-       petsc_random_vector generates a uniform distribution [0 1] whose
-       mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      Real mean_dw = 0.0, variance_dw = 0.0;
-      
-      // A more precise way is to construct a random vector with gaussian distribution
-      const Real std_dev  = std::sqrt(dt);
-      brownian_sys->std_random_vector(0.0,std_dev,"gaussian",&dw);
-      brownian_sys->_vector_mean_variance(dw, mean_dw, variance_dw);
-      VecScale(dw,std::sqrt(2.0));
-      
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Print out the mean and variance or view the generated vector.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+     Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
+     petsc_random_vector generates a uniform distribution [0 1] whose
+     mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    Real mean_dw = 0.0, variance_dw = 0.0;
+    
+    // A more precise way is to construct a random vector with gaussian distribution
+    const Real std_dev  = std::sqrt(dt);
+    brownian_sys->std_random_vector(0.0,std_dev,"gaussian",&dw);
+    brownian_sys->_vector_mean_variance(dw, mean_dw, variance_dw);
+    VecScale(dw,std::sqrt(2.0));
+    
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Print out the mean and variance or view the generated vector.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 //      PetscPrintf(PETSC_COMM_WORLD,
 //                 "Generated random_vector: mean = %f, variance = %f\n",
 //                 mean_dw, variance_dw);
 //      PetscPrintf(PETSC_COMM_WORLD,
 //                 "Predicted random_vector: mean = %f, variance = %f\n",
 //                 0., std::sqrt(2.*dt));
-      // Compute dw = B^-1 * dw using Chebyshev polynomial, dw will be changed!
-      VecCopy (dw,dw_mid);  // save dw to dw_mid, which will be used for Chebyshev
-      for(std::size_t j=0; j<2; j++)
-      {
-        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-         Compute the max/min eigenvalues if needed. Otherwise, magnify the interval.
-         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-        if(compute_eigen){
-          //cout << "Compute the max & min eigenvalues for Chebyshev polynomial at step "<<i+1<<endl;
-          brownian_sys->compute_eigenvalues(eig_min,eig_max,tol_eigen);
-          // Magnify the spectral range by a factor (1.05 by default).
-  	      eig_max *= eig_factor; eig_min /= eig_factor;
-          PetscPrintf(PETSC_COMM_WORLD,
-                     "--->Recomputed eigen values and magnify the range by a factor eig_factor = %f: eig_min = %f, eig_max = %f, tol_cheb = %f, max_n_cheb = %d\n",
-                     eig_factor,eig_min,eig_max,tol_cheb,max_n_cheb);   
-        }
-        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-         Compute the Brownian displacement B^-1 * dw using Chebyshev approximation.
-         Here dw is both input and output variables, so it will be changed.
-         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-        cheb_converge = brownian_sys->chebyshev_polynomial_approximation(max_n_cheb,
-                                                                        eig_min,eig_max,tol_cheb,&dw);       
-        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-         If converged, dw returns the Brownian displacement, then break the j-loop;
-         Otherwise, recompute eigenvalues
-         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-        if(cheb_converge){
-          compute_eigen = false; break;
-        }
-        else{
-          compute_eigen = true;
-          VecCopy(dw_mid,dw); /*copy back, recompute eigenvalues*/
-          //cout << "It is necessry to re-compute the eigenvalues at step " <<i+1<<endl;
-        }
-      } // end for j-loop
-
+    // Compute dw = B^-1 * dw using Chebyshev polynomial, dw will be changed!
+    VecCopy (dw,dw_mid);  // save dw to dw_mid, which will be used for Chebyshev
+    cout << "debug 0\n";
+    for(std::size_t j=0; j<2; j++)
+    {
+      cout << "j = "<<j<<endl;
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Double-check the convergence of Chebyshev polynomial approximation
-       *** If cheb does NOT converge, consider re-generating a rand vector!
+       Compute the max/min eigenvalues if needed. Otherwise, magnify the interval.
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      if(!cheb_converge)
-      {
-        PMToolBox::output_message("****** Warning: After recomputing eigenvalues, Chebysheve failed to converge at step " +std::to_string(i), comm_in);
-        libmesh_error();
+      if(compute_eigen){
+        cout <<"compute_eigen = "<<compute_eigen << endl;
+        //cout << "Compute the max & min eigenvalues for Chebyshev polynomial at step "<<i+1<<endl;
+        brownian_sys->compute_eigenvalues(eig_min,eig_max,tol_eigen);
+        // Magnify the spectral range by a factor (1.05 by default).
+	      eig_max *= eig_factor; eig_min /= eig_factor;
+        if(eig_min < 0 or eig_max < 0 or eig_min > eig_max){
+          cout <<"--->Invalid eigenvalue range: eig_min = "<<eig_min <<"; eig_max = "<<eig_max << endl;
+          cheb_converge = false;
+          break;  
+        } 
+        else{
+          cout <<"--->Valid eigenvalue range: recomputed eigen values and magnify the range by a factor eig_factor = " << eig_factor 
+               <<"; eig_min = " << eig_min
+               <<"; eig_max = " << eig_max
+               <<"; tol_cheb = "<< tol_cheb
+               <<"; max_n_cheb = " << max_n_cheb << endl; 
+        }
       }
-     
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       Compute the Brownian displacement B^-1 * dw using Chebyshev approximation.
+       Here dw is both input and output variables, so it will be changed.
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+      cheb_converge = brownian_sys->chebyshev_polynomial_approximation(max_n_cheb,
+                                                                      eig_min,eig_max,tol_cheb,&dw);  
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       If converged, dw returns the Brownian displacement, then break the j-loop;
+       Otherwise, recompute eigenvalues
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+      if(cheb_converge){
+        compute_eigen = false; break;
+      }
+      else{
+        compute_eigen = true;
+        VecCopy(dw_mid,dw); /*copy back, recompute eigenvalues*/
+        //cout << "It is necessry to re-compute the eigenvalues at step " <<i+1<<endl;
+      }
+    } // end for j-loop
+    cout << "debug 2, cheb_converge = "<<cheb_converge  <<endl;
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Double-check the convergence of Chebyshev polynomial approximation
+     If cheb_converge = true continue fixman integration
+     otherwise, relax the system for serval free-draining steps
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    if(cheb_converge){
       // Compute dw_mid = D*B^-1*dw, which can be obtained by solving the Stokes
       brownian_sys->hi_ewald(M,dw,dw_mid);  // dw_mid = D * dw
-
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Particle coordinate vector R0.
        Move the particle R_mid = R0 + 0.5*(U0+U1)*dt (deterministic)
@@ -1082,25 +1093,31 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int i)
       // Update ROUT (position vector excluding pbc) at the i-th step
       VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
       VecAXPY(ROUT,2.0*coef,dw_mid);  // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
-    } // end if Brownian
-    
-    else{ // if without Brownian
-      // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
-      brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
-      VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
-      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords 
-      this -> update_object();
-      // Update ROUT (position vector excluding pbc) at the i-th step
-      VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
-    } // end else (without_brownian)
-    real_time += dt;
-    timestep_duration += 1;   
+    }// end if cheb_converge
+    else {
+      n_chebyshev_failure += 1;
+      PMToolBox::output_message("****** Warning: After recomputing eigenvalues, Chebysheve failed to converge at step " +std::to_string(i)+"; relax the system for "+std::to_string(n_relax_step)+" steps", comm_in);
+      for (int relax_step=0; relax_step<n_relax_step; relax_step++){
+        langevin_integrate(equation_systems, i);
+        i++;
+      }
+    }// end else cheb_converge
+  } // end if Brownian
+  else{ // if without Brownian
+    // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
+    brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
+    VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
+    brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords 
+    this -> update_object();
+    // Update ROUT (position vector excluding pbc) at the i-th step
+    VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
+  } // end else (without_brownian)
+  real_time += dt;
+  timestep_duration += 1;
 //   perf_log.pop("other");
-
 }
 
-void Copss::langevin_integrate(EquationSystems& equation_systems,
-                               unsigned int i)
+void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
   // get stokes system from equation systems
   PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");

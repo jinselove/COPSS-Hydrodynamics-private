@@ -165,6 +165,7 @@ public:
   bool restart; // if restart
   std::size_t restart_step; // restart step
   unsigned int nstep; // totol number of steps to run
+  unsigned int n_relax_step; // relaxation steps when Chebyshev cannot converge even after recompute eigenvalue
   bool debug_info;
   // ouput file 
   unsigned int write_interval; // output file write interval
@@ -190,7 +191,8 @@ public:
   unsigned int n_vec;
   Real hminf, hmaxf; // fluid mesh minimum
   Real hmin, hmax; // all mesh minimum
-  bool cheb_converge;
+  bool cheb_converge = false;
+  unsigned int n_chebyshev_failure = 0;
   Real eig_min = 0, eig_max = 0;
   const std::string out_system_filename = "output_pm_system.e";
   UniquePtr<NumericVector<Real>> v0_ptr;
@@ -368,12 +370,12 @@ protected:
   /*!
    * Integrate particle motions using Fixman's midpoint scheme
    */
-  void fixman_integrate(EquationSystems& equation_systems, unsigned int i);
+  void fixman_integrate(EquationSystems& equation_systems, unsigned int& i);
 
   /*!
    * Integrate particle motions using overdamped Langevin(Brownian dynamics) scheme
    */
-  void langevin_integrate(EquationSystems& equation_systems, unsigned int i);
+  void langevin_integrate(EquationSystems& equation_systems, unsigned int& i);
 
   // update object positions due to PBS
   virtual void update_object() {};

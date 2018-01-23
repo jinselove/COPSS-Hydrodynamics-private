@@ -746,9 +746,14 @@ void ParticleMesh<KDDim>::write_particle_mesh(const unsigned int& o_step) const
   START_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
   this->comm().barrier();
   for (std::size_t particle_id = 0; particle_id < _n_rigid_particles; particle_id++){
-    std::ostringstream surface_mesh_filename;
-    surface_mesh_filename << "surface_mesh_particle_"<<particle_id+1<<"_step_"<<o_step<<".e";
-    _particles[particle_id]->mesh().write(surface_mesh_filename.str());
+    std::ostringstream surface_mesh_filename; 
+    surface_mesh_filename << "out_particle_"<<particle_id+1
+			  << ".e-s."
+			  << std::setw(7)
+		          << std::setfill('0')
+			  << std::right
+		          << o_step;
+    ExodusII_IO(_particles[particle_id]->mesh()).write(surface_mesh_filename.str());
   }
   STOP_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
 }

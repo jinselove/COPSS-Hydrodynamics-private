@@ -27,6 +27,7 @@
 #include "libmesh/parallel_object.h"
 #include "libmesh/mesh.h"
 #include "libmesh/elem.h"
+#include "libmesh/exodusII_io.h"
 #ifdef LIBMESH_HAVE_NANOFLANN
 #  include "libmesh/nanoflann.hpp"
 #endif

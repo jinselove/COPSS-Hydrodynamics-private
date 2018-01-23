@@ -98,13 +98,6 @@ private:
   	std::size_t num_rigid_particles;
 
 
-  	// const std::string smesh_file_name = "particle_surface_mesh.e";
-
-  	// std::ostringstream smesh_file_name_i;
-
-  	// bool write_particle_mesh;
-
-
 };
 
 

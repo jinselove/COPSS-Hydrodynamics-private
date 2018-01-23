@@ -662,11 +662,11 @@ void ParticleMesh<KDDim>::write_particle(const unsigned int& step_id,
     }
     else if(output_file[i] == "trajectory") this -> write_particle_trajectory(o_step, comm_in_rank);
     else if (output_file[i] == "particle_mesh") this->write_particle_mesh(o_step);
+    else if (output_file[i] == "surface_node") this->write_surface_node(o_step,comm_in_rank);
     else if(output_file[i] == "mean_square_displacement"){
         std::cout <<"Error: there is difficulty to calculate msd of rigid particles from ROUT, fix it before output msd" << std::endl;
         libmesh_error();
         // this -> write_particle_msd(step_id, o_step,center0, lvec, comm_in_rank);
-      
     }
     else {
       std::cout << "unsupported output_file content: (" << output_file[i] <<")" << std::endl; 
@@ -738,6 +738,36 @@ void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
 
   STOP_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
 }
+
+// ======================================================================
+template <unsigned int KDDim>
+void ParticleMesh<KDDim>::write_surface_node(const unsigned int& o_step,
+                                             unsigned int comm_in_rank) const
+{
+  std::ostringstream oss;
+  oss << "output_surface_node_" << o_step <<".csv";
+  std::ofstream out_file;
+  if(comm_in_rank == 0 ){
+    out_file.open(oss.str(), std::ios_base::out);
+    //write out the csv file
+    //POINT data
+    out_file <<"rigid_particle_id node_id x_coord y_coord z_coord\n";
+    out_file.precision(6);
+    for(std::size_t i=0; i<_n_rigid_particles; i++){
+      for(std::size_t j=0; j<_particles[i]->num_mesh_nodes();++j){
+        const Point node_pos = _particles[i]->mesh_point(j);
+        out_file << i << " " << j << " ";
+        for(std::size_t k=0; k<KDDim; k++){
+          out_file << node_pos(k) <<" ";
+        } // end loop over all dimensions
+        out_file << "\n"; 
+      }// end loop over all mesh points of one rigid particle
+    }// end loop over all rigid particles
+    out_file.close();
+  } // end if comm_in_rank
+}
+
+
 
 // ======================================================================
 template <unsigned int KDDim>

@@ -424,16 +424,12 @@ public:
                                  unsigned int comm_in_rank) const;
 
   /*
-   * Write out mean square displacement of rigid particles
-   * Average over all rigidparticles
-   * "out.mean_sqaure_displacement"
+   * Write out surface nodes positions to csv files
    */
-  // void write_particle_msd(const unsigned int& step_id,
-  //                     const unsigned int& o_step,
-  //                     const std::vector<Point>& center0,
-  //                     const std::vector<Real>& lvec,
-  //                     unsigned int comm_in_rank) const;
-  
+  void write_surface_node(const unsigned int& o_step,
+                          unsigned int comm_in_rank) const;
+
+
   /*
    * Write out the particle's mesh(either surface mesh or volume mesh)
    */

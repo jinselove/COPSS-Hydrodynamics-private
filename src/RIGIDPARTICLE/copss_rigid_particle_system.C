@@ -137,8 +137,6 @@ void CopssRigidParticleSystem::create_object_mesh(){
   cout << "\n==>(4/4) Create point_mesh object \n";
   // Create object mesh
   point_mesh = new PointMesh<3> (*particle_mesh, search_radius_p, search_radius_e);
-  // visualize mesh points if needed
-  point_mesh->write_initial_surface_node_pos(); 
   // No need to add periodic boundary, which is already included in particle_mesh
   // Reinit point_mesh
   point_mesh->reinit(with_hi, neighbor_list_update_flag);

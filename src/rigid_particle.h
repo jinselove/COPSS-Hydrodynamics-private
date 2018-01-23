@@ -201,7 +201,6 @@ public:
    */
   void read_mesh_cylinder(const std::string& filename);
   
-  
   /*
    * Write the mesh data for the current particle.
    */

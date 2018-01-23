@@ -48,7 +48,7 @@ protected:
 	// create objects, polymer chains
 	void create_object() override;
 
-	// attach mesh spring network to particle mesh
+	// attach mesh spring network
 	void attach_mesh_spring_network();
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

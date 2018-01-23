@@ -227,15 +227,21 @@ public:
   // Destructor
   ~ParticleMesh();
 
-
   /**
-   * Read sphere particle coordinate data from file
+   * Read particle coordinate data from file
    * mesh_type = "surface_mesh" or "volume_mesh"
    * defaulty, we turn the "Electrostatics" off
    */
-   void read_particles_data(const std::string& filename,      // particle xyz file
-                            const std::string& particle_mesh_type);    // mesh type of the particle);
-  
+  void read_particles_data(const std::string& filename,      // particle xyz file
+                           const std::string& particle_mesh_type);    // mesh type of the particle);
+
+  /**
+   * Read particle data for restart mesh files
+   * only surface mesh is allowed
+   */
+  void read_particles_data_restart(const std::string& filename,
+                                   const std::string& particle_mesh_type);
+
   
   /**
    * Read chromatin data (cylinder particle) from the local file.
@@ -408,6 +414,7 @@ public:
                   const Real& real_time,
                   unsigned int comm_in_rank) const;
 
+
   /*
    * Write out particle trajectories && forces && velocity to csv files
    * "output_bead_o_step.csv"
@@ -429,8 +436,12 @@ public:
   /*
    * Write out the particle's mesh(either surface mesh or volume mesh)
    */
-  void write_particle_mesh(const unsigned int & step_id,
-                           const unsigned int& o_step) const;
+  void write_particle_mesh(const unsigned int& o_step) const;
+
+  /*
+   * Write out restart mesh (only save the latest step)
+   */
+  void write_particle_mesh_restart() const;
   
   /*  
    * Return a stitched mesh associated with all particles for electrostatic solver
@@ -541,10 +552,6 @@ public:
    */
   void print_elem_neighbor_list(std::ostream & out = libMesh::out) const;
   
-
-  
-
-
 private:
   // number of rigid particles
   std::size_t _n_rigid_particles;
@@ -558,7 +565,7 @@ private:
   // mesh files
   std::vector<std::string> _rigid_particle_mesh_files;
 
-    // A vector that store the pointers to Particle
+  // A vector that store the pointers to Particle
   std::vector<RigidParticle*> _particles;
 
   // Mesh base: this is the domain(fluid) mesh, not the particle's mesh

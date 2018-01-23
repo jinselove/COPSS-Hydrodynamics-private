@@ -148,6 +148,6 @@ n_relax_step   = 1
 write_interval = 1
 restart        = false
 random_seed    = 123456789
-output_file    = 'equation_systems particle_mesh trajectory'
+output_file    = 'equation_systems particle_mesh trajectory surface_node'
 print_info     = false
 debug_info     = false

@@ -186,8 +186,6 @@ void RigidParticle::read_mesh_sphere(const std::string& filename)
       (*node)(i) =  ((*node)(i)*_radius + _center0(i) );
     }
   } // end for
-  
-  
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Compute the volume of the sphere.
    FIXME: the volume for sphere can be computed analytically!
@@ -196,22 +194,10 @@ void RigidParticle::read_mesh_sphere(const std::string& filename)
   STOP_LOG("read_mesh_sphere()", "RigidParticle");
 }
   
-
-  
 // ======================================================================
 void RigidParticle::read_mesh_cylinder(const std::string& filename)
 {
   START_LOG("read_mesh_cylinder()", "RigidParticle");
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Check the existance of the file
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  const bool file_exist = PMToolBox::file_exist(filename);
-  if( !file_exist )
-  {
-    printf("***error in RigidParticle::read_mesh_cylinder(): file does NOT exist!");
-    libmesh_error();
-  }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    read the data file
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -235,8 +221,8 @@ void RigidParticle::read_mesh_cylinder(const std::string& filename)
   _particle_shape = "cylinder";
   STOP_LOG("read_mesh_cylinder()", "RigidParticle");
 }
-  
-  
+
+
   
 // ======================================================================
 void RigidParticle::write_mesh(const std::string& filename)

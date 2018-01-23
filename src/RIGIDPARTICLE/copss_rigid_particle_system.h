@@ -48,7 +48,7 @@ protected:
 	// create objects, polymer chains
 	void create_object() override;
 
-	// attach mesh spring network to particle mesh
+	// attach mesh spring network
 	void attach_mesh_spring_network();
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -96,13 +96,6 @@ private:
   	std::vector<MeshSpringNetwork*> mesh_spring_network;
 
   	std::size_t num_rigid_particles;
-
-
-  	// const std::string smesh_file_name = "particle_surface_mesh.e";
-
-  	// std::ostringstream smesh_file_name_i;
-
-  	// bool write_particle_mesh;
 
 
 };

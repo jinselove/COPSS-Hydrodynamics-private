@@ -69,20 +69,17 @@ void CopssRigidParticleSystem::create_object(){
   // initialize _particle_mesh
   particle_mesh = new ParticleMesh<3> (*mesh,search_radius_p,search_radius_e);
   // add periodic boundary
-  //std::cout << "debug in create_object: pm_periodic_boundary->box_length = " << pm_periodic_boundary->box_length() <<endl;
   particle_mesh -> add_periodic_boundary(*pm_periodic_boundary);
-
   //Read the particle data
   std::ostringstream pfilename;
     // if restart, read particle data from ...
+  pfilename<<"rigid_particle_data.in";
   if(restart){
-    // implement this for restart mode
-    cout <<"Warning: restart mode for rigid particles has not been implemented yet" << endl;
-    libmesh_error();
+    cout <<"in restart mode ---------" << endl;
+    particle_mesh -> read_particles_data_restart(pfilename.str(),particle_mesh_type);
   }
-    // if not restart, read particle data from "rigid_particle_data.in"
+  // if not restart, read particle data from "rigid_particle_data.in"
   else{
-    pfilename <<"rigid_particle_data.in";
     particle_mesh -> read_particles_data(pfilename.str(), particle_mesh_type);    
   }
   // reinit _particle_mesh
@@ -125,7 +122,6 @@ void CopssRigidParticleSystem::attach_mesh_spring_network()
     mesh_spring_network[i]->build_spring_network(centroid0);
     particle_mesh->particles()[i]->attach_mesh_spring_network(mesh_spring_network[i]);
   }
-
 }
 
 //=====================================================================
@@ -141,8 +137,6 @@ void CopssRigidParticleSystem::create_object_mesh(){
   cout << "\n==>(4/4) Create point_mesh object \n";
   // Create object mesh
   point_mesh = new PointMesh<3> (*particle_mesh, search_radius_p, search_radius_e);
-  // visualize mesh points if needed
-  point_mesh->write_initial_surface_node_pos(); 
   // No need to add periodic boundary, which is already included in particle_mesh
   // Reinit point_mesh
   point_mesh->reinit(with_hi, neighbor_list_update_flag);

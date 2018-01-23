@@ -826,7 +826,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
    Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
-//   perf_log.push("reinit sytem");
+  // perf_log.push("reinit sytem");
   if(i>0){
     *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
     // Update the local values to reflect the solution on neighboring processors
@@ -845,34 +845,27 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
   if(comm_in.rank()==0)
     point_mesh->print_point_info();
   }
-//   perf_log.pop("reinit sytem");
-//   perf_log.push("compute_point_velocity undisturbed");
+  // perf_log.pop("reinit sytem");
+//  perf_log.push("compute_point_velocity undisturbed");
   // compute undisturbed velocity of points 
   system.compute_point_velocity("undisturbed", vel0);
-//   perf_log.pop("compute_point_velocity undisturbed");
+//  perf_log.pop("compute_point_velocity undisturbed");
 
   reinit_stokes = false;
-//   perf_log.push("solve_stokes disturbed");
-
+//  perf_log.push("solve_stokes disturbed");
   system.solve_stokes("disturbed",reinit_stokes); // Using StokesSolver
-//   perf_log.pop("solve_stokes disturbed");
+//  perf_log.pop("solve_stokes disturbed");
 
   // compute distrubed velocity of points
-//   perf_log.push("compute_point_velocity disturbed");
-
-
+//  perf_log.push("compute_point_velocity disturbed");
   system.compute_point_velocity("disturbed", vel1);
-//   perf_log.pop("compute_point_velocity disturbed");
-
-//   perf_log.push("other");
-
+//  perf_log.pop("compute_point_velocity disturbed");
   // add up undistrubed and disturbed velocity of points
   for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
  // transform total point velocity to U0 in Brownian_system
   brownian_sys->vector_transform(vel1, &U0, "forward");
   // assign vel1 to particle velocity
   point_mesh->set_bead_velocity(vel1);
-
   if (debug_info){
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      * ---> test: output the particle velocity
@@ -973,20 +966,19 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
   if (with_brownian)
   {
- //   perf_log.push("bd");
+    // PerfLog perf_log("BD step");
+  // perf_log.push("bd");
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
      petsc_random_vector generates a uniform distribution [0 1] whose
      mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     Real mean_dw = 0.0, variance_dw = 0.0;
-    
     // A more precise way is to construct a random vector with gaussian distribution
     const Real std_dev  = std::sqrt(dt);
     brownian_sys->std_random_vector(0.0,std_dev,"gaussian",&dw);
     brownian_sys->_vector_mean_variance(dw, mean_dw, variance_dw);
     VecScale(dw,std::sqrt(2.0));
-    
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Print out the mean and variance or view the generated vector.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -998,10 +990,11 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 //                 0., std::sqrt(2.*dt));
     // Compute dw = B^-1 * dw using Chebyshev polynomial, dw will be changed!
     VecCopy (dw,dw_mid);  // save dw to dw_mid, which will be used for Chebyshev
-    cout << "debug 0\n";
+  //  cout << "debug 0\n";
+    // perf_log.push("cheb_converge");
     for(std::size_t j=0; j<2; j++)
     {
-      cout << "j = "<<j<<endl;
+    //  cout << "j = "<<j<<endl;
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Compute the max/min eigenvalues if needed. Otherwise, magnify the interval.
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -1043,12 +1036,14 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
         //cout << "It is necessry to re-compute the eigenvalues at step " <<i+1<<endl;
       }
     } // end for j-loop
-    cout << "debug 2, cheb_converge = "<<cheb_converge  <<endl;
+    // perf_log.pop("cheb_converge");
+//    cout << "debug 2, cheb_converge = "<<cheb_converge  <<endl;
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Double-check the convergence of Chebyshev polynomial approximation
      If cheb_converge = true continue fixman integration
      otherwise, relax the system for serval free-draining steps
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    // perf_log.push("fixman step");
     if(cheb_converge){
       // Compute dw_mid = D*B^-1*dw, which can be obtained by solving the Stokes
       brownian_sys->hi_ewald(M,dw,dw_mid);  // dw_mid = D * dw
@@ -1081,7 +1076,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
       brownian_sys->vector_transform(vel1, &U0, "forward"); // (U0+U1)_mid
       brownian_sys->hi_ewald(M,dw,dw_mid);  // dw_mid = D_mid*dw, where dw=B^-1*dw computed above
-   
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        the mid-point to the NEW point, and update the particle coordinates
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -1102,6 +1096,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
         i++;
       }
     }// end else cheb_converge
+    // perf_log.pop("fixman step");
+    // perf_log.pop("bd");
   } // end if Brownian
   else{ // if without Brownian
     // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
@@ -1114,7 +1110,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
   } // end else (without_brownian)
   real_time += dt;
   timestep_duration += 1;
-//   perf_log.pop("other");
 }
 
 void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& i)

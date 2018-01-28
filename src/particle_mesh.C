@@ -221,6 +221,40 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
 
 // ======================================================================
 template <unsigned int KDDim>
+void ParticleMesh<KDDim>::read_particles_data_restart(const std::string& filename)
+{
+  std::cout << std::endl << "### Read rigid particle from = " << filename << std::endl;
+  // Check the existence of the particle input file
+  std::ifstream infile;
+  infile.open (filename, std::ios_base::in);
+  if( !infile.good() )
+  {
+    std::cout << "***error in read_particles_data_restart(): "<<filename<<" does NOT exist!" << std::endl;
+    libmesh_error();
+  }
+  std::size_t tmp_n;
+  std::string line_str, str_tmpt;
+  std::getline(infile, line_str); // skip header line
+  // read surface node 
+  for (std::size_t i=0; i<_n_rigid_particles; ++i)
+  {
+    std::vector<Point> node_pos;
+    std::size_t num_mesh_nodes = _particles[i]->num_mesh_nodes();
+    node_pos.resize(num_mesh_nodes);   
+    for (std::size_t j=0; j < num_mesh_nodes; j++){
+      infile >> tmp_n
+             >> tmp_n
+             >> node_pos[j](0) >> node_pos[j](1) >> node_pos[j](2);
+    }
+    _particles[i]->update_mesh(node_pos);
+  }
+  infile.close();
+  this->comm().barrier();
+  std::cout << "Update particle surface node position from "<<filename <<" is completed\n"; 
+}   
+
+// ======================================================================
+template <unsigned int KDDim>
 void ParticleMesh<KDDim>::read_particles_data_restart(const std::string& filename,
                                                       const std::string& particle_mesh_type)
 {
@@ -231,7 +265,7 @@ void ParticleMesh<KDDim>::read_particles_data_restart(const std::string& filenam
   infile.open (filename, std::ios_base::in);
   if( !infile.good() )
   {
-    std::cout << "***error in read_particles_data(): "<<filename<<" does NOT exist!" << std::endl;
+    std::cout << "***error in read_particles_data_restart(): "<<filename<<" does NOT exist!" << std::endl;
     libmesh_error();
   }
   // init variables
@@ -655,14 +689,15 @@ void ParticleMesh<KDDim>::write_particle(const unsigned int& step_id,
 {
   START_LOG("write_particle()", "ParticleMesh<KDDim>");
   this->write_time(step_id, o_step, real_time, comm_in_rank);
-  this->write_particle_mesh_restart();
   for (int i = 0; i < output_file.size(); i++){
     if(output_file[i] == "equation_systems") {
       // this output has been written in Copss.C
     }
     else if(output_file[i] == "trajectory") this -> write_particle_trajectory(o_step, comm_in_rank);
     else if (output_file[i] == "particle_mesh") this->write_particle_mesh(o_step);
+    // else if (output_file[i] == "restart_file/particle_mesh") this -> write_particle_mesh_restart();
     else if (output_file[i] == "surface_node") this->write_surface_node(o_step,comm_in_rank);
+  // else if (output_file[i] == "restart_file/surface_node") this-> write_surface_node_restart();
     else if(output_file[i] == "mean_square_displacement"){
         std::cout <<"Error: there is difficulty to calculate msd of rigid particles from ROUT, fix it before output msd" << std::endl;
         libmesh_error();
@@ -715,6 +750,7 @@ void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
     // POINT data
     out_file <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
     out_file.precision(o_precision);
+    out_file.setf(std::ios::fixed);
     for(std::size_t i=0; i<_n_rigid_particles; ++i)
     {
       out_file << i << " ";
@@ -753,6 +789,7 @@ void ParticleMesh<KDDim>::write_surface_node(const unsigned int& o_step,
     //POINT data
     out_file <<"rigid_particle_id node_id x_coord y_coord z_coord\n";
     out_file.precision(6);
+    out_file.setf(std::ios::fixed);
     for(std::size_t i=0; i<_n_rigid_particles; i++){
       for(std::size_t j=0; j<_particles[i]->num_mesh_nodes();++j){
         const Point node_pos = _particles[i]->mesh_point(j);

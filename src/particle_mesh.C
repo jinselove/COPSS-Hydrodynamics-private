@@ -655,14 +655,15 @@ void ParticleMesh<KDDim>::write_particle(const unsigned int& step_id,
 {
   START_LOG("write_particle()", "ParticleMesh<KDDim>");
   this->write_time(step_id, o_step, real_time, comm_in_rank);
-  this->write_particle_mesh_restart();
   for (int i = 0; i < output_file.size(); i++){
     if(output_file[i] == "equation_systems") {
       // this output has been written in Copss.C
     }
     else if(output_file[i] == "trajectory") this -> write_particle_trajectory(o_step, comm_in_rank);
     else if (output_file[i] == "particle_mesh") this->write_particle_mesh(o_step);
+    else if (output_file[i] == "restart_file/particle_mesh") this -> write_particle_mesh_restart();
     else if (output_file[i] == "surface_node") this->write_surface_node(o_step,comm_in_rank);
+  // else if (output_file[i] == "restart_file/surface_node") this-> write_surface_node_restart();
     else if(output_file[i] == "mean_square_displacement"){
         std::cout <<"Error: there is difficulty to calculate msd of rigid particles from ROUT, fix it before output msd" << std::endl;
         libmesh_error();

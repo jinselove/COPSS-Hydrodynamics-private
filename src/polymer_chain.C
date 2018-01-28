@@ -745,7 +745,8 @@ void PolymerChain::write_polymer_trajectory(const unsigned int& o_step,
   std::ofstream outfile;
   if(comm_in_rank == 0){
     outfile.open(oss.str(), std::ios_base::out);
-//    outfile.precision(o_precision);
+    outfile.precision(o_precision);
+    outfile.setf(std::ios::fixed);
     const std::size_t n_beads = _beads.size();  
     // write out the VTK file
     outfile << "# vtk DataFile Version 4.0\n";
@@ -755,6 +756,7 @@ void PolymerChain::write_polymer_trajectory(const unsigned int& o_step,
     
     // POINT data
     outfile << "POINTS " << n_beads << " float\n";
+
     for(std::size_t i=0; i<n_beads; ++i)
     {
       for(std::size_t j=0; j<3; ++j){

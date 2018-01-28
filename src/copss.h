@@ -153,8 +153,8 @@ public:
   Real tol_cheb; // tolerance of chebyshev convergence
   Real eig_factor; // factor to resize eigen value range
   Real tol_eigen; // tolerance of eigenvalue convergence
-  bool compute_eigen; // if compute eigen value; initially set it true
-
+  bool compute_eigen; // if compute eigen value; false by default
+  bool read_eigen; // if read eigen value from existed file; false by default
   // Run time info
   bool with_hi;
   bool with_brownian; // if consider brownian motion
@@ -207,9 +207,9 @@ public:
    RIN will not change, and ROUT excludes pbc
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   Vec             U0, R0, R_mid, RIN,ROUT, dw, dw_mid;
+  PetscViewer     viewer;
   Mat             M;
   PetscRandom     rand_ctx;
-  PetscViewer     viewer;
   PetscScalar     coef = 0.0;
   BrownianSystem* brownian_sys; 
   std::vector<Point> center0;
@@ -334,6 +334,7 @@ protected:
   void read_chebyshev_info(); 
   void read_run_info(); 
   void read_restart_time();
+  void read_restart_eigenvalue();
 
   /*!
    * Steps for create_object_mesh()
@@ -380,6 +381,9 @@ protected:
   // update object positions due to PBS
   virtual void update_object() {};
   virtual void write_object(unsigned int step_id) = 0;
+
+  // output precision
+  const int o_precision = 6;
 };
 
 } // end namespace libMesh

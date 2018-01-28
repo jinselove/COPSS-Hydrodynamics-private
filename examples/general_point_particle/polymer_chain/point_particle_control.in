@@ -123,12 +123,8 @@ schur_pc_type = SMp
 #############################################
 #	Chebyshev info (only for brownian system)         			
 #############################################
-#compute eigenvalues at the first step
+# compute eigen
 compute_eigen = true
-
-# specify eig_min and eig_max if compute_eigen=false
-# eig_min = 
-# eig_max = 
 
 # max number of chebyshev polynomial #
 max_n_cheb = 50

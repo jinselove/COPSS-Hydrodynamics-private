@@ -433,7 +433,7 @@ private:
   PMPeriodicBoundary* _periodic_boundary;
 
   // precision of output
-  const int o_precision = 9;
+  const int o_precision = 6;
 }; // end of class
   
 }  // end of namespace

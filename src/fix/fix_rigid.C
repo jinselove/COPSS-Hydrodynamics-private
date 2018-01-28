@@ -78,7 +78,7 @@ void FixRigid::check_walls(){
       for (; nd!=end_nd; ++nd){
         Node* node = *nd;
       // Move particle back into spherical cavity
-        if( node->size() > cavity_radius ) (*node) = node->unit()*(2.*cavity_radius) - (*node);
+        if( node->norm() > cavity_radius ) (*node) = node->unit()*(2.*cavity_radius) - (*node);
       } // end for loop over nodes
     } // end loop over particles
   } // end else

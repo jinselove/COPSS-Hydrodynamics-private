@@ -72,18 +72,10 @@ void CopssRigidParticleSystem::create_object(){
   particle_mesh -> add_periodic_boundary(*pm_periodic_boundary);
   //Read the particle data
   std::ostringstream pfilename;
-    // if restart, read particle data from ...
+  // if restart, read particle data from ...
   pfilename<<"rigid_particle_data.in";
-  if(restart){
-    cout <<"in restart mode ---------" << endl;
-    particle_mesh -> read_particles_data_restart(pfilename.str(),particle_mesh_type);
-  }
-  // if not restart, read particle data from "rigid_particle_data.in"
-  else{
-    particle_mesh -> read_particles_data(pfilename.str(), particle_mesh_type);    
-  }
-  // reinit _particle_mesh
-  particle_mesh -> reinit();
+  // read particle data from "rigid_particle_data.in"
+  particle_mesh -> read_particles_data(pfilename.str(), particle_mesh_type);
   hsize_solid = particle_mesh->mesh_size();// mesh size of solid
   hmins = hsize_solid[0];
   hmaxs = hsize_solid[1];
@@ -92,6 +84,17 @@ void CopssRigidParticleSystem::create_object(){
   this -> attach_mesh_spring_network();
   // initialize center0 for calculation of MSD
   particle_mesh->initial_particle_center_of_mass(center0);
+  // if restart, update particle positions from previous trajectories
+  if(restart){
+    pfilename.str("");
+    pfilename.clear();
+    pfilename << "output_surface_node_" <<o_step <<".csv";
+    cout <<"in restart mode ---------" << endl
+         <<"-------------> read rigid_particle surface node from "<<pfilename.str() <<endl;
+    particle_mesh->read_particles_data_restart(pfilename.str());
+  }
+  // reinit _particle_mesh
+  particle_mesh -> reinit();
   // print out information
   cout<<"##########################################################\n"
            <<"#                  Particle Parameters                    \n"

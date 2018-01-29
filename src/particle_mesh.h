@@ -237,12 +237,15 @@ public:
                            const std::string& particle_mesh_type);    // mesh type of the particle);
 
   /**
-   * Read particle data for restart mesh files
+   * Read particle data from restart mesh files
    * only surface mesh is allowed
    */
   void read_particles_data_restart(const std::string& filename,
                                    const std::string& particle_mesh_type);
-
+  /**
+   * Read particle data from output_surface_node_*.csv
+   */
+  void read_particles_data_restart(const std::string& filename);
   
   /**
    * Read chromatin data (cylinder particle) from the local file.
@@ -595,7 +598,7 @@ private:
   PMPeriodicBoundary* _periodic_boundary;
 
   // precision of output
-  const int o_precision = 9;
+  const int o_precision = 6;
 };
 
 

@@ -559,6 +559,9 @@ private:
   // number of rigid particle types
   std::size_t _n_rigid_particle_types;
 
+  // number of rigid particle mesh types
+  std::size_t _n_rigid_particle_mesh_types;
+
   // mass values of rigid particles
   std::vector<Real> _mass;
 

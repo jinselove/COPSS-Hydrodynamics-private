@@ -125,7 +125,8 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
   // init variables
   const std::size_t dim = _mesh.mesh_dimension(); // fluid mesh dimension
   unsigned int p_id;
-  unsigned  p_type;
+  unsigned  int p_type;
+  unsigned int mesh_id;
   Point p_center;
   Point mag;
   Point rot;
@@ -137,8 +138,9 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
   std::string line_str, str_tmpt;
   std::getline(infile, line_str); // 0. Header line
   infile >> _n_rigid_particles >> line_str; // # number of particles
-  infile >> _n_rigid_particle_types >> line_str >> str_tmpt; // # number of particle type ( == number of mesh types == number of mesh files)
-
+  infile >> _n_rigid_particle_types >> line_str >> str_tmpt; // # number of particle type 
+  infile >> _n_rigid_particle_mesh_types >> line_str >> str_tmpt; // # number of particle mesh type
+  
   // init
   _mass.resize(_n_rigid_particle_types);
   _particles.resize(_n_rigid_particles);
@@ -159,11 +161,11 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
     if(line_str=="Particle Meshes") break;
   }
   std::getline(infile, line_str); // skip the empty line
-  for(std::size_t i=0; i<_n_rigid_particle_types; ++i)
+  for(std::size_t i=0; i<_n_rigid_particle_mesh_types; ++i)
   {
     infile >> n1 >> _rigid_particle_mesh_files[i];
   }
-  // Read the rigid particles
+ // Read the rigid particles
   while (std::getline(infile, line_str)){
     if(line_str=="Particles") break;
   }
@@ -172,6 +174,7 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
   {   
     infile >> p_id
            >> p_type 
+	   >> mesh_id
            >> p_center(0) >> p_center(1) >> p_center(2) 
            >> mag(0) >> mag(1) >> mag(2) 
            >> rot(0) >> rot(1) >> rot(2) 
@@ -182,7 +185,7 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
     // When particles have different shapes, read mesh from different mesh files!
       //if( (!smesh_exist[p_type]) || i==0 )  particle->extract_surface_mesh( vmesh_file[p_type], smesh_file[p_type] );
     if(particle_mesh_type == "surface_mesh" or particle_mesh_type == "volume_mesh"){
-      const std::string& particle_mesh_filename = _rigid_particle_mesh_files[p_type-1];
+      const std::string& particle_mesh_filename = _rigid_particle_mesh_files[mesh_id-1];
       bool particle_mesh_exist = PMToolBox::file_exist(particle_mesh_filename);
       if( !particle_mesh_exist )
       {

@@ -374,7 +374,10 @@ void Copss::read_run_info(){
   if(with_brownian){
     random_seed   = input_file("random_seed",111);
   }
-  max_dr_coeff   = input_file("max_dr_coeff", 0.1);
+  max_dr_coeff.resize(input_file.vector_variable_size("max_dr_coeff"));
+  for (unsigned int i=0; i<max_dr_coeff.size();i++){
+    max_dr_coeff[i] = input_file("max_dr_coeff", 0.1, i);
+  }
   adaptive_dt    = input_file("adaptive_dt", true);  
   if (restart){
     this->read_restart_time();
@@ -407,7 +410,8 @@ void Copss::read_run_info(){
        << "#                 Run information                      \n"
        << "##########################################################\n\n"
        << "-----------> adaptive_dt: " << std::boolalpha << adaptive_dt << endl
-       << "-----------> max_dr_coeff (this value will be multiplied by hmin if with_brownian == false and with_hi == true): " << max_dr_coeff << endl
+       << "-----------> max_dr_coeff at step 0(this value will be multiplied by hmin if with_brownian == false and with_hi == true): " << max_dr_coeff[0] << endl
+       << "-----------> max_dr_coeff at step i > 0(this value will be multiplied by hmin if with_brownian == false and with_hi == true): " << max_dr_coeff.back() << endl
        << "-----------> debug_info: " << std::boolalpha << debug_info << endl; 
   if (with_hi) cout << "-----------> with_hi: " <<std::boolalpha <<with_hi <<endl;
   if (with_brownian){
@@ -631,18 +635,15 @@ EquationSystems Copss::create_equation_systems()
   /* Initialize the data structures for the equation system. */
   cout<<"==>(6/8) Init equation_systems (libmesh function, to init all systems in equation_systems)"<<endl;
   equation_systems.init();
-  
   // zero the PC matrix, which MUST be done after es.init()
   if( user_defined_pc ) {
     cout<<"==> (If user_defined_pc) Zero preconditioner matrix"<<endl;
     system.get_matrix("Preconditioner").zero();
   }
   cout<<"--------------> Equation systems are initialized:\n"<<std::endl;
-
   // set parameters for equation systems
   cout<<"==>(7/8) Set parameters of equation_systems"<<endl;
   this -> set_parameters(equation_systems);
-
   // initialized force field
   cout<<"==>(8/8) Attach fixes to 'stokes' system"<<endl;
   this -> attach_fixes(system); 
@@ -965,14 +966,14 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
   if(adaptive_dt){
     Real vp_max = point_mesh->maximum_bead_velocity();
     Real vp_min = point_mesh->minimum_bead_velocity();
-    dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  
+    if (i==0) dt = (vp_max <= 1.) ? (max_dr_coeff[0]) : (max_dr_coeff[0] * 1. / vp_max);  
+    else dt = (vp_max <= 1.) ? (max_dr_coeff.back()) : (max_dr_coeff.back() * 1. / vp_max);  
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
            << "       # Max velocity magnitude is " <<std::setprecision(o_precision) <<std::fixed << vp_max << endl
            << "       # Min velocity magnitude is " <<std::setprecision(o_precision) <<std::fixed << vp_min << endl
            << "       # minimum mesh size = " << hmin << endl
            << "       # The adaptive time increment at step "<< i << " is dt = " <<std::setprecision(o_precision) <<std::fixed << dt<<endl
-           << "       # max_dr_coeff = " << max_dr_coeff <<endl 
            << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
            << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i) "<<endl      
            << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
@@ -980,11 +981,11 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     } // end if (i% write_interval)  
   }
   else{
-    dt = max_dr_coeff * 1.; 
+    if (i==0) dt = max_dr_coeff[0] * 1.;
+    else dt = max_dr_coeff.back() * 1.; 
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
            << "       # The fixed time increment at step "<< i << " is dt = " <<std::setprecision(o_precision)<<std::fixed << dt<<endl
-           << "       # max_dr_coeff = " << max_dr_coeff << endl
      	     << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
            << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0 "<<endl
            << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
@@ -1228,24 +1229,24 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
   if(adaptive_dt){
     Real vp_max = point_mesh->maximum_bead_velocity();
     Real vp_min = point_mesh->minimum_bead_velocity();
-    dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max); 
+    if (i==0) dt = (vp_max <= 1.) ? (max_dr_coeff[0]) : (max_dr_coeff[0] * 1. / vp_max);  
+    else dt = (vp_max <= 1.) ? (max_dr_coeff.back()) : (max_dr_coeff.back() * 1. / vp_max);  
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
            << "       # Max velocity magnitude is " << std::setprecision(o_precision) <<std::fixed <<vp_max << endl
            << "       # Min velocity magnitude is " << std::setprecision(o_precision) <<std::fixed <<vp_min << endl
            << "       # minimum mesh size = " << hmin << endl
            << "       # The adaptive time increment at step "<< i << " is dt = " << std::setprecision(o_precision) <<std::fixed <<dt<<endl
-           << "       # max_dr_coeff = " << max_dr_coeff <<endl 
            << "       # adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
            << "       ##############################################################################################################" << endl;
     } // end if (i% write_interval)  
   }
   else{
-    dt = max_dr_coeff * 1;  
+    if (i==0) dt = max_dr_coeff[0] * 1.;
+    else dt = max_dr_coeff.back() * 1.; 
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
            << "       # The fixed time increment at step "<< i << " is dt = " << std::setprecision(o_precision) <<std::fixed <<dt<<endl
-           << "       # max_dr_coeff = " << max_dr_coeff << endl
            << "       # fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
            << "       ##############################################################################################################" << endl;
     } // end if (i % write_interval == 0)

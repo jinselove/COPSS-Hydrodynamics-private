@@ -226,12 +226,14 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
   hmin = std::min(hmins, hminf);
   hmax = std::max(hmaxs, hmaxf);
   // only when with_hi==true and with_brownian ==false, we can use a larger time step
-  if(with_brownian==false and with_hi==true) max_dr_coeff *= hmin;
+  if(with_brownian==false and with_hi==true) {
+    for (int i=0; i<max_dr_coeff.size();i++) max_dr_coeff[i] *= hmin;
+  }
   if(update_neighbor_list_everyStep){
     std::cout << "====> neighbor_list is updated at every time step (including half step of fixman if available)\n";
   }
   else {
-    neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff);
+    neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff.back());
     std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n\n";
     std::cout << "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
               << "updating neighborList at each step seems tiny, but we have not fully validated it.\n\n";

@@ -336,9 +336,8 @@ void Copss::read_chebyshev_info(){
   compute_eigen = input_file("compute_eigen", false);
   eig_min = 0.;
   eig_max = 0.;
-  if(with_hi and with_brownian and restart){
-    read_eigen = true;
-    compute_eigen = false;    
+  if(with_hi and with_brownian and restart and !compute_eigen){
+    read_eigen = true;  
     this -> read_restart_eigenvalue();
   }
   max_n_cheb = input_file("max_n_cheb", 10);

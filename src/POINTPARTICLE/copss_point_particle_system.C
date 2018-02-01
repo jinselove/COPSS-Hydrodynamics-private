@@ -253,15 +253,17 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   n_vec  = dim*NP;
   hmin = hminf;
   hmax = hmaxf;
-  if(with_brownian == false and with_hi == true) max_dr_coeff *= hmin; 
+  if(with_brownian==false and with_hi==true) {
+    for (int i=0; i<max_dr_coeff.size();i++) max_dr_coeff[i] *= hmin;
+  }
   if(update_neighbor_list_everyStep){
     std::cout << "====> neighbor_list is updated at every time step (including half step of fixman if available)\n";
   }
   else {
-    neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff);
-    std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n\n" << std::endl;
+    neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff.back());
+    std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n\n";
     std::cout << "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
-              << "updating neighborList at each step seems tiny, but we have not fully validated it." <<std::endl;
+              << "updating neighborList at each step seems tiny, but we have not fully validated it.\n\n";
   }
   // Get a better conformation of polymer chains before simulation.
   this -> update_object();
@@ -288,7 +290,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   cout<<"==>(3/3) Start calculating dynamics and advancing time steps"<<endl;
   vel0.resize(n_vec);
   vel1.resize(n_vec);
-  if (adaptive_dt == true and point_particle_model == "polymer_chain") max_dr_coeff *= Ss2 / Rb / Rb;
+  if (adaptive_dt == true and point_particle_model == "polymer_chain"){
+    for (int i=0; i<max_dr_coeff.size(); i++) max_dr_coeff[i] *= Ss2 / Rb / Rb;
+  }
   //start integration
   perf_log.push ("integration");
   for(unsigned int i=istart; i<=istart+nstep; ++i)

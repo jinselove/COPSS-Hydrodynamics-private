@@ -72,18 +72,10 @@ void CopssRigidParticleSystem::create_object(){
   particle_mesh -> add_periodic_boundary(*pm_periodic_boundary);
   //Read the particle data
   std::ostringstream pfilename;
-    // if restart, read particle data from ...
+  // if restart, read particle data from ...
   pfilename<<"rigid_particle_data.in";
-  if(restart){
-    cout <<"in restart mode ---------" << endl;
-    particle_mesh -> read_particles_data_restart(pfilename.str(),particle_mesh_type);
-  }
-  // if not restart, read particle data from "rigid_particle_data.in"
-  else{
-    particle_mesh -> read_particles_data(pfilename.str(), particle_mesh_type);    
-  }
-  // reinit _particle_mesh
-  particle_mesh -> reinit();
+  // read particle data from "rigid_particle_data.in"
+  particle_mesh -> read_particles_data(pfilename.str(), particle_mesh_type);
   hsize_solid = particle_mesh->mesh_size();// mesh size of solid
   hmins = hsize_solid[0];
   hmaxs = hsize_solid[1];
@@ -92,6 +84,17 @@ void CopssRigidParticleSystem::create_object(){
   this -> attach_mesh_spring_network();
   // initialize center0 for calculation of MSD
   particle_mesh->initial_particle_center_of_mass(center0);
+  // if restart, update particle positions from previous trajectories
+  if(restart){
+    pfilename.str("");
+    pfilename.clear();
+    pfilename << "output_surface_node_" <<o_step <<".csv";
+    cout <<"in restart mode ---------" << endl
+         <<"-------------> read rigid_particle surface node from "<<pfilename.str() <<endl;
+    particle_mesh->read_particles_data_restart(pfilename.str());
+  }
+  // reinit _particle_mesh
+  particle_mesh -> reinit();
   // print out information
   cout<<"##########################################################\n"
            <<"#                  Particle Parameters                    \n"
@@ -223,15 +226,17 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
   hmin = std::min(hmins, hminf);
   hmax = std::max(hmaxs, hmaxf);
   // only when with_hi==true and with_brownian ==false, we can use a larger time step
-  if(with_brownian==false and with_hi==true) max_dr_coeff *= hmin;
+  if(with_brownian==false and with_hi==true) {
+    for (int i=0; i<max_dr_coeff.size();i++) max_dr_coeff[i] *= hmin;
+  }
   if(update_neighbor_list_everyStep){
     std::cout << "====> neighbor_list is updated at every time step (including half step of fixman if available)\n";
   }
   else {
-    neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff);
-    std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n\n" << std::endl;
+    neighbor_list_update_interval = int(search_radius_p / 2. / max_dr_coeff.back());
+    std::cout << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n\n";
     std::cout << "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
-              << "updating neighborList at each step seems tiny, but we have not fully validated it." <<std::endl;
+              << "updating neighborList at each step seems tiny, but we have not fully validated it.\n\n";
   }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   Compute undisturbed velocity field without particles.

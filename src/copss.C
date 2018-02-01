@@ -330,26 +330,33 @@ void Copss::read_stokes_solver_info(){
  * read Chebyshev info
  */
 void Copss::read_chebyshev_info(){
-  // Initialize compute_eigen
-  compute_eigen = input_file("compute_eigen", true);
-  if (compute_eigen == false){
-    eig_min = input_file ("eig_min", 0.);
-    eig_max = input_file ("eig_max", 0.);
+  with_hi        = input_file("with_hi", false);
+  with_brownian  = input_file("with_brownian", false);
+  restart       = input_file("restart", false); 
+  compute_eigen = input_file("compute_eigen", false);
+  eig_min = 0.;
+  eig_max = 0.;
+  if(with_hi and with_brownian and restart and !compute_eigen){
+    read_eigen = true;  
+    this -> read_restart_eigenvalue();
   }
   max_n_cheb = input_file("max_n_cheb", 10);
   tol_cheb = input_file("tol_cheb", 0.1);
   eig_factor = input_file("eig_factor", 1.05);
   tol_eigen = input_file("tol_eigen", 0.01);
-  if(with_brownian){
+  if(with_brownian and with_hi){
     cout <<endl<< "##########################################################"<<endl
          << "#   Chebyshev information (only for brownian System)            " <<endl
          << "##########################################################"<<endl<<endl;  
     cout << "-----------> compute eigen values  = " <<std::boolalpha << compute_eigen <<endl;
-    cout << "-----------> initial eigen value range = ( " << eig_min << ", " << eig_max << " )" << endl;
     cout << "-----------> max number of chebyshev polynomial = " <<max_n_cheb <<endl;
     cout << "-----------> tolerance of chebyshev polynomial = " <<tol_cheb <<endl;
     cout << "-----------> factor of eigenvalues range = " <<eig_factor <<endl;
     cout << "-----------> tolerance of eigenvalues convergence = " <<tol_eigen <<endl;
+    if (read_eigen){
+      cout << "-----------> read eigen value range from 'out.eigenvalue = '"<<std::boolalpha<<read_eigen << endl
+           << "-----------> initial eigen value range = ( " << eig_min << ", " << eig_max << " )" << endl;
+    }
   }
 } // end read_chebyshev_info()
 
@@ -363,18 +370,17 @@ void Copss::read_run_info(){
   //############## With Brownian ##################################
   // For polymer_chain: maximum displacement (non dimensional) of one step = 0.1 * Ss2/Rb/Rb
   // For bead: maximum displacement (non_dimensional) of one step = 0.1
-  with_hi        = input_file("with_hi", true);
-  with_brownian  = input_file("with_brownian", true);
   if(with_brownian){
     random_seed   = input_file("random_seed",111);
   }
-  max_dr_coeff   = input_file("max_dr_coeff", 0.1);
+  max_dr_coeff.resize(input_file.vector_variable_size("max_dr_coeff"));
+  for (unsigned int i=0; i<max_dr_coeff.size();i++){
+    max_dr_coeff[i] = input_file("max_dr_coeff", 0.1, i);
+  }
   adaptive_dt    = input_file("adaptive_dt", true);  
-  restart       = input_file("restart", false); 
   if (restart){
     this->read_restart_time();
     istart = restart_step;
-    random_seed++;    
   }
   else{
     restart_step = -1;
@@ -403,7 +409,8 @@ void Copss::read_run_info(){
        << "#                 Run information                      \n"
        << "##########################################################\n\n"
        << "-----------> adaptive_dt: " << std::boolalpha << adaptive_dt << endl
-       << "-----------> max_dr_coeff (this value will be multiplied by hmin if with_brownian == false and with_hi == true): " << max_dr_coeff << endl
+       << "-----------> max_dr_coeff at step 0(this value will be multiplied by hmin if with_brownian == false and with_hi == true): " << max_dr_coeff[0] << endl
+       << "-----------> max_dr_coeff at step i > 0(this value will be multiplied by hmin if with_brownian == false and with_hi == true): " << max_dr_coeff.back() << endl
        << "-----------> debug_info: " << std::boolalpha << debug_info << endl; 
   if (with_hi) cout << "-----------> with_hi: " <<std::boolalpha <<with_hi <<endl;
   if (with_brownian){
@@ -431,7 +438,6 @@ void Copss::read_restart_time()
   std::cout <<"\n###Read time output: out.time"<<std::endl;
   std::ifstream fin;
   fin.open ("out.time", std::ios_base::ate);
-  std::string tmp;
   char c = '\0';
   if( fin.is_open() ){
     const unsigned int length = fin.tellg();
@@ -449,6 +455,33 @@ void Copss::read_restart_time()
     printf("***warning: read_restart_time can NOT read the time output: out.time");
     libmesh_error();
   }
+}
+
+//============================================================================
+void Copss::read_restart_eigenvalue()
+{
+  //Open the local file and check the existance
+  std::cout <<"\n###Read eigenvalue from previous simulation to restart: out.eigenvalue" << std::endl;
+  std::ifstream fin;
+  fin.open ("out.eigenvalue", std::ios_base::ate);
+  std::string tmp;
+  char c = '\0';
+  if( fin.is_open() ){
+    const unsigned int length = fin.tellg();
+    cout << "length = " << length <<endl;
+    for (int i = length-2; i>0;i--){
+      fin.seekg(i);
+      c = fin.get();
+      if(c=='\r' || c=='\n') // new line?
+        break;
+    }
+    fin >> eig_min >> eig_max;
+    fin.close();
+  } // end if
+  else{
+    printf("***warning: read_restart_eigenvalue() can NOT read the time output: out.eigenvalue");
+    libmesh_error();
+  }  
 }
 
 //============================================================================
@@ -601,18 +634,15 @@ EquationSystems Copss::create_equation_systems()
   /* Initialize the data structures for the equation system. */
   cout<<"==>(6/8) Init equation_systems (libmesh function, to init all systems in equation_systems)"<<endl;
   equation_systems.init();
-  
   // zero the PC matrix, which MUST be done after es.init()
   if( user_defined_pc ) {
     cout<<"==> (If user_defined_pc) Zero preconditioner matrix"<<endl;
     system.get_matrix("Preconditioner").zero();
   }
   cout<<"--------------> Equation systems are initialized:\n"<<std::endl;
-
   // set parameters for equation systems
   cout<<"==>(7/8) Set parameters of equation_systems"<<endl;
   this -> set_parameters(equation_systems);
-
   // initialized force field
   cout<<"==>(8/8) Attach fixes to 'stokes' system"<<endl;
   this -> attach_fixes(system); 
@@ -813,6 +843,7 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
     PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_RIN.dat",FILE_MODE_WRITE,&viewer);
     VecView(RIN,viewer);
   }
+  PetscViewerDestroy(&viewer);
   comm_in.barrier();
 }
 
@@ -921,7 +952,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
        * Write out ROUT for restart mode at step i
        ----------------------------------------------------------------------------------------------------*/
       PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-      VecView(ROUT,viewer);        
+      VecView(ROUT,viewer);
+      PetscViewerDestroy(&viewer);        
     }
     // update o_step
     o_step++;
@@ -933,14 +965,14 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
   if(adaptive_dt){
     Real vp_max = point_mesh->maximum_bead_velocity();
     Real vp_min = point_mesh->minimum_bead_velocity();
-    dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max);  
+    if (i==0) dt = (vp_max <= 1.) ? (max_dr_coeff[0]) : (max_dr_coeff[0] * 1. / vp_max);  
+    else dt = (vp_max <= 1.) ? (max_dr_coeff.back()) : (max_dr_coeff.back() * 1. / vp_max);  
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
-           << "       # Max velocity magnitude is " << vp_max << endl
-           << "       # Min velocity magnitude is " << vp_min << endl
+           << "       # Max velocity magnitude is " <<std::setprecision(o_precision) <<std::fixed << vp_max << endl
+           << "       # Min velocity magnitude is " <<std::setprecision(o_precision) <<std::fixed << vp_min << endl
            << "       # minimum mesh size = " << hmin << endl
-           << "       # The adaptive time increment at step "<< i << " is dt = " << dt<<endl
-           << "       # max_dr_coeff = " << max_dr_coeff <<endl 
+           << "       # The adaptive time increment at step "<< i << " is dt = " <<std::setprecision(o_precision) <<std::fixed << dt<<endl
            << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
            << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i) "<<endl      
            << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
@@ -948,26 +980,41 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     } // end if (i% write_interval)  
   }
   else{
-    dt = max_dr_coeff * 1.; 
+    if (i==0) dt = max_dr_coeff[0] * 1.;
+    else dt = max_dr_coeff.back() * 1.; 
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
-           << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl
-           << "       # max_dr_coeff = " << max_dr_coeff << endl
+           << "       # The fixed time increment at step "<< i << " is dt = " <<std::setprecision(o_precision)<<std::fixed << dt<<endl
      	     << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
            << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0 "<<endl
            << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
            << "       ##############################################################################################################" << endl;
     } // end if (i % write_interval == 0)
   } // end if (adaptive_dt)
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     If with Brownian motion, we use midpoint scheme
     If without Brownian motion, we use normal stepping: dR = Utotal*dt
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
   if (with_brownian)
   {
+    /*-------------------------------------------
+    * For restarted Brownian system, to make sure the trajectory after is exactly 
+    * the same as a continus simulation, we need to let the random number generator
+    * run "restart_step" steps
+    * ------------------------------------------*/
+    if (i==restart_step){
+      cout << "       ##############################################################################################################" << endl
+           << "       # Run RandomGenerator for "<<restart_step<<" steps to make sure the trajectroy after restart is the same as a " <<endl
+	   << "       # continuous simulation (this is only done once at the first step of restarted simulation)" <<endl
+           << "       ##############################################################################################################" << endl;
+      Vec dw_prep; // this Vec is never used
+      for (unsigned int j=0; j<restart_step; j++){
+        brownian_sys->std_random_vector(0.0, 1.0,"gaussian", &dw_prep);
+	VecDestroy(&dw_prep);
+      }
+    }
     // PerfLog perf_log("BD step");
-  // perf_log.push("bd");
+    // perf_log.push("bd");
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
      petsc_random_vector generates a uniform distribution [0 1] whose
@@ -990,7 +1037,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 //                 0., std::sqrt(2.*dt));
     // Compute dw = B^-1 * dw using Chebyshev polynomial, dw will be changed!
     VecCopy (dw,dw_mid);  // save dw to dw_mid, which will be used for Chebyshev
-  //  cout << "debug 0\n";
     // perf_log.push("cheb_converge");
     for(std::size_t j=0; j<2; j++)
     {
@@ -1014,7 +1060,21 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
                <<"; eig_min = " << eig_min
                <<"; eig_max = " << eig_max
                <<"; tol_cheb = "<< tol_cheb
-               <<"; max_n_cheb = " << max_n_cheb << endl; 
+               <<"; max_n_cheb = " << max_n_cheb << endl
+               <<"--->Write this eigenvalue range to out.eigenvalue for restart purpose" << endl;
+          std::ofstream out_file;  
+          if(comm_in.rank() == 0){
+            if(i == 0){
+              out_file.open("out.eigenvalue", std::ios_base::out);
+              out_file << "eigen_min" <<"  " <<"eigen_max" <<"\n";      
+            }
+            else{
+              out_file.open("out.eigenvalue", std::ios_base::app);
+            }
+            out_file.precision(o_precision);
+            out_file <<eig_min <<"  " <<eig_max <<"\n";
+            out_file.close();  
+          }
         }
       }
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1037,7 +1097,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       }
     } // end for j-loop
     // perf_log.pop("cheb_converge");
-//    cout << "debug 2, cheb_converge = "<<cheb_converge  <<endl;
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Double-check the convergence of Chebyshev polynomial approximation
      If cheb_converge = true continue fixman integration
@@ -1156,7 +1215,8 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
        * Write out ROUT for restart mode at step i
        ----------------------------------------------------------------------------------------------------*/
       PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-      VecView(ROUT,viewer);        
+      VecView(ROUT,viewer);
+      PetscViewerDestroy(&viewer);        
     }
     // update o_step
     o_step++;
@@ -1168,48 +1228,57 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
   if(adaptive_dt){
     Real vp_max = point_mesh->maximum_bead_velocity();
     Real vp_min = point_mesh->minimum_bead_velocity();
-    dt = (vp_max <= 1.) ? (max_dr_coeff) : (max_dr_coeff * 1. / vp_max); 
+    if (i==0) dt = (vp_max <= 1.) ? (max_dr_coeff[0]) : (max_dr_coeff[0] * 1. / vp_max);  
+    else dt = (vp_max <= 1.) ? (max_dr_coeff.back()) : (max_dr_coeff.back() * 1. / vp_max);  
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
-           << "       # Max velocity magnitude is " << vp_max << endl
-           << "       # Min velocity magnitude is " << vp_min << endl
+           << "       # Max velocity magnitude is " << std::setprecision(o_precision) <<std::fixed <<vp_max << endl
+           << "       # Min velocity magnitude is " << std::setprecision(o_precision) <<std::fixed <<vp_min << endl
            << "       # minimum mesh size = " << hmin << endl
-           << "       # The adaptive time increment at step "<< i << " is dt = " << dt<<endl
-           << "       # max_dr_coeff = " << max_dr_coeff <<endl 
+           << "       # The adaptive time increment at step "<< i << " is dt = " << std::setprecision(o_precision) <<std::fixed <<dt<<endl
            << "       # adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
            << "       ##############################################################################################################" << endl;
     } // end if (i% write_interval)  
   }
   else{
-    dt = max_dr_coeff * 1;  
+    if (i==0) dt = max_dr_coeff[0] * 1.;
+    else dt = max_dr_coeff.back() * 1.; 
     if(i % write_interval == 0){
       cout << "       ##############################################################################################################" << endl
-           << "       # The fixed time increment at step "<< i << " is dt = " << dt<<endl
-           << "       # max_dr_coeff = " << max_dr_coeff << endl
+           << "       # The fixed time increment at step "<< i << " is dt = " << std::setprecision(o_precision) <<std::fixed <<dt<<endl
            << "       # fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
            << "       ##############################################################################################################" << endl;
     } // end if (i % write_interval == 0)
   } // end if (adaptive_dt)
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     If with Brownian motion, we use midpoint scheme
     If without Brownian motion, we use normal stepping: dR = Utotal*dt
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
   if (with_brownian)
   {
+    /*-------------------------------------------
+    * For restarted Brownian system, to make sure the trajectory after is exactly 
+    * the same as a continus simulation, we need to let the random number generator
+    * run "restart_step" steps
+    * ------------------------------------------*/
+    if (i==restart_step){
+      Vec dw_prep; // this Vec is never used
+      for (unsigned int j=0; j<restart_step; j++){
+        brownian_sys->std_random_vector(0.0, 1.0,"gaussian", &dw_prep);
+	VecDestroy(&dw_prep);
+      }
+    }
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
      petsc_random_vector generates a uniform distribution [0 1] whose
      mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     Real mean_dw = 0.0, variance_dw = 0.0;
-    
     // A more precise way is to construct a random vector with gaussian distribution
     const Real std_dev  = std::sqrt(dt);
     brownian_sys->std_random_vector(0.0,std_dev,"gaussian",&dw);
     brownian_sys->_vector_mean_variance(dw, mean_dw, variance_dw);
     VecScale(dw,std::sqrt(2.0));
-    
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Print out the mean and variance or view the generated vector.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

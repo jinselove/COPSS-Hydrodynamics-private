@@ -374,6 +374,12 @@ const Point& RigidParticle::mesh_point(const std::size_t i) const
   return _mesh.point(i);
 }
 
+// ======================================================================
+const Real RigidParticle::node_center_dist(const std::size_t i) const
+{
+  Point node_center_dist = _mesh.point(i) - _centroid;
+  return node_center_dist.size();
+}
 
 
 // ======================================================================

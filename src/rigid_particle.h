@@ -252,6 +252,11 @@ public:
    */
   const Point& mesh_point(const std::size_t i) const;
   
+  /*
+   * Return node to center distance
+   */
+  const Real node_center_dist(const std::size_t i) const;
+  
   
   /*
    * total number of nodes of the mesh

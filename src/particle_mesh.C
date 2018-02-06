@@ -243,11 +243,13 @@ void ParticleMesh<KDDim>::read_particles_data_restart(const std::string& filenam
   {
     std::vector<Point> node_pos;
     std::size_t num_mesh_nodes = _particles[i]->num_mesh_nodes();
-    node_pos.resize(num_mesh_nodes);   
+    node_pos.resize(num_mesh_nodes);
+    Real node_center_dist;
     for (std::size_t j=0; j < num_mesh_nodes; j++){
       infile >> tmp_n
              >> tmp_n
-             >> node_pos[j](0) >> node_pos[j](1) >> node_pos[j](2);
+             >> node_pos[j](0) >> node_pos[j](1) >> node_pos[j](2)
+	     >> node_center_dist;
     }
     _particles[i]->update_mesh(node_pos);
   }
@@ -790,17 +792,18 @@ void ParticleMesh<KDDim>::write_surface_node(const unsigned int& o_step,
     out_file.open(oss.str(), std::ios_base::out);
     //write out the csv file
     //POINT data
-    out_file <<"rigid_particle_id node_id x_coord y_coord z_coord\n";
+    out_file <<"rigid_particle_id node_id x_coord y_coord z_coord node_center_distance\n";
     out_file.precision(6);
     out_file.setf(std::ios::fixed);
     for(std::size_t i=0; i<_n_rigid_particles; i++){
       for(std::size_t j=0; j<_particles[i]->num_mesh_nodes();++j){
         const Point node_pos = _particles[i]->mesh_point(j);
-        out_file << i << " " << j << " ";
+        const Real node_center_dist = _particles[i]->node_center_dist(j);
+	out_file << i << " " << j << " ";
         for(std::size_t k=0; k<KDDim; k++){
           out_file << node_pos(k) <<" ";
         } // end loop over all dimensions
-        out_file << "\n"; 
+        out_file << node_center_dist <<"\n"; 
       }// end loop over all mesh points of one rigid particle
     }// end loop over all rigid particles
     out_file.close();

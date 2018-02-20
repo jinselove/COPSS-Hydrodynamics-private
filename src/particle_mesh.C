@@ -224,9 +224,10 @@ void ParticleMesh<KDDim>::read_particles_data(const std::string& filename,
 
 // ======================================================================
 template <unsigned int KDDim>
-void ParticleMesh<KDDim>::read_particles_data_restart(const std::string& filename)
+void ParticleMesh<KDDim>::read_particles_data_restart(const std::string& filename, 
+                                                      const unsigned int& o_step)
 {
-  std::cout << std::endl << "### Read rigid particle from = " << filename << std::endl;
+  std::cout << std::endl << "### Read rigid particle from = " << filename <<", restart step = " <<o_step<< std::endl;
   // Check the existence of the particle input file
   std::ifstream infile;
   infile.open (filename, std::ios_base::in);
@@ -237,7 +238,13 @@ void ParticleMesh<KDDim>::read_particles_data_restart(const std::string& filenam
   }
   std::size_t tmp_n;
   std::string line_str, str_tmpt;
-  std::getline(infile, line_str); // skip header line
+  // std::getline(infile, line_str); // skip header line
+  // ignore lines until "#output_step_id,o_step"
+  std::ostringstream oss;
+  oss<<"#output_step_id,"<<o_step;
+  while (std::getline(infile, line_str)){
+    if(line_str==oss.str()) break;
+  }
   // read surface node 
   for (std::size_t i=0; i<_n_rigid_particles; ++i)
   {
@@ -255,7 +262,7 @@ void ParticleMesh<KDDim>::read_particles_data_restart(const std::string& filenam
   }
   infile.close();
   this->comm().barrier();
-  std::cout << "Update particle surface node position from "<<filename <<" is completed\n"; 
+  std::cout << "Update particle surface node position from "<<filename <<", restart step = "<<o_step<<" is completed\n"; 
 }   
 
 // ======================================================================

@@ -245,7 +245,8 @@ public:
   /**
    * Read particle data from output_surface_node_*.csv
    */
-  void read_particles_data_restart(const std::string& filename);
+  void read_particles_data_restart(const std::string& filename,
+                                   const unsigned int&  o_step);
   
   /**
    * Read chromatin data (cylinder particle) from the local file.

@@ -88,10 +88,11 @@ void CopssRigidParticleSystem::create_object(){
   if(restart){
     pfilename.str("");
     pfilename.clear();
-    pfilename << "output_surface_node_" <<o_step <<".csv";
+    pfilename << "output_surface_node.csv";
     cout <<"in restart mode ---------" << endl
-         <<"-------------> read rigid_particle surface node from "<<pfilename.str() <<endl;
-    particle_mesh->read_particles_data_restart(pfilename.str());
+         <<"-------------> read rigid_particle surface node from "<<pfilename.str() 
+         <<", restart from output_id = "<<o_step<<endl;
+    particle_mesh->read_particles_data_restart(pfilename.str(), o_step);
   }
   // reinit _particle_mesh
   particle_mesh -> reinit();

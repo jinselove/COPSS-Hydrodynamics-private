@@ -747,15 +747,19 @@ void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
 {
   START_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
   std::ostringstream oss;
-  oss << "output_particle_" << o_step <<".csv";
+  oss << "output_particle_trajectory.csv";
   std::ofstream out_file;
+  out_file.precision(o_precision);
+  out_file.setf(std::ios::fixed);
   if (comm_in_rank == 0){
-    out_file.open(oss.str(), std::ios_base::out);
-    // write out the csv file  
-    // POINT data
-    out_file <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force\n";
-    out_file.precision(o_precision);
-    out_file.setf(std::ios::fixed);
+    if (o_step == 0){
+      out_file.open(oss.str(), std::ios_base::out);
+      out_file <<"scalar x_coord y_coord z_coord x_vel y_vel z_vel x_force y_force z_force \n";
+    }
+    else{
+      out_file.open(oss.str(), std::ios_base::app);
+    }
+    out_file <<"#output_step_id," << o_step <<" \n";
     for(std::size_t i=0; i<_n_rigid_particles; ++i)
     {
       out_file << i << " ";
@@ -773,10 +777,8 @@ void ParticleMesh<KDDim>::write_particle_trajectory(const unsigned int& o_step,
       }
       out_file <<"\n";
     }
-    out_file << "\n";
     out_file.close();
   } // end if comm_in_rank == 0
-
   STOP_LOG ("write_particle_trajectory()", "ParticleMesh<KDDim>");
 }
 
@@ -786,24 +788,28 @@ void ParticleMesh<KDDim>::write_surface_node(const unsigned int& o_step,
                                              unsigned int comm_in_rank) const
 {
   std::ostringstream oss;
-  oss << "output_surface_node_" << o_step <<".csv";
+  oss << "output_surface_node.csv";
   std::ofstream out_file;
+  out_file.precision(o_precision);
+  out_file.setf(std::ios::fixed);  
   if(comm_in_rank == 0 ){
-    out_file.open(oss.str(), std::ios_base::out);
-    //write out the csv file
-    //POINT data
-    out_file <<"rigid_particle_id node_id x_coord y_coord z_coord node_center_distance\n";
-    out_file.precision(6);
-    out_file.setf(std::ios::fixed);
+    if (o_step == 0){
+      out_file.open(oss.str(), std::ios_base::out);
+      out_file <<"rigid_particle_id node_id x_coord y_coord z_coord node_center_distance \n";
+    }
+    else{
+      out_file.open(oss.str(), std::ios_base::app);
+    }
+    out_file <<"#output_step_id,"<<o_step<<"\n";
     for(std::size_t i=0; i<_n_rigid_particles; i++){
       for(std::size_t j=0; j<_particles[i]->num_mesh_nodes();++j){
         const Point node_pos = _particles[i]->mesh_point(j);
         const Real node_center_dist = _particles[i]->node_center_dist(j);
-	out_file << i << " " << j << " ";
+	      out_file << i << " " << j << " ";
         for(std::size_t k=0; k<KDDim; k++){
           out_file << node_pos(k) <<" ";
         } // end loop over all dimensions
-        out_file << node_center_dist <<"\n"; 
+        out_file << node_center_dist <<" \n"; 
       }// end loop over all mesh points of one rigid particle
     }// end loop over all rigid particles
     out_file.close();

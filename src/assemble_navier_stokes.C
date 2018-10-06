@@ -757,9 +757,13 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
   
   // Get a reference to the Particle-Mesh linear implicit system object.
   PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
-//  const MeshBase& mesh   = pm_system.get_mesh();
+  std::vector<bool> shear = pm_system.get_equation_systems().parameters.get<std::vector<bool>>("shear");
+  std::vector<unsigned int> shear_direction = pm_system.get_equation_systems().parameters.get<std::vector<unsigned int>>("shear_direction");
+  std::vector<Real> shear_rate = pm_system.get_equation_systems().parameters.get<std::vector<Real>>("shear_rate");
+  std::string wall_type = pm_system.get_equation_systems().parameters.get<std::string>("wall_type");
+  std::vector<Real> wall_params = pm_system.get_equation_systems().parameters.get<std::vector<Real>> (wall_type);
+
   const Real penalty     = 1E6;    // The penalty value.
-  const Real tol         = 1E-6;   // The tolerence value.
   const unsigned int n_nodes = elem->n_nodes();
   const std::size_t elem_id = elem->id();
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
@@ -776,11 +780,30 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
       UniquePtr<Elem> side (elem->build_side(_boundary_sides[elem_id][s]));
       for (unsigned int nn=0; nn<side->n_nodes(); nn++)
       {
-        // Otherwise if this is the wall of the channel, set u/v/w = 0
+        // Begin by calculating undisturbed velocity on boundaries
+        // Set u/v/w = 0 by default for no-slip boundary on walls
         std::vector<Real> uvw(_dim,0.0);
-        
-        // In GGEM, vel bc at the no-slip boundaries is u_bc = -u_local
-        // In the case of "undisturbed" flow field, set u_bc = 0.
+
+        // If there is shearing, then impose velocities on relevant boudaries (for slit geometry ONLY)
+        // Loop through boundary pairs
+        for(unsigned int i=0; i<3; ++i)
+        {
+          if ( shear[i] == true )
+          {
+            // if this side of elem is associated with the lower shear boundary
+            if ( _mesh.get_boundary_info().has_boundary_id(elem, _boundary_sides[elem_id][s], _boundary_id_3D[2*i]) )
+            {
+              uvw[ shear_direction[i] ] = shear_rate[i] * wall_params[2*i];
+            } // then the upper shear boundary
+            else if ( _mesh.get_boundary_info().has_boundary_id(elem, _boundary_sides[elem_id][s], _boundary_id_3D[2*i+1]) )
+            {
+              uvw[ shear_direction[i] ] = shear_rate[i] * wall_params[2*i+1];
+            }
+          }
+        }
+        // End of undisturbed velocity
+
+        // For disturbed velocity, vel bc at the no-slip boundaries is u_bc = -u_local in GGEM
         // Note this only influence the rhs vector
         if(option=="disturbed")
         {
@@ -791,12 +814,12 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
           if(_eqn_sys.parameters.get<std::string> ("test_name") == "ggem_validation")
           {
             const std::vector<Real> u_boundary = analytical_solution.exact_solution_infinite_domain(ptx);
-            for(unsigned int k=0;k<_dim;++k) uvw[k] = u_boundary[k]-u_local[k];
+            for(unsigned int k=0;k<_dim;++k) uvw[k] = u_boundary[k] - u_local[k];
           }
-          // ---------------- setup for other test -------------
+          // Normally on the boundary, disturbed_velocity = undistrubed_velocity - ggem_local_velocity
           else
           {
-            for(unsigned int k=0;k<_dim;++k) uvw[k] = -u_local[k];
+            for(unsigned int k=0;k<_dim;++k) uvw[k] = uvw[k] - u_local[k];
           }
         }
         
@@ -812,7 +835,6 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
             } // end for k-loop
           } // end if (elem->node(n) == side->node(nn))
         } // enf for n-loop
-      
       } // end for nn-loop
   } // end for s-loop  
   STOP_LOG("apply_bc_by_penalty()", "AssembleNS");

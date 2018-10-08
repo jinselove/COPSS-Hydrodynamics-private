@@ -51,8 +51,9 @@ inlet = 'false false false'
 inlet_pressure = '0 0 0'
 
 # shear info #
-shear = 'false false false false false false'
-shear_rate = '0. 0. 0. 0. 0. 0.'
+shear = 'false false false'
+shear_rate = '0. 0. 0.'
+shear_direction = '0. 0. 0.'
 
 #############################################
 #			   Mesh info         			

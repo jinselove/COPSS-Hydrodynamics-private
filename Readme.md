@@ -33,7 +33,7 @@ Load or compile
  
 	 `cd $HOME/projects/petsc`
 	 
-	 `./configure --with-cc=mpicc --with-cxx=mpicxx --with-mpiexec=mpiexec --with-fc=mpif90 â€“download-fblaslapack --download-scalapack --download-mumps --download-superlu_dist --download-hypre --download-ml --download-parmetis --download-metis --download-triangle --download-chaco --with-debugging=0`
+	 `./configure --with-cc=mpicc --with-cxx=mpicxx --with-mpiexec=mpiexec --with-fc=mpif90 –download-fblaslapack --download-scalapack --download-mumps --download-superlu_dist --download-hypre --download-ml --download-parmetis --download-metis --download-triangle --download-chaco --with-debugging=0`
 	 
 	 **And then follow the instructions on screen to install and test the package.** 
  - Export environment variables:
@@ -101,29 +101,65 @@ If you meet any trouble, please refer to [SLEPC installation](http://slepc.upv.e
 
 ###4. Install COPSS-hydrodynamics
 
- - Download the latest 
+ - Download the latest COPSS codes
+ 
+ 
 	 `cd /path/to/where/you/want/to/install/copss`
+
 
 	 `git clone https://bitbucket.org/COPSS/copss-hydrodynamics-public.git`
 
- - Compile the codes	 
- 
-	 `cp /path/to/copss/tools/Makefile /path/to/copss/example/general_point_particle` 
-	 
-	 `cd /path/to/copss/example/general_point_particle/` 
-	 
+
+
+ __ ------------------On Master branch (only point particle systems are available)---------------------------------------__
+
+
+ - Compile the codes (on Master branch)	 
+
+
+	 `cd /path/to/copss/src/` 
+
 	 `make`
 
- - Run the system
 
-         `cp /path/to/copss/src/example-opt $PWD`	 
 
-	 `cp /path/to/copss/tools/run.sh $PWD` 
+ - Run an diffusion example of beads
 
-         `bash run.sh` (You can define how many cores you want to run on in **run.sh**)
+
+ 	  `cd /path/to/copss/examples/general_point_particle/beads/`
+
+      `cp /path/to/copss/src/example-opt $PWD`	 
+
+	  `cp /path/to/copss/tools/run.sh $PWD` 
+
+      `bash run.sh` (You can define how many cores you want to run on in **run.sh**)
+	  
 	
 	You need to set up your system in **point_particle_control.in** and **datafile (e.g., point_particle_data.in)**. More details can be found in our documentation.
 
+
+ __ ------------------On Development branch (both PointParticle and RigidParticle are avaiable)---------------------------------------__
+
+ - Compile the codes
+ 
+	 `cd /path/to/copss/src/` 
+	 
+	 
+	 `make package=POINTPARICLE (for point particle systems)  Or make package=RIGIDPARTICLE (for rigid particle systems)`	
+	 
+	 
+
+ - Run an sedimentation example of rigid particles
+ 
+ 
+ 	  `cd /path/to/copss/examples/general_rigid_particle/sedimentation_benchmark/`
+	  
+
+       `modify run.sh dependending on your system`
+
+
+      `bash run.sh`
+	  
 
 **Build documentation**
 -------------------------------------------

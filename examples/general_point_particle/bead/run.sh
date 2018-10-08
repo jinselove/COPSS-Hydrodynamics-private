@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mpirun -n 4 ../../../src/copss-RIGIDPARTICLE-opt                  \
+mpirun -n 4 ../../../src/copss-POINTPARTICLE-opt                  \
 --disable-perflog                          \
 -ksp_type preonly                           \
 -pc_type lu                                 \
@@ -8,4 +8,3 @@ mpirun -n 4 ../../../src/copss-RIGIDPARTICLE-opt                  \
 -ksp_monitor -eps_monitor \
 -memory_view -log_view 2>&1 | tee log_history.txt
 
-#--disable-perflog                          \

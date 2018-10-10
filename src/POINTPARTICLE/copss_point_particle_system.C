@@ -51,7 +51,7 @@ void CopssPointParticleSystem::read_particle_info(){
   particle_type = input_file("particle_type", "other");
 	if (particle_type != "point_particle"){
 		error_msg = "invalid particle type ("+particle_type+") defined\n";
-		PMToolBox::output_message(error_msg,comm_in);
+		PMToolBox::output_message(error_msg, *comm_in);
 		libmesh_error();
 	}
 	point_particle_model	= input_file("point_particle_model", "other");
@@ -66,7 +66,7 @@ void CopssPointParticleSystem::read_particle_info(){
 	}
 	else{
 		error_msg = "	Invalid point_particle_model !!!";
-		PMToolBox::output_message(error_msg, comm_in);
+		PMToolBox::output_message(error_msg, *comm_in);
 		libmesh_error();
 	}
 }// end read_particle_parameter()
@@ -143,7 +143,7 @@ void CopssPointParticleSystem::create_object(){
               <<"   non-dimensional ksi = sqrt(PI)/(3a0)    = " <<std::sqrt(PI)/(3.) <<"\n";
   }
   pfilename.str(""); pfilename.clear();
-  comm_in.barrier();
+  comm_in->barrier();
 }//end function
 
 //=====================================================================
@@ -209,6 +209,9 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<string> ("test_name") = test_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
+  equation_systems.parameters.set<std::vector<bool>> ("shear") = shear;
+  equation_systems.parameters.set<std::vector<Real>> ("shear_rate") = shear_rate;
+  equation_systems.parameters.set<std::vector<unsigned int>> ("shear_direction") = shear_direction;
 }
 
 void CopssPointParticleSystem::update_object()
@@ -218,7 +221,7 @@ void CopssPointParticleSystem::update_object()
     chain_broken = polymer_chain->check_chain(max_spring_len);
     if(chain_broken) {
       output_msg = "   ********** warning: Polymer chain is broken ---> bead position is corrected by scaling the chain length and moving the particle according to periodicity";
-      PMToolBox::output_message(output_msg, comm_in);
+      PMToolBox::output_message(output_msg, *comm_in);
     }
   }  
 }
@@ -233,10 +236,10 @@ void CopssPointParticleSystem::write_object(unsigned int step_id)
   brownian_sys->vector_transform(lvec,&ROUT, "backward"); // ROUT -> lvec
   // write output file
   if(point_particle_model == "polymer_chain"){
-    polymer_chain->write_polymer_chain(step_id, o_step, real_time, center0, lvec, output_file, comm_in.rank());
+    polymer_chain->write_polymer_chain(step_id, o_step, real_time, center0, lvec, output_file, comm_in->rank());
   }
   else{
-    polymer_chain->write_bead(step_id, o_step, real_time, center0, lvec, output_file, comm_in.rank());
+    polymer_chain->write_bead(step_id, o_step, real_time, center0, lvec, output_file, comm_in->rank());
   } // end else
 }
 

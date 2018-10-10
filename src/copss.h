@@ -32,6 +32,7 @@
 #include "libmesh/libmesh_config.h"
 #include "libmesh/getpot.h"
 #include "libmesh/exodusII_io.h"
+#include "libmesh/enum_solver_package.h"
 
 #include "libmesh/serial_mesh.h"
 #include "libmesh/mesh_generation.h"
@@ -80,7 +81,7 @@ class Copss
 {
 public: 
   // PETSC MPI communicator
-  Parallel::Communicator comm_in;
+  Parallel::Communicator *comm_in;
   // error message string
   std::string error_msg;
   // output message string
@@ -116,8 +117,9 @@ public:
   std::vector<bool> periodicity; // periodicity of the box
   std::vector<bool> inlet; // inlet direction of the box
   std::vector<Real> inlet_pressure; // inlet pressure
-  std::vector<bool> shear;
-  std::vector<Real> shear_rate;
+  std::vector<bool> shear; // apply shear or not on boundary pairs
+  std::vector<Real> shear_rate; // shear rate on boundary pairs
+  std::vector<unsigned int> shear_direction; // shear direction on boundary pairs
 
   // Mesh information
   bool generate_mesh; // flag to generate mesh or load mesh
@@ -234,7 +236,7 @@ public:
   /*!
    * class constructor
    */
-  Copss(const CopssInit& init);
+  Copss(CopssInit& init);
 
   /*!
    * class destructor

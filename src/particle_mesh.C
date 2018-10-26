@@ -23,6 +23,8 @@
 #include "libmesh/exodusII_io.h"
 #include "libmesh/parallel.h"
 #include "libmesh/parallel_algebra.h"
+#include "libmesh/explicit_system.h"
+#include "libmesh/equation_systems.h"
 
 // C++ Includes
 #include <stdio.h>
@@ -706,14 +708,11 @@ void ParticleMesh<KDDim>::write_particle(const unsigned int& step_id,
       // this output has been written in Copss.C
     }
     else if(output_file[i] == "trajectory") this -> write_particle_trajectory(o_step, comm_in_rank);
-    else if (output_file[i] == "particle_mesh") this->write_particle_mesh(o_step);
-   // else if (output_file[i] == "restart_file/particle_mesh") this -> write_particle_mesh_restart();
-    else if (output_file[i] == "surface_node") this->write_surface_node(o_step,comm_in_rank);
-  // else if (output_file[i] == "restart_file/surface_node") this-> write_surface_node_restart();
+    else if(output_file[i] == "particle_mesh") this->write_particle_mesh(o_step);
+    else if(output_file[i] == "surface_node") this->write_surface_node(o_step,comm_in_rank);
     else if(output_file[i] == "mean_square_displacement"){
         std::cout <<"Error: there is difficulty to calculate msd of rigid particles from ROUT, fix it before output msd" << std::endl;
         libmesh_error();
-        // this -> write_particle_msd(step_id, o_step,center0, lvec, comm_in_rank);
     }
     else {
       std::cout << "unsupported output_file content: (" << output_file[i] <<")" << std::endl; 
@@ -825,24 +824,38 @@ void ParticleMesh<KDDim>::write_surface_node(const unsigned int& o_step,
 
 
 
-// ======================================================================
+// // ======================================================================
 template <unsigned int KDDim>
 void ParticleMesh<KDDim>::write_particle_mesh(const unsigned int& o_step) const
 {
   START_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
   this->comm().barrier();
-  for (std::size_t particle_id = 0; particle_id < _n_rigid_particles; particle_id++){
-    std::ostringstream surface_mesh_filename; 
-    surface_mesh_filename << "out_particle_"<<particle_id+1
-			  << ".e-s."
-			  << std::setw(7)
-		          << std::setfill('0')
-			  << std::right
-		          << o_step;
-    ExodusII_IO(_particles[particle_id]->mesh()).write(surface_mesh_filename.str());
+
+  std::ostringstream surface_mesh_filename;
+  for (std::size_t p_id=0; p_id<_n_rigid_particles; p_id++){
+    surface_mesh_filename << "out_particle_"
+                          << p_id+1
+                          << ".e-s."
+                          << std::setw(7)
+                          << std::setfill('0')
+                          << std::right
+                          << o_step;
+
+    EquationSystems exodus_es(_particles[p_id]->mesh());
+    ExplicitSystem& v_system = exodus_es.add_system<ExplicitSystem>("none");
+    v_system.add_variable("u_vel", FIRST, LAGRANGE);
+    exodus_es.init();
+
+    ExodusII_IO(_particles[p_id]->mesh()).write_timestep(
+      surface_mesh_filename.str(),
+      exodus_es,
+      1,
+      o_step*1.0);
   }
+
   STOP_LOG ("write_particle_mesh()", "ParticleMesh<KDDim>");
 }
+
 
 // ======================================================================
 template <unsigned int KDDim>

@@ -24,9 +24,9 @@ namespace libMesh
 {
 
 //==========================================================================
-Copss::Copss(const CopssInit& init)
+Copss::Copss(CopssInit& init)
 {
-  comm_in = init.comm();
+  comm_in = &init.comm();
   cout << endl <<"============================0.  Initialize libMesh.===========================" << endl;
   this -> check_libmesh();
 }
@@ -177,7 +177,7 @@ void Copss::read_domain_info()
   for (unsigned int i=0; i < periodicity.size(); i++){ periodicity[i] = input_file("periodicity", false, i); }
   if(periodicity[0]==true and periodicity[1] == true and periodicity[2]==true){
     error_msg = "warning: The box cannot be periodic on all directions at the same time. (required by FEM)";
-    PMToolBox::output_message(error_msg, comm_in);
+    PMToolBox::output_message(error_msg, *comm_in);
     libmesh_error();
   }
   //============== inlet 
@@ -190,7 +190,7 @@ void Copss::read_domain_info()
      inlet[i] = input_file("inlet", false, i);
      if(inlet[i]==true and periodicity[i]==true) {
       error_msg = "warning: A inlet direction has to be non-periodic";
-      PMToolBox::output_message(error_msg,comm_in);
+      PMToolBox::output_message(error_msg, *comm_in);
       libmesh_error();
      }
   }
@@ -198,24 +198,26 @@ void Copss::read_domain_info()
   inlet_pressure.resize(input_file.vector_variable_size("inlet_pressure"));
   for (unsigned int i=0; i < inlet_pressure.size(); i++){ inlet_pressure[i] = input_file("inlet_pressure", 0, i); }
 
-  //============== shear
-  std::cout << "\n\nWarning: shear flow has not been implemented \n\n";
+  //============== shear or not on each boundary pair
   shear.resize(input_file.vector_variable_size("shear"));
-  if(shear.size() != dim*2){
-    cout <<"Warning: shear has to be defined for all dimensions and both upper wall and bottom wall" << endl;
-    libmesh_error();
+  if(shear.size() != dim){
+     cout <<"Warning: shear has to be defined for all boundary pairs" << endl;
+     libmesh_error();
   }
-  for (unsigned int i=0; i < shear.size(); i++){ 
+  for (unsigned int i=0; i < shear.size(); i++){
      shear[i] = input_file("shear", false, i);
-     if(shear[i]==true and periodicity[int(i/2)]==true) {
-      error_msg = "warning: A shear direction has to be non-periodic";
-      PMToolBox::output_message(error_msg,comm_in);
-      libmesh_error();
+     if(shear[i]==true and periodicity[i]==true) {
+       error_msg = "warning: A shear direction has to be non-periodic";
+       PMToolBox::output_message(error_msg, *comm_in);
+       libmesh_error();
      }
   }
-  // =============== shear rate
+  //=============== shear stress on each boundary
   shear_rate.resize(input_file.vector_variable_size("shear_rate"));
-  for (unsigned int i=0; i < shear_rate.size(); i++){ shear_rate[i] = input_file("shear_rate", 0, i); }
+  for (unsigned int i=0; i < shear_rate.size(); i++){ shear_rate[i] = input_file("shear_rate", 0.0, i); }
+  //=============== shear direction on each boundary
+  shear_direction.resize(input_file.vector_variable_size("shear_direction"));
+  for (unsigned int i=0; i < shear_direction.size(); i++){ shear_direction[i] = input_file("shear_direction", 0, i); }
 
   cout <<endl<< "##########################################################"<<endl
        << "#                  Geometry information                   " <<endl
@@ -234,8 +236,8 @@ void Copss::read_domain_info()
   cout << "-----------> Inlet/Outlet of the box: ";
   for (int i=0; i<dim; i++) cout << std::boolalpha << inlet[i] <<"(pressure = " <<inlet_pressure[i] <<" ), ";
   cout <<endl;
-  cout << "-----------> shear of the box: ";
-  for (int i=0; i<dim*2; i++) cout << std::boolalpha << shear[i] <<"(shear_rate = " <<shear_rate[i] <<" ), ";
+  cout << "-----------> shear on boundary pairs: ";
+  for (int i=0; i<dim; i++) cout << std::boolalpha << shear[i] <<"(shear_rate = " <<shear_rate[i] <<" ), ";
   cout <<endl;
   cout <<endl<< "##########################################################"<<endl
        << "#                  Domain Mesh information                     " <<endl
@@ -495,11 +497,11 @@ void Copss::create_domain_mesh()
 {
   if(dim == 2) {
     error_msg = "Copss::create_mesh() only works for 3D systems; 2D simulation needs extra implementation";
-    PMToolBox::output_message(error_msg, comm_in);
+    PMToolBox::output_message(error_msg, *comm_in);
     libmesh_error();
   }
-  mesh = new SerialMesh(comm_in);
-  //mesh = std::unique_ptr<SerialMesh> (new SerialMesh (comm_in));
+  mesh = new SerialMesh(*comm_in);
+  //mesh = std::unique_ptr<SerialMesh> (new SerialMesh (*comm_in));
   if(generate_mesh){
     if (wall_type == "slit"){      
         const Real meshsize_x   = (wall_params[1] - wall_params[0])/Real( n_mesh[0] );
@@ -587,7 +589,7 @@ void Copss::create_periodic_boundary(){
     // check: No PBC, No inlet/outlet
     bool error_flag = false;
     for (int i=0; i<dim; i++){
-      if(periodicity[i] or inlet[i] or shear[2*i] or shear[2*i+1]) error_flag = true;
+      if(periodicity[i] or inlet[i] or shear[i]) error_flag = true;
     }
     if (error_flag){
       cout << "spherical domain cannot have PBC or inlet/outlet, check control file" << endl;
@@ -714,7 +716,7 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                    "**** search radius = "+ std::to_string(search_radius_p) + 
                    ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
                    "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, comm_in);
+      PMToolBox::output_message(output_msg, *comm_in);
       libmesh_error();
     }
   }
@@ -747,7 +749,7 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                    "**** search radius = "+ std::to_string(search_radius_p) + 
                    ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
                    "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, comm_in);
+      PMToolBox::output_message(output_msg, *comm_in);
       libmesh_error();
     }
   }
@@ -775,7 +777,7 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                    "**** search radius = "+ std::to_string(search_radius_p) + 
                    ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
                    "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, comm_in);
+      PMToolBox::output_message(output_msg, *comm_in);
       libmesh_error();
     }
   }  
@@ -794,7 +796,7 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   system.reinit_hi_system(neighbor_list_update_flag); // neighbor_list_update is ture here
   if(print_info){
     cout << "print particle information after first reinit\n";
-    if(comm_in.rank()==0)
+    if(comm_in->rank()==0)
     point_mesh->print_point_info();
   }
   reinit_stokes = true;
@@ -850,7 +852,7 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
     VecView(RIN,viewer);
   }
   PetscViewerDestroy(&viewer);
-  comm_in.barrier();
+  comm_in->barrier();
 }
 
 //==============================================================================================
@@ -879,7 +881,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     system.reinit_hi_system(neighbor_list_update_flag);
   }
   if(print_info){
-  if(comm_in.rank()==0)
+  if(comm_in->rank()==0)
     point_mesh->print_point_info();
   }
   // perf_log.pop("reinit sytem");
@@ -910,7 +912,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     const Real v0_min = v0_ptr->min();
     const Real v0_max = v0_ptr->max();
     const Real v0_sum = v0_ptr->sum();
-    if(comm_in.rank()==0){
+    if(comm_in->rank()==0){
       for(unsigned int j=0; j<NP;++j)
       {    
         std::vector<Real> vtest0(dim), vtest1(dim);
@@ -943,7 +945,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
         if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end())
         {
           system.add_local_solution();  // add local solution for the disturbed system
-          system.solution->add(*v0_ptr);// add the undisturbed solution
+          //system.solution->add(*v0_ptr);// (do not) add the undisturbed solution
   #ifdef LIBMESH_HAVE_EXODUS_API
           exodus_ptr->append(true);
           exodus_ptr->write_timestep(out_system_filename,equation_systems,o_step,o_step);
@@ -1069,7 +1071,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
                <<"; max_n_cheb = " << max_n_cheb << endl
                <<"--->Write this eigenvalue range to out.eigenvalue for restart purpose" << endl;
           std::ofstream out_file;  
-          if(comm_in.rank() == 0){
+          if(comm_in->rank() == 0){
             if(i == 0){
               out_file.open("out.eigenvalue", std::ios_base::out);
               out_file << "eigen_min" <<"  " <<"eigen_max" <<"\n";      
@@ -1155,7 +1157,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     }// end if cheb_converge
     else {
       n_chebyshev_failure += 1;
-      PMToolBox::output_message("****** Warning: After recomputing eigenvalues, Chebysheve failed to converge at step " +std::to_string(i)+"; relax the system for "+std::to_string(n_relax_step)+" steps", comm_in);
+      PMToolBox::output_message("****** Warning: After recomputing eigenvalues, Chebysheve failed to converge at step " +std::to_string(i)+"; relax the system for "+std::to_string(n_relax_step)+" steps", *comm_in);
       for (int relax_step=0; relax_step<n_relax_step; relax_step++){
         langevin_integrate(equation_systems, i);
         i++;

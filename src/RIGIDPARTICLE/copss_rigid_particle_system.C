@@ -57,7 +57,7 @@ void CopssRigidParticleSystem::read_particle_info(){
   particle_type = input_file("particle_type", "other");
 	if (particle_type != "rigid_particle"){
 		error_msg = "invalid particle type ("+particle_type+") defined\n";
-		PMToolBox::output_message(error_msg,comm_in);
+		PMToolBox::output_message(error_msg, *comm_in);
 		libmesh_error();
 	}
   // Particles' meshes
@@ -110,7 +110,7 @@ void CopssRigidParticleSystem::create_object(){
 
   pfilename.str("");
   pfilename.clear();
-  comm_in.barrier();
+  comm_in->barrier();
 }//end function
 
 //==========================================================================
@@ -200,6 +200,9 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<string> ("test_name") = test_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
+  equation_systems.parameters.set<std::vector<bool>> ("shear") = shear;
+  equation_systems.parameters.set<std::vector<Real>> ("shear_rate") = shear_rate;
+  equation_systems.parameters.set<std::vector<unsigned int>> ("shear_direction") = shear_direction;
 }
 
 void CopssRigidParticleSystem::write_object(unsigned int step_id)
@@ -210,7 +213,7 @@ void CopssRigidParticleSystem::write_object(unsigned int step_id)
   // std::vector<Real> lvec;
   // brownian_sys->vector_transform(lvec,&ROUT, "backward"); // ROUT -> lvec
   point_mesh->update_particle_mesh(particle_mesh);
-  particle_mesh->write_particle(step_id, o_step, real_time, output_file, comm_in.rank());
+  particle_mesh->write_particle(step_id, o_step, real_time, output_file, comm_in->rank());
 }
 
 void CopssRigidParticleSystem::run(EquationSystems& equation_systems){

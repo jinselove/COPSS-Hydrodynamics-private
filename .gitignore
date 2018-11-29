@@ -7,6 +7,8 @@
 **/*-opt
 **/.ROUT
 **/.RIN
+**/.DS_Store
+**/._.DS_Store
 doxygen/build/
 doxygen/html/
 doxygen/latex/

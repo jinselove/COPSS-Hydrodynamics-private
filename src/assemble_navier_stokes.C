@@ -334,7 +334,7 @@ void AssembleNS::assemble_int_force(const Elem* elem,
     //  _int_force[elem_id][k] += JxW[qp]*phi[k][qp];
     //  printf("_int_force[elem_id=%d][k*q_xyz.size()+qp=%d] = JxW[qp=%d]*phi[k=%d][qp=%d] = %f *%f = %f\n", elem_id, k*q_xyz.size()+qp, qp,k,qp, JxW[qp],phi[k][qp], _int_force[elem_id][k*q_xyz.size()+qp]);
     }
-  }    
+  }
   STOP_LOG("assemble_int_force()", "AssembleNS");
   return;
 }

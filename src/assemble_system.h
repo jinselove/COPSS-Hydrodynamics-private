@@ -43,10 +43,6 @@ using namespace libMesh;
  * assembling the matrix and right-hand-side vector
  * when solving any partial differential equations
  * using finite element method.
- * 
- * For details of the numerical discretization, refer to
- * The finite element method in heat transfer and fluid dynamics (3rd ed)
- * J.N. Reddy and D.K. Gartling. 2010, CRC Press
  */
 
 class AssembleSystem : public ReferenceCountedObject<AssembleSystem>
@@ -154,7 +150,7 @@ public:
  
  
  
-private:
+protected:
   // Equation systems
   EquationSystems& _eqn_sys;
  
@@ -165,8 +161,9 @@ private:
   MeshBase& _mesh;
 
   // Boundary ids
-  const std::vector<boundary_id_type> _boundary_id_3D;
-  const std::vector<std::string> _boundary_name_3D;
+  // defaults in cubic geometry generated from libMesh
+  const std::vector<boundary_id_type> _boundary_id_3D = {4,2,1,3,0,5};
+  const std::vector<std::string> _boundary_name_3D = {"left", "right", "bottom", "top", "back", "front"};
 
   // int_force matrix
   // this matrix stores the product of JxW[qp] * phi[k][qp]

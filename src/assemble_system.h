@@ -69,7 +69,7 @@ public:
 
   */
   virtual void assemble_global_K(const std::string& system_name,
-                                 const std::string& option);
+                                 const std::string& option){}; //{} defines virtual function
  
  
   /*! \brief Assemble the Global force vector F
@@ -79,7 +79,7 @@ public:
     @param[out] Fe Add rhs vector to system.
   */
   virtual void assemble_global_F(const std::string& system_name,
-                                 const std::string& option);
+                                 const std::string& option){};
  
  
   /*! \brief Assemble the element matrix K_IJ
@@ -93,7 +93,7 @@ public:
                                     const unsigned int n_u_dofs,
                                     const unsigned int I,
                                     const unsigned int J,
-                                    DenseMatrix<Number>& Kij);
+                                    DenseMatrix<Number>& Kij){};
  
  
   /*! \brief  Assemble function for calculating each element's contribution to
@@ -107,7 +107,7 @@ public:
                                    const bool& pf_flag,
                                    const std::string& option,
                                    const Real& alpha,
-                                   DenseVector<Number>& Fe);
+                                   DenseVector<Number>& Fe){};
 
  
   /*! \brief Apply Boundary Conditions by penalty method.
@@ -117,7 +117,7 @@ public:
                                    const std::string& matrix_or_vector,
                                    DenseMatrix<Number>& Ke,
                                    DenseVector<Number>& Fe,
-                                   const std::string& option);
+                                   const std::string& option){};
 
  
   /*! \brief Assemble int_force matrix for every element,

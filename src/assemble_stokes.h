@@ -18,6 +18,7 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
+#pragma once
 
 // C++ includes
 //#include <stdio.h>
@@ -57,8 +58,8 @@ public:
   @param[in,out] es EquationSystem
   */
   AssembleStokes(EquationSystems& es);
-  
-  
+ 
+ 
   /*! \brief Destructor
   
   */
@@ -73,7 +74,7 @@ public:
 
   */
   void assemble_global_K(const std::string& system_name,
-                         const std::string& option);
+                         const std::string& option) override;
  
 
   /*! \brief Assemble the Global force vector F
@@ -83,7 +84,7 @@ public:
     @param[out] Fe Add rhs vector to system.
   */
   void assemble_global_F(const std::string& system_name,
-                         const std::string& option);
+                         const std::string& option) override;
  
  
   /*! \brief Assemble the element matrix K_IJ
@@ -97,7 +98,7 @@ public:
                             const unsigned int n_u_dofs,
                             const unsigned int I,
                             const unsigned int J,
-                            DenseMatrix<Number>& Kij);
+                            DenseMatrix<Number>& Kij) override;
 
  
   /*! \brief Assemble the element matrices Q_I, i.e., kup, kvp, kwp, for pressure
@@ -135,7 +136,7 @@ public:
                            const bool& pf_flag,
                            const std::string& option,
                            const Real& alpha,
-                           DenseVector<Number>& Fe);
+                           DenseVector<Number>& Fe) override;
  
   /*! \brief Apply BCs by penalty method.
  
@@ -144,7 +145,7 @@ public:
                            const std::string& matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string& option);
+                           const std::string& option) override;
  
  
   /*! \brief Define the pressure jump at the inlet and outlet of the channel

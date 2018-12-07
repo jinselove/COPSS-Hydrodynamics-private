@@ -32,7 +32,6 @@
 #include "libmesh/elem.h"
 #include "libmesh/auto_ptr.h"
 
-
 // For systems of equations the DenseSubMatrix and DenseSubVector provide convenient ways
 // for assembling the element matrix and vector on a component-by-component basis.
 #include "libmesh/sparse_matrix.h"
@@ -42,19 +41,17 @@
 #include "libmesh/dense_submatrix.h"
 #include "libmesh/dense_subvector.h"
 #include "libmesh/mesh.h"
+
 // User defined header includes
 #include "analytical_solution.h"
 #include "ggem_system.h"
 #include "pm_toolbox.h"
-//#include "pm_linear_implicit_system.h"
+#include "assemble_stokes.h"
 
 // ==================================================================================
 AssembleStokes::AssembleStokes(EquationSystems& es)
-: _eqn_sys(es),
-_mesh(es.get_mesh())
-
+: AssembleSystem(es)
 {
-  // do nothing
   _dim  = es.get_mesh().mesh_dimension();
   _int_force.resize(1); // initialize _int_force matrix
   _boundary_sides.resize(1); // intialize _boundary_sides matrix
@@ -200,7 +197,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
     for (unsigned int i=0; i<_dim; ++i)
     {
       DenseMatrix<Number> Kij;
-      this->assemble_element_KIJ(JxW,dphi,mu,n_u_dofs,i,i,Kij);
+      this->assemble_element_KIJ(JxW,dphi,n_u_dofs,i,i,Kij);
       Ktt += Kij;
     }
     
@@ -211,7 +208,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
       {
         // -------------------------------------------------------------
         DenseMatrix<Number> Kij;
-        this->assemble_element_KIJ(JxW,dphi,mu,n_u_dofs,i,j,Kij);
+        this->assemble_element_KIJ(JxW,dphi,n_u_dofs,i,j,Kij);
         
         // add Kij to Ke
         for(unsigned int k=0; k<n_u_dofs; ++k)

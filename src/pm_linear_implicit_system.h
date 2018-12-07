@@ -30,7 +30,8 @@
 #include "point_mesh.h"
 #include "particle_mesh.h"
 #include "elasticity_system.h"
-#include "assemble_navier_stokes.h"
+//#include "assemble_navier_stokes.h"
+#include "assemble_stokes.h"
 #include "stokes_solver.h"
 
 // C++ Includes   -------------------------------------
@@ -340,8 +341,8 @@ private:
   // Stokes solver
   StokesSolver _stokes_solver;
   
-  // Assemble NS system
-  AssembleNS* _assemble_ns;
+  // Assemble Stokes system
+  AssembleStokes* _assemble_stokes;
 
   // the type of particles in this PMSystem: "point_particle" or "rigid_particle"
 //  std::string _particle_type;

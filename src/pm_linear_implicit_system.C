@@ -58,7 +58,7 @@ PMLinearImplicitSystem::PMLinearImplicitSystem(EquationSystems& es,
   _particle_mesh(NULL)
 {
   // Assemble Navier Stokes
-  _assemble_ns = ( new AssembleNS(es) );
+  _assemble_stokes = ( new AssembleStokes(es) );
 }
 
 
@@ -80,8 +80,8 @@ void PMLinearImplicitSystem::clear ()
   Parent::clear();
   
   // delete the pointer
-  if(_assemble_ns) {
-    delete _assemble_ns;
+  if(_assemble_stokes) {
+    delete _assemble_stokes;
   }
 }
 
@@ -112,7 +112,7 @@ void PMLinearImplicitSystem::assemble_matrix(const std::string& system_name,
    Call assemble function to assemble matrix
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   //assemble_matrix_sedimentation_ex1(this->get_equation_systems(), system_name, option);
-  _assemble_ns->assemble_global_K(system_name, option);
+  _assemble_stokes->assemble_global_K(system_name, option);
   
   
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -144,7 +144,7 @@ void PMLinearImplicitSystem::assemble_rhs(const std::string& system_name,
 //perf_log.pop("zero");
   //assemble_rhs_sedimentation_ex1 (this->get_equation_systems(), system_name, option);
 //perf_log.push("assemble");
-  _assemble_ns->assemble_global_F(system_name, option);
+  _assemble_stokes->assemble_global_F(system_name, option);
 //perf_log.pop("assemble");
 //perf_log.push("close");
   this->rhs->close();

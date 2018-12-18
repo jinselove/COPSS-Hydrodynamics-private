@@ -32,7 +32,6 @@
 #include "libmesh/elem.h"
 #include "libmesh/auto_ptr.h"
 
-
 // For systems of equations the DenseSubMatrix and DenseSubVector provide convenient ways
 // for assembling the element matrix and vector on a component-by-component basis.
 #include "libmesh/sparse_matrix.h"
@@ -42,19 +41,17 @@
 #include "libmesh/dense_submatrix.h"
 #include "libmesh/dense_subvector.h"
 #include "libmesh/mesh.h"
+
 // User defined header includes
 #include "analytical_solution.h"
 #include "ggem_system.h"
 #include "pm_toolbox.h"
-//#include "pm_linear_implicit_system.h"
+#include "assemble_stokes.h"
 
 // ==================================================================================
-AssembleNS::AssembleNS(EquationSystems& es)
-: _eqn_sys(es),
-_mesh(es.get_mesh())
-
+AssembleStokes::AssembleStokes(EquationSystems& es)
+: AssembleSystem(es)
 {
-  // do nothing
   _dim  = es.get_mesh().mesh_dimension();
   _int_force.resize(1); // initialize _int_force matrix
   _boundary_sides.resize(1); // intialize _boundary_sides matrix
@@ -63,21 +60,18 @@ _mesh(es.get_mesh())
 
 
 // ==================================================================================
-AssembleNS::~AssembleNS()
+AssembleStokes::~AssembleStokes()
 {
   // do nothing
 }
 
 
 
-
-
-
 // ==================================================================================
-void AssembleNS::assemble_global_K(const std::string& system_name,
-                                   const std::string& option)
+void AssembleStokes::assemble_global_K(const std::string& system_name,
+                                       const std::string& option)
 {
-  START_LOG ("assemble_global_K()", "AssembleNS");
+  START_LOG ("assemble_global_K()", "AssembleStokes");
   /*! It is a good idea to make sure we are assembling the proper system.
   
   */
@@ -203,7 +197,7 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
     for (unsigned int i=0; i<_dim; ++i)
     {
       DenseMatrix<Number> Kij;
-      this->assemble_element_KIJ(JxW,dphi,mu,n_u_dofs,i,i,Kij);
+      this->assemble_element_KIJ(JxW,dphi,n_u_dofs,i,i,Kij);
       Ktt += Kij;
     }
     
@@ -214,7 +208,7 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
       {
         // -------------------------------------------------------------
         DenseMatrix<Number> Kij;
-        this->assemble_element_KIJ(JxW,dphi,mu,n_u_dofs,i,j,Kij);
+        this->assemble_element_KIJ(JxW,dphi,n_u_dofs,i,j,Kij);
         
         // add Kij to Ke
         for(unsigned int k=0; k<n_u_dofs; ++k)
@@ -244,12 +238,10 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
       
     } // end for I-loop
     
-    
 //    if(_eqn_sys.comm().rank()==0){
 //      printf("----->TEST: element id = %u\n", elem->id());
 //      PMToolBox::output_dense_matrix(Ktt);
 //    }
-    
     
     // apply BCs by penalty method
     this->apply_bc_by_penalty(elem, "matrix", Ke, Fe, option);
@@ -301,99 +293,39 @@ void AssembleNS::assemble_global_K(const std::string& system_name,
       }
       // -------------------------------------------------------------------------------
     } // end if( user_defined_pc )
-    
   } // end of elem-loop
-  
-  
-  // That's it.
+ 
   // -------------------------------------------------------------------------------------------
   //  if (_pm_system.comm().rank()==0){
   //  printf("assemble_matrix_K(): The global matrix K has been assembled ...\n");
   // }
   // -------------------------------------------------------------------------------------------
   return;
-  STOP_LOG ("assemble_global_K()", "AssembleNS");
+  STOP_LOG ("assemble_global_K()", "AssembleStokes");
 }
 
-void AssembleNS::assemble_int_force(const Elem* elem,
-                                    const unsigned int n_u_dofs,
-                                    FEBase& fe_v)
-{
-  START_LOG("assemble_int_force()", "AssembleNS");
-  const std::vector<Real>& JxW                = fe_v.get_JxW();
-  const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
-  const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords of quad pts
-  //fe_v.reinit(elem);
-  const std::size_t elem_id = elem->id();
-  _int_force[elem_id].resize(n_u_dofs*q_xyz.size(),0.); // resize this row
-  _q_xyz[elem_id] = q_xyz;
-  for (unsigned int k=0; k<n_u_dofs; ++k){
-    // loop over all gauss quadrature points
-    for(unsigned int qp=0; qp<q_xyz.size(); qp++){
-      _int_force[elem_id][k*q_xyz.size()+qp] = JxW[qp]*phi[k][qp];
-    //  _int_force[elem_id][k] += JxW[qp]*phi[k][qp];
-    //  printf("_int_force[elem_id=%d][k*q_xyz.size()+qp=%d] = JxW[qp=%d]*phi[k=%d][qp=%d] = %f *%f = %f\n", elem_id, k*q_xyz.size()+qp, qp,k,qp, JxW[qp],phi[k][qp], _int_force[elem_id][k*q_xyz.size()+qp]);
-    }
-  }    
-  STOP_LOG("assemble_int_force()", "AssembleNS");
-  return;
-}
-
-void AssembleNS::select_boundary_side(const Elem* elem)
-{
-  START_LOG("select_boundary_side()", "AssembleNS");
-
-  // Get a reference to the Particle-Mesh linear implicit system object.
-  PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
-  const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
-  const std::vector<bool>& inlet_direction = pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
-  const std::size_t elem_id = elem->id();
-   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   The following loops over the sides of the element. If the element has NO
-   neighbors on a side then that side MUST live on a boundary of the domain.
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  for (unsigned int s=0; s<elem->n_sides(); s++)
-  {
-    bool apply_bc = false;
-    if (elem->neighbor(s) == NULL)
-    {
-      apply_bc = true; 
-      // if this side is on the periodic side or pressure side, don't apply penalty
-      for (int i = 0; i < _dim; i++)
-      {
-        if(periodicity[i] or inlet_direction[i]){
-          if (_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
-              _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
-          { apply_bc = false; }
-        }
-      }   
-    }
-    if (apply_bc) _boundary_sides[elem_id].push_back(s);
-  }
-  STOP_LOG("select_boundary_side()", "AssembleNS");
-}
 
 
 // ==================================================================================
-void AssembleNS::assemble_global_F(const std::string& system_name,
-                                   const std::string& option)
+void AssembleStokes::assemble_global_F(const std::string& system_name,
+                                       const std::string& option)
 {
-  START_LOG ("assemble_global_F()", "AssembleNS");  
+  START_LOG ("assemble_global_F()", "AssembleStokes");
   // PerfLog perf_log("assemble_global_F");
   // perf_log.push("preparation");
   // It is a good idea to make sure we are assembling the proper system.
   libmesh_assert_equal_to (system_name, "Stokes");
 //  const MeshBase& _mesh = _eqn_sys.get_mesh();
   PMLinearImplicitSystem& _pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> (system_name);
-  
+ 
   // Numeric ids corresponding to each variable in the system
   const unsigned int  u_var = _pm_system.variable_number ("u");      // u_var = 0
   const unsigned int  p_var = _pm_system.variable_number ("p");      // p_var = 2(dim=2); = 3(dim=3)
-  
+ 
   // Get the FE type for "u" and "p".  Note "u" is the same as the type for "v".
   FEType fe_vel_type  = _pm_system.variable_type(u_var);
   UniquePtr<FEBase> fe_vel  (FEBase::build(_dim, fe_vel_type) );
-  
+ 
   // Define Gauss quadrature rule for numerical integration.
   // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (_dim, SECOND);   //3^dim pts
@@ -547,7 +479,7 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
     // perf_log.pop("finish");
    } // end for elem-loop
   
-  STOP_LOG ("assemble_global_F()", "AssembleNS");  
+  STOP_LOG ("assemble_global_F()", "AssembleStokes");  
   
   // ---------------------------------------------------------------------------------------------
   //if (_pm_system.comm().rank()==0){
@@ -558,17 +490,18 @@ void AssembleNS::assemble_global_F(const std::string& system_name,
 }
 
 
+
 // ==================================================================================
-void AssembleNS::compute_element_rhs(const Elem*     elem,
-                                     const unsigned int n_u_dofs,
-                                     FEBase& fe_v,
-                                     const std::vector<std::size_t> n_list,
-                                     const bool& pf_flag,
-                                     const std::string& option,
-                                     const Real& alpha,
-                                     DenseVector<Number>& Fe)
+void AssembleStokes::compute_element_rhs(const Elem* elem,
+                                         const unsigned int n_u_dofs,
+                                         FEBase& fe_v,
+                                         const std::vector<std::size_t> n_list,
+                                         const bool& pf_flag,
+                                         const std::string& option,
+                                         const Real& alpha,
+                                         DenseVector<Number>& Fe)
 {
-  START_LOG("compute_element_rhs()", "AssembleNS");  // libMesh log
+  START_LOG("compute_element_rhs()", "AssembleStokes");  // libMesh log
   
   libmesh_assert_equal_to (system_name, "Stokes");
 //  const MeshBase& _mesh = _eqn_sys.get_mesh();
@@ -666,24 +599,26 @@ void AssembleNS::compute_element_rhs(const Elem*     elem,
     } // end for s-loop
   } // end if( option == "undisturbed" )
 
-  STOP_LOG("compute_element_rhs()", "AssembleNS");
+  STOP_LOG("compute_element_rhs()", "AssembleStokes");
   return;
 }
 
 
+
 // ==================================================================================
-void AssembleNS::assemble_element_KIJ(const std::vector<Real>& JxW,
-                                      const std::vector<std::vector<RealGradient> >& dphi,
-                                      const Real&     mu,
-                                      const unsigned int n_u_dofs,
-                                      const unsigned int i,
-                                      const unsigned int j,
-                                      DenseMatrix<Number>& Kij)
+void AssembleStokes::assemble_element_KIJ(const std::vector<Real>& JxW,
+                                          const std::vector<std::vector<RealGradient> >& dphi,
+                                          const unsigned int n_u_dofs,
+                                          const unsigned int i,
+                                          const unsigned int j,
+                                          DenseMatrix<Number>& Kij)
 {
-  START_LOG("assemble_element_KIJ()", "AssembleNS");  // libMesh log
-  
+  START_LOG("assemble_element_KIJ()", "AssembleStokes");  // libMesh log
+
+  const Real mu = _eqn_sys.parameters.get<Real>("viscosity_0");
+
   Kij.resize(n_u_dofs, n_u_dofs);
-  
+ 
   // reinit and compute the element matrix K_ij
   for (unsigned int qp=0; qp<JxW.size(); qp++)
   {
@@ -692,23 +627,23 @@ void AssembleNS::assemble_element_KIJ(const std::vector<Real>& JxW,
       for (unsigned int n=0; n<n_u_dofs; n++)
         Kij(m,n) += JxW[qp]*(dphi[m][qp](i)*dphi[n][qp](j))*mu; // with viscosity
   }
-  
-  STOP_LOG("assemble_element_KIJ()", "AssembleNS");  // libMesh log
+ 
+  STOP_LOG("assemble_element_KIJ()", "AssembleStokes");  // libMesh log
   return;
 }
 
 
 
 // ==================================================================================
-void AssembleNS::assemble_element_QI(const std::vector<Real>& JxW,
-                                     const std::vector<std::vector<RealGradient> >& dphi,
-                                     const std::vector<std::vector<Real> >& psi,
-                                     const unsigned int n_v_dofs,
-                                     const unsigned int n_p_dofs,
-                                     const unsigned int I,
-                                     DenseMatrix<Number>& Qi)
+void AssembleStokes::assemble_element_QI(const std::vector<Real>& JxW,
+                                         const std::vector<std::vector<RealGradient> >& dphi,
+                                         const std::vector<std::vector<Real> >& psi,
+                                         const unsigned int n_v_dofs,
+                                         const unsigned int n_p_dofs,
+                                         const unsigned int I,
+                                         DenseMatrix<Number>& Qi)
 {
-  START_LOG("assemble_element_QI()", "AssembleNS");  // libMesh log
+  START_LOG("assemble_element_QI()", "AssembleStokes");  // libMesh log
   
   // reinit and compute the element matrix K_ij
   Qi.resize(n_v_dofs,n_p_dofs);
@@ -720,18 +655,18 @@ void AssembleNS::assemble_element_QI(const std::vector<Real>& JxW,
         Qi(m,n) += JxW[qp]*(dphi[m][qp](I)*psi[n][qp]);
   }
   
-  STOP_LOG("assemble_element_QI()", "AssembleNS");  // libMesh log
+  STOP_LOG("assemble_element_QI()", "AssembleStokes");  // libMesh log
 }
 
 
 
 // ==================================================================================
-void AssembleNS::assemble_element_MIJ(const std::vector<Real>& JxW,
-                                      const std::vector<std::vector<Real> >& phi,
-                                      const unsigned int n_v_dofs,
-                                      DenseMatrix<Number>& Mij)
+void AssembleStokes::assemble_element_MIJ(const std::vector<Real>& JxW,
+                                          const std::vector<std::vector<Real> >& phi,
+                                          const unsigned int n_v_dofs,
+                                          DenseMatrix<Number>& Mij)
 {
-  START_LOG("assemble_element_MIJ()", "AssembleNS");  // libMesh log
+  START_LOG("assemble_element_MIJ()", "AssembleStokes");  // libMesh log
   
   // reinit and compute the element matrix K_ij
   Mij.resize(n_v_dofs, n_v_dofs);
@@ -743,17 +678,19 @@ void AssembleNS::assemble_element_MIJ(const std::vector<Real>& JxW,
         Mij(m,n) += JxW[qp]*(phi[m][qp]*phi[n][qp]); // with density
   }
   
-  STOP_LOG("assemble_element_MIJ()", "AssembleNS");  // libMesh log
+  STOP_LOG("assemble_element_MIJ()", "AssembleStokes");  // libMesh log
 }
 
-/// ======================================================================================= ///
-void AssembleNS::apply_bc_by_penalty(const Elem* elem,
-                                     const std::string& matrix_or_vector,
-                                     DenseMatrix<Number>& Ke,
-                                     DenseVector<Number>& Fe,
-                                     const std::string& option)
+
+
+// =======================================================================================
+void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
+                                         const std::string& matrix_or_vector,
+                                         DenseMatrix<Number>& Ke,
+                                         DenseVector<Number>& Fe,
+                                         const std::string& option)
 {
-  START_LOG("apply_bc_by_penalty()", "AssembleNS");  // libMesh log
+  START_LOG("apply_bc_by_penalty()", "AssembleStokes");  // libMesh log
   
   // Get a reference to the Particle-Mesh linear implicit system object.
   PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
@@ -837,56 +774,13 @@ void AssembleNS::apply_bc_by_penalty(const Elem* elem,
         } // enf for n-loop
       } // end for nn-loop
   } // end for s-loop  
-  STOP_LOG("apply_bc_by_penalty()", "AssembleNS");
+  STOP_LOG("apply_bc_by_penalty()", "AssembleStokes");
 } // end of function apply_bc_by_penalty()
 
 
 
-/// ======================================================================================= ///
-void AssembleNS::penalize_elem_matrix_vector(DenseMatrix<Number>& Ke,
-                                             DenseVector<Number>& Fe,
-                                             const std::string & matrix_or_vector,
-                                             const unsigned int& var_number,
-                                             const unsigned int& local_node_id,
-                                             const unsigned int& n_nodes_elem, // total vel-node #!
-                                             const Real& penalty,
-                                             const Real& value)
-{
-  START_LOG("penalize_elem_matrix_vector()", "AssembleNS");
-  
-  
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Penalize Matrix or vector.
-   n_nodes_elem: number of nodes in an element
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  const unsigned int n = local_node_id;
-  if (matrix_or_vector=="matrix")
-  {
-    Ke(var_number*n_nodes_elem+n,var_number*n_nodes_elem+n) += penalty;
-  }
-  else if (matrix_or_vector=="vector")  // Penalize Right-hand-side.
-  {
-    Fe(var_number*n_nodes_elem + n) += penalty*value;
-  }
-  else if (matrix_or_vector=="both")
-  {
-    Ke(var_number*n_nodes_elem+n,var_number*n_nodes_elem+n) += penalty;
-    Fe(var_number*n_nodes_elem + n) += penalty*value;
-  }
-  else
-  {
-    libmesh_assert("*** error in AssembleNS::penalize_elem_matrix_vector():");
-    libmesh_assert("*** ---> invalid argument: matrix_or_vector!");
-    libmesh_error();
-  }
-  
-  STOP_LOG("penalize_elem_matrix_vector()", "AssembleNS");
-}
-
-
-
 // ============================================================================================
-Real AssembleNS::boundary_pressure_jump(const std::string& which_side) const
+Real AssembleStokes::boundary_pressure_jump(const std::string& which_side) const
 {
   // set the pressure on the left boundary as a time dependent function
   if(which_side=="left")
@@ -901,7 +795,7 @@ Real AssembleNS::boundary_pressure_jump(const std::string& which_side) const
   }
   else
   {
-    std::cout <<"********* error in AssembleNS::boundary_pressure_jump(): *********"<<std::endl
+    std::cout <<"********* error in AssembleStokes::boundary_pressure_jump(): *********"<<std::endl
               <<"********** the side can only be left or right boundary !**********"<<std::endl
               <<"******************************************************************"<<std::endl;
     return 1E100;
@@ -912,7 +806,7 @@ Real AssembleNS::boundary_pressure_jump(const std::string& which_side) const
 
 
 // ============================================================================================
-Real AssembleNS::boundary_traction(const std::string& which_side) const
+Real AssembleStokes::boundary_traction(const std::string& which_side) const
 {
   // set the traction on the left boundary as a time dependent function
   if(which_side=="left")
@@ -927,16 +821,12 @@ Real AssembleNS::boundary_traction(const std::string& which_side) const
   }
   else
   {
-    std::cout <<"************ error in AssembleNS::boundary_traction(): ***********"<<std::endl
+    std::cout <<"************ error in AssembleStokes::boundary_traction(): ***********"<<std::endl
               <<"********** the side can only be left or right boundary !**********"<<std::endl
               <<"******************************************************************"<<std::endl;
     return 1E100;
   } // end if-else
-  
 }
-
-
-
 
 
 

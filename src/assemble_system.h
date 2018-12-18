@@ -49,41 +49,42 @@ class AssembleSystem : public ReferenceCountedObject<AssembleSystem>
 {
 public:
   /*! \brief Constructor
- 
+
   @param[in,out] es EquationSystem
   */
   AssembleSystem(EquationSystems& es);
- 
- 
+
+
   /*! \brief Destructor
- 
+
   */
   ~AssembleSystem();
 
 
   /*! \brief Assemble the Global Matrix K
- 
+
     \param[in] system_name Name of the system (could be "Stokes", "Poisson", or "NP")
     \param[in] Option options of assembling the system ("disturbed" or "undisturbed") for Stokes equation
     \param[out] Ke Add element matrix to system
 
   */
   virtual void assemble_global_K(const std::string& system_name,
-                                 const std::string& option){}; //{} defines virtual function
- 
- 
+                                 const std::string& option) = 0;
+
+
   /*! \brief Assemble the Global force vector F
- 
+
     @param[in] system_name Name of the system (could be "Stokes", "Poisson", or "NP")
     @param[in] option Options of assembling the system ("disturbed" or "undisturbed") for Stokes equation
     @param[out] Fe Add rhs vector to system.
   */
   virtual void assemble_global_F(const std::string& system_name,
-                                 const std::string& option){};
- 
- 
+                                 const std::string& option) = 0;
+
+
+
   /*! \brief Assemble the element matrix K_IJ
- 
+
       Reinit and compute the element matrix K_ij, which will be added into K
       matrix after calling assemble_global_K(). For Stokes equation, size of
       this submatrix is n_u_dofs * n_u_dofs = n_v_dofs * n_v_dofs = n_w_dofs * n_w_dofs
@@ -93,12 +94,11 @@ public:
                                     const unsigned int n_u_dofs,
                                     const unsigned int I,
                                     const unsigned int J,
-                                    DenseMatrix<Number>& Kij){};
- 
- 
+                                    DenseMatrix<Number>& Kij) = 0;
+
   /*! \brief  Assemble function for calculating each element's contribution to
    *          the right-hand-side vector. It is used in assemble_global_F()
- 
+
   */
   virtual void compute_element_rhs(const Elem* elem,
                                    const unsigned int n_u_dofs,
@@ -107,25 +107,25 @@ public:
                                    const bool& pf_flag,
                                    const std::string& option,
                                    const Real& alpha,
-                                   DenseVector<Number>& Fe){};
+                                   DenseVector<Number>& Fe) = 0;
 
- 
+
   /*! \brief Apply Boundary Conditions by penalty method.
- 
+
   */
   virtual void apply_bc_by_penalty(const Elem* elem,
                                    const std::string& matrix_or_vector,
                                    DenseMatrix<Number>& Ke,
                                    DenseVector<Number>& Fe,
-                                   const std::string& option){};
+                                   const std::string& option) = 0;
 
- 
+
   /*! \brief Assemble int_force matrix for every element,
    * this includes Gaussian quadrature weights multiplied by shape functions.
    * The product is calculated once and is stored in _int_force.
 
   */
-  void assemble_int_force(const Elem*     elem,
+  void assemble_int_force(const Elem* elem,
                           const unsigned int n_u_dofs,
                           FEBase& fe_v);
 
@@ -135,7 +135,7 @@ public:
    */
   void select_boundary_side(const Elem* elem);
 
- 
+
   /*! \brief Universal function to penalize element matrix or vector with a large number.
 
   */
@@ -147,13 +147,13 @@ public:
                                    const unsigned int& n_nodes_elem,   // vel-node number of elem!
                                    const Real& penalty,
                                    const Real& value);
- 
- 
- 
+
+
+
 protected:
   // Equation systems
   EquationSystems& _eqn_sys;
- 
+
   // system dimension
   unsigned int _dim;
 
@@ -167,7 +167,7 @@ protected:
 
   // int_force matrix
   // this matrix stores the product of JxW[qp] * phi[k][qp]
-  // size = num_elem * (n_u_dofs * n_quad_points) 
+  // size = num_elem * (n_u_dofs * n_quad_points)
   std::vector<std::vector<Real>> _int_force;
 
   // vector stores q_xyz size

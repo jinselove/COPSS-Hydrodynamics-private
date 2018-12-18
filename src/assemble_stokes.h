@@ -20,31 +20,13 @@
 
 #pragma once
 
-// C++ includes
-//#include <stdio.h>
-//#include <iostream>
-//#include <cstring>
-//#include <utility>
-//#include <vector>
-//#include <map>
-
-// Libmesh includes
-//#include "libmesh/libmesh.h"
-//#include "libmesh/equation_systems.h"
-//#include "libmesh/point.h"
-//#include "pm_linear_implicit_system.h"
-
 // Local includes
 #include "assemble_system.h"
-
-// Bring in everything from the libMesh namespace
-//using namespace libMesh;
-
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
  * Stokes equations.
- * 
+ *
  * For details of the numerical discretization, refer to
  * The finite element method in heat transfer and fluid dynamics (3rd ed)
  * J.N. Reddy and D.K. Gartling. 2010, CRC Press
@@ -54,20 +36,20 @@ class AssembleStokes : public AssembleSystem
 {
 public:
   /*! \brief Constructor
-  
+
   @param[in,out] es EquationSystem
   */
   AssembleStokes(EquationSystems& es);
- 
- 
+
+
   /*! \brief Destructor
-  
+
   */
   ~AssembleStokes();
 
 
   /*! \brief Assemble the Global Matrix K
-  
+
     \param[in] system_name Name of the system (should be "Stokes")
     \param[in] Option options of assembling the system ("disturbed" or "undisturbed")
     \param[out] Ke Add element matrix to system
@@ -75,20 +57,20 @@ public:
   */
   void assemble_global_K(const std::string& system_name,
                          const std::string& option) override;
- 
+
 
   /*! \brief Assemble the Global force vector F
-  
+
     @param[in] system_name Name of the system (should be "Stokes")
     @param[in] option Options of assembling the system ("disturbed" or "undisturbed")
     @param[out] Fe Add rhs vector to system.
   */
   void assemble_global_F(const std::string& system_name,
                          const std::string& option) override;
- 
- 
+
+
   /*! \brief Assemble the element matrix K_IJ
-      
+
       Reinit and compute the element matrix K_ij, which will be added into K
       matrix after calling assemble_global_K(). Size of this submatrix is
       n_u_dofs * n_u_dofs = n_v_dofs * n_v_dofs = n_w_dofs * n_w_dofs
@@ -100,9 +82,9 @@ public:
                             const unsigned int J,
                             DenseMatrix<Number>& Kij) override;
 
- 
+
   /*! \brief Assemble the element matrices Q_I, i.e., kup, kvp, kwp, for pressure
- 
+
       These element matrices will be added to Ke after calling assemble_global_K().
       This function only exists for Stokes equation.
   */
@@ -113,8 +95,8 @@ public:
                            const unsigned int n_p_dofs,
                            const unsigned int I,
                            DenseMatrix<Number>& Qi);
- 
- 
+
+
   /*! \brief Assemble the element mass matrix M for preconditioning matrix.
 
       This function only exists for Stokes equation.
@@ -123,8 +105,8 @@ public:
                             const std::vector<std::vector<Real> >& phi,
                             const unsigned int n_v_dofs,
                             DenseMatrix<Number>& Mij);
- 
- 
+
+
   /*! \brief Assemble function for the right-hand-side in Stokes equation.
 
       This calculates each element's contribution to the right-hand-side vector.
@@ -137,25 +119,25 @@ public:
                            const std::string& option,
                            const Real& alpha,
                            DenseVector<Number>& Fe) override;
- 
+
   /*! \brief Apply BCs by penalty method.
- 
+
   */
   void apply_bc_by_penalty(const Elem* elem,
                            const std::string& matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
                            const std::string& option) override;
- 
- 
+
+
   /*! \brief Define the pressure jump at the inlet and outlet of the channel
-  
+
   */
   Real boundary_pressure_jump(const std::string& which_side) const;
- 
- 
+
+
   /*! \brief Define the pressure jump at the inlet and outlet of the channel
-  
+
   */
   Real boundary_traction(const std::string& which_side) const;
 };

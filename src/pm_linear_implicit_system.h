@@ -30,7 +30,6 @@
 #include "point_mesh.h"
 #include "particle_mesh.h"
 #include "elasticity_system.h"
-//#include "assemble_navier_stokes.h"
 #include "assemble_stokes.h"
 #include "stokes_solver.h"
 
@@ -48,10 +47,10 @@ namespace libMesh
  * solve the stokes equation with regularized Gaussian
  * point forces due to particles using mixed FEM.
  */
-  
+
 class Fix;
 
-  
+
 class PMLinearImplicitSystem : public LinearImplicitSystem
 {
 public:
@@ -62,41 +61,41 @@ public:
   PMLinearImplicitSystem (EquationSystems& es,
                           const std::string& name,
                           const unsigned int number); // number of systems
-  
+
 
   /**
    * Destructor.
    */
   virtual ~PMLinearImplicitSystem ();
-  
-  
-  
+
+
+
   /**
    * The type of system.
    */
   typedef PMLinearImplicitSystem sys_type;
-  
-  
+
+
   /**
    * The type of the parent.
    */
   typedef LinearImplicitSystem Parent;
-  
-  
+
+
   /**
    * @returns a clever pointer to the system.
    */
   sys_type & system () { return *this; }
-  
-  
-  
+
+
+
   /**
    * Clear all the data structures associated with the system.
    */
   virtual void clear ();
 
-  
-  
+
+
   /**
    * Assemble the system matrix.
    * option == "undisturbed" : undisturbed velocity field (without particles)
@@ -107,17 +106,17 @@ public:
    */
   void assemble_matrix (const std::string& system_name,
                         const std::string& option);
-  
-  
+
+
   /**
    * Assemble the system rhs.
    */
   void assemble_rhs (const std::string& system_name,
                      const std::string& option);
-  
 
-  
-  /*   - - - - - Recommended - - - - - - 
+
+
+  /*   - - - - - Recommended - - - - - -
    * Solve the Stokes system.
    * option = "undisturbed", compute the undisturbed field of flow without particles
    * option = "disturbed",   compute the disturbed field of flow with particles
@@ -125,14 +124,14 @@ public:
    */
   void solve_stokes (const std::string& option,
                      const bool& re_init);
-  
-  
+
+
   /*
    * Return the StokesSolver
    */
   StokesSolver& stokes_solver() { return _stokes_solver;  }
-  
-  
+
+
   /**
    * Compute the purturbed velocity vector of moving points
    * according to physical fields. which is a dim*N vector
@@ -145,48 +144,48 @@ public:
    * pv = particle_velocity
    */
   void compute_point_velocity(const std::string& option, std::vector<Real>& pv);
-  
-  
-  
+
+
+
   /**
-   * Compute the unperturbed velocity vector at the location of particles 
+   * Compute the unperturbed velocity vector at the location of particles
    */
   std::vector<Real> compute_unperturbed_point_velocity();
-  
-  
+
+
   /*
    * Obtain the velocity vector on the i-th point
    */
   std::vector<Real> point_velocity(const std::vector<Real>& vel_beads,
                                    const std::size_t i) const;
-  
-  
+
+
   /*
    * Attach PointMesh
    */
   void attach_point_mesh(PointMesh<3>* pm){ _point_mesh = pm;  };
-  
-  
+
+
   /*
    * return editable PointMesh ptr and const PointMesh ptr
    */
   PointMesh<3>* point_mesh(){  return _point_mesh;  };
   PointMesh<3>* point_mesh() const {  return _point_mesh;  };
-  
-  
+
+
   /*
    * Attach ParticleMesh
    */
   void attach_particle_mesh(ParticleMesh<3>* pm){ _particle_mesh = pm;  };
-  
-  
+
+
   /*
    * return editable ParticleMesh ptr and const ParticleMesh ptr
    */
   ParticleMesh<3>* particle_mesh(){  return _particle_mesh;  };
   ParticleMesh<3>* particle_mesh() const {  return _particle_mesh;  };
-  
-  
+
+
   /*
    * Re-init particle mesh, including:
    * (1) reinit() reinit point particles
@@ -206,17 +205,17 @@ public:
    *             modify the force field according to the vel_last_step.
    */
   void reinit_fd_system(bool& neighbor_list_update_flag);
-  
-  
-  
+
+
+
   /*
    * Attach the ForceField
    */
   void attach_fixes(std::vector<Fix*> fixes){ _fixes = fixes;  };
   std::vector<Fix*> fixes() { return _fixes; };
   std::vector<Fix*> fixes() const {  return _fixes; };
-  
-  
+
+
   /**
    * Local velocity of a fluid point in an unbounded space,
    * which is computed from Green's function
@@ -232,8 +231,8 @@ public:
    */
   std::vector<Real> local_velocity_fluid(const Elem* elem,
                                          const Point &p,
-                                         const std::string& force_type) const;  
-  
+                                         const std::string& force_type) const;
+
   /**
    * Local velocity of a bead in an unbounded space,
    * which is computed from Green's function.
@@ -241,35 +240,35 @@ public:
    */
   Point local_velocity_bead(const std::size_t& bead_id,
                                         const std::string& force_type) const;
-  
-  
+
+
   /*
    * Self-exclusion term for the velocity at the i-th bead
    */
   Point global_self_exclusion(const std::size_t p_id) const;
-  
-  
-  
+
+
+
   /*
    * Compute the L2-error in an unbounded domain
    * This function will change the system solution vector by add local solution.
    */
   void test_l2_norm(bool& neighbor_list_update_flag);
-  
-  
+
+
   /*
    * Test function. output velocity profile along x-y-z direction
    */
   void test_velocity_profile(bool& neighbor_list_update_flag);
 
-  
+
   /*
    * Return the exact solution of Stokes eqn for any given
    * point \pt0 in an unbounded domain.
    */
   //const std::vector<Real> exact_solution(const Point& pt0) const;
-  
-  
+
+
   /*
    * write out single particle(point particle) info, including:
    * timestep, time, particle_xyz,  particle_velocity
@@ -278,8 +277,8 @@ public:
                                  const std::vector<Real>& vel,
                                  const int i_step,
                                  const Real time) const;
-  
-  
+
+
   /*
    * Write out particle(point) coordinates represented by a PETSc vector
    */
@@ -288,8 +287,8 @@ public:
                                   const Real& time,
                                   const std::string& f_name,
                                   const std::string& openmode) const;
-  
-  
+
+
   /*
    * Write out particle(point) coordinates
    * The output format is Comma Separated Variable(CSV) for ParaView.
@@ -297,11 +296,11 @@ public:
   void write_point_csv(const std::string& filename,
                        const std::vector<Real>& pv,
                        const bool write_velocity) const;
-  
+
   PetscErrorCode write_point_csv(const std::string& filename,
                                  Vec * petsc_vector,
                                  const bool write_velocity) const;
-  
+
   /*
    * Write out equation systems of Stokes. This requires combining the
    * local and global solution, and update the solution vectors.
@@ -310,13 +309,13 @@ public:
   void write_equation_systems(const std::size_t time_step,
                               const std::string& output_filename,
                               const std::string& output_format);
-  
-  
+
+
   /*
    * Add the local solution to the global solution
    */
   void add_local_solution();
- 
+
  
   /*
    * Write nodal coordinates (x, y, z) and velocities (vx, vy, vz)
@@ -326,21 +325,21 @@ public:
    * to the solution vector.
    */
   void write_fluid_velocity_data(const std::string& filename);
- 
+
 private:
-  
+
   // particle mesh pointer
   PointMesh<3>* _point_mesh;
-  
+
   // particle mesh pointer
   ParticleMesh<3>* _particle_mesh;
-  
+
   // force field for particle/points
   std::vector<Fix*> _fixes;
-  
+
   // Stokes solver
   StokesSolver _stokes_solver;
-  
+
   // Assemble Stokes system
   AssembleStokes* _assemble_stokes;
 

@@ -632,7 +632,7 @@ EquationSystems Copss::create_equation_systems()
   cout<<"==>(5/8) Add period boundary conditions to 'Stokes' system"<<endl;
   this->attach_period_boundary(system);
 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Initialize the Preconditioning matrix for saddle point problems if required.
    Initialize the equation system and zero the preconditioning matrix
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

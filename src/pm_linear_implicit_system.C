@@ -32,16 +32,12 @@
 #include "libmesh/gmv_io.h"
 #include "libmesh/vtk_io.h"
 
-
 // particle-mesh header files
 #include "pm_toolbox.h"
 #include "ggem_system.h"
 #include "brownian_system.h"
 #include "pm_linear_implicit_system.h"
 #include "analytical_solution.h"
-
-// assemble functions
-//#include "assemble_navier_stokes.h"
 
 namespace libMesh
 {
@@ -417,7 +413,7 @@ void PMLinearImplicitSystem::reinit_hi_system(bool& neighbor_list_update_flag)
     for (std::size_t i = 0; i < _fixes.size(); i++){
       _fixes[i]->compute();
     }
-  }   
+  }
   //perf_log.pop("fix compute");
   STOP_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
 }
@@ -1151,15 +1147,14 @@ PetscErrorCode PMLinearImplicitSystem::write_point_csv(const std::string& filena
 }
 
 
-  
+ 
 // ==================================================================================
 void PMLinearImplicitSystem::write_equation_systems(const std::size_t time_step,
                                                     const std::string& output_filename,
                                                     const std::string& output_format)
 {
   START_LOG("write_equation_systems()", "PMLinearImplicitSystem");
-  
-  
+ 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Write out the FEM results: global solution
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -1169,11 +1164,11 @@ void PMLinearImplicitSystem::write_equation_systems(const std::size_t time_step,
   {
     std::ostringstream file_name_fem;
     file_name_fem << output_filename + "_fem";
-    
+ 
     if (output_format=="EXODUS")
     {
 #ifdef LIBMESH_HAVE_EXODUS_API
-      
+ 
       if(time_step==0)
       {
         file_name_fem << ".e";
@@ -1183,7 +1178,7 @@ void PMLinearImplicitSystem::write_equation_systems(const std::size_t time_step,
       {
 //        file_name_fem << ".e-s." << std::setw(8) << std::setfill('0') << std::right << time_step;
 //        ExodusII_IO(mesh).write_equation_systems(file_name_fem.str(),this->get_equation_systems());
-        
+ 
         file_name_fem << ".e";
         ExodusII_IO exodus_IO(mesh);
         exodus_IO.append(true);

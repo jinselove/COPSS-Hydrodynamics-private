@@ -29,9 +29,6 @@
 // Local Includes -----------------------------------
 #include "point_mesh.h"
 #include "particle_mesh.h"
-#include "elasticity_system.h"
-#include "assemble_stokes.h"
-#include "stokes_solver.h"
 
 // C++ Includes -------------------------------------
 #include <stdio.h>
@@ -220,7 +217,8 @@ public:
                                  const bool write_velocity) const;
 
 
-private:
+
+protected:
 
   // particle mesh pointer
   PointMesh<3>* _point_mesh;
@@ -231,6 +229,6 @@ private:
   // force field for particle/points
   std::vector<Fix*> _fixes;
 
-}; // end of class PMLinearImplicitSystem
+};
 
 } // end namespace libMesh

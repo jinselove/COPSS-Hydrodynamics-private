@@ -77,19 +77,13 @@ public:
 
 
   /**
-   * The type of the parent.
-   */
-  typedef LinearImplicitSystem Parent;
-
-
-  /**
    * @returns a clever pointer to the system.
    */
   sys_type & system () { return *this; }
 
 
   /**
-   * Clear all the data structures associated with the system.
+   * Clear all the data structures associated with the parent system.
    */
   virtual void clear () = 0;
 
@@ -106,6 +100,13 @@ public:
    */
   virtual void assemble_rhs (const std::string& system_name,
                              const std::string& option) = 0;
+
+
+  /**
+   * Solve the system.
+   */
+  virtual void solve (const std::string& option,
+                      const bool& re_init) = 0;
 
 
   /*
@@ -166,6 +167,7 @@ public:
    *             modify the force field according to the vel_last_step.
    */
   void reinit_hi_system(bool& neighbor_list_update_flag);
+
 
   /*
    * Re-init free-draining system, including:

@@ -77,7 +77,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
   */
   libmesh_assert_equal_to (system_name, "Stokes");
   const unsigned int n_mesh_elem = _mesh.n_elem(); 
-  PMLinearImplicitSystem& _pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> (system_name);
+  PMSystemStokes& _pm_system = _eqn_sys.get_system<PMSystemStokes> (system_name);
   // Numeric ids corresponding to each variable in the system
   const unsigned int  u_var = _pm_system.variable_number ("u");      // u_var = 0
   const unsigned int  v_var = _pm_system.variable_number ("v");      // v_var = 1
@@ -316,7 +316,7 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   // It is a good idea to make sure we are assembling the proper system.
   libmesh_assert_equal_to (system_name, "Stokes");
 //  const MeshBase& _mesh = _eqn_sys.get_mesh();
-  PMLinearImplicitSystem& _pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> (system_name);
+  PMSystemStokes& _pm_system = _eqn_sys.get_system<PMSystemStokes> (system_name);
  
   // Numeric ids corresponding to each variable in the system
   const unsigned int  u_var = _pm_system.variable_number ("u");      // u_var = 0
@@ -505,7 +505,7 @@ void AssembleStokes::compute_element_rhs(const Elem* elem,
   
   libmesh_assert_equal_to (system_name, "Stokes");
 //  const MeshBase& _mesh = _eqn_sys.get_mesh();
-  PMLinearImplicitSystem& _pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes& _pm_system = _eqn_sys.get_system<PMSystemStokes> ("Stokes");
  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Get a reference to the Particle-Mesh linear implicit system.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -693,7 +693,7 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
   START_LOG("apply_bc_by_penalty()", "AssembleStokes");  // libMesh log
   
   // Get a reference to the Particle-Mesh linear implicit system object.
-  PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes & pm_system = _eqn_sys.get_system<PMSystemStokes> ("Stokes");
   std::vector<bool> shear = pm_system.get_equation_systems().parameters.get<std::vector<bool>>("shear");
   std::vector<unsigned int> shear_direction = pm_system.get_equation_systems().parameters.get<std::vector<unsigned int>>("shear_direction");
   std::vector<Real> shear_rate = pm_system.get_equation_systems().parameters.get<std::vector<Real>>("shear_rate");

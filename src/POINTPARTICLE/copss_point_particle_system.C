@@ -248,7 +248,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
   // get stokes system from equation systems
-  PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Parameters for dynamic process
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

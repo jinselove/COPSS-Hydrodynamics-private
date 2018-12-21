@@ -33,6 +33,7 @@
 #include "libmesh/id_types.h"
 #include "libmesh/mesh.h"
 #include "libmesh/serial_mesh.h"
+#include "libmesh/equation_systems.h"
 
 #include "../pm_linear_implicit_system.h"
 #include "../elasticity_system.h"

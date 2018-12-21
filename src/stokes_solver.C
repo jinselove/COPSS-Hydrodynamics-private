@@ -36,7 +36,7 @@ EXTERN_C_FOR_PETSC_BEGIN
 EXTERN_C_FOR_PETSC_END
 
 
-// Local includes libmesh headers
+// libmesh headers
 #include "libmesh/libmesh_config.h"
 #include "libmesh/dof_map.h"
 #include "libmesh/system.h"
@@ -45,8 +45,8 @@ EXTERN_C_FOR_PETSC_END
 #include "libmesh/petsc_vector.h"
 #include "libmesh/petsc_linear_solver.h"
 
-
-#include "pm_linear_implicit_system.h"
+// local header 
+#include "pm_system_stokes.h"
 
 using namespace libMesh;
 
@@ -122,7 +122,7 @@ void StokesSolver::init_ksp_solver()
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Get a reference to the system Matrix
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  PMLinearImplicitSystem & system = _equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes & system = _equation_systems.get_system<PMSystemStokes> ("Stokes");
   PetscMatrix<Number>* matrix     = cast_ptr<PetscMatrix<Number>*>( system.matrix );
   //this->petsc_view_matrix( matrix->mat() );
   
@@ -206,7 +206,7 @@ void StokesSolver::solve()
    Get a reference to the Particle-Mesh linear implicit system object,
    and the assembled matrix and the rhs vector, solution
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  PMLinearImplicitSystem & system = _equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes & system = _equation_systems.get_system<PMSystemStokes> ("Stokes");
   PetscVector<Number>*      rhs   = cast_ptr<PetscVector<Number>*>( system.rhs );
   NumericVector<Number>& sol_in   = *(system.solution);
   PetscVector<Number>* solution   = cast_ptr<PetscVector<Number>*>( &sol_in );

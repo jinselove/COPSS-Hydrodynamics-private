@@ -614,9 +614,9 @@ EquationSystems Copss::create_equation_systems()
   //equation_systems = new EquationSystems(*mesh);
   cout << "==>(1/8) Initialize equation_systems object using the 'mesh' we created before" <<endl;
   EquationSystems equation_systems(*mesh);
-  // Add 'Stokes' system (of PMLinearImplicitSystem) to the 'equation_systems'
-  cout << "==>(2/8) Add 'Stokes' system (of PMLinearImplicitSystem) to the 'equation_systems'" <<endl;
-  PMLinearImplicitSystem& system = equation_systems.add_system<PMLinearImplicitSystem> ("Stokes");
+  // Add 'Stokes' system (of PMSystemStokes) to the 'equation_systems'
+  cout << "==>(2/8) Add 'Stokes' system (of PMSystemStokes) to the 'equation_systems'" <<endl;
+  PMSystemStokes& system = equation_systems.add_system<PMSystemStokes> ("Stokes");
   cout << "==>(3/8) Add variables to 'Stokes' system" <<endl;
   //Add variables to 'Stokes' system"
   u_var = system.add_variable ("u", SECOND);
@@ -787,7 +787,7 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
 void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
 {
    // get stokes system from equation systems
-  PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Compute undisturbed velocity field without particles.
    NOTE: We MUST re-init particle-mesh before solving Stokes
@@ -800,7 +800,7 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
     point_mesh->print_point_info();
   }
   reinit_stokes = true;
-  system.solve_stokes("undisturbed",reinit_stokes);
+  system.solve("undisturbed",reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    write out the equation systems at Step 0 (undisturbed field)
@@ -860,7 +860,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
 //  PerfLog perf_log("integration");
   // get stokes system from equation systems
-  PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -891,9 +891,9 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 //  perf_log.pop("compute_point_velocity undisturbed");
 
   reinit_stokes = false;
-//  perf_log.push("solve_stokes disturbed");
-  system.solve_stokes("disturbed",reinit_stokes); // Using StokesSolver
-//  perf_log.pop("solve_stokes disturbed");
+//  perf_log.push("solve disturbed");
+  system.solve("disturbed",reinit_stokes); // Using StokesSolver
+//  perf_log.pop("solve disturbed");
 
   // compute distrubed velocity of points
 //  perf_log.push("compute_point_velocity disturbed");
@@ -1138,7 +1138,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       system.reinit_hi_system(neighbor_list_update_flag);
       system.compute_point_velocity("undisturbed", vel0);
       reinit_stokes = false;
-      system.solve_stokes("disturbed",reinit_stokes);   // solve the disturbed solution
+      system.solve("disturbed",reinit_stokes);   // solve the disturbed solution
       system.compute_point_velocity("disturbed", vel1);
       for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
       brownian_sys->vector_transform(vel1, &U0, "forward"); // (U0+U1)_mid
@@ -1182,7 +1182,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
   // get stokes system from equation systems
-  PMLinearImplicitSystem& system = equation_systems.get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
   if(i>0){
     system.update();
     if(update_neighbor_list_everyStep){

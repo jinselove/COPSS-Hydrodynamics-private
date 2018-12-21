@@ -31,7 +31,7 @@
 
 
 // ======================================================================
-AnalyticalSolution::AnalyticalSolution(PMLinearImplicitSystem& pm_system)
+AnalyticalSolution::AnalyticalSolution(PMSystemStokes& pm_system)
 : _pm_system(pm_system)
 {
   // Do nothing

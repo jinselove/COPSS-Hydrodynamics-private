@@ -199,7 +199,7 @@ public:
    * Return the exact solution of Stokes eqn for any given
    * point \pt0 in an unbounded domain.
    */
-  const std::vector<Real> exact_solution(const Point& pt0) const;
+  //const std::vector<Real> exact_solution(const Point& pt0) const;
 
 
   /*

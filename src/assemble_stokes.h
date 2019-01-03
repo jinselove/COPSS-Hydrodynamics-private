@@ -120,6 +120,11 @@ public:
                            const Real& alpha,
                            DenseVector<Number>& Fe) override;
 
+    /*! \brief select sides on the boundary for all elements
+    *
+    */
+    void select_boundary_side(const Elem* elem) override;               
+
   /*! \brief Apply BCs by penalty method.
 
   */

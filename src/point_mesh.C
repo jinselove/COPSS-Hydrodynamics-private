@@ -902,7 +902,7 @@ void PointMesh<KDDim>::reinit(const bool& with_hi,
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     if(with_hi){
       this->build_elem_neighbor_list();
-    }    
+    }
     // after reinit neighbor list, set the flag to false
     neighbor_list_update_flag = false;
   } // end if (reinit_neighbor_list)

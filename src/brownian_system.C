@@ -53,8 +53,8 @@ PetscErrorCode _MatMult_Stokes(Mat M,Vec f,Vec u)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   ierr = MatShellGetContext(M,&shell_ctx);    CHKERRQ(ierr);
   BrownianSystem& brownian_sys      = *(BrownianSystem*)shell_ctx;
-  PMLinearImplicitSystem & pm_system =
-  brownian_sys.get_equation_systems().get_system<PMLinearImplicitSystem> ("Stokes");
+  PMSystemStokes & pm_system =
+  brownian_sys.get_equation_systems().get_system<PMSystemStokes> ("Stokes");
   std::vector<PointParticle*> particles  = pm_system.point_mesh()->particles();
   unsigned int  _n_points     = pm_system.point_mesh()->num_particles();
   unsigned int _dim = pm_system.get_mesh().mesh_dimension();
@@ -85,7 +85,7 @@ PetscErrorCode _MatMult_Stokes(Mat M,Vec f,Vec u)
    Solve the Stokes equation to obtain the particle velocity vector pv
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   const bool reinit_stokes = !( pm_system.stokes_solver().is_ksp_initialized() );
-  pm_system.solve_stokes("disturbed", reinit_stokes);
+  pm_system.solve("disturbed", reinit_stokes);
   std::vector<Real> pvelocity(_dim*_n_points,0);
   pm_system.compute_point_velocity("disturbed", pvelocity);
   MPI_Barrier( PETSC_COMM_WORLD );
@@ -126,7 +126,7 @@ BrownianSystem::BrownianSystem(EquationSystems& es)
 : ParallelObject (es),
   _equation_systems(es)
 {
-  PMLinearImplicitSystem & _pm_system = es.get_system<PMLinearImplicitSystem>("Stokes");
+  PMSystemStokes & _pm_system = es.get_system<PMSystemStokes>("Stokes");
   _point_mesh = _pm_system.point_mesh();
   _n_points     = _point_mesh->num_particles();
   _fixes = _pm_system.fixes();

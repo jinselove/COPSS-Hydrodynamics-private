@@ -133,7 +133,7 @@ public:
   /*! \brief select sides on the boundary for all elements
    *
    */
-  void select_boundary_side(const Elem* elem);
+  virtual void select_boundary_side(const Elem* elem) = 0;
 
 
   /*! \brief Universal function to penalize element matrix or vector with a large number.
@@ -169,6 +169,7 @@ protected:
   // this matrix stores the product of JxW[qp] * phi[k][qp]
   // size = num_elem * (n_u_dofs * n_quad_points)
   std::vector<std::vector<Real>> _int_force;
+
 
   // vector stores q_xyz size
   // size = num_elem * q_xyz.size()

@@ -53,7 +53,7 @@
 #include "point_particle.h"
 #include "particle_mesh.h"
 #include "point_mesh.h"
-#include "pm_linear_implicit_system.h"
+#include "pm_system_stokes.h"
 #include "brownian_system.h"
 #include "pm_periodic_boundary.h"
 #include "chebyshev.h"
@@ -330,11 +330,11 @@ protected:
   void read_physical_info(); 
   virtual void read_particle_info() = 0;
   void read_domain_info(); 
-  void read_force_info(); 
-  virtual void read_ggem_info() = 0; 
-  void read_stokes_solver_info(); 
-  void read_chebyshev_info(); 
-  void read_run_info(); 
+  void read_force_info();
+  virtual void read_ggem_info() = 0;
+  void read_stokes_solver_info();
+  void read_chebyshev_info();
+  void read_run_info();
   void read_restart_time();
   void read_restart_eigenvalue();
 

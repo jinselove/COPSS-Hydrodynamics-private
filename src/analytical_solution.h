@@ -25,7 +25,7 @@
 
 #include "libmesh/reference_counted_object.h"
 
-#include "pm_linear_implicit_system.h"
+#include "pm_system_stokes.h"
 
 //namespace libMesh
 //{
@@ -45,7 +45,7 @@ public:
   /*! \brief Constructor
 
   */
-  AnalyticalSolution(PMLinearImplicitSystem& pm_system);
+  AnalyticalSolution(PMSystemStokes& pm_system);
 
 
   /*! \brief Destructor
@@ -78,7 +78,7 @@ private:
   /*! private member
    *
   */  
-  PMLinearImplicitSystem& _pm_system;
+  PMSystemStokes& _pm_system;
 
 }; // end of class defination
 

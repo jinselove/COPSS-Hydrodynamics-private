@@ -100,7 +100,12 @@ void AssembleSystem::select_boundary_side(const Elem* elem)
   START_LOG("select_boundary_side()", "AssembleSystem");
 
   // Get a reference to the Particle-Mesh linear implicit system object.
-  PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
+  // PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
+  if (_eqn_sys.n_systems() == 0){
+      libmesh_error_msg("ERROR: There are no subsystems in equation_systems. Exiting...");
+      libmesh_error();
+  }
+  PMLinearImplicitSystem& pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> (0);
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::vector<bool>& inlet_direction = pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
   const std::size_t elem_id = elem->id();
@@ -112,7 +117,7 @@ void AssembleSystem::select_boundary_side(const Elem* elem)
     bool apply_bc = false;
     if (elem->neighbor(s) == NULL)
     {
-      apply_bc = true; 
+      apply_bc = true;
       // if this side is on the periodic side or pressure side, don't apply penalty
       for (int i = 0; i < _dim; i++)
       {
@@ -121,7 +126,7 @@ void AssembleSystem::select_boundary_side(const Elem* elem)
               _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
           { apply_bc = false; }
         }
-      }   
+      }
     }
     if (apply_bc) _boundary_sides[elem_id].push_back(s);
   }
@@ -141,7 +146,7 @@ void AssembleSystem::penalize_elem_matrix_vector(DenseMatrix<Number>& Ke,
                                                  const Real& value)
 {
   START_LOG("penalize_elem_matrix_vector()", "AssembleSystem");
-  
+
   // Penalize Matrix or vector.
   // n_nodes_elem: number of nodes in an element
   const unsigned int n = local_node_id;
@@ -164,6 +169,6 @@ void AssembleSystem::penalize_elem_matrix_vector(DenseMatrix<Number>& Ke,
     libmesh_assert("*** ---> invalid argument: matrix_or_vector!");
     libmesh_error();
   }
-  
+
   STOP_LOG("penalize_elem_matrix_vector()", "AssembleSystem");
 }

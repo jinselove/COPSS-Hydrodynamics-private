@@ -126,7 +126,7 @@ public:
   virtual void write_equation_systems(const std::size_t time_step,
                                       const std::string& output_filename,
                                       const std::string& output_format) = 0;
- 
+
 
   /*
    * Attach PointMesh
@@ -152,28 +152,6 @@ public:
    */
   ParticleMesh<3>* particle_mesh(){  return _particle_mesh;  };
   ParticleMesh<3>* particle_mesh() const {  return _particle_mesh;  };
-
-
-  /*
-   * Re-init particle mesh, including:
-   * (1) reinit() reinit point particles
-   *              build_particle_neighbor_list()
-   *              build_elem_neighbor_list()
-   * (2) update the mesh of each finite sized particle if there are;
-   * (3) compute particle force (by force field)
-   *             modify the force field according to the vel_last_step.
-   */
-  void reinit_hi_system(bool& neighbor_list_update_flag);
-
-
-  /*
-   * Re-init free-draining system, including:
-   * (1) reinit() reinit point particles
-   *              build_particle_neighbor_list()
-   * (2) compute particle force (by force field)
-   *             modify the force field according to the vel_last_step.
-   */
-  void reinit_fd_system(bool& neighbor_list_update_flag);
 
 
   /*

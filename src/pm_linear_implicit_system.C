@@ -60,91 +60,6 @@ PMLinearImplicitSystem::~PMLinearImplicitSystem()
   // Clear the parent data
   LinearImplicitSystem::clear();
 }
- 
-
-
-// ==================================================================================
-void PMLinearImplicitSystem::reinit_hi_system(bool& neighbor_list_update_flag)
-{
-  //PerfLog perf_log("reinit_hi_system");
-  START_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
-  this->comm().barrier(); // Is this at the beginning or the end necessary?
-  // reinit point-mesh system, including
-  // (1) build the point-point neighbor list according to search radius;
-  // (2) build the element-point neighbor list according to search radius;
-  // (3) evaluate forces
-  //perf_log.push("reinit point_mesh");
-  const bool with_hi = true;
-  _point_mesh->reinit(with_hi, neighbor_list_update_flag);  
-  //perf_log.pop("reinit point_mesh");
-  //perf_log.push("fix compute");
-  // update the tracking points position on the mesh if needed
-  if(_particle_mesh != NULL){
-    // update node positions on particle mesh using updated point mesh information
-    _point_mesh->update_particle_mesh(_particle_mesh);
-    // zero force density of each rigid particle
-    _particle_mesh->zero_node_force();
-    // need to check if particles are on the pbc, if so, rebuild the particle mesh
-    _fixes[0]->check_pbc_pre_fix();
-    // compute forces on surface nodes
-    for (std::size_t i = 0; i < _fixes.size(); i++){
-     // _fixes[i]->print_fix();
-      _fixes[i]->compute();
-    }
-    // sync forces on nodes to PointParticles in point mesh 
-    _fixes[0] -> sync_node_to_pointmesh();
-    // need to restore particle mesh after applying all fixes if particles are on pbc
-    _fixes[0]->check_pbc_post_fix();
-  }
-  else
-  {
-    for (std::size_t i = 0; i < _fixes.size(); i++){
-      _fixes[i]->compute();
-    }
-  }
-  //perf_log.pop("fix compute");
-  STOP_LOG("reinit_hi_system()", "PMLinearImplicitSystem");
-}
-
-
-
-// ==================================================================================
-void PMLinearImplicitSystem::reinit_fd_system(bool& neighbor_list_update_flag)
-{
-  START_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
-  this->comm().barrier(); // Is this at the beginning or the end necessary?
-  
-  // reinit point-mesh system, including
-  // (1) build the point-point neighbor list according to search radius;
-  // (2) set the elem_id and proc_id for points
-  const bool with_hi = false;
-  _point_mesh->reinit(with_hi, neighbor_list_update_flag);  
-  // update the tracking points position on the mesh if needed
-  if(_particle_mesh != NULL){
-    // update node positions on particle mesh using updated point mesh information
-    _point_mesh->update_particle_mesh(_particle_mesh);
-    // zero force density of each rigid particle
-    _particle_mesh->zero_node_force();
-    // need to check if particles are on the pbc, if so, rebuild the particle mesh
-    _fixes[0]->check_pbc_pre_fix();
-    // compute forces on surface nodes
-    for (std::size_t i = 0; i < _fixes.size(); i++){
-      _fixes[i]->compute();
-    }
-    // sync forces on nodes to PointParticles in point mesh
-    _fixes[0] -> sync_node_to_pointmesh();
-    // need to restore particle mesh after applying all fixes if particles are on pbc
-    _fixes[0]->check_pbc_post_fix();
-  }
-  else
-  {
-    for (std::size_t i = 0; i < _fixes.size(); i++){
-      _fixes[i]->compute();
-    }
-  }   
-
-  STOP_LOG("reinit_fd_system()", "PMLinearImplicitSystem");
-}
 
 
 
@@ -161,7 +76,7 @@ void PMLinearImplicitSystem::write_out_single_particle(const Point& coords,
   std::string filename = "single_particle_history.txt";
   std::ofstream outfile;
   int o_width = 15, o_precision = 9;
-  
+
   // the first step, ios_base::out, File open for writing
   if(i_step<=0)
   {
@@ -169,7 +84,7 @@ void PMLinearImplicitSystem::write_out_single_particle(const Point& coords,
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
     outfile.precision(o_precision);   outfile.width(o_width/3);
     if( this->comm().rank()==0 ) outfile << i_step << "  " << time;
-    
+
     for ( std::size_t i=0; i<dim; ++i )
     {
       outfile.setf(std::ios::right);  outfile.setf(std::ios::fixed);
@@ -184,7 +99,7 @@ void PMLinearImplicitSystem::write_out_single_particle(const Point& coords,
     }
     if( this->comm().rank()==0 ) outfile << "\n";
   }
-  
+
   // the following steps, ios_base::app, output operations happen at the end of the file,
   // appending to its existing contents.
   if(i_step>0)
@@ -193,7 +108,7 @@ void PMLinearImplicitSystem::write_out_single_particle(const Point& coords,
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
     outfile.precision(o_precision);   outfile.width(o_width);
     if( this->comm().rank()==0 ) outfile << i_step << "  " << time;
-    
+
     for ( std::size_t i=0; i<dim; ++i )
     {
       outfile.setf(std::ios::right);  outfile.setf(std::ios::fixed);
@@ -208,11 +123,11 @@ void PMLinearImplicitSystem::write_out_single_particle(const Point& coords,
     }
     if( this->comm().rank()==0 ) outfile << "\n";
   }
-  
+
   // close the file
   outfile.close();
   this->comm().barrier();
-  
+
   STOP_LOG("write_out_single_particle()", "PMLinearImplicitSystem");
 }
 
@@ -226,26 +141,26 @@ void PMLinearImplicitSystem::write_out_point_coordinate(Vec* vin,
                                                         const std::string& openmode) const
 {
   START_LOG("write_out_particle_coordinate()", "PMLinearImplicitSystem");
-  
+
   VecScatter ctx;
   Vec vout;
   const PetscScalar     *px;
-  
+
   //  PetscPrintf(PETSC_COMM_WORLD,"--->test in write_out_particle_coordinate vin = \n");
   //  VecView(*vin,PETSC_VIEWER_STDOUT_WORLD);  // View the random vector
-  
+
   VecScatterCreateToZero(*vin,&ctx,&vout);
   VecScatterBegin(ctx,*vin,vout,INSERT_VALUES,SCATTER_FORWARD);
   VecScatterEnd(ctx,*vin,vout,INSERT_VALUES,SCATTER_FORWARD);
   VecGetArrayRead(vout,&px);
-  
+
   //  PetscPrintf(PETSC_COMM_WORLD,"--->test in write_out_particle_coordinate vout = \n");
   //  VecView(vout,PETSC_VIEWER_STDOUT_WORLD);  // View the random vector
-  
+
   //
   const std::size_t NP = _point_mesh->num_particles();
   const std::size_t dim = this->get_mesh().mesh_dimension();
-  
+
   std::ofstream outfile;
   const int o_width = 5, o_precision = 9;
   if(this->comm().rank()==0)
@@ -260,7 +175,7 @@ void PMLinearImplicitSystem::write_out_point_coordinate(Vec* vin,
       outfile.open(filename,std::ios_base::app);
     }
     // end of if-else
-    
+
     if(istep==0) outfile << NP << "\n";
     outfile << "Step " << istep << " time = " <<time<< "\n";
     for (std::size_t i=0; i<NP; ++i)
@@ -277,28 +192,28 @@ void PMLinearImplicitSystem::write_out_point_coordinate(Vec* vin,
       }
       outfile << "\n";
     }
-    
+
     outfile << "End Step " << istep << "\n\n";
     outfile.close();
   }
- 
+
   // restore vector and destroy ctx
   VecRestoreArrayRead(vout,&px);
   VecScatterDestroy(&ctx);
   VecDestroy(&vout);
- 
+
   STOP_LOG("write_out_particle_coordinate()", "PMLinearImplicitSystem");
 }
 
 
- 
+
 // ==================================================================================
 void PMLinearImplicitSystem::write_point_csv(const std::string& filename,
                                              const std::vector<Real>& pv,
                                              const bool write_velocity) const
 {
   START_LOG("write_point_csv()", "PMLinearImplicitSystem");
-  
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Write out the CSV file on the 0-th processor
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -313,7 +228,7 @@ void PMLinearImplicitSystem::write_point_csv(const std::string& filename,
     if(write_velocity)
       outfile << ",  Vx,      "<< "Vy,       "<< "Vz,      "<< "Vmag ";
     outfile << "\n";
-    
+
     for (std::size_t i=0; i<NP; ++i)
     {
       // write the point id and coordinates
@@ -327,7 +242,7 @@ void PMLinearImplicitSystem::write_point_csv(const std::string& filename,
         outfile.precision(o_precision);   outfile.width(o_width);
         outfile << ",  "<< xyz;
       } // end for j-loop
-      
+
       // write the point velocity if needed
       if(write_velocity)
       {
@@ -343,12 +258,12 @@ void PMLinearImplicitSystem::write_point_csv(const std::string& filename,
         Vmag = std::sqrt(Vmag);
         outfile << ",  "<< Vmag;
       }
-      
+
       outfile << "\n";
     }
     outfile.close();
   }
- 
+
   STOP_LOG("write_point_csv()", "PMLinearImplicitSystem");
 }
 
@@ -364,9 +279,9 @@ PetscErrorCode PMLinearImplicitSystem::write_point_csv(const std::string& filena
   PetscErrorCode    ierr;
   PetscFunctionBeginUser;
   START_LOG ("write_point_csv()", "PMLinearImplicitSystem");
-  
+
   std::vector<Real> std_vec;
-  
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Get the Ownership range and local components, then copy to a std::vector!
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -376,18 +291,18 @@ PetscErrorCode PMLinearImplicitSystem::write_point_csv(const std::string& filena
     ierr = VecGetOwnershipRange(*petsc_vec,&low,&high); CHKERRQ(ierr);
     ierr = VecGetLocalSize(*petsc_vec,&nlocal);         CHKERRQ(ierr);
     ierr = VecGetArray(*petsc_vec,&pv);                 CHKERRQ(ierr);
-    
+
     std_vec.resize( (std::size_t)nlocal );
     for(int i=0; i<nlocal; ++i) std_vec[i] = pv[i];
     this->comm().allgather(std_vec);
     ierr = VecRestoreArray(*petsc_vec,&pv);             CHKERRQ(ierr);
   }
-  
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Call the member function to write out point CSV file
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   this->write_point_csv(filename, std_vec, write_velocity);
-  
+
   STOP_LOG("write_point_csv()", "PMLinearImplicitSystem");
   PetscFunctionReturn(0);
 }

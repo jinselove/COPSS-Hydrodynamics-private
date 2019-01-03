@@ -52,9 +52,9 @@ AssembleSystem::AssembleSystem(EquationSystems& es)
 : _eqn_sys(es),
 _mesh(es.get_mesh())
 {
-  _dim = es.get_mesh().mesh_dimension();
-  _int_force.resize(1); // initialize _int_force matrix
-  _boundary_sides.resize(1); // intialize _boundary_sides matrix
+    _dim = es.get_mesh().mesh_dimension();
+    _boundary_sides.resize(1); // intialize _boundary_sides matrix
+    _int_force.resize(1); // initialize _int_force matrix
 }
 
 
@@ -90,47 +90,6 @@ void AssembleSystem::assemble_int_force(const Elem* elem,
   }
   STOP_LOG("assemble_int_force()", "AssembleSystem");
   return;
-}
-
-
-
-// ==================================================================================
-void AssembleSystem::select_boundary_side(const Elem* elem)
-{
-  START_LOG("select_boundary_side()", "AssembleSystem");
-
-  // Get a reference to the Particle-Mesh linear implicit system object.
-  // PMLinearImplicitSystem & pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
-  if (_eqn_sys.n_systems() == 0){
-      libmesh_error_msg("ERROR: There are no subsystems in equation_systems. Exiting...");
-      libmesh_error();
-  }
-  PMLinearImplicitSystem& pm_system = _eqn_sys.get_system<PMLinearImplicitSystem> (0);
-  const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
-  const std::vector<bool>& inlet_direction = pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
-  const std::size_t elem_id = elem->id();
-
-  // The following loops over the sides of the element. If the element has NO
-  // neighbors on a side then that side MUST live on a boundary of the domain.
-  for (unsigned int s=0; s<elem->n_sides(); s++)
-  {
-    bool apply_bc = false;
-    if (elem->neighbor(s) == NULL)
-    {
-      apply_bc = true;
-      // if this side is on the periodic side or pressure side, don't apply penalty
-      for (int i = 0; i < _dim; i++)
-      {
-        if(periodicity[i] or inlet_direction[i]){
-          if (_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
-              _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
-          { apply_bc = false; }
-        }
-      }
-    }
-    if (apply_bc) _boundary_sides[elem_id].push_back(s);
-  }
-  STOP_LOG("select_boundary_side()", "AssembleSystem");
 }
 
 

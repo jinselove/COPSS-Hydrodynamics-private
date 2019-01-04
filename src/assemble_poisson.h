@@ -25,33 +25,32 @@
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
- * Stokes equations.
+ * Poisson equations.
  *
- * For details of the numerical discretization, refer to
- * The finite element method in heat transfer and fluid dynamics (3rd ed)
- * J.N. Reddy and D.K. Gartling. 2010, CRC Press
+ * For details of the implementation, refer to ...
+ *
  */
 
-class AssembleStokes : public AssembleSystem
+class AssemblePoisson : public AssembleSystem
 {
 public:
   /*! \brief Constructor
 
   @param[in,out] es EquationSystem
   */
-  AssembleStokes(EquationSystems& es);
+  AssemblePoisson(EquationSystems& es);
 
 
   /*! \brief Destructor
 
   */
-  ~AssembleStokes();
+  ~AssemblePoisson();
 
 
   /*! \brief Assemble the Global Matrix K
 
-    \param[in] system_name Name of the system (should be "Stokes")
-    \param[in] Option options of assembling the system ("disturbed" or "undisturbed")
+    \param[in] system_name Name of the system (should be "NP")
+    \param[in] Option options of assembling the system
     \param[out] Ke Add element matrix to system
 
   */
@@ -61,8 +60,8 @@ public:
 
   /*! \brief Assemble the Global force vector F
 
-    @param[in] system_name Name of the system (should be "Stokes")
-    @param[in] option Options of assembling the system ("disturbed" or "undisturbed")
+    @param[in] system_name Name of the system (should be "NP")
+    @param[in] option Options of assembling the system
     @param[out] Fe Add rhs vector to system.
   */
   void assemble_global_F(const std::string& system_name,
@@ -83,31 +82,7 @@ public:
                             DenseMatrix<Number>& Kij) override;
 
 
-  /*! \brief Assemble the element matrices Q_I, i.e., kup, kvp, kwp, for pressure
-
-      These element matrices will be added to Ke after calling assemble_global_K().
-      This function only exists for Stokes equation.
-  */
-  void assemble_element_QI(const std::vector<Real>& JxW,
-                           const std::vector<std::vector<RealGradient> >& dphi,
-                           const std::vector<std::vector<Real> >& psi,
-                           const unsigned int n_v_dofs,
-                           const unsigned int n_p_dofs,
-                           const unsigned int I,
-                           DenseMatrix<Number>& Qi);
-
-
-  /*! \brief Assemble the element mass matrix M for preconditioning matrix.
-
-      This function only exists for Stokes equation.
-  */
-  void assemble_element_MIJ(const std::vector<Real>& JxW,
-                            const std::vector<std::vector<Real> >& phi,
-                            const unsigned int n_v_dofs,
-                            DenseMatrix<Number>& Mij);
-
-
-  /*! \brief Assemble function for the right-hand-side in Stokes equation.
+  /*! \brief Assemble function for the right-hand-side in NP equation.
 
       This calculates each element's contribution to the right-hand-side vector.
   */
@@ -120,12 +95,11 @@ public:
                            const Real& alpha,
                            DenseVector<Number>& Fe) override;
 
-  
+
   /*! \brief select sides on the boundary for all elements
   *
   */
   void select_boundary_side(const Elem* elem) override;
-
 
   /*! \brief Apply BCs by penalty method.
 
@@ -135,16 +109,5 @@ public:
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
                            const std::string& option) override;
-
-
-  /*! \brief Define the pressure jump at the inlet and outlet of the channel
-
-  */
-  Real boundary_pressure_jump(const std::string& which_side) const;
-
-
-  /*! \brief Define the pressure jump at the inlet and outlet of the channel
-
-  */
-  Real boundary_traction(const std::string& which_side) const;
+                           
 };

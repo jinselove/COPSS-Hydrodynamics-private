@@ -222,7 +222,7 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
 void PMSystemStokes::solve (const std::string& option,
                             const bool& re_init)
 {
-  START_LOG("solve_stokes()", "PMSystemStokes");
+  START_LOG("solve()", "PMSystemStokes");
   // PerfLog perf_log("solve_stokes");
   // Real t1, t2;
   //std::string msg = "---> solve Stokes";
@@ -261,7 +261,7 @@ void PMSystemStokes::solve (const std::string& option,
   _stokes_solver.solve();
 // perf_log.pop("solve()");
 
-  STOP_LOG("solve_stokes()", "PMSystemStokes");
+  STOP_LOG("solve()", "PMSystemStokes");
 }
 
 

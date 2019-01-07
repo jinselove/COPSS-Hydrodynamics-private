@@ -106,45 +106,44 @@ If you meet any trouble, please refer to [SLEPC installation](http://slepc.upv.e
         `cd /path/to/where/you/want/to/install/copss`
 
         `git clone https://bitbucket.org/COPSS/copss-hydrodynamics-public.git`
-
- * **On Master branch (only point particle systems are available)**
-
-
-    - Compile the codes (on Master branch)
-
-        `cd /path/to/copss/src/`
-
-        `make`
-
-
-
-    - Run an diffusion example of beads
-
-        `cd /path/to/copss/examples/general_point_particle/beads/`
-
-        `cp /path/to/copss/src/example-opt $PWD`
-
-        `cp /path/to/copss/tools/run.sh $PWD`
-
-        `bash run.sh` (You can define how many cores you want to run on in **run.sh**)
-
-	
-	You need to set up your system in **point_particle_control.in** and **datafile (e.g., point_particle_data.in)**. More details can be found in our documentation.
-
-
- * **On Development branch (both PointParticle and RigidParticle are available)**
-    - Compile the codes
  
-        `cd /path/to/copss/src/`
+ - Add the path to COPSS to system environment
+    i.e., add the following code block to ~/.bashrc and source it before moving on.
+    
+    .. code-block::
+    
+        export COPSS_DIR="/path/to/cloned/copss/directory"  (notice: don't include '/' in the end)
+    
+    for example, in my system.
+    
+    .. code-block::
+    
+        export COPSS_DIR="/scratch/midway2/jyli/bitbucket/MICCOM/copss/copss-hydrodynamics-private"
+    
 
-        `make package=POINTPARICLE (for point particle systems)  Or make package=RIGIDPARTICLE (for rigid particle systems)`
 
+ - Compile the codes
+ 
+    1) Manually compile the code
+    
+    .. code-block::
+    
+        cd /path/to/copss/src/
+        make package=POINTPARICLE (for point particle systems)  Or make package=RIGIDPARTICLE (for rigid particle systems)
+    
+    2) Use auto compilation tool
+        The compilation tool is located at **$COPSS_DIR/tools/compile.sh**. To use it, execute one of the following commands depending
+        on your purpose:
+        
+        .. code-block::
+            
+            bash compile.sh -h (For help)
+            bash compile.sh -p POINTPARTICLE (Compile PointParticle package)
+            bash compile.sh -a clean_first -p POINTPARTICLE (Compile POINTPARTICLE package after cleaning)
 
     - Run an sedimentation example of rigid particles
  
         `cd /path/to/copss/examples/general_rigid_particle/sedimentation_benchmark/`
-
-        `modify run.sh dependending on your system`
 
         `bash run.sh`
 	  

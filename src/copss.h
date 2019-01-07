@@ -60,7 +60,7 @@
 #include "pm_toolbox.h"
 #include "polymer_chain.h"
 #include "random_generator.h"
-#include "stokes_solver.h"
+#include "solver.h"
 #include "ggem_system.h"
 #include "copss_init.h"
 #include "fix/fix_factory.h"
@@ -148,7 +148,7 @@ public:
   Real schur_user_ksp_atol;
   std::string schur_pc_type;
   std::string stokes_solver_type;
-  StokesSolverType solver_type; 
+  SystemSolverType solver_type; 
 
   // Chebyshev information
   unsigned int max_n_cheb; // max order of Chebyshev polynomianl 

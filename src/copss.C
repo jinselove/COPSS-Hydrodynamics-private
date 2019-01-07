@@ -892,7 +892,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 
   reinit_stokes = false;
 //  perf_log.push("solve disturbed");
-  system.solve("disturbed",reinit_stokes); // Using StokesSolver
+  system.solve("disturbed",reinit_stokes); // Using SolverStokes
 //  perf_log.pop("solve disturbed");
 
   // compute distrubed velocity of points

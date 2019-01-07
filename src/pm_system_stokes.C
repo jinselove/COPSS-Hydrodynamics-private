@@ -235,7 +235,7 @@ void PMSystemStokes::solve (const std::string& option,
     //t1 = MPI_Wtime();
 
     // set the solver type for the Stokes equation
-    const StokesSolverType solver_type  = this->get_equation_systems().parameters.get<StokesSolverType> ("solver_type");
+    const SystemSolverType solver_type  = this->get_equation_systems().parameters.get<SystemSolverType> ("solver_type");
     _stokes_solver.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver

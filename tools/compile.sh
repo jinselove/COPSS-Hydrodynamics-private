@@ -4,15 +4,15 @@ s=$(printf "%-80s" "*")
 echo "${s// /*}"
 
 ### Find COPSS Source folder
-if [ "$COPSS_SRC" != "" ]; then
-  echo "COPSS source library found at $COPSS_SRC"
+if [ "$COPSS_DIR" != "" ]; then
+  echo "COPSS directory found at $COPSS_DIR"
 else
   echo "COPSS source library not found. Exiting..."
-  echo "Suggestion: please add 'export COPSS_SRC=[/path/to/COPSS/SOURCE/DIRECTORY]' to\
+  echo "Suggestion: please add 'export COPSS_DIR=[/path/to/COPSS/DIRECTORY]' to\
 your environment, e.g., .bashrc file"
   exit 0
 fi
-cd $COPSS_SRC
+cd $COPSS_DIR/src
 
 
 action=""
@@ -72,7 +72,7 @@ function compile(){
   echo "${s// /*}"
   make package=$package
   # export exectuble
-  copss_exec="${COPSS_SRC}copss-$package-opt"
+  copss_exec="${COPSS_DIR}/src/copss-$package-opt"
   echo "${s// /*}"
   echo "Compilation is done, the compiled executable is at $copss_exec"
   echo "${s// /*}"

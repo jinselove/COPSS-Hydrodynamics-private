@@ -81,8 +81,10 @@ pp_ev_lj_cut defines a Lennard-Jones potential between two particle $i$ and $j$.
 Then the lj force:
 
    if  $R\ *{size} <=  r*\ {cut}$:
-   $\vec{f}\ *{ij} = -24 * \epsilon * (2*(\frac{\sigma}{r*\ {ij}})^{12} - (\frac{\sigma}{r_{ij}})^{6} )$
+   $\vec{f}\ *{ij} = -24 * \epsilon * (2*(\frac{\sigma}{r*\ {ij}})^{12} - (\frac{\sigma}{r_{ij}})^{6} ) * r_{ij} / r_{ij}^2$
+
    $\vec{f}\ *i  += \vec{f}*\ {ij}$
+
    else:
    $\vec{f}_i  += \vec{0}$
 
@@ -103,9 +105,11 @@ $r_{cut}$ is set to be the equilibrium length where lj force is zero:
 Then the repulsive lj force:
 
    if  $R\ *{size} <=  r*\ {cut}$:
-   $\vec{f}\ *{ij} = -24 * \epsilon * (2*(\frac{\sigma}{r*\ {ij}})^{12} - (\frac{\sigma}{r_{ij}})^{6} )$
+   $\vec{f}\ *{ij} = -24 * \epsilon * (2*(\frac{\sigma}{r*\ {ij}})^{12} - (\frac{\sigma}{r_{ij}})^{6} ) * r_{ij} / r_{ij}^2$
+
    $\vec{f}\ *i  += \vec{f}*\ {ij}$
-   else
+
+   else:
    $\vec{f}_i  += \vec{0}$
 
 
@@ -226,8 +230,10 @@ pw_ev_lj_cut defines a Lennard-Jones potential between particle $i$ and the wall
 Then the lj force:
 
    if  $R\ *{size} <=  r*\ {cut}$:
-   $\vec{f}\ *{iw} = -24 * \epsilon * (2*(\frac{\sigma}{r*\ {iw}})^{12} - (\frac{\sigma}{r_{iw}})^{6} )$
+   $\vec{f}\ *{iw} = -24 * \epsilon * (2*(\frac{\sigma}{r*\ {iw}})^{12} - (\frac{\sigma}{r_{iw}})^{6} ) * r_{iw} / r_{iw}^2$
+
    $\vec{f}\ *i  += \vec{f}*\ {iw}$
+
    else:
    $\vec{f}_i  += \vec{0}$
 
@@ -246,8 +252,10 @@ $r_{cut}$ is set to be the equilibrium length where lj force is zero:
 Then the repulsive lj force:
 
    if  $R\ *{size} <=  r*\ {cut}$:
-   $\vec{f}\ *{iw} = -24 * \epsilon * (2*(\frac{\sigma}{r*\ {iw}})^{12} - (\frac{\sigma}{r_{iw}})^{6} )$
+   $\vec{f}\ *{iw} = -24 * \epsilon * (2*(\frac{\sigma}{r*\ {iw}})^{12} - (\frac{\sigma}{r_{iw}})^{6} ) * r_{iw} / r_{iw}^2$
+
    $\vec{f}\ *i  += \vec{f}*\ {iw}$
+
    else:
    $\vec{f}_i  += \vec{0}$
 

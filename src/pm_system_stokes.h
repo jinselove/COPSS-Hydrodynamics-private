@@ -23,7 +23,7 @@
 
 // Local Includes -----------------------------------
 #include "assemble_stokes.h"
-#include "stokes_solver.h"
+#include "solver_stokes.h"
 #include "pm_linear_implicit_system.h"
 
 namespace libMesh
@@ -145,9 +145,9 @@ public:
 
 
   /*
-   * Return the StokesSolver
+   * Return the SolverStokes
    */
-  StokesSolver& stokes_solver() { return _stokes_solver;  }
+  SolverStokes& stokes_solver() { return _stokes_solver;  }
 
 
   /**
@@ -238,7 +238,7 @@ public:
 private:
 
   // Stokes solver
-  StokesSolver _stokes_solver;
+  SolverStokes _stokes_solver;
 
   // Assemble Stokes system
   AssembleStokes* _assemble_stokes;

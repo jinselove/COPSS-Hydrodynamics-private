@@ -181,7 +181,7 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>("schur_user_ksp_rtol") = schur_user_ksp_rtol;
   equation_systems.parameters.set<Real>("schur_user_ksp_atol") = schur_user_ksp_atol;
   equation_systems.parameters.set<string>    ("schur_pc_type") = schur_pc_type;
-  equation_systems.parameters.set<StokesSolverType> ("solver_type") = solver_type;
+  equation_systems.parameters.set<SystemSolverType> ("solver_type") = solver_type;
   equation_systems.parameters.set<Real>              ("alpha") = alpha;
   equation_systems.parameters.set<Real>         ("kBT")        = kBT;
   equation_systems.parameters.set<Real>         ("ibm_beta")   = ibm_beta;

@@ -23,7 +23,7 @@
 
 // Local Includes -----------------------------------
 #include "assemble_poisson.h"
-#include "stokes_solver.h"
+#include "solver_stokes.h"
 #include "pm_linear_implicit_system.h"
 
 namespace libMesh
@@ -96,14 +96,14 @@ public:
   // /*
   //  * Return the NPSolver
   //  */
-  StokesSolver& poisson_solver() { return _poisson_solver;  }
+  SolverStokes& poisson_solver() { return _poisson_solver;  }
 
 
 
 private:
 
   // // Stokes solver
-  StokesSolver _poisson_solver;
+  SolverStokes _poisson_solver;
 
   // Assemble Stokes system
   AssemblePoisson* _assemble_poisson;

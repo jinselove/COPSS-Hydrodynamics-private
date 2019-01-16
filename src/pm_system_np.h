@@ -23,7 +23,7 @@
 
 // Local Includes -----------------------------------
 #include "assemble_nernst_planck.h"
-#include "stokes_solver.h"
+#include "solver_stokes.h"
 #include "pm_linear_implicit_system.h"
 
 namespace libMesh
@@ -96,14 +96,14 @@ public:
   // /*
   //  * Return the NPSolver
   //  */
-  StokesSolver& np_solver() { return _np_solver;  }
+  SolverStokes& np_solver() { return _np_solver;  }
 
 
 
 private:
 
   // // Stokes solver
-  StokesSolver _np_solver;
+  SolverStokes _np_solver;
 
   // Assemble Stokes system
   AssembleNP* _assemble_np;

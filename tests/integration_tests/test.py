@@ -59,12 +59,20 @@ compile_tool = copss_dir + "/tools/compile.sh"
 if os.path.isfile(compile_tool):
     start = time.time()
     print("--"*2 + "Recompiling copss-POINTPARTICLE-opt")
-    subprocess.call("bash " + compile_tool + " -p "+ "POINTPARTICLE", shell=True,
+    returnvalue = subprocess.call("bash " + compile_tool + " -p "+ "POINTPARTICLE", shell=True,
                     stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    if returnvalue != 0:
+            print("--"*2 + "Error: Compilation exited with non-zero exit code {}".format(returnvalue))
+            sys.exit(returnvalue)
+        
     print("--"*2 + "Recompiling copss-RIGIDPARTICLE-opt")
-    subprocess.call("bash " + compile_tool + " -p "+ "RIGIDPARTICLE", shell=True,
+    returnvalue = subprocess.call("bash " + compile_tool + " -p "+ "RIGIDPARTICLE", shell=True,
                     stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    if returnvalue != 0:
+            print("--"*2 + "Error: Compilation exited with non-zero exit code {}".format(returnvalue))
+            sys.exit(returnvalue)
     end = time.time()
+    
     print("--"*1 + "Timing for Recompiling: {} s".format(end-start))
 else:
     sys.exit(0)

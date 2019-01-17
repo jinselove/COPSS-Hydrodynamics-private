@@ -34,7 +34,7 @@
 
 // particle-mesh header files
 #include "pm_toolbox.h"
-#include "ggem_system.h"
+// #include "ggem_system.h"
 #include "brownian_system.h"
 #include "pm_linear_implicit_system.h"
 #include "analytical_solution.h"

@@ -61,7 +61,6 @@
 #include "polymer_chain.h"
 #include "random_generator.h"
 #include "solver.h"
-#include "ggem_system.h"
 #include "copss_init.h"
 #include "fix/fix_factory.h"
 #include "fix/fix.h"

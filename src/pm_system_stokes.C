@@ -34,7 +34,7 @@
 
 // local header files
 #include "pm_toolbox.h"
-#include "ggem_system.h"
+#include "ggem_stokes.h"
 #include "brownian_system.h"
 #include "analytical_solution.h"
 #include "pm_system_stokes.h"
@@ -701,8 +701,8 @@ std::vector<Number> PMSystemStokes::local_velocity_fluid(const Point &p,
   }
 
   // compute the local velocity corresponding to the unbounded domain
-  GGEMSystem ggem_sys;
-  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,p,alpha, ibm_beta, mu,bead_r0,
+  GGEMStokes ggem_stokes;
+  std::vector<Real> Ulocal = ggem_stokes.local_velocity_fluid(_point_mesh,p,alpha, ibm_beta, mu,bead_r0,
                                                            hmin,dim,force_type);
 
   STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
@@ -741,8 +741,8 @@ std::vector<Number> PMSystemStokes::local_velocity_fluid(const Elem* elem,
   }
 
   // compute the local velocity corresponding to the unbounded domain
-  GGEMSystem ggem_sys;
-  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,elem,p,alpha,ibm_beta, mu,bead_r0,
+  GGEMStokes ggem_stokes;
+  std::vector<Real> Ulocal = ggem_stokes.local_velocity_fluid(_point_mesh,elem,p,alpha,ibm_beta, mu,bead_r0,
                                                            hmin,dim,force_type);
 
   STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
@@ -780,8 +780,8 @@ Point PMSystemStokes::local_velocity_bead(const std::size_t& bead_id,
   }
 
   // compute the local velocity corresponding to the unbounded domain
-  GGEMSystem ggem_sys;
-  Point Ulocal = ggem_sys.local_velocity_bead(_point_mesh,bead_id,alpha, ibm_beta, mu,bead_r0,
+  GGEMStokes ggem_stokes;
+  Point Ulocal = ggem_stokes.local_velocity_bead(_point_mesh,bead_id,alpha, ibm_beta, mu,bead_r0,
                                                           hmin,dim,force_type);
 
   STOP_LOG("local_velocity_bead()", "PMSystemStokes");
@@ -801,8 +801,8 @@ Point PMSystemStokes::global_self_exclusion(const std::size_t p_id) const
   const Real alpha   =  this->get_equation_systems().parameters.get<Real> ("alpha");
 
   // compute the global self-exclusion velocity
-  GGEMSystem ggem_sys;
-  Point self_v = ggem_sys.global_self_exclusion(_point_mesh,p_id,alpha,mu,dim);
+  GGEMStokes ggem_stokes;
+  Point self_v = ggem_stokes.global_self_exclusion(_point_mesh,p_id,alpha,mu,dim);
 
   STOP_LOG("global_self_exclusion()", "PMSystemStokes");
   return self_v;
@@ -956,7 +956,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
 //{
 //  START_LOG("exact_solution()", "PMSystemStokes");
 //
-//  // ksi's value should be consistent with that in GGEMSystem::regularization_parameter()
+//  // ksi's value should be consistent with that in GGEMStokes::regularization_parameter()
 //  const Real ksi = std::sqrt(libMesh::pi)/3.0;  // = 0.591
 //  const Real muc = 1.0/(6*libMesh::pi);
 //  const unsigned int dim = 3;
@@ -964,7 +964,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
 //  DenseMatrix<Number> GT;
 //
 //  // GGEM object and number of points in the system
-//  GGEMSystem ggem_system;
+//  GGEMStokes ggem_stokes;
 //  const std::size_t n_points = _point_mesh->num_particles();
 //
 //  // loop over each point
@@ -977,7 +977,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
 //    if(x.size()<1E-6) zero_limit  = true;
 //
 //    // use ksi instead of alpha
-//    GT = ggem_system.green_tensor_exp(x,ksi,muc,dim,zero_limit);
+//    GT = ggem_stokes.green_tensor_exp(x,ksi,muc,dim,zero_limit);
 //    const std::vector<Real> fv = _point_mesh->particles()[i]->particle_force();
 //    //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv[0],fv[1],fv[2]);
 //

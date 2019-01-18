@@ -26,11 +26,7 @@
 #include "libmesh/dense_vector.h"
 #include "libmesh/elem.h"
 #include "libmesh/point.h"
-
-
 #include "point_mesh.h"
-//#include "particle_mesh.h"
-
 
 using namespace libMesh;
 
@@ -60,7 +56,7 @@ namespace libMesh
  * point forces due to particles using mixed FEM, which 
  * is usually known as 'global' part of the solution
  *
- * This class GGEMSystem will provide the main functionalities of
+ * This class GGEMStokes will provide the main functionalities of
  * GGEM (General Geometry Ewald-like Method), and it will provide
  * the 'local' solution. Together with 'PMLI_system', this will
  * provide the complete solution for the Stokes system with
@@ -71,16 +67,16 @@ namespace libMesh
  * Green's function for 2D situation is different.
  */
   
-class GGEMSystem :  public ReferenceCountedObject<GGEMSystem>
+class GGEMStokes :  public ReferenceCountedObject<GGEMStokes>
 {
 public:
 
   // Constructor
-  GGEMSystem();
+  GGEMStokes();
   
   
   // Destructor
-  ~GGEMSystem();
+  ~GGEMStokes();
   
   
   // PI constant

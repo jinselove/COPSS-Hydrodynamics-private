@@ -19,14 +19,8 @@
 
 
 #include "libmesh/libmesh_logging.h"
-//#include "libmesh/dense_matrix.h"
-//#include "libmesh/dense_vector.h"
-//#include "libmesh/dense_submatrix.h"
-//#include "libmesh/dense_subvector.h"
-//#include "libmesh/elem.h"
-//#include "libmesh/point.h"
+#include "ggem_stokes.h"
 
-#include "ggem_system.h"
 
 
 namespace libMesh
@@ -34,7 +28,7 @@ namespace libMesh
 
 
 // ======================================================================
-GGEMSystem::GGEMSystem()
+GGEMStokes::GGEMStokes()
 {
   _kronecker_delta.resize(3, std::vector<Real>(3,0.));
   for(int i=0; i<3; i++) _kronecker_delta[i][i] = 1.;
@@ -43,7 +37,7 @@ GGEMSystem::GGEMSystem()
 
 
 // ======================================================================
-GGEMSystem::~GGEMSystem()
+GGEMStokes::~GGEMStokes()
 {
   // do nothing
 }
@@ -51,12 +45,12 @@ GGEMSystem::~GGEMSystem()
 
 
 // ======================================================================
-Real GGEMSystem::regularization_parameter(const Real& hc,
+Real GGEMStokes::regularization_parameter(const Real& hc,
                                           const Real& ibm_beta,
                                           const Real& R0,
                                           const PointType& point_type) const
 {
-  START_LOG ("regularization_parameter()", "GGEMSystem");
+  START_LOG ("regularization_parameter()", "GGEMStokes");
   
   Real val = 0.0;
   switch (point_type)
@@ -78,12 +72,12 @@ Real GGEMSystem::regularization_parameter(const Real& hc,
     }
     default:
     {
-      printf("*** error in GGEMSystem::regularization_parameter(): Undefined PointType!\n");
+      printf("*** error in GGEMStokes::regularization_parameter(): Undefined PointType!\n");
       libmesh_error();
     }
   }
   
-  STOP_LOG ("regularization_parameter()", "GGEMSystem");
+  STOP_LOG ("regularization_parameter()", "GGEMStokes");
   //printf("--->test in regularization_parameter(): ksi = %f\n", val);
   return val;
 }
@@ -91,17 +85,17 @@ Real GGEMSystem::regularization_parameter(const Real& hc,
 
 
 // ======================================================================
-Real GGEMSystem::smoothed_force_exp(const Real& r,
+Real GGEMStokes::smoothed_force_exp(const Real& r,
                                          const Real& alpha) const
 {
-  START_LOG ("smoothed_force_exp()", "GGEMSystem");
+  START_LOG ("smoothed_force_exp()", "GGEMStokes");
   
   const Real a2   = alpha*alpha,  a3 = a2*alpha;
   const Real r2   = r*r;
   const Real a2r2 = a2*r2;
   Real  force = ( a3/(pi_23) )*(2.5 - a2r2)*std::exp( -a2r2 );
   
-  STOP_LOG ("smoothed_force_exp()", "GGEMSystem");
+  STOP_LOG ("smoothed_force_exp()", "GGEMStokes");
   
   return force;
 }
@@ -109,14 +103,14 @@ Real GGEMSystem::smoothed_force_exp(const Real& r,
 
   
 // ======================================================================
-DenseMatrix<Number> GGEMSystem::green_tensor(const Point& x,
+DenseMatrix<Number> GGEMStokes::green_tensor(const Point& x,
                                              const Real& alpha,
                                              const Real& mu,
                                              const std::size_t& dim,
                                              const bool& zero_limit,
                                              const DeltaFunType& delta_type) const
 {
-  START_LOG ("green_tensor()", "GGEMSystem");
+  START_LOG ("green_tensor()", "GGEMStokes");
   
   // Compute the values according to the delta_type
   DenseMatrix<Number> GT(dim,dim);
@@ -129,29 +123,29 @@ DenseMatrix<Number> GGEMSystem::green_tensor(const Point& x,
       GT = this->green_tensor_exp(x, alpha, mu, dim, zero_limit);
       break;
     default:
-      printf("*** error in GGEMSystem::green_tensor: undefined DeltaFunType!\n");
+      printf("*** error in GGEMStokes::green_tensor: undefined DeltaFunType!\n");
       libmesh_error();
   }
   
-  STOP_LOG ("green_tensor()", "GGEMSystem");
+  STOP_LOG ("green_tensor()", "GGEMStokes");
   return GT;
 }
   
   
   
 // ======================================================================
-DenseMatrix<Number> GGEMSystem::green_tensor_exact(const Point& x,
+DenseMatrix<Number> GGEMStokes::green_tensor_exact(const Point& x,
                                                    const Real& mu,
                                                    const std::size_t& dim) const
 {
-  START_LOG ("green_tensor_exact()", "GGEMSystem");
+  START_LOG ("green_tensor_exact()", "GGEMStokes");
   
   const Real  r = x.norm(), r2  = r*r;
   const Real c0 = 1.0/(8.*PI*mu*r);
   
   // output warning if x->0
   if(r < r_eps) {
-    printf("*** warning in GGEMSystem::green_tensor_exact, \
+    printf("*** warning in GGEMStokes::green_tensor_exact, \
            r->0 which may lead to singular solution!\n");
   }
   
@@ -163,7 +157,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_exact(const Point& x,
     }
   }
   
-  STOP_LOG ("green_tensor_exact()", "GGEMSystem");
+  STOP_LOG ("green_tensor_exact()", "GGEMStokes");
   
   // done
   return G;
@@ -173,13 +167,13 @@ DenseMatrix<Number> GGEMSystem::green_tensor_exact(const Point& x,
   
 
 // ======================================================================
-DenseMatrix<Number> GGEMSystem::green_tensor_exp(const Point& x,
+DenseMatrix<Number> GGEMStokes::green_tensor_exp(const Point& x,
                                                  const Real& alpha,
                                                  const Real& mu,
                                                  const std::size_t& dim,
                                                  const bool& zero_limit) const
 {
-  START_LOG ("green_tensor_exp()", "GGEMSystem");
+  START_LOG ("green_tensor_exp()", "GGEMStokes");
   
   const Real c0 = 1.0/(8.*PI*mu);
   DenseMatrix<Number> G(dim,dim);
@@ -211,7 +205,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_exp(const Point& x,
     
   } // end if-else
   
-  STOP_LOG ("green_tensor_exp()", "GGEMSystem");
+  STOP_LOG ("green_tensor_exp()", "GGEMStokes");
   
   // done
   return G;
@@ -220,13 +214,13 @@ DenseMatrix<Number> GGEMSystem::green_tensor_exp(const Point& x,
 
   
 // ======================================================================
-DenseMatrix<Number> GGEMSystem::green_tensor_local(const Point& x,
+DenseMatrix<Number> GGEMStokes::green_tensor_local(const Point& x,
                                                    const Real& alpha,
                                                    const Real& mu,
                                                    const std::size_t& dim,
                                                    const bool& zero_limit) const
 {
-  START_LOG ("green_tensor_exp()", "GGEMSystem");
+  START_LOG ("green_tensor_exp()", "GGEMStokes");
   
   const Real c0 = 1.0/(8.*PI*mu);
   DenseMatrix<Number> G(dim,dim);
@@ -258,21 +252,21 @@ DenseMatrix<Number> GGEMSystem::green_tensor_local(const Point& x,
     
   } // end if-else
   
-  STOP_LOG ("green_tensor_exp()", "GGEMSystem");
+  STOP_LOG ("green_tensor_exp()", "GGEMStokes");
   
   // done
   return G;
 }
 
 // ======================================================================
-DenseMatrix<Number> GGEMSystem::green_tensor_regularized(const Point& x,
+DenseMatrix<Number> GGEMStokes::green_tensor_regularized(const Point& x,
                                                          const Real& alpha,
                                                          const Real& mu,
                                                          const Real& ksi,
                                                          const std::size_t& dim,
                                                          const bool& zero_limit) const
 {
-  START_LOG ("green_tensor_regularized()", "GGEMSystem");
+  START_LOG ("green_tensor_regularized()", "GGEMStokes");
   
   const Real c0 = 1.0/(8.*PI*mu);
   DenseMatrix<Number> G(dim,dim);
@@ -306,7 +300,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_regularized(const Point& x,
     
   } // end if-else
   
-  STOP_LOG ("green_tensor_regularized()", "GGEMSystem");
+  STOP_LOG ("green_tensor_regularized()", "GGEMStokes");
   
   // done
   return G;
@@ -315,7 +309,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_regularized(const Point& x,
   
   
 // ======================================================================
-DenseMatrix<Number> GGEMSystem::green_tensor_diff(const Point& x,
+DenseMatrix<Number> GGEMStokes::green_tensor_diff(const Point& x,
                                                   const Real& alpha,
                                                   const Real& mu,
                                                   const Real& ksi,
@@ -324,7 +318,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_diff(const Point& x,
                                                   const DeltaFunType& delta_type_a,
                                                   const DeltaFunType& delta_type_k) const
 {
-  START_LOG ("green_tensor_diff()", "GGEMSystem");
+  START_LOG ("green_tensor_diff()", "GGEMStokes");
   
   // Initialization
   DenseMatrix<Number> GTa(dim,dim),  GTk(dim,dim);
@@ -334,7 +328,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_diff(const Point& x,
   GTk = this->green_tensor(x, ksi,   mu, dim, zero_limit, delta_type_k);
   GTk -= GTa;
   
-  STOP_LOG ("green_tensor_diff()", "GGEMSystem");
+  STOP_LOG ("green_tensor_diff()", "GGEMStokes");
   
   // done
   return GTk;
@@ -343,7 +337,7 @@ DenseMatrix<Number> GGEMSystem::green_tensor_diff(const Point& x,
   
 
 // ======================================================================
-std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
+std::vector<Real> GGEMStokes::local_velocity_fluid(PointMesh<3>*  point_mesh,
                                                    const Point& ptx,
                                                    const Real& alpha,
                                                    const Real& ibm_beta,
@@ -353,7 +347,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
                                                    const std::size_t& dim,
                                                    const std::string& force_type) const
 {
-  START_LOG ("local_velocity_fluid()", "GGEMSystem");
+  START_LOG ("local_velocity_fluid()", "GGEMStokes");
   
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    build the particle neighbor list around the given point \p ptx
@@ -393,7 +387,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
     if(force_type == "regularized")
       GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
     else
-      libmesh_assert ("GGEMSystem::local_velocity_fluid, wrong force_type!");
+      libmesh_assert ("GGEMStokes::local_velocity_fluid, wrong force_type!");
 
     // end if-else
     
@@ -419,12 +413,12 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
   } // end for v-loop
 
   
-  STOP_LOG ("local_velocity_fluid()", "GGEMSystem");
+  STOP_LOG ("local_velocity_fluid()", "GGEMStokes");
   return u;
 }
 
 // ======================================================================
-std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
+std::vector<Real> GGEMStokes::local_velocity_fluid(PointMesh<3>*  point_mesh,
                                                    const Elem* elem,
                                                    const Point& ptx,
                                                    const Real& alpha,
@@ -435,7 +429,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
                                                    const std::size_t& dim,
                                                    const std::string& force_type) const
 {
-  START_LOG ("local_velocity_fluid()", "GGEMSystem");
+  START_LOG ("local_velocity_fluid()", "GGEMStokes");
   
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    build the particle neighbor list around the given point \p ptx
@@ -472,7 +466,7 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
     if (force_type=="regularized")
       GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
     else
-      libmesh_assert ("GGEMSystem::local_velocity_fluid, wrong force_type!");
+      libmesh_assert ("GGEMStokes::local_velocity_fluid, wrong force_type!");
     // end if-else
     
     // 2. compute the force vector of particle-v
@@ -497,13 +491,13 @@ std::vector<Real> GGEMSystem::local_velocity_fluid(PointMesh<3>*  point_mesh,
   } // end for v-loop
 
   
-  STOP_LOG ("local_velocity_fluid()", "GGEMSystem");
+  STOP_LOG ("local_velocity_fluid()", "GGEMStokes");
   return u;
 }
 
   
 // ======================================================================
-Point GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
+Point GGEMStokes::local_velocity_bead(PointMesh<3>*  point_mesh,
                                       const std::size_t& pid0,
                                       const Real&   alpha,
                                       const Real&   ibm_beta,
@@ -513,7 +507,7 @@ Point GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
                                       const std::size_t& dim,
                                       const std::string& force_type) const
 {
-  START_LOG ("local_velocity_bead()", "GGEMSystem");
+  START_LOG ("local_velocity_bead()", "GGEMStokes");
   
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Find the bead position ptx and its neighbor list, and its point type
@@ -544,7 +538,7 @@ Point GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
     if(force_type=="regularized")
       GT = this->green_tensor_regularized(x,alpha,mu,ksi,dim,zero_limit);
     else
-      libmesh_assert("GGEMSystem::local_velocity_bead, wrong force_type");
+      libmesh_assert("GGEMStokes::local_velocity_bead, wrong force_type");
     // end if-else
     
     // 2. compute the force vector of particle-v
@@ -581,20 +575,20 @@ Point GGEMSystem::local_velocity_bead(PointMesh<3>*  point_mesh,
   }
   
   
-  STOP_LOG ("local_velocity_bead()", "GGEMSystem");
+  STOP_LOG ("local_velocity_bead()", "GGEMStokes");
   return u;
 }
 
   
 
 // ======================================================================
-Point GGEMSystem::global_self_exclusion(PointMesh<3>* point_mesh,
+Point GGEMStokes::global_self_exclusion(PointMesh<3>* point_mesh,
                                                     const std::size_t&  pid0,
                                                     const Real& alpha,
                                                     const Real& mu,
                                                     const std::size_t& dim) const
 {
-  START_LOG ("self_exclusion()", "GGEMSystem");
+  START_LOG ("self_exclusion()", "GGEMStokes");
   
   // 1. compute the force vector of the particle
   const Point fv = point_mesh->particles()[pid0]->particle_force();
@@ -605,19 +599,19 @@ Point GGEMSystem::global_self_exclusion(PointMesh<3>* point_mesh,
   for (std::size_t i=0; i<dim; ++i)
     self_v(i) = c0*4.0*alpha/sqrt_pi*fv(i);
 
-  STOP_LOG ("self_exclusion()", "GGEMSystem");
+  STOP_LOG ("self_exclusion()", "GGEMStokes");
   
   return self_v;  // done and return
 }
 
 
 // ======================================================================
-DenseMatrix<Number> GGEMSystem::rpy_tensor(const Point& x,  /* vector x = pt1 - pt0 */
+DenseMatrix<Number> GGEMStokes::rpy_tensor(const Point& x,  /* vector x = pt1 - pt0 */
                                            const Real& mu,  /* viscosity */
                                            const Real& a,   /* bead radius */
                                            const std::size_t& dim) const /*dim==3*/
 {
-  START_LOG ("rpy_tensor()", "GGEMSystem");
+  START_LOG ("rpy_tensor()", "GGEMStokes");
   
   const Real  r = x.norm(), r2  = r*r, a2 = a*a;
   const Real t1 = 1.0/(8.*PI*mu*r);
@@ -652,19 +646,19 @@ DenseMatrix<Number> GGEMSystem::rpy_tensor(const Point& x,  /* vector x = pt1 - 
     } // end i-loop
   } // end if
   
-  STOP_LOG ("rpy_tensor()", "GGEMSystem");
+  STOP_LOG ("rpy_tensor()", "GGEMStokes");
   return G;
 }
 
 
   
 // ======================================================================
-DenseMatrix<Number> GGEMSystem::mobility_tensor(const Point& x,     /* vector x = pt1 - pt0 */
+DenseMatrix<Number> GGEMStokes::mobility_tensor(const Point& x,     /* vector x = pt1 - pt0 */
                                                 const Real& mu,     /* kinematic viscosity */
                                                 const Real& a,      /* bead radius */
                                                 const std::size_t& dim) const /*dim==3*/
 {
-  START_LOG ("mobility_tensor()", "GGEMSystem");
+  START_LOG ("mobility_tensor()", "GGEMStokes");
   
   const Real  r = x.norm();
   const Real t1 = 1.0/(6.*PI*mu*a);
@@ -692,7 +686,7 @@ DenseMatrix<Number> GGEMSystem::mobility_tensor(const Point& x,     /* vector x 
   }
   
   
-  STOP_LOG ("mobility_tensor()", "GGEMSystem");
+  STOP_LOG ("mobility_tensor()", "GGEMStokes");
   return M;
 }
   
@@ -708,7 +702,7 @@ DenseMatrix<Number> GGEMSystem::mobility_tensor(const Point& x,     /* vector x 
   
   //
   //// ======================================================================
-  //std::vector<Real> GGEMSystem::local_velocity(ParticleMesh<3>* point_mesh,
+  //std::vector<Real> GGEMStokes::local_velocity(ParticleMesh<3>* point_mesh,
   //                                             const Elem* elem,
   //                                             const Point& ptx,
   //                                             const Real& alpha,
@@ -717,7 +711,7 @@ DenseMatrix<Number> GGEMSystem::mobility_tensor(const Point& x,     /* vector x 
   //                                             const std::size_t& dim,
   //                                             const std::string& option)
   //{
-  //  START_LOG ("local_velocity(Elem)", "GGEMSystem");
+  //  START_LOG ("local_velocity(Elem)", "GGEMStokes");
   //
   //  // build the particle neighbor list around the element \p elem
   //  // In fact, it is not necessary to use 'sorted' neighbor list here!
@@ -745,7 +739,7 @@ DenseMatrix<Number> GGEMSystem::mobility_tensor(const Point& x,     /* vector x 
   //    else if (option=="smooth")
   //      GT = this->green_tensor_smooth(x,alpha,mu,dim);
   //    else
-  //      libmesh_assert ("GGEMSystem::local_velocity, wrong option!");
+  //      libmesh_assert ("GGEMStokes::local_velocity, wrong option!");
   //    // end if-else
   //
   //    // 2. compute the force vector of particle-v
@@ -763,7 +757,7 @@ DenseMatrix<Number> GGEMSystem::mobility_tensor(const Point& x,     /* vector x 
   //  u_mag = std::sqrt( u_mag );
   //  if ( n_list.size()>0 )// && u_mag>1e-10
   //  {
-  //    printf("------------ GGEMSystem::local_velocity(elem) -------------\n");
+  //    printf("------------ GGEMStokes::local_velocity(elem) -------------\n");
   //    printf("There are %lu neighbor particles around the element within r = %f\n",
   //           n_list.size(), point_mesh->search_radius("e") );
   //
@@ -778,7 +772,7 @@ DenseMatrix<Number> GGEMSystem::mobility_tensor(const Point& x,     /* vector x 
   //  }
   //  // -------------------------------------------------------------
   //  
-  //  STOP_LOG ("local_velocity(Elem)", "GGEMSystem");
+  //  STOP_LOG ("local_velocity(Elem)", "GGEMStokes");
   //  return u;
   //}
   

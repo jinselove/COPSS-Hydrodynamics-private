@@ -44,7 +44,6 @@
 
 // User defined header includes
 #include "analytical_solution.h"
-#include "ggem_system.h"
 #include "pm_toolbox.h"
 #include "assemble_nernst_planck.h"
 

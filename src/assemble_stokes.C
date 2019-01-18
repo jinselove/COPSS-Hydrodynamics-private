@@ -44,7 +44,7 @@
 
 // User defined header includes
 #include "analytical_solution.h"
-#include "ggem_system.h"
+#include "ggem_stokes.h"
 #include "pm_toolbox.h"
 #include "assemble_stokes.h"
 
@@ -528,7 +528,7 @@ void AssembleStokes::compute_element_rhs(const Elem* elem,
   if( pf_flag && (option == "disturbed") )
   {
     // get the location of points in the neighbor list
-    GGEMSystem ggem_sys;
+    GGEMStokes ggem_stokes;
     const std::size_t n_pts = n_list.size();
     // Now we will build the element RHS using high order gauss quadrature.
     // first loop over all neighboring particles near this element
@@ -544,7 +544,7 @@ void AssembleStokes::compute_element_rhs(const Elem* elem,
       // distance from Gaussian point to the force point
         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
         // evaluate the value of gauss force at this quad pt.
-        force_val = ggem_sys.smoothed_force_exp(r, alpha);
+        force_val = ggem_stokes.smoothed_force_exp(r, alpha);
         for (unsigned int j=0; j<_dim; ++j){
         	for (unsigned int k=0; k<n_u_dofs; ++k){
 //            Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues_j;

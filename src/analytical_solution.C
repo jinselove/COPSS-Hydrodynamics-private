@@ -26,7 +26,7 @@
 
 // user defined headers
 #include "pm_toolbox.h"
-#include "ggem_system.h"
+#include "ggem_stokes.h"
 #include "analytical_solution.h"
 
 
@@ -53,7 +53,7 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
   
   START_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
   
-  // ksi's value should be consistent with that in GGEMSystem::regularization_parameter()
+  // ksi's value should be consistent with that in GGEMStokes::regularization_parameter()
   const Real ksi = std::sqrt(libMesh::pi)/3.0;  // = 0.591
   const Real muc = 1.0/(6*libMesh::pi);
   const unsigned int dim = 3;
@@ -61,7 +61,7 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
   DenseMatrix<Number> GT;
   
   // GGEM object and number of points in the system
-  GGEMSystem ggem_system;
+  GGEMStokes ggem_stokes;
   const std::size_t n_points = _pm_system.point_mesh()->num_particles();
   
   // loop over each point
@@ -74,7 +74,7 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
     if(x.norm()<1E-6) zero_limit  = true;
     
     // use ksi instead of alpha
-    GT = ggem_system.green_tensor_exp(x,ksi,muc,dim,zero_limit);
+    GT = ggem_stokes.green_tensor_exp(x,ksi,muc,dim,zero_limit);
     const Point fv = _pm_system.point_mesh()->particles()[i]->particle_force();
     //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv(0),fv(1),fv(2);
     
@@ -118,7 +118,3 @@ Real AnalyticalSolution::correction_factor_haberman(const Real r_r0) const
   STOP_LOG("correction_factor_haberman()", "AnalyticalSolution");
   return f1/f2;
 }
-
-
-
-

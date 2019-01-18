@@ -142,9 +142,9 @@ public:
   void penalize_elem_matrix_vector(DenseMatrix<Number>& Ke,
                                    DenseVector<Number>& Fe,
                                    const std::string & matrix_or_vector,
-                                   const unsigned int& var_number,     // variable number
-                                   const unsigned int& local_node_id,  // local node id to be penalized
-                                   const unsigned int& n_nodes_elem,   // vel-node number of elem!
+                                   const unsigned int& var_number,    // variable number
+                                   const unsigned int& local_node_id, // local node id to be penalized
+                                   const unsigned int& n_nodes_elem,  // vel-node number of elem!
                                    const Real& penalty,
                                    const Real& value);
 
@@ -154,7 +154,7 @@ protected:
   // Equation systems
   EquationSystems& _eqn_sys;
 
-  // system dimension
+  // System dimension
   unsigned int _dim;
 
   // Fluid mesh
@@ -169,7 +169,6 @@ protected:
   // this matrix stores the product of JxW[qp] * phi[k][qp]
   // size = num_elem * (n_u_dofs * n_quad_points)
   std::vector<std::vector<Real>> _int_force;
-
 
   // vector stores q_xyz size
   // size = num_elem * q_xyz.size()
@@ -186,7 +185,10 @@ protected:
   std::vector<std::vector<dof_id_type> > _dof_indices_u;
   std::vector<std::vector<dof_id_type> > _dof_indices_p;
 
-  // sides on the boundary
-  std::vector<std::vector<unsigned int> > _boundary_sides;
+  // Sides on the boundary for different SubEquationSystems. Boundaries applied with
+  // Dirichlet BC using penalty method are different for different systems.
+  // For example, in Poisson system, we don't use pressure inlet/outlet condition
+  // to decide whether this side has to be included in the Dirichlet BC.
+  std::vector<std::vector<unsigned int> > _boundary_sides, _boundary_sides_poisson;
 
 };

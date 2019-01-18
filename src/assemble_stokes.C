@@ -293,11 +293,9 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
     } // end if( user_defined_pc )
   } // end of elem-loop
 
-  // -------------------------------------------------------------------------------------------
-  //  if (_pm_system.comm().rank()==0){
-  //  printf("assemble_matrix_K(): The global matrix K has been assembled ...\n");
-  // }
-  // -------------------------------------------------------------------------------------------
+  //if (_pm_system.comm().rank()==0){
+  // printf("assemble_matrix_K(): The global matrix K has been assembled ...\n");
+  //}
   return;
   STOP_LOG ("assemble_global_K()", "AssembleStokes");
 }

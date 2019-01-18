@@ -27,7 +27,9 @@
  * for assembling the matrix and vector when solving
  * Poisson equations.
  *
- * For details of the implementation, refer to ...
+ * For details of the implementation, refer to
+ * J. Chem. Phys. 142, 014108 (2015)
+ * J. Chem. Theory Comput. 2018, 14, 4901-4913
  *
  */
 
@@ -49,7 +51,7 @@ public:
 
   /*! \brief Assemble the Global Matrix K
 
-    \param[in] system_name Name of the system (should be "NP")
+    \param[in] system_name Name of the system (should be "Poisson")
     \param[in] Option options of assembling the system
     \param[out] Ke Add element matrix to system
 
@@ -60,7 +62,7 @@ public:
 
   /*! \brief Assemble the Global force vector F
 
-    @param[in] system_name Name of the system (should be "NP")
+    @param[in] system_name Name of the system (should be "Poisson")
     @param[in] option Options of assembling the system
     @param[out] Fe Add rhs vector to system.
   */
@@ -68,21 +70,7 @@ public:
                          const std::string& option) override;
 
 
-  /*! \brief Assemble the element matrix K_IJ
-
-      Reinit and compute the element matrix K_ij, which will be added into K
-      matrix after calling assemble_global_K(). Size of this submatrix is
-      n_u_dofs * n_u_dofs = n_v_dofs * n_v_dofs = n_w_dofs * n_w_dofs
-  */
-  void assemble_element_KIJ(const std::vector<Real>& JxW,
-                            const std::vector<std::vector<RealGradient> >& dphi,
-                            const unsigned int n_u_dofs,
-                            const unsigned int I,
-                            const unsigned int J,
-                            DenseMatrix<Number>& Kij) override;
-
-
-  /*! \brief Assemble function for the right-hand-side in NP equation.
+  /*! \brief Assemble function for the right-hand-side in Poisson equation.
 
       This calculates each element's contribution to the right-hand-side vector.
   */
@@ -101,6 +89,7 @@ public:
   */
   void select_boundary_side(const Elem* elem) override;
 
+
   /*! \brief Apply BCs by penalty method.
 
   */
@@ -109,5 +98,5 @@ public:
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
                            const std::string& option) override;
-                           
+ 
 };

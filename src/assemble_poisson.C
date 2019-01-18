@@ -67,16 +67,119 @@ AssemblePoisson::~AssemblePoisson()
 
 // ==================================================================================
 void AssemblePoisson::assemble_global_K(const std::string& system_name,
-                                       const std::string& option)
+                                        const std::string& option)
 {
   START_LOG ("assemble_global_K()", "AssemblePoisson");
-  /*! It is a good idea to make sure we are assembling the proper system.*/
-  libmesh_assert_equal_to (system_name, "NP");
-  // -------------------------------------------------------------------------------------------
-  //  if (_pm_system.comm().rank()==0){
-  //  printf("assemble_matrix_K(): The global matrix K has been assembled ...\n");
-  // }
-  // -------------------------------------------------------------------------------------------
+
+  // Make sure we are assembling the proper system
+  libmesh_assert_equal_to (system_name, "Poisson");
+
+  const unsigned int n_mesh_elem = _mesh.n_elem();
+
+  PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson>(system_name);
+
+  // Numeric id that corresponds to variable (potential) in the system
+  const unsigned int phi_var = _pm_system.variable_number ("phi");
+
+  // Get Finite Element type for "phi"
+  FEType fe_phi_type = _pm_system.variable_type(phi_var);
+
+  // Build a Finite Element object of the specified type for the potential variable
+  UniquePtr<FEBase> fe_phi (FEBase::build(_dim, fe_phi_type) );
+
+  // Gauss quadrature rule for numerical integration
+  QGauss qrule (_dim, SECOND);
+
+  // Tell finite element objects to use the quadrature rule
+  fe_phi->attach_quadrature_rule (&qrule);
+
+  // Element Jacobian*quadrature weight at each integration point
+  const std::vector<Real>& JxW = fe_phi->get_JxW();
+
+  // Element shape function gradients for potential variable evaluated at quadrature points
+  const std::vector<std::vector<RealGradient>>& dphi = fe_phi->get_dphi();
+
+  // Element shape function for potential variable evaluated at quadrature points
+  const std::vector<std::vector<Real>>& phi = fe_phi->get_phi();
+
+  // Reference to the DofMap object for this system
+  const DofMap & dof_map = _pm_system.get_dof_map();
+  std::vector<dof_id_type> dof_indices;
+
+  // Element matrix contribution
+  DenseMatrix<Number> Ke;
+
+  // Element vector contribution, input of compute_element_rhs()
+  DenseVector<Number> Fe;
+
+  // Build _boundary_sides_poisson vector at beginning of simulation
+  if(_boundary_sides_poisson.size() == 1){
+    _boundary_sides_poisson.resize(n_mesh_elem);
+    MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
+    const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
+    for ( ; el != end_el; ++el)
+    {
+      // Store a pointer to the element we are currently working on.
+      const Elem* elem = *el;
+      this->select_boundary_side(elem);
+      // printf("finished select_boundary_side\n");
+    }
+  }
+
+  // Loop over all the elements in the mesh that live on the local processor.
+  // We will compute the element matrix Ke. In case users
+  // later modify the program to include refinement, we will be safe and will only
+  // consider the active elements.
+  MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
+  const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
+
+  for ( ; el != end_el; ++el)
+  {
+    // Store a pointer to the element we are currently working on.
+    const Elem* elem = *el;
+
+    // Get the degree of freedom indices for the current element. These define where
+    // in the global matrix and right-hand-side this element will contribute to.
+    dof_map.dof_indices (elem, dof_indices);
+
+    const unsigned int n_dofs = dof_indices.size();
+
+    // Zero the element matrix Ke before summing them. We use the resize member here because
+    // the number of degrees of freedom might have changed from the last element. Note that
+    // this will be the case if the element type is different (i.e. the last element was a
+    // triangle, now we are on a quadrilateral.)
+    Ke.resize (n_dofs, n_dofs);
+
+    // Compute the element-specific data for the current element. This involves computing
+    // the location of the quadrature points (q_point) and the shape functions (phi, dphi)
+    // for the current element.
+    fe_phi->reinit (elem);
+
+    // Now loop over the quadrature points. This handles the numeric integration.
+    for (unsigned int qp=0; qp<qrule->n_points(); qp++)
+    {
+      // Add the matrix contribution
+      for (std::size_t i=0; i<phi.size(); i++)
+        for (std::size_t j=0; j<phi.size(); j++)
+          Ke(i,j) += JxW[qp]*(dphi[i][qp]*dphi[j][qp]);
+    }
+
+    // apply BCs by penalty method
+    this->apply_bc_by_penalty(elem, "matrix", Ke, Fe, option);
+
+    // If this assembly program were to be used on an adaptive mesh,
+    // we would have to apply any hanging node constraint equations.
+    dof_map.constrain_element_matrix (Ke, dof_indices);
+
+    // Add the element matrix to the global system.
+    //GeomTools::zero_filter_dense_matrix(Ke, 1e-10);
+    //PMToolBox::output_dense_matrix(Ke);
+    _pm_system.matrix->add_matrix (Ke, dof_indices);
+  }
+  //if (_pm_system.comm().rank()==0){
+  // printf("assemble_matrix_K(): The global matrix K has been assembled ...\n");
+  //}
+
   return;
   STOP_LOG ("assemble_global_K()", "AssemblePoisson");
 }
@@ -85,21 +188,143 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
 
 // ==================================================================================
 void AssemblePoisson::assemble_global_F(const std::string& system_name,
-                                       const std::string& option)
+                                        const std::string& option)
 {
   START_LOG ("assemble_global_F()", "AssemblePoisson");
-  // PerfLog perf_log("assemble_global_F");
-  // perf_log.push("preparation");
-  // It is a good idea to make sure we are assembling the proper system.
-  libmesh_assert_equal_to (system_name, "NP");
+
+  // Make sure we are assembling the proper system.
+  libmesh_assert_equal_to (system_name, "Poisson");
+
+  PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson> (system_name);
+
+  // Numeric id corresponding to potential variable
+  const unsigned int phi_var = _pm_system.variable_number ("phi");
+
+  // Get FE type for "phi"
+  FEType fe_phi_type = _pm_system.variable_type(phi_var);
+  UniquePtr<FEBase> fe_phi (FEBase::build(_dim, fe_phi_type));
+
+  // Define Gauss quadrature rule for numerical integration.
+  QGauss qrule (_dim, SECOND);
+  fe_phi->attach_quadrature_rule (&qrule);
+
+  // build the face element for boundary potential
+  UniquePtr<FEBase> fe_face (FEBase::build(_dim, fe_phi_type));
+  QGauss qface(_dim-1, SECOND);
+  fe_face->attach_quadrature_rule (&qface);
+
+  // The element Jacobian * quadrature weight at each integration point.
+  const std::vector<Real>& JxW                = fe_phi->get_JxW();
+  const std::vector<std::vector<Real>>& phi   = fe_phi->get_phi();
+  const std::vector<Point>& q_xyz             = fe_phi->get_xyz(); // xyz coords of quad pts
+
+  // A reference to the DofMap object for this system.
+  const DofMap & dof_map = _pm_system.get_dof_map();
+
+  // Define data structures to contain the element matrix Ke and vector Fe
+  DenseMatrix<Number> Ke;
+  DenseVector<Number> Fe;
+
+  // System parameters
+  const Real epsilon_r = _eqn_sys.parameters.get<Real> ("epsilon_r");
+  const Real alpha     = _eqn_sys.parameters.get<Real> ("alpha");
+
+  // Build _int_force vector at the beginning of Poisson solver
+  // FIXME: Do we need to clear the _dof_indices for different physics solver?
+  if(_int_force.size() == 1){
+    if(_pm_system.comm().rank()==0){
+      printf("\nassemble_int_force() for Poisson solver at the beginning of simulation\n\n");
+    }
+
+    const unsigned int n_mesh_elem = _mesh.n_elem();
+    _int_force.resize(n_mesh_elem);
+    _q_xyz.resize(n_mesh_elem);
+    _n_dofs.resize(n_mesh_elem);
+    _dof_indices.resize(n_mesh_elem);
+
+    // Now we will loop over all the elements in the mesh that live
+    // on the local processor.
+    MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
+    const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
+    for ( ; el != end_el; ++el)
+    {
+      // Store a pointer to the element we are currently working on.
+      const Elem* elem = *el;
+      const unsigned int elem_id = elem->id();
+
+      // Get the degree of freedom indices for the current element.
+      dof_map.dof_indices (elem, _dof_indices[elem_id]);
+
+      _n_dofs[elem_id] = _dof_indices[elem_id].size();
+      Fe.resize (_n_dofs[elem_id]);
+
+      // NOTE: here JxW and dphi and other element quantities are not computed up to now,
+      // and these will be done in the elem loop after fe->reinit()
+      fe_phi->reinit (elem);
+
+      //qrule.print_info();
+      this->assemble_int_force(elem, _n_dofs[elem_id], *fe_phi);
+      // printf("finished assemble_int_force\n");
+    }
+  }
+
+  // Now we will loop over all the elements in the mesh that live
+  // on the local processor, and compute the element vector Fe.
+  MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
+  const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
+  for ( ; el != end_el; ++el)
+  {
+    // Store a pointer to the element we are currently working on.
+    const Elem* elem = *el;
+    const unsigned int elem_id = elem->id();
+
+    // Get the degree of freedom indices for the current element.
+    // Why do we update dof_indices again?
+    dof_map.dof_indices (elem, _dof_indices[elem_id]);
+
+    // const unsigned int n_dofs = dof_indices.size();
+    Fe.resize (_n_dofs[elem_id]);
+
+    // NOTE: here JxW and dphi and other element quantities are not computed up to now,
+    // and these will be done in the elem loop after fe->reinit()
+    //fe_vel->reinit (elem);
+    //qrule.print_info();
+
+    // if elem_neighbor_list is pre-built, we can access it directly
+    const std::vector<std::size_t>& n_list = _pm_system.point_mesh()->elem_neighbor_list(elem);
+
+    // if this elem has no neighboring particle we turn the pc_flag to 'false'
+    bool pc_flag = true;                   // a flag for the point charge
+    if(n_list.size()==0) pc_flag = false; // No point force because no point list.
+
+    // Now compute Fe caused by the regularized point charge and space charge density.
+    // perf_log.push("compute_element_rhs");
+    this->compute_element_rhs(elem, _n_dofs[elem_id], *fe_phi, n_list,
+                              pc_flag, option, alpha, Fe);
+    // perf_log.pop("compute_element_rhs");
+
+    // Imposed the Dirichlet BC (electrical potential) via the penalty method.
+    // perf_log.push("apply_bc_by_penalty");
+    this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
+    // perf_log.pop("apply_bc_by_penalty");
+
+    // If this assembly program were to be used on an adaptive mesh,
+    // we would have to apply any hanging node constraint equations.
+    // perf_log.push("finish");
+    dof_map.constrain_element_vector (Fe, _dof_indices[elem_id]);
+
+    // Add the element rhs vector to the global system.
+    //PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
+    //PMToolBox::output_dense_vector(Fe);
+    _pm_system.rhs->add_vector (Fe,_dof_indices[elem_id]);
+    // perf_log.pop("finish");
+  }// end for elem-loop
 
   STOP_LOG ("assemble_global_F()", "AssemblePoisson");
 
-  // ---------------------------------------------------------------------------------------------
   //if (_pm_system.comm().rank()==0){
   //  printf("assemble_global_F(): The global RHS vector has been assembled ...\n");
-  // }
-  // ---------------------------------------------------------------------------------------------
+  //}
   return;
 }
 
@@ -110,32 +335,77 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
                                          const unsigned int n_u_dofs,
                                          FEBase& fe_v,
                                          const std::vector<std::size_t> n_list,
-                                         const bool& pf_flag,
+                                         const bool& pc_flag,
                                          const std::string& option,
                                          const Real& alpha,
                                          DenseVector<Number>& Fe)
 {
-  START_LOG("compute_element_rhs()", "AssemblePoisson");  // libMesh log
+  START_LOG("compute_element_rhs()", "AssemblePoisson");
 
-  libmesh_assert_equal_to (system_name, "NP");
+  libmesh_assert_equal_to (system_name, "Poisson");
+
+  PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson> ("Poisson");
+
+  // Get a reference to the PointMesh, PMPeriodicBoundary, and PointParticles
+  PointMesh<3>* _point_mesh = _pm_system.point_mesh();
+  PMPeriodicBoundary* _pm_periodic_boundary = _point_mesh->pm_periodic_boundary();
+  std::vector<PointParticle*> _particles = _point_mesh->particles();
+
+  // The element Jacobian * quadrature weight at each quad pt(high order Qgauss).
+  // const std::vector<Real>& JxW                = fe_v.get_JxW();
+  // const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
+  // const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords of quad pts
+  //printf("q_xyz size = %d\n", q_xyz.size());
+  //fe_v.reinit(elem);
+
+  const unsigned int elem_id = elem->id();
+  const std::vector<Point>& q_xyz = _q_xyz[elem_id]; // xyz coords of quad pts
+
+  // 1. Add the regularized point charge, first examine if this element is
+  // "close to" the point charge sources
+  //if( pc_flag && (option == "disturbed") )
+  if( pc_flag )
+  {
+    // Use GGEMSystem to access Green's function for electrostatics
+    GGEMSystem ggem_sys;
+
+    // Number of particles in the neighbor list
+    const std::size_t n_pts = n_list.size();
+
+    // Initialize variables for position, charge, distance, etc.
+    Point np_pos(0.);
+    Real r = 0., charge_val = 0., np_charge = 0.;
+    unsigned int qp_size = q_xyz.size();
+    //printf("qp_size = %d\n", q_xyz.size());
+
+    // Now we will build the element RHS using gauss quadrature integration.
+    // first loop over all neighboring particles near this element
+    for(unsigned int np = 0; np<n_pts; ++np){
+      // FIXME:Charge on this bead
+      np_charge = _particles[n_list[np]]->particle_charge();
+
+      // Get the location of this bead
+      np_pos = _particles[n_list[np]]->point();
+
+      for(unsigned int qp=0; qp<qp_size; qp++){
+        // distance from quadrature point to the charge point
+        r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
+
+        // FIXME:evaluate the value of regularized gaussian charge at this quadrature point
+        charge_val = ggem_sys.smoothed_charge_exp(r, alpha);
+
+        // FIXME:Need to add nodal space charge density from ion concentration fields
+        Real space_charge_density = 0.;
+
+       	for(unsigned int k=0; k<n_u_dofs; ++k){
+        //Fe(k) += JxW[qp]*phi[k][qp]*fvalues_j;
+          Fe(k) += _int_force[elem_id][k*qp_size+qp]*charge_val*np_charge;
+       	} // end loop over nodes
+      } // end loop over quadrature points
+    } // end loop over beads
+  } // end if( pc_flag )
 
   STOP_LOG("compute_element_rhs()", "AssemblePoisson");
-  return;
-}
-
-
-
-// ==================================================================================
-void AssemblePoisson::assemble_element_KIJ(const std::vector<Real>& JxW,
-                                          const std::vector<std::vector<RealGradient> >& dphi,
-                                          const unsigned int n_u_dofs,
-                                          const unsigned int i,
-                                          const unsigned int j,
-                                          DenseMatrix<Number>& Kij)
-{
-  START_LOG("assemble_element_KIJ()", "AssemblePoisson");  // libMesh log
-
-  STOP_LOG("assemble_element_KIJ()", "AssemblePoisson");  // libMesh log
   return;
 }
 
@@ -145,6 +415,34 @@ void AssemblePoisson::assemble_element_KIJ(const std::vector<Real>& JxW,
 void AssemblePoisson::select_boundary_side(const Elem* elem)
 {
   START_LOG("select_boundary_side()", "AssemblePoisson");
+
+  // Get a reference to the Particle-Mesh System.
+  PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson> ("Poisson");
+  const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
+  const std::size_t elem_id = elem->id();
+
+  // The following loops over the sides of the element. If the element has NO
+  // neighbors on a side then that side MUST live on a boundary of the domain.
+  for(unsigned int s=0; s<elem->n_sides(); s++)
+  {
+    bool apply_bc = false;
+    if(elem->neighbor(s) == NULL)
+    {
+      apply_bc = true;
+
+      // If this side is on the periodic side, don't apply penalty
+      // The _boundary_id_3D only works with Cubic domain
+      for(int i = 0; i < _dim; i++)
+      {
+        if(periodicity[i]){
+          if(_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
+             _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
+          { apply_bc = false; }
+        }
+      }
+    }
+    if(apply_bc) _boundary_sides_poisson[elem_id].push_back(s);
+  }
 
   STOP_LOG("select_boundary_side()", "AssemblePoisson");
 }
@@ -158,7 +456,62 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
                                          DenseVector<Number>& Fe,
                                          const std::string& option)
 {
-  START_LOG("apply_bc_by_penalty()", "AssemblePoisson");  // libMesh log
+  START_LOG("apply_bc_by_penalty()", "AssemblePoisson");
+
+  // Get a reference to the Particle-Mesh System
+  PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson> ("Poisson");
+
+  const Real penalty = 1E6; //The penalty value
+  const unsigned int n_nodes = elem->n_nodes();
+  const std::size_t elem_id = elem->id();
+  const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
+
+  // Loop through sides in this element that sits on system's boundary
+  for (unsigned int s=0; s<_boundary_sides[elem_id].size(); s++)
+  {
+    // Build the full-order side element for "potential" Dirichlet BC at the walls.
+    UniquePtr<Elem> side (elem->build_side(_boundary_sides[elem_id][s]));
+
+    // Loop through nodes on this side element
+    for (unsigned int nn=0; nn<side->n_nodes(); nn++)
+    {
+      // Begin by calculating electrical potential on boundaries
+      // Set phi = 0 by default for zero potential on walls
+      // FIXME: set potential values from the input file?
+      Real phi_total = 0., phi_global;
+
+      // Calculate local part of the electrical potential from GGEM
+      const Point ptx = side->point(nn); // Coordinate of the node
+      // FIXME: implement local_potential_fluid in PMSystemPoisson
+      const std::vector<Real> phi_local = pm_system.local_potential_fluid(elem, ptx,"regularized");
+      //const std::vector<Real> phi_local = pm_system.local_potential_fluid(ptx,"regularized");
+
+      // Note this only influence the rhs vector
+      // FIXME: Maybe we can setup a validation test for Poisson system
+      if(_eqn_sys.parameters.get<std::string> ("test_name") == "ggem_validation_poisson")
+      {
+        const Real phi_boundary = analytical_solution.exact_solution_infinite_domain(ptx);
+        phi_global = phi_boundary - phi_local;
+      }
+      // Usually on the boundary, global_potential = total_potential - ggem_local_potential
+      else
+      {
+        phi_global = phi_total - phi_local;
+      }
+
+      // Find the node on the element matching this node on the side.
+      // That defined where in the element matrix the BC will be applied.
+      for (unsigned int n=0; n<elem->n_nodes(); n++)
+      {
+        if (elem->node(n) == side->node(nn))
+        {
+          // Penalize phi at the current node
+          this->penalize_elem_matrix_vector(Ke,Fe,matrix_or_vector,0,n,n_nodes,penalty,phi_global);
+        } // end if (elem->node(n) == side->node(nn))
+      } // enf for n-loop
+    } // end for nn-loop
+  } // end for s-loop
+
 
   STOP_LOG("apply_bc_by_penalty()", "AssemblePoisson");
-} // end of function apply_bc_by_penalty()
+}

@@ -783,7 +783,7 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
           const std::vector<Real> u_local = pm_system.local_velocity_fluid(elem, ptx,"regularized");
           // const std::vector<Real> u_local = pm_system.local_velocity_fluid(ptx,"regularized");
           // ---------------- setup for validation test 01 -------------
-          if(_eqn_sys.parameters.get<std::string> ("test_name") == "ggem_validation")
+          if(_eqn_sys.parameters.get<std::string> ("system_name") == "ggem_validation")
           {
             const std::vector<Real> u_boundary = analytical_solution.exact_solution_infinite_domain(ptx);
             for(unsigned int k=0;k<_dim;++k) uvw[k] = u_boundary[k] - u_local[k];

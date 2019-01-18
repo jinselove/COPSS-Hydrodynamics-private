@@ -197,7 +197,7 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<string> ("particle_mesh_type") = particle_mesh_type;
   equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;
   for (int i=0; i<numForceTypes; i++) equation_systems.parameters.set<std::vector<Real>> (forces[i].first) = forces[i].second;
-  equation_systems.parameters.set<string> ("test_name") = test_name;
+  equation_systems.parameters.set<string> ("system_name") = system_name;
   equation_systems.parameters.set<string> ("wall_type") = wall_type;
   equation_systems.parameters.set<std::vector<Real>> (wall_type) = wall_params;
   equation_systems.parameters.set<std::vector<bool>> ("shear") = shear;

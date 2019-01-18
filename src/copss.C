@@ -108,11 +108,11 @@ void Copss::read_input()
 //====================================================================
 void Copss::read_system_info()
 {
-    test_name = input_file("test_name", "validation");
+    system_name = input_file("system_name", "validation");
     cout <<"\n##########################################################\n"
          <<  "#                       system_name                       \n"
          <<  "##########################################################\n\n"
-         <<  "-----------> system_name: "<< test_name.c_str() << endl;
+         <<  "-----------> system_name: "<< system_name.c_str() << endl;
     print_info = input_file("print_info", false);
 }
 
@@ -1345,8 +1345,3 @@ void Copss::destroy()
 
 
 } // end namespace
-
-
-
-
-

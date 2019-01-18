@@ -90,7 +90,7 @@ public:
   // control file name
   std::string control_fileName;
   // test name
-  std::string test_name;
+  std::string system_name;
   bool print_info;
   // physical parameters
   const Real kB = 1.380662E-17;//1.380662E-23(J/K) = 1.3806623E-23(N*m/K) = 1.380662E-17(N*um/K)

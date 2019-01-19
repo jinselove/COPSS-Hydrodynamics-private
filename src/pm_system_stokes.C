@@ -48,7 +48,7 @@ PMSystemStokes::PMSystemStokes(EquationSystems& es,
                                const std::string& name,
                                const unsigned int number)
 : PMLinearImplicitSystem (es, name, number),
-  _stokes_solver(es)
+  _solver_stokes(es)
 {
   // Stokes equation assembly
   _assemble_stokes = ( new AssembleStokes(es) );
@@ -236,11 +236,11 @@ void PMSystemStokes::solve (const std::string& option,
 
     // set the solver type for the Stokes equation
     const SystemSolverType solver_type  = this->get_equation_systems().parameters.get<SystemSolverType> ("solver_type");
-    _stokes_solver.set_solver_type(solver_type);
+    _solver_stokes.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver
     this->assemble_matrix("Stokes",option);
-    _stokes_solver.init_ksp_solver();
+    _solver_stokes.init_ksp_solver();
     //perf_log.pop("assemble_matrix (undisturbed)");
 
     //t2 = MPI_Wtime();
@@ -258,7 +258,7 @@ void PMSystemStokes::solve (const std::string& option,
 
   // solve the problem
 // perf_log.push("solve()");
-  _stokes_solver.solve();
+  _solver_stokes.solve();
 // perf_log.pop("solve()");
 
   STOP_LOG("solve()", "PMSystemStokes");

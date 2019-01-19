@@ -100,7 +100,7 @@ void Copss::read_input()
   this -> read_domain_info();
   this -> read_force_info();
   this -> read_ggem_info();
-  this -> read_stokes_solver_info();
+  this -> read_solver_stokes_info();
   this -> read_chebyshev_info();
   this -> read_run_info();
 } // end read_data function
@@ -291,7 +291,7 @@ void Copss::read_force_info(){
 /*
  * read Stokes Solver  
  */
-void Copss::read_stokes_solver_info(){
+void Copss::read_solver_stokes_info(){
   max_linear_iterations = input_file("max_linear_iterations", 100);
   linear_solver_rtol   = input_file("linear_solver_rtol", 1E-6);
   linear_solver_atol   = input_file("linear_solver_atol", 1E-6);
@@ -300,12 +300,12 @@ void Copss::read_stokes_solver_info(){
   schur_user_ksp_rtol  = input_file("schur_user_ksp_rtol", 1E-6);
   schur_user_ksp_atol  = input_file("schur_user_ksp_atol", 1E-6);
   schur_pc_type = input_file("schur_pc_type", "SMp");
-  stokes_solver_type = input_file("stokes_solver", "superLU_dist");
-  if(stokes_solver_type=="superLU_dist") {
+  solver_type_stokes = input_file("solver_stokes", "superLU_dist");
+  if(solver_type_stokes=="superLU_dist") {
     solver_type = superLU_dist;
     user_defined_pc = false;
   }
-  else if(stokes_solver_type=="field_split") {
+  else if(solver_type_stokes=="field_split") {
     solver_type = field_split;
     user_defined_pc = true;
   }
@@ -316,8 +316,8 @@ void Copss::read_stokes_solver_info(){
   cout <<endl<< "##########################################################"<<endl
        << "#                 Solver information                      " <<endl
        << "##########################################################"<<endl<<endl;
-  cout << "-----------> Stokes solver type = " << stokes_solver_type <<endl;
-  if (stokes_solver_type=="field_split"){
+  cout << "-----------> Stokes solver type = " << solver_type_stokes <<endl;
+  if (solver_type_stokes=="field_split"){
     cout<<"-----------> FieldSplit Schur Complement Reduction Solver"<<endl;
     cout<<"-----------> schur_pc_type = " << schur_pc_type << endl;
       if(schur_user_ksp){
@@ -325,8 +325,8 @@ void Copss::read_stokes_solver_info(){
             cout<<"----------->  KSP rel tolerance for Schur Complement solver is = " << schur_user_ksp_rtol <<endl;
             cout<<"----------->  KSP abs tolerance for Schur Complement solver is = " << schur_user_ksp_atol <<endl;
         }// end if(schur_user_ksp)
-    }// end if (stokes_solver_type == "field_split")
-}// end read_stokes_solver_info()
+    }// end if (solver_type_stokes == "field_split")
+}// end read_solver_stokes_info()
 
 /*
  * read Chebyshev info

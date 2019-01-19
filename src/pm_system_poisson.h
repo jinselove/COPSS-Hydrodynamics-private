@@ -21,9 +21,9 @@
 
 #pragma once
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "assemble_poisson.h"
-#include "solver_stokes.h"
+#include "solver_poisson.h"
 #include "pm_linear_implicit_system.h"
 
 namespace libMesh
@@ -42,8 +42,8 @@ public:
    * Constructor.
    */
   PMSystemPoisson (EquationSystems& es,
-                    const std::string& name,
-                    const unsigned int number); // number of systems
+                   const std::string& name,
+                   const unsigned int number); // number of systems
 
 
   /**
@@ -72,7 +72,7 @@ public:
 
   /**
    * Assemble the system matrix.
-   * option ==
+   * option == "disturbed" or "undisturbed", only works for Stokes equation
    */
   void assemble_matrix (const std::string& system_name,
                         const std::string& option);
@@ -80,6 +80,7 @@ public:
 
   /**
    * Assemble the system rhs.
+   * option == "disturbed" or "undisturbed", only works for Stokes equation
    */
   void assemble_rhs (const std::string& system_name,
                      const std::string& option);
@@ -87,23 +88,24 @@ public:
 
   /*
    * Solve the system.
-   * option = ...
+   * FIXME:option = ...
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
   void solve (const std::string& option,
               const bool& re_init);
-              
-  // /*
-  //  * Return the NPSolver
-  //  */
-  SolverStokes& poisson_solver() { return _poisson_solver;  }
+
+
+  /*
+   * Return the SolverPoisson
+   */
+  SolverPoisson& solver_poisson() { return _solver_poisson; }
 
 
 
 private:
 
-  // // Stokes solver
-  SolverStokes _poisson_solver;
+  // Poisson solver
+  SolverPoisson _solver_poisson;
 
   // Assemble Stokes system
   AssemblePoisson* _assemble_poisson;

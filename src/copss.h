@@ -147,7 +147,7 @@ public:
   Real schur_user_ksp_rtol;
   Real schur_user_ksp_atol;
   std::string schur_pc_type;
-  std::string stokes_solver_type;
+  std::string solver_type_stokes;
   SystemSolverType solver_type; 
 
   // Chebyshev information
@@ -278,7 +278,7 @@ public:
    * step 4: read_domain_info()
    * step 5: read_force_info()
    * step 6: read_ggem_info()
-   * step 7: read_stokes_solver_info()
+   * step 7: read_solver_stokes_info()
    * step 8: read_chebyshev_info()
    * step 9: read_run_info()
    */
@@ -332,7 +332,7 @@ protected:
   void read_domain_info(); 
   void read_force_info();
   virtual void read_ggem_info() = 0;
-  void read_stokes_solver_info();
+  void read_solver_stokes_info();
   void read_chebyshev_info();
   void read_run_info();
   void read_restart_time();

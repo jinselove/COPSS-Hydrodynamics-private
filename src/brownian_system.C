@@ -84,7 +84,7 @@ PetscErrorCode _MatMult_Stokes(Mat M,Vec f,Vec u)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Solve the Stokes equation to obtain the particle velocity vector pv
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  const bool reinit_stokes = !( pm_system.stokes_solver().is_ksp_initialized() );
+  const bool reinit_stokes = !( pm_system.solver_stokes().is_ksp_initialized() );
   pm_system.solve("disturbed", reinit_stokes);
   std::vector<Real> pvelocity(_dim*_n_points,0);
   pm_system.compute_point_velocity("disturbed", pvelocity);

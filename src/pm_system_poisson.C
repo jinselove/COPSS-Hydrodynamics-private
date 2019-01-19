@@ -45,12 +45,12 @@ namespace libMesh
 
 // ======================================================================================
 PMSystemPoisson::PMSystemPoisson(EquationSystems& es,
-                               const std::string& name,
-                               const unsigned int number)
+                                 const std::string& name,
+                                 const unsigned int number)
 : PMLinearImplicitSystem (es, name, number),
-  _poisson_solver(es)
+  _solver_poisson(es)
 {
-  // Stokes equation assembly
+  // Poisson equation assembly
   _assemble_poisson = ( new AssemblePoisson(es) );
 }
 
@@ -78,12 +78,28 @@ void PMSystemPoisson::clear ()
 
 // ===========================================================
 void PMSystemPoisson::assemble_matrix(const std::string& system_name,
-             			     const std::string& option)
+                                      const std::string& option)
 {
   libmesh_assert (this->matrix);
   libmesh_assert (this->matrix->initialized());
 
   START_LOG("assemble_matrix()", "PMSystemPoisson");
+
+  // init the matrices: global stiffness and PC matrix (if required)
+  this->matrix->zero();
+  const bool user_defined_pc = this->get_equation_systems().parameters.get<bool>("user_defined_pc");
+  if( user_defined_pc ) {
+    std::cout << "--->test in PMSystemPoisson::assemble_matrix(): "
+              << "Initialize the preconditioning matrix (all zeros) \n";
+    this->get_matrix("Preconditioner").zero();
+  }
+
+  // Call assemble function to assemble matrix
+  _assemble_poisson->assemble_global_K(system_name, option);
+
+  // close the matrices
+  this->matrix->close();  // close the matrix
+  if( user_defined_pc ) this->get_matrix("Preconditioner").close();
 
   STOP_LOG("assemble_matrix()", "PMSystemPoisson");
 }
@@ -99,6 +115,11 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name,
 
   START_LOG("assemble_rhs()", "PMSystemPoisson");
 
+  // init, assemble, and close the rhs vector
+  this->rhs->zero();
+  _assemble_poisson->assemble_global_F(system_name, option);
+  this->rhs->close();
+
   STOP_LOG("assemble_rhs()", "PMSystemPoisson");
 }
 
@@ -109,6 +130,36 @@ void PMSystemPoisson::solve(const std::string& option,
                             const bool& re_init)
 {
   START_LOG("solve()", "PMSystemPoisson");
+
+  //Real t1, t2;
+  //std::string msg = "---> solve Poisson";
+  //PMToolBox::output_message(msg, this->comm());
+
+  // Assemble the global matrix and pc matrix, and record the CPU wall time.
+  if(re_init)
+  {
+    //t1 = MPI_Wtime();
+
+    // Set the solver type for the Poisson equation
+    const SystemSolverType solver_type  = this->get_equation_systems().parameters.get<SystemSolverType> ("solver_type");
+    _solver_poisson.set_solver_type(solver_type);
+
+    // Assemble the global matrix, and init the KSP solver
+    this->assemble_matrix("Poisson",option);
+    _solver_poisson.init_ksp_solver();
+
+    //t2 = MPI_Wtime();
+    //std::cout << "For Poisson equation, time used to assemble the global matrix and reinit KSP is " <<t2-t1<<" s\n\n";
+  }
+
+  // assemble the rhs vector, and record the CPU wall time.
+  //t1 = MPI_Wtime();
+  this->assemble_rhs ("Poisson",option);
+  //t2 = MPI_Wtime();
+  //std::cout << "For Poisson equation, time used to assemble the right-hand-side vector is " <<t2-t1<<" s\n";
+
+  // solve the problem
+  _solver_poisson.solve();
 
   STOP_LOG("solve()", "PMSystemPoisson");
 }

@@ -147,7 +147,7 @@ public:
   /*
    * Return the SolverStokes
    */
-  SolverStokes& stokes_solver() { return _stokes_solver;  }
+  SolverStokes& solver_stokes() { return _solver_stokes;  }
 
 
   /**
@@ -238,7 +238,7 @@ public:
 private:
 
   // Stokes solver
-  SolverStokes _stokes_solver;
+  SolverStokes _solver_stokes;
 
   // Assemble Stokes system
   AssembleStokes* _assemble_stokes;

@@ -282,6 +282,8 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
     }  
   }
   perf_log.pop ("integration");
+  // destroy objects after integration
+  this -> destroy();
 }
 
 } // end of namespace

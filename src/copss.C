@@ -1328,17 +1328,19 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
 
 void Copss::destroy()
 {
-  MatDestroy(&M);
   VecDestroy(&U0);
   VecDestroy(&R0);
   VecDestroy(&R_mid);
   VecDestroy(&dw_mid);
   PetscRandomDestroy(&rand_ctx);
-  if(with_brownian){
+  if(&dw){
     VecDestroy(&dw);
   }
   if(exodus_ptr and with_hi) {
     delete exodus_ptr;
+  }
+  if (&viewer){
+      PetscViewerDestroy(&viewer);
   }
   PetscViewerDestroy(&viewer);
 }

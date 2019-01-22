@@ -10,6 +10,16 @@
                                                         "out.time",
                                                         "out.eigenvalue"]
                               },
+"PointParticle_Stokes_GGEM":{
+                              "package": "POINTPARTICLE",
+                              "required_inputs": ["point_particle_control.in",
+                                                  "point_particle_data.in",
+                                                  "run.sh",
+                                                  "zclean.sh"],
+                              "validation_outputs": ["output_velocity_profile_x_3P.txt",
+                                                     "output_velocity_profile_y_3P.txt",
+                                                     "output_velocity_profile_z_3P.txt"]
+                            },                                  
 "RigidParticle_Sphere_Sedimentation_HI": {
                                           "package": "RIGIDPARTICLE",
                                           "required_inputs": ["rigid_particle_control.in",

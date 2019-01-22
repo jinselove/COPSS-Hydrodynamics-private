@@ -33,6 +33,9 @@ Fix* FixFactory::buildFix(std::string& fix_name, PMLinearImplicitSystem& pm_syst
 				libmesh_error();				
 			}            
         }
+        else if (fix_name == "p_constant"){
+            return new FixPointConstant(pm_system);
+        }
 		else{
 			std::cout <<"Error: undefined force field for point_particles: " << fix_name << std::endl;
 			libmesh_error();

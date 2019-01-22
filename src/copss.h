@@ -78,7 +78,8 @@ namespace libMesh{
 
 class Copss
 {
-public: 
+    
+protected: 
   // PETSC MPI communicator
   Parallel::Communicator *comm_in;
   // error message string

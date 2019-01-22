@@ -246,9 +246,16 @@ void CopssPointParticleSystem::write_object(unsigned int step_id)
 //============================================================================
 void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
-  cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
+  // validate StokesGGEM if system_name = ggem_validation
+  if (system_name == "ggem_validation"){
+	  
+  }
+  
+  
+  
+  cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Parameters for dynamic process
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

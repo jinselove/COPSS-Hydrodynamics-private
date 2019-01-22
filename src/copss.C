@@ -108,11 +108,11 @@ void Copss::read_input()
 //====================================================================
 void Copss::read_system_info()
 {
-    system_name = input_file("system_name", "validation");
+    simulation_name = input_file("simulation_name", "validation");
     cout <<"\n##########################################################\n"
-         <<  "#                       system_name                       \n"
+         <<  "#                       simulation_name                       \n"
          <<  "##########################################################\n\n"
-         <<  "-----------> system_name: "<< system_name.c_str() << endl;
+         <<  "-----------> simulation_name: "<< simulation_name.c_str() << endl;
     print_info = input_file("print_info", false);
 }
 

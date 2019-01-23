@@ -39,15 +39,31 @@ def compile(package, decompile=False):
             sys.exit(returnvalue)
     print("--"*2 + "Compilation done !!!")
     
-def compare_output(validation_outputs):
+def compare_output(validation_outputs, cmp_method = "filecmp"):
+    """
+    :params validation_outputs: a list of output files to compare
+    :param cmp_method: method to compare the files, if cmp_method == "cmpfile",
+     the files will be directly compared using python filecmp.cmp(); if cmp_method
+     == "cmpdf", a script named "compare_output.py" located in the particular test
+     folder will be called
+    """
     cwd = os.getcwd()
-    for validation_output in validation_outputs:
-        benchmark_file = cwd + '/output/' + validation_output
-        file = cwd + "/" + validation_output
-        if not filecmp.cmp(benchmark_file, file):
-            return False, file
-    
-    return True, None
+    if cmp_method == "cmpfile":
+        for validation_output in validation_outputs:
+            benchmark_file = cwd + '/output/' + validation_output
+            file = cwd + "/" + validation_output
+            if not filecmp.cmp(benchmark_file, file):
+                return False, file
+        return True, None
+    elif cmp_method == "cmpdf":
+        sys.path.append(cwd)
+        from compare_output import compare_output
+        return_value = compare_output()
+        del compare_output
+        return return_value
+    else:
+        print("Error: Unavailable 'cmp_method specified'")
+        sys.exit(-1)
 
 ##################################################
 # define global parameter
@@ -57,7 +73,7 @@ print("Notice: Results generated using different number of CPUs are slightly dif
  defined in 'run.sh' in each test folder).")
 if multiprocessing.cpu_count() < 4:
     print("Error: Available number of CPUs ({0}) is less than required.".format(multiprocessing.cpu_count()))
-    sys.exit(0)
+    sys.exit(-1)
     
 ###################################################
 # Load tests from test.json
@@ -108,6 +124,10 @@ for key, value in tests.items():
                               + key + "/output/" + output_file):
             print("--"*3 + "Error: Validation output file '{}' does not exist. Exiting ...".format(output_file))
             sys.exit(-1)
+    if value["cmp_method"] != "cmpfile":
+        if "compare_output.py" not in value["required_inputs"]:
+            print("--"*3 + "Error: 'compare_output.py' has to exist when 'cmp_method' != 'cmpfile'")
+            sys.exit(-1)
 
 ##################################################
 # Perform integration tests
@@ -135,7 +155,8 @@ for key, value in tests.items():
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         sys.exit(returnvalue)
     # compile output files defined in the json file
-    is_output_same, diff_file = compare_output(value['validation_outputs'])
+    is_output_same, diff_file = compare_output(validation_outputs = value['validation_outputs'],
+                                               cmp_method = value['cmp_method'])
     if not is_output_same:
         print("--"*2 + "Error: At least output file '{0}' is not the same with benchmark. Exiting ...".format(diff_file))
         print("--"*2 + "Suggestion: Manually run this test and figure out the differences.")

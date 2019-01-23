@@ -8,17 +8,20 @@
                                 "validation_outputs": ["output_polymer_0.vtk",
                                                         "output_polymer_5.vtk",
                                                         "out.time",
-                                                        "out.eigenvalue"]
+                                                        "out.eigenvalue"],
+                                "cmp_method": "cmpfile"
                               },
 "PointParticle_Stokes_GGEM":{
                               "package": "POINTPARTICLE",
                               "required_inputs": ["point_particle_control.in",
                                                   "point_particle_data.in",
                                                   "run.sh",
-                                                  "zclean.sh"],
+                                                  "zclean.sh",
+                                                  "compare_output.py"],
                               "validation_outputs": ["output_velocity_profile_x_3P.txt",
                                                      "output_velocity_profile_y_3P.txt",
-                                                     "output_velocity_profile_z_3P.txt"]
+                                                     "output_velocity_profile_z_3P.txt"],
+                              "cmp_method": "cmpdf"
                             },                                  
 "RigidParticle_Sphere_Sedimentation_HI": {
                                           "package": "RIGIDPARTICLE",
@@ -29,6 +32,7 @@
                                                               "zclean.sh"],
                                           "validation_outputs": ["output_particle_trajectory.csv",
                                                                  "output_surface_node.csv",
-                                                                 "out.time"]
+                                                                 "out.time"],
+                                          "cmp_method": "cmpfile"
                                         }
 }

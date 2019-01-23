@@ -42,14 +42,34 @@ AnalyticalSolution::AnalyticalSolution(const std::string& name)
 // ======================================================================
 AnalyticalSolution::~AnalyticalSolution()
 {
-    // do nothing
+    //do nothing
 }
 
 
+// ======================================================================
+void AnalyticalSolution::attach_point_mesh(PointMesh<3>* point_mesh) 
+{
+    START_LOG("attach_point_mesh()", "AnalyticalSolution");  
+    
+    _point_mesh = point_mesh;
+
+    STOP_LOG("attach_point_mesh()", "AnalyticalSolution")  
+}
+
 
 // ======================================================================
-std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point& pt0,
-                                                                     PointMesh<3>* point_mesh) const
+PointMesh<3>* AnalyticalSolution::get_point_mesh() 
+{
+    START_LOG("get_point_mesh()", "AnalyticalSolution");  
+    
+    return _point_mesh;
+
+    STOP_LOG("get_point_mesh()", "AnalyticalSolution");    
+}
+
+
+// ======================================================================
+std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point& pt0) const
 {
   
   START_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
@@ -67,12 +87,12 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
   // GGEM object and number of points in the system
   GGEMStokes ggem_stokes;
   
-  const std::size_t n_points = point_mesh->num_particles();
+  const std::size_t n_points = _point_mesh->num_particles();
   
   // loop over each point
   for(std::size_t i=0; i<n_points; ++i)
   {
-    const Point pti = point_mesh->particles()[i]->point();
+    const Point pti = _point_mesh->particles()[i]->point();
     const Point x   = pt0 - pti;
     
     bool  zero_limit  = false;
@@ -80,7 +100,7 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
     
     // use ksi instead of alpha
     GT = ggem_stokes.green_tensor_exp(x,ksi,muc,dim,zero_limit);
-    const Point fv = point_mesh->particles()[i]->particle_force();
+    const Point fv = _point_mesh->particles()[i]->particle_force();
     //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv(0),fv(1),fv(2);
     
     // 3. compute u due to this particle

@@ -390,7 +390,7 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
 
     // compute the local velocity of fluid at the current node
     //const std::vector<Real> Uexact = this->exact_solution(pt);
-    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt, _point_mesh);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt);
 
     // compute the errors
     for(unsigned int i=0; i<dim; ++i){
@@ -856,7 +856,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt, _point_mesh);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt);
 
     // write the velocity, x vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
@@ -891,7 +891,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt, _point_mesh);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt);
 
     // write the velocity, y vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
@@ -926,7 +926,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt, _point_mesh);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt);
 
     // write the velocity, z vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);

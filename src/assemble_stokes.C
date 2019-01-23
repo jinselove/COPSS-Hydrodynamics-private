@@ -159,7 +159,14 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
       // printf("finished select_boundary_side\n");
     }
   }
-
+  
+  // attach PointMesh to AnalyticalSolution (only do this once for "ggem_validation")
+  if (_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation" &&
+      !analytical_solution -> get_point_mesh()) 
+  {
+      analytical_solution -> attach_point_mesh(_pm_system.point_mesh());
+  }
+  
   // Now we will loop over all the elements in the mesh that live
   // on the local processor. We will compute the element matrix Ke. In case users
   // later modify the program to include refinement, we will be safe and will only
@@ -407,7 +414,6 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 
   // perf_log.pop("compute_int_force");
   }
-
 
   // Now we will loop over all the elements in the mesh that live
   // on the local processor, and compute the element matrix Ke.
@@ -745,7 +751,7 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
   const std::size_t elem_id = elem->id();
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::vector<bool>& inlet_direction = pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
-  // AnalyticalSolution analytical_solution(pm_system);
+
   for (unsigned int s=0; s<_boundary_sides[elem_id].size(); s++)
   {
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -790,7 +796,7 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
           // ---------------- setup for validation test 01 -------------
           if(_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation")
           {
-            const std::vector<Real> u_boundary = analytical_solution -> exact_solution_infinite_domain(ptx, pm_system.point_mesh());
+            const std::vector<Real> u_boundary = analytical_solution -> exact_solution_infinite_domain(ptx);
             for(unsigned int k=0;k<_dim;++k) uvw[k] = u_boundary[k] - u_local[k];
           }
           // Normally on the boundary, disturbed_velocity = undistrubed_velocity - ggem_local_velocity

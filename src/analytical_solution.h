@@ -58,8 +58,7 @@ public:
   /*! \brief Exact solution for point forces in an unbounded domain
 
   */
-  std::vector<Real> exact_solution_infinite_domain(const Point& pt0,
-                                                   PointMesh<3>* point_mesh) const;
+  std::vector<Real> exact_solution_infinite_domain(const Point& pt0) const;
   
   
   /*! \brief correction factor for a particle in a cylinder: Bohlin approximation
@@ -73,6 +72,14 @@ public:
   */
   Real correction_factor_haberman(const Real r_ratio) const;
   
+  void attach_point_mesh(PointMesh<3>* point_mesh);
+  
+  PointMesh<3>* get_point_mesh();
+  
+private:
+    
+    PointMesh<3>* _point_mesh = NULL;
+
 }; // end of class defination
 
 

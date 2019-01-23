@@ -54,3 +54,4 @@ axes[0, 1].set_title("velocity in y-direction: v")
 axes[0, 2].set_title("velocity in z-direction: w")
 #plt.show()
 plt.savefig('ggem_pointforce_validation.eps', format='eps', dpi=100)
+

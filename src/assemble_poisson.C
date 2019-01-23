@@ -230,7 +230,8 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   const Real alpha     = _eqn_sys.parameters.get<Real> ("alpha");
 
   // Build _int_force vector at the beginning of Poisson solver
-  // FIXME: Do we need to clear the _dof_indices for different physics solver?
+  // This can work for both Poisson and Stokes equations, since there is only one
+  // forcing term on the right-hand-side of the equations.
   if(_int_force.size() == 1){
     if(_pm_system.comm().rank()==0){
       printf("\nassemble_int_force() for Poisson solver at the beginning of simulation\n\n");
@@ -381,7 +382,7 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
     // Now we will build the element RHS using gauss quadrature integration.
     // first loop over all neighboring particles near this element
     for(unsigned int np = 0; np<n_pts; ++np){
-      // FIXME:Charge on this bead
+      // FIXME:need to read-in charge in the beginning of simulation
       np_charge = _particles[n_list[np]]->particle_charge();
 
       // Get the location of this bead
@@ -391,11 +392,13 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
         // distance from quadrature point to the charge point
         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
 
-        // FIXME:evaluate the value of regularized gaussian charge at this quadrature point
+        // FIXME:new ggem function to evaluate the value of regularized gaussian charge at this quadrature point
         charge_val = ggem_sys.smoothed_charge_exp(r, alpha);
 
         // FIXME:Need to add nodal space charge density from ion concentration fields
-        Real space_charge_density = 0.;
+        // this will need to access PMSystemNP, and approximate ion concentration on
+        // quadrature points?
+        //Real space_charge_density = 0.;
 
        	for(unsigned int k=0; k<n_u_dofs; ++k){
         //Fe(k) += JxW[qp]*phi[k][qp]*fvalues_j;
@@ -477,27 +480,18 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
     {
       // Begin by calculating electrical potential on boundaries
       // Set phi = 0 by default for zero potential on walls
-      // FIXME: set potential values from the input file?
+      // FIXME: set potential values from the input file? how to set
+      // different potentials to different boundaries in future development?
       Real phi_total = 0., phi_global;
 
       // Calculate local part of the electrical potential from GGEM
       const Point ptx = side->point(nn); // Coordinate of the node
       // FIXME: implement local_potential_fluid in PMSystemPoisson
-      const std::vector<Real> phi_local = pm_system.local_potential_fluid(elem, ptx,"regularized");
+      const Real phi_local = pm_system.local_potential_fluid(elem, ptx,"regularized");
       //const std::vector<Real> phi_local = pm_system.local_potential_fluid(ptx,"regularized");
 
-      // Note this only influence the rhs vector
-      // FIXME: Maybe we can setup a validation test for Poisson system
-      if(_eqn_sys.parameters.get<std::string> ("test_name") == "ggem_validation_poisson")
-      {
-        const Real phi_boundary = analytical_solution.exact_solution_infinite_domain(ptx);
-        phi_global = phi_boundary - phi_local;
-      }
       // Usually on the boundary, global_potential = total_potential - ggem_local_potential
-      else
-      {
-        phi_global = phi_total - phi_local;
-      }
+      phi_global = phi_total - phi_local;
 
       // Find the node on the element matching this node on the side.
       // That defined where in the element matrix the BC will be applied.

@@ -174,13 +174,16 @@ public:
    */
   void set_neighbor_vector(std::vector<Point>& neighbor_vector) 
   { _neighbor_vector = neighbor_vector;};
-  
+
+ 
   /**
    * neighbor distance
    */
   const std::vector<Point> neighbor_vector() const{
     return _neighbor_vector;
   }
+
+
   /*
    * Set the force vector on the particle
    * This is set by the member function in the class "ParticleMesh"
@@ -199,21 +202,29 @@ public:
    */
   void zero_particle_force();
 
+
   /*!\ brief particle force
    *
    */  
   const Point& particle_force() {return _force;};
+
+
+  /*!\ brief particle charge
+   *
+   */  
+  const Real& particle_charge() {return _charge;};
+
 
   /*
    * Set particle velocity
    */ 
   void set_particle_velocity(const Point& p_velocity) {_velocity = p_velocity;};
 
+
   /*
    * Return the velocity vector of the particle
    */
   const Point& particle_velocity() const {return _velocity; };
-
 
   
   /*
@@ -252,7 +263,9 @@ private:
 
   // the force vector excerted on this particle(non-hydrodynamic and non-Brownian)
   Point _force;
-  
+ 
+  // Charge on the bead
+  Real _charge;
 
   // Count how many times the point has crossed a boundary
   // Used to unfold point's coordinate with periodic boundaries

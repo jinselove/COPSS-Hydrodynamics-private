@@ -24,11 +24,12 @@
 #include <stdio.h>
 
 #include "libmesh/reference_counted_object.h"
+#include "libmesh/linear_implicit_system.h"
 
-#include "pm_system_stokes.h"
+#include "point_mesh.h"
 
-//namespace libMesh
-//{
+namespace libMesh
+{
 
 /*! \brief Analytic solution to unbounded flow field
 
@@ -45,7 +46,7 @@ public:
   /*! \brief Constructor
 
   */
-  AnalyticalSolution(PMSystemStokes& pm_system);
+  AnalyticalSolution(const std::string& name);
 
 
   /*! \brief Destructor
@@ -57,7 +58,8 @@ public:
   /*! \brief Exact solution for point forces in an unbounded domain
 
   */
-  std::vector<Real> exact_solution_infinite_domain(const Point& pt0) const;
+  std::vector<Real> exact_solution_infinite_domain(const Point& pt0,
+                                                   PointMesh<3>* point_mesh) const;
   
   
   /*! \brief correction factor for a particle in a cylinder: Bohlin approximation
@@ -71,18 +73,8 @@ public:
   */
   Real correction_factor_haberman(const Real r_ratio) const;
   
-  
-  
-private:
-
-  /*! private member
-   *
-  */  
-  PMSystemStokes& _pm_system;
-
 }; // end of class defination
 
 
 
-//}  // end of namespace
-
+}  // end of namespace

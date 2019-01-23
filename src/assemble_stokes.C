@@ -47,12 +47,15 @@
 #include "ggem_stokes.h"
 #include "pm_toolbox.h"
 #include "assemble_stokes.h"
+#include "pm_system_stokes.h"
 
 // ==================================================================================
-AssembleStokes::AssembleStokes(EquationSystems& es)
+AssembleStokes::AssembleStokes(EquationSystems& es,
+                               const std::string& name)
 : AssembleSystem(es)
 {
-    //do nothing
+    if (name != "Stokes") libmesh_error();
+    analytical_solution = new AnalyticalSolution(name);
 }
 
 
@@ -60,7 +63,9 @@ AssembleStokes::AssembleStokes(EquationSystems& es)
 // ==================================================================================
 AssembleStokes::~AssembleStokes()
 {
-  // do nothing
+    if (analytical_solution){
+        delete analytical_solution;
+    }
 }
 
 
@@ -740,7 +745,7 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
   const std::size_t elem_id = elem->id();
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::vector<bool>& inlet_direction = pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
-  AnalyticalSolution analytical_solution(pm_system);
+  // AnalyticalSolution analytical_solution(pm_system);
   for (unsigned int s=0; s<_boundary_sides[elem_id].size(); s++)
   {
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -785,7 +790,7 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
           // ---------------- setup for validation test 01 -------------
           if(_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation")
           {
-            const std::vector<Real> u_boundary = analytical_solution.exact_solution_infinite_domain(ptx);
+            const std::vector<Real> u_boundary = analytical_solution -> exact_solution_infinite_domain(ptx, pm_system.point_mesh());
             for(unsigned int k=0;k<_dim;++k) uvw[k] = u_boundary[k] - u_local[k];
           }
           // Normally on the boundary, disturbed_velocity = undistrubed_velocity - ggem_local_velocity

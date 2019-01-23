@@ -22,6 +22,7 @@
 
 // Local includes
 #include "assemble_system.h"
+#include "analytical_solution.h"
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
@@ -39,7 +40,8 @@ public:
 
   @param[in,out] es EquationSystem
   */
-  AssembleStokes(EquationSystems& es);
+  AssembleStokes(EquationSystems& es,
+                 const std::string& name);
 
 
   /*! \brief Destructor
@@ -147,4 +149,15 @@ public:
 
   */
   Real boundary_traction(const std::string& which_side) const;
+  
+  /*! \brief Pointer to analytical_solution
+  */
+  AnalyticalSolution* get_analytical_solution() {return analytical_solution;};
+  
+private:
+
+    //! Get a reference to AnalyticalSolution 
+    AnalyticalSolution* analytical_solution;   
+    
+    
 };

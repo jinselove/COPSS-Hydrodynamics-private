@@ -36,7 +36,6 @@
 #include "pm_toolbox.h"
 #include "ggem_stokes.h"
 #include "brownian_system.h"
-#include "analytical_solution.h"
 #include "pm_system_stokes.h"
 
 
@@ -51,7 +50,9 @@ PMSystemStokes::PMSystemStokes(EquationSystems& es,
   _stokes_solver(es)
 {
   // Stokes equation assembly
-  _assemble_stokes = ( new AssembleStokes(es) );
+  if (name != "Stokes") libmesh_error();
+  assemble_stokes = ( new AssembleStokes(es, name) );
+  analytical_solution = assemble_stokes -> get_analytical_solution();
 }
 
 
@@ -68,10 +69,10 @@ PMSystemStokes::~PMSystemStokes()
 // ==================================================================================
 void PMSystemStokes::clear ()
 {
-  // delete the pointer
-  if(_assemble_stokes) {
-    delete _assemble_stokes;
-  }
+    // delete the pointer
+    if(assemble_stokes) {
+        delete assemble_stokes;
+    }
 }
 
 
@@ -181,7 +182,7 @@ void PMSystemStokes::assemble_matrix(const std::string& system_name,
 
   // Call assemble function to assemble matrix
   //assemble_matrix_sedimentation_ex1(this->get_equation_systems(), system_name, option);
-  _assemble_stokes->assemble_global_K(system_name, option);
+  assemble_stokes->assemble_global_K(system_name, option);
 
   // close the matrices
   this->matrix->close();  // close the matrix
@@ -207,7 +208,7 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
 //perf_log.pop("zero");
   //assemble_rhs_sedimentation_ex1 (this->get_equation_systems(), system_name, option);
 //perf_log.push("assemble");
-  _assemble_stokes->assemble_global_F(system_name, option);
+  assemble_stokes->assemble_global_F(system_name, option);
 //perf_log.pop("assemble");
 //perf_log.push("close");
   this->rhs->close();
@@ -365,7 +366,7 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
   const unsigned int n_nodes    = mesh.n_nodes();
   Real val0_norm = 0., val1_norm = 0.;
   Real val2_norm = 0., val3_norm = 0.;
-  AnalyticalSolution analytical_solution(*this);
+  // AnalyticalSolution analytical_solution(*this);
 
   // Loop over each node and compute the nodal velocity value
   MeshBase::node_iterator       nd     = mesh.local_nodes_begin();
@@ -389,7 +390,7 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
 
     // compute the local velocity of fluid at the current node
     //const std::vector<Real> Uexact = this->exact_solution(pt);
-    const std::vector<Real> Uexact = analytical_solution.exact_solution_infinite_domain(pt);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt, _point_mesh);
 
     // compute the errors
     for(unsigned int i=0; i<dim; ++i){
@@ -828,7 +829,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
   const Real xn = 200, yn = 80, zn = 80;
   const Real dx = box_len(0)/xn, dy = box_len(1)/yn, dz = box_len(2)/zn;
   const unsigned int NP = _point_mesh->num_particles();
-  AnalyticalSolution analytical_solution(*this);
+  // AnalyticalSolution analytical_solution(*this);
 
   std::ofstream outfile;
   int o_width = 12, o_precision = 9;
@@ -855,7 +856,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution.exact_solution_infinite_domain(pt);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt, _point_mesh);
 
     // write the velocity, x vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
@@ -890,7 +891,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution.exact_solution_infinite_domain(pt);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt, _point_mesh);
 
     // write the velocity, y vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
@@ -925,7 +926,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution.exact_solution_infinite_domain(pt);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(pt, _point_mesh);
 
     // write the velocity, z vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);

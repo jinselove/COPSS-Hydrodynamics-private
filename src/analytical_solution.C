@@ -28,13 +28,13 @@
 #include "pm_toolbox.h"
 #include "ggem_stokes.h"
 #include "analytical_solution.h"
-
+#include "point_mesh.h"
+// #include "pm_system_stokes.h"
 
 // ======================================================================
-AnalyticalSolution::AnalyticalSolution(PMSystemStokes& pm_system)
-: _pm_system(pm_system)
+AnalyticalSolution::AnalyticalSolution(const std::string& name)
 {
-  // Do nothing
+    if (name != "Stokes") libmesh_error();
 }
 
 
@@ -42,32 +42,37 @@ AnalyticalSolution::AnalyticalSolution(PMSystemStokes& pm_system)
 // ======================================================================
 AnalyticalSolution::~AnalyticalSolution()
 {
-  // Do nothing
+    // do nothing
 }
 
 
 
 // ======================================================================
-std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point& pt0) const
+std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point& pt0,
+                                                                     PointMesh<3>* point_mesh) const
 {
   
   START_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
-  
   // ksi's value should be consistent with that in GGEMStokes::regularization_parameter()
   const Real ksi = std::sqrt(libMesh::pi)/3.0;  // = 0.591
+  
   const Real muc = 1.0/(6*libMesh::pi);
+  
   const unsigned int dim = 3;
-  std::vector<Real> UA(dim,0.);
+  
+  std::vector<Real> UA(dim, 0.);
+  
   DenseMatrix<Number> GT;
   
   // GGEM object and number of points in the system
   GGEMStokes ggem_stokes;
-  const std::size_t n_points = _pm_system.point_mesh()->num_particles();
+  
+  const std::size_t n_points = point_mesh->num_particles();
   
   // loop over each point
   for(std::size_t i=0; i<n_points; ++i)
   {
-    const Point pti = _pm_system.point_mesh()->particles()[i]->point();
+    const Point pti = point_mesh->particles()[i]->point();
     const Point x   = pt0 - pti;
     
     bool  zero_limit  = false;
@@ -75,7 +80,7 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
     
     // use ksi instead of alpha
     GT = ggem_stokes.green_tensor_exp(x,ksi,muc,dim,zero_limit);
-    const Point fv = _pm_system.point_mesh()->particles()[i]->particle_force();
+    const Point fv = point_mesh->particles()[i]->particle_force();
     //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv(0),fv(1),fv(2);
     
     // 3. compute u due to this particle

@@ -26,17 +26,14 @@
 
 // user defined headers
 #include "pm_toolbox.h"
-#include "ggem_stokes.h"
 #include "analytical_solution.h"
 #include "point_mesh.h"
-// #include "pm_system_stokes.h"
 
 // ======================================================================
 AnalyticalSolution::AnalyticalSolution(const std::string& name)
 {
     if (name != "Stokes") libmesh_error();
 }
-
 
 
 // ======================================================================
@@ -69,23 +66,18 @@ PointMesh<3>* AnalyticalSolution::get_point_mesh()
 
 
 // ======================================================================
-std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point& pt0) const
+std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(GGEMStokes& ggem_stokes,
+                                                                     const Point& pt0) const
 {
   
   START_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
-  // ksi's value should be consistent with that in GGEMStokes::regularization_parameter()
-  const Real ksi = std::sqrt(libMesh::pi)/3.0;  // = 0.591
-  
-  const Real muc = 1.0/(6*libMesh::pi);
-  
-  const unsigned int dim = 3;
   
   std::vector<Real> UA(dim, 0.);
   
   DenseMatrix<Number> GT;
   
   // GGEM object and number of points in the system
-  GGEMStokes ggem_stokes;
+  // GGEMStokes ggem_stokes;
   
   const std::size_t n_points = _point_mesh->num_particles();
   
@@ -99,9 +91,8 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
     if(x.norm()<1E-6) zero_limit  = true;
     
     // use ksi instead of alpha
-    GT = ggem_stokes.green_tensor_exp(x,ksi,muc,dim,zero_limit);
+    GT = ggem_stokes.green_tensor_unbounded_smoothed(x, ggem_stokes.get_ksi(), zero_limit);
     const Point fv = _point_mesh->particles()[i]->particle_force();
-    //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv(0),fv(1),fv(2);
     
     // 3. compute u due to this particle
     for (std::size_t k=0; k<dim; ++k){
@@ -114,7 +105,6 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
   STOP_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
   return UA;
 }
-
 
 
 // ======================================================================

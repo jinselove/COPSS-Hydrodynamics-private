@@ -36,7 +36,7 @@ namespace libMesh
 PointParticle::PointParticle(const Point pt,
                              const dof_id_type point_id)
 : _center(pt), _counter(3,0), _id(point_id),
-  _point_type(NOT_DEFINED), _parent_id(-1),
+  _point_type(NOT_DEFINED_POINTTYPE), _parent_id(-1),
   _processor_id(-1),
   _elem_id(-1),
   _force(3,0.),

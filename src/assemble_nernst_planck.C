@@ -111,7 +111,6 @@ void AssembleNP::compute_element_rhs(const Elem* elem,
                                          const std::vector<std::size_t> n_list,
                                          const bool& pf_flag,
                                          const std::string& option,
-                                         const Real& alpha,
                                          DenseVector<Number>& Fe)
 {
   START_LOG("compute_element_rhs()", "AssembleNP");  // libMesh log

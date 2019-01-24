@@ -27,6 +27,7 @@
 #include "libmesh/linear_implicit_system.h"
 
 #include "point_mesh.h"
+#include "ggem_stokes.h"
 
 namespace libMesh
 {
@@ -58,7 +59,8 @@ public:
   /*! \brief Exact solution for point forces in an unbounded domain
 
   */
-  std::vector<Real> exact_solution_infinite_domain(const Point& pt0) const;
+  std::vector<Real> exact_solution_infinite_domain(GGEMStokes& ggem_stokes,
+                                                   const Point& pt0) const;
   
   
   /*! \brief correction factor for a particle in a cylinder: Bohlin approximation
@@ -72,13 +74,27 @@ public:
   */
   Real correction_factor_haberman(const Real r_ratio) const;
   
+  
+  /*! \brief Attach point mesh to the class
+  *
+  */
   void attach_point_mesh(PointMesh<3>* point_mesh);
   
+  
+  /*! \brief Get the pointer to the class member, point_mesh
+  *
+  */
   PointMesh<3>* get_point_mesh();
+  
   
 private:
     
+    // Initialization a null _point_mesh pointer
     PointMesh<3>* _point_mesh = NULL;
+    
+    
+    // System dimension
+    const int dim = 3;
 
 }; // end of class defination
 

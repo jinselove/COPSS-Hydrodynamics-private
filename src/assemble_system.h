@@ -189,6 +189,6 @@ protected:
   // Dirichlet BC using penalty method are different for different systems.
   // For example, in Poisson system, we don't use pressure inlet/outlet condition
   // to decide whether this side has to be included in the Dirichlet BC.
-  std::vector<std::vector<unsigned int> > _boundary_sides, _boundary_sides_poisson;
+  std::vector<std::vector<unsigned int> > _boundary_sides;
 
 };

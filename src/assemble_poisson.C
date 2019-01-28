@@ -113,8 +113,8 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
   DenseVector<Number> Fe;
 
   // Build _boundary_sides_poisson vector at beginning of simulation
-  if(_boundary_sides_poisson.size() == 1){
-    _boundary_sides_poisson.resize(n_mesh_elem);
+  if(_boundary_sides_dirichlet_poisson.size() == 1){
+    _boundary_sides_dirichlet_poisson.resize(n_mesh_elem);
     MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
     const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
     for ( ; el != end_el; ++el)
@@ -304,10 +304,13 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
                               pc_flag, option, alpha, Fe);
     // perf_log.pop("compute_element_rhs");
 
-    // Imposed the Dirichlet BC (electrical potential) via the penalty method.
+    // Impose the Dirichlet BC (electrical potential) via the penalty method.
     // perf_log.push("apply_bc_by_penalty");
     this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
     // perf_log.pop("apply_bc_by_penalty");
+
+    // Impose Neumann BC (surface charge density) to the right hand side 
+    this->apply_bc_neumann(elem, *fe_face, Fe);
 
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
@@ -424,27 +427,52 @@ void AssemblePoisson::select_boundary_side(const Elem* elem)
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::size_t elem_id = elem->id();
 
+  // Get boundary ids for each BC
+  const std::vector<unsigned int> boundary_id_dirichlet_poisson = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_dirichlet_poisson");
+  const std::vector<unsigned int> boundary_id_neumann_poisson   = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_neumann_poisson");
+
   // The following loops over the sides of the element. If the element has NO
   // neighbors on a side then that side MUST live on a boundary of the domain.
   for(unsigned int s=0; s<elem->n_sides(); s++)
   {
-    bool apply_bc = false;
+    bool apply_bc_dirichlet = false, apply_bc_neumann = false;
+
+    // If this side is on the boundary
     if(elem->neighbor(s) == NULL)
     {
-      apply_bc = true;
-
-      // If this side is on the periodic side, don't apply penalty
-      // The _boundary_id_3D only works with Cubic domain
-      for(int i = 0; i < _dim; i++)
-      {
-        if(periodicity[i]){
-          if(_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
-             _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
-          { apply_bc = false; }
+      // Find this side's corresponding Dirichlet BoundaryID. If found, stop looping all BoundaryIDs 
+      for(unsigned int i=0; i<boundary_id_dirichlet_poisson.size(); i++){
+        if(_mesh.get_boundary_info().has_boundary_id(elem, s, boundary_id_dirichlet_poisson[i]){
+          apply_bc_dirichlet = true;
+          break;
         }
       }
+
+      // Find this side's corresponding Neumann BoundaryID. If found, stop looping all BoundaryIDs 
+      for(unsigned int i=0; i<boundary_id_neumann_poisson.size(); i++){
+        if(_mesh.get_boundary_info().has_boundary_id(elem, s, boundary_id_neumann_poisson[i]){
+          apply_bc_neumann = true;
+          break;
+        }
+      }
+
+      //OLD CODE, DEPRECATE IF NEW CODE PASS INTEGRATION TEST
+      //apply_bc = true;
+      //// If this side is on the periodic side, don't apply penalty
+      //// The _boundary_id_3D only works with Cubic domain
+      //for(int i = 0; i < _dim; i++)
+      //{
+      //  if(periodicity[i]){
+      //    if(_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
+      //       _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
+      //    { apply_bc = false; }
+      //  }
+      //}
     }
-    if(apply_bc) _boundary_sides_poisson[elem_id].push_back(s);
+
+    // If BC is applied, store this side_id for this element
+    if(apply_bc_dirichlet) _boundary_sides_dirichlet_poisson[elem_id].push_back(s);
+    if(apply_bc_neumann)   _boundary_sides_neumann_poisson[elem_id].push_back(s);
   }
 
   STOP_LOG("select_boundary_side()", "AssemblePoisson");
@@ -454,10 +482,10 @@ void AssemblePoisson::select_boundary_side(const Elem* elem)
 
 // =======================================================================================
 void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
-                                         const std::string& matrix_or_vector,
-                                         DenseMatrix<Number>& Ke,
-                                         DenseVector<Number>& Fe,
-                                         const std::string& option)
+                                          const std::string& matrix_or_vector,
+                                          DenseMatrix<Number>& Ke,
+                                          DenseVector<Number>& Fe,
+                                          const std::string& option)
 {
   START_LOG("apply_bc_by_penalty()", "AssemblePoisson");
 
@@ -469,29 +497,37 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
   const std::size_t elem_id = elem->id();
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
 
+  // Dirichlet boundaries
+  const std::vector<unsigned int> boundary_id_dirichlet_poisson = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_dirichlet_poisson");
+  const std::vector<Real> boundary_value_dirichlet_poisson = _eqn_sys.parameters.get<std::vector<Real>> ("boundary_value_dirichlet_poisson");
+
   // Loop through sides in this element that sits on system's boundary
-  for (unsigned int s=0; s<_boundary_sides[elem_id].size(); s++)
+  for (unsigned int s=0; s<_boundary_sides_dirichlet_poisson[elem_id].size(); s++)
   {
     // Build the full-order side element for "potential" Dirichlet BC at the walls.
-    UniquePtr<Elem> side (elem->build_side(_boundary_sides[elem_id][s]));
+    UniquePtr<Elem> side (elem->build_side(_boundary_sides_dirichlet_poisson[elem_id][s]));
+
+    // Total electrical potential on this side
+    Real phi_total = 0.;
+    for(unsigned int i=0; i<boundary_value_dirichlet_poisson.size(); i++){
+      if(_mesh.get_boundary_info().has_boundary_id(elem, s, boundary_id_dirichlet_poisson[i]){
+        phi_total = boundary_value_dirichlet_poisson[i];
+        break;
+      }
+    }
 
     // Loop through nodes on this side element
     for (unsigned int nn=0; nn<side->n_nodes(); nn++)
     {
-      // Begin by calculating electrical potential on boundaries
-      // Set phi = 0 by default for zero potential on walls
-      // FIXME: set potential values from the input file? how to set
-      // different potentials to different boundaries in future development?
-      Real phi_total = 0., phi_global;
-
       // Calculate local part of the electrical potential from GGEM
       const Point ptx = side->point(nn); // Coordinate of the node
-      // FIXME: implement local_potential_fluid in PMSystemPoisson
+      // FIXME: implement local_potential_fluid in PMSystemPoisson, which depends
+      // on local_potential_fluid from GGEMSystem
       const Real phi_local = pm_system.local_potential_fluid(elem, ptx,"regularized");
       //const std::vector<Real> phi_local = pm_system.local_potential_fluid(ptx,"regularized");
 
-      // Usually on the boundary, global_potential = total_potential - ggem_local_potential
-      phi_global = phi_total - phi_local;
+      // Ewald split: global_potential = total_potential - ggem_local_potential
+      Real phi_global = phi_total - phi_local;
 
       // Find the node on the element matching this node on the side.
       // That defined where in the element matrix the BC will be applied.
@@ -499,13 +535,68 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
       {
         if (elem->node(n) == side->node(nn))
         {
-          // Penalize phi at the current node
+          // Penalize phi at the current node, var_number is 0 for 'phi'
           this->penalize_elem_matrix_vector(Ke,Fe,matrix_or_vector,0,n,n_nodes,penalty,phi_global);
         } // end if (elem->node(n) == side->node(nn))
       } // enf for n-loop
     } // end for nn-loop
   } // end for s-loop
 
-
   STOP_LOG("apply_bc_by_penalty()", "AssemblePoisson");
+}
+
+
+
+// =======================================================================================
+void AssemblePoisson::apply_bc_neumann(const Elem* elem,
+                                       FEBase& fe_face,
+                                       DenseVector<Number>& Fe)
+{
+  START_LOG("apply_bc_neumann()", "AssemblePoisson");
+
+  // Get a reference to the Particle-Mesh System
+  PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson> ("Poisson");
+
+  const unsigned int n_nodes = elem->n_nodes();
+  const std::size_t elem_id = elem->id();
+
+  // Neumann boundaries
+  const std::vector<unsigned int> boundary_id_neumann_poisson = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_neumann_poisson");
+  const std::vector<Real> boundary_value_neumann_poisson = _eqn_sys.parameters.get<std::vector<Real>> ("boundary_value_neumann_poisson");
+
+  const std::vector<Real>               & JxW_face = fe_face->get_JxW();
+  const std::vector<std::vector<Real> > & phi_face = fe_face->get_phi();
+
+  // Loop through sides in this element that sits on system's boundary
+  for (unsigned int s=0; s<_boundary_sides_neumann_poisson[elem_id].size(); s++)
+  {
+    // Build the full-order side element for "potential" Dirichlet BC at the walls.
+    UniquePtr<Elem> side (elem->build_side(_boundary_sides_neumann_poisson[elem_id][s]));
+
+    // dphi / dn (surface charge density) on this side
+    Real sigma_total = 0.;
+    for(unsigned int i=0; i<boundary_value_neumann_poisson.size(); i++){
+      if(_mesh.get_boundary_info().has_boundary_id(elem, s, boundary_id_neumann_poisson[i]){
+        sigma_total = boundary_value_neumann_poisson[i];
+        break;
+      }
+    }
+
+    // Calcualte (dphi / dn)_local
+    Real sigma_local = 0.; //FIXME:implement this needs GgemPoisson
+
+    // Calculate (dphi / dn)_global
+    Real sigma_global = sigma_total - sigma_local;
+
+    // Calcualte Jacobian*Weights and shape functions on this side
+    fe_face->reinit(elem, s);
+
+    // Integrate on this side 
+    for (unsigned int qp=0; qp<JxW_face.size(); qp++)
+      for (unsigned int i=0; i<phi_face.size(); i++)
+        Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global;
+
+  } // end for s-loop
+
+  STOP_LOG("apply_bc_neumann()", "AssemblePoisson");
 }

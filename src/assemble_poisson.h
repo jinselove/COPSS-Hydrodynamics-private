@@ -25,7 +25,7 @@
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
- * Poisson equations.
+ * Poisson equation.
  *
  * For details of the implementation, refer to
  * J. Chem. Phys. 142, 014108 (2015)
@@ -90,7 +90,7 @@ public:
   void select_boundary_side(const Elem* elem) override;
 
 
-  /*! \brief Apply BCs by penalty method.
+  /*! \brief Apply Dirichlet BC by penalty method.
 
   */
   void apply_bc_by_penalty(const Elem* elem,
@@ -98,5 +98,20 @@ public:
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
                            const std::string& option) override;
+
+
+  /*! \brief Apply Neumann BC.
+
+  */
+  void apply_bc_neumann(const Elem* elem,
+                        FEBase& fe_face,
+                        DenseVector<Number>& Fe);
+
+
+
+private:
+
+  // Boundary sides that Dirichlet and Neumann BCs are applied.
+  std::vector<std::vector<unsigned int> > _boundary_sides_dirichlet_poisson, _boundary_sides_neumann_poisson;
  
 };

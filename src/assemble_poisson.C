@@ -521,10 +521,10 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
     {
       // Calculate local part of the electrical potential from GGEM
       const Point ptx = side->point(nn); // Coordinate of the node
-      // FIXME: implement local_potential_fluid in PMSystemPoisson, which depends
-      // on local_potential_fluid from GGEMSystem
-      const Real phi_local = pm_system.local_potential_fluid(elem, ptx,"regularized");
-      //const std::vector<Real> phi_local = pm_system.local_potential_fluid(ptx,"regularized");
+      // FIXME: implement local_electrical_potential in PMSystemPoisson, which depends
+      // on local_electrical_potential from GGEMSystem
+      const Real phi_local = pm_system.local_electrical_potential(elem, ptx,"regularized");
+      //const std::vector<Real> phi_local = pm_system.local_electrical_potential(ptx,"regularized");
 
       // Ewald split: global_potential = total_potential - ggem_local_potential
       Real phi_global = phi_total - phi_local;
@@ -549,6 +549,7 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
 
 // =======================================================================================
 void AssemblePoisson::apply_bc_neumann(const Elem* elem,
+                                       FEBase& fe_phi,
                                        FEBase& fe_face,
                                        DenseVector<Number>& Fe)
 {
@@ -564,8 +565,40 @@ void AssemblePoisson::apply_bc_neumann(const Elem* elem,
   const std::vector<unsigned int> boundary_id_neumann_poisson = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_neumann_poisson");
   const std::vector<Real> boundary_value_neumann_poisson = _eqn_sys.parameters.get<std::vector<Real>> ("boundary_value_neumann_poisson");
 
+  // Integration terms for side element
   const std::vector<Real>               & JxW_face = fe_face->get_JxW();
   const std::vector<std::vector<Real> > & phi_face = fe_face->get_phi();
+  const std::vector<Point>          & face_normals = fe_face->get_normals();
+
+  // Extract the shape function derivatives to be evaluated at the nodes
+  const std::vector<std::vector<RealGradient> > & dphi = fe_phi->get_dphi();
+  // Extract the element node coordinates in the reference frame
+  std::vector<Point> nodes;
+  fe_phi->get_refspace_nodes(elem->type(), nodes);
+  // Evaluate the shape functions derivatives at the nodes
+  fe_phi->reinit(elem, &nodes);
+
+  // Local electrical potential and its gradient on all nodes in this element
+  std::vector<Real> phi_local;
+  phi_local.resize(elem->n_nodes());
+  std::vector<RealGradient> dphi_local;
+  dphi_local.resize(elem->n_nodes());
+  // Loop through nodes on this element
+  for (unsigned int nn=0; nn<elem->n_nodes(); nn++)
+  {
+    // Coordinate of the node
+    const Point ptx = elem->point(nn);
+    // Evaluate local electrical potential (phi) on each node
+    // FIXME: implement local_electrical_potential in PMSystemPoisson, which depends
+    // on local_electrical_potential from GGEMSystem
+    phi_local[nn] = pm_system.local_electrical_potential(elem, ptx, "regularized");
+    //const std::vector<Real> phi_local = pm_system.local_electrical_potential(ptx,"regularized");
+  }
+
+  // Gradient of electrical potential on all nodes in this element
+  for (unsigned int nn=0; nn<elem->n_nodes(); nn++)
+    for (unsigned int i=0; i<phi_local.size(); i++)
+      dphi_local[nn] += phi_local[i] * dphi[i][nn];
 
   // Loop through sides in this element that sits on system's boundary
   for (unsigned int s=0; s<_boundary_sides_neumann_poisson[elem_id].size(); s++)
@@ -582,19 +615,38 @@ void AssemblePoisson::apply_bc_neumann(const Elem* elem,
       }
     }
 
-    // Calcualte (dphi / dn)_local
-    Real sigma_local = 0.; //FIXME:implement this needs GgemPoisson
-
-    // Calculate (dphi / dn)_global
-    Real sigma_global = sigma_total - sigma_local;
-
     // Calcualte Jacobian*Weights and shape functions on this side
     fe_face->reinit(elem, s);
+
+    // Calculate (dphi / dn)_local on side nodes
+    std::vector<Real> sigma_local;
+    sigma_local.resize(side->n_nodes());
+    // Loop through nodes on this side element
+    for (unsigned int nn=0; nn<side->n_nodes(); nn++)
+    {
+      // Find the node on the element matching this node on the side.
+      // That defined where in the element matrix the BC will be applied.
+      for (unsigned int n=0; n<elem->n_nodes(); n++)
+      {
+        if (elem->node(n) == side->node(nn))
+        {
+          sigma_local[nn] = dphi_local[n][0] * face_normals(0)
+                          + dphi_local[n][1] * face_normals(1)
+                          + dphi_local[n][2] * face_normals(2);
+        }
+      }
+    }
+
+    // Calculate (dphi / dn)_global
+    std::vector<Real> sigma_global;
+    sigma_global.resize(side->n_nodes());
+    for (unsigned int nn=0; nn<side->n_nodes(); nn++)
+      sigma_global[nn] = sigma_total - sigma_local[nn];
 
     // Integrate on this side 
     for (unsigned int qp=0; qp<JxW_face.size(); qp++)
       for (unsigned int i=0; i<phi_face.size(); i++)
-        Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global;
+        Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global[i];
 
   } // end for s-loop
 

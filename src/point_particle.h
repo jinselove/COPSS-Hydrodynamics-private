@@ -219,9 +219,14 @@ public:
   /*
    * Return the orientation vector of the particle
    */
-  const std::vector<Real> orientation() const {  return _orientation;  };
+  const std::vector<Real>& orientation() const {  return _orientation;  };
   void set_orientation(const std::vector<Real>& rot_vec);
   
+ /*
+  * Return the charge of the particle
+  */
+  const Real& charge() const {return _charge;};
+  void set_charge(const Real& charge) {_charge = charge;};
   
   
   /*
@@ -253,6 +258,8 @@ private:
   // the force vector excerted on this particle(non-hydrodynamic and non-Brownian)
   Point _force;
   
+  // charge
+  Real _charge;
 
   // Count how many times the point has crossed a boundary
   // Used to unfold point's coordinate with periodic boundaries

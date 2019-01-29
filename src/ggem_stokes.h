@@ -28,6 +28,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/point.h"
 #include "point_mesh.h"
+#include "ggem_system.h"
 
 using namespace libMesh;
 
@@ -35,29 +36,16 @@ using namespace libMesh;
 namespace libMesh
 {
   
-  
-/*
-* Type of a Dirac Delta function(for a point force)
-*/
-enum DeltaFunType {
-    NOT_DEFINED_DELTAFUNTYPE   = -1,   // NOT DEFINED delta function
-    SINGULAR      = 0,    // Original Dirac delta function with singularity
-    SMOOTHED_EXP  = 1,    // Smoothed force(Exponent/Gaussian form)
-    SMOOTHED_POL1 = 2,    // Smoothed force(Polynomial type 1)
-    SMOOTHED_POL2 = 3     // Smoothed force(Polynomial type 2)
-};
-  
-  
 /*
  * Remember that:
- * The PMLinearImplicitSystem is designed to solve
+ * The PMSystemStokes is designed to solve
  * the Stokes equation with regularized Gaussian
  * point forces due to particles using mixed FEM, which 
  * is usually known as 'global' part of the solution
  *
  * This class GGEMStokes will provide the main functionalities of
  * GGEM (General Geometry Ewald-like Method), and it will provide
- * the 'local' solution. Together with 'PMLI_system', this will
+ * the 'local' solution. Together with 'PMSystemStokes', this will
  * provide the complete solution for the Stokes system with
  * multiple point forces.
  *
@@ -67,7 +55,7 @@ enum DeltaFunType {
  */
   
 // class GGEMStokes :  public ReferenceCountedObject<GGEMStokes>
-class GGEMStokes
+class GGEMStokes : public GGEMSystem
 {
 public:
 
@@ -78,26 +66,19 @@ public:
     // Destructor
     ~GGEMStokes();
 
-
-    /* 
-    * Kronecker delta function 
-    */
-    inline Real kronecker_delta(const std::size_t i,
-                              const std::size_t j) const
-    { return  i==j ? 1.0 : 0.0; };
-    
-
     /*
     * Modified smoothed Dirac delta function with exponent form
+    * Reference: Eqn (27) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
     */
     Real smoothed_force_exp(const Real& r) const;
 
 
     /*
-    * Green tensors for different types of Dirac Delta function
+    * Green tensors for different types of Dirac Delta function in unbounded domain
+    * if delta_type==SINGULAR: will return this -> green_tensor_unbounded_singular
+    * if delta_type==SMOOTHED_EXP: will return this -> green_tensor_unbounded_smoothed
     */
-    DenseMatrix<Number> green_tensor(const Point& x,     /* vector x = pt1 - pt0 */
-                                     const bool& zero_limit,           /* x-->0  */
+    DenseMatrix<Number> green_tensor_unbounded(const Point& x,     /* vector x = pt1 - pt0 */
                                      const DeltaFunType& delta_type) const;
 
 
@@ -114,38 +95,43 @@ public:
     /*
      * Green tensor for unbounded domain due to a smoothed force defined by a Gaussian
      * force density: rho = sum[v=1:N] f_v*( g ).
+     * If alpha_or_ksi == ksi, then this tensor gives the solution to the total local_velocity
+     * at the boundary of a periodic box.
+     * Reference: The ksi part of Equation (31) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
+     * The reason why we only take the ksi part is because Equation (31) is the local part of the green
+     * tensor, i.e, the green tensor because of the local force, i.e., g_ski - g_alpha. However, here we need
+     * the total green tensor because of the total force, i.e., g_ksi 
      */
      DenseMatrix<Number> green_tensor_unbounded_smoothed(const Point& x,     /* vector x = pt1 - pt0 */
-                                                         const Real& alpha_or_ksi,
-                                                         const bool& zero_limit) const;    /* x-->0  */
+                                                         const Real& alpha_or_ksi) const;   
 
 
     /*
-    * Green function for unbounded Stokes due to a point force + a 'local' smoothed force
+    * Green function for the local force density, which is written as a singular point 
+    * force (delta) + a 'local' smoothed force (g)    
     * with exp form: rho = sum[v=1:N] f_v*( delta - g ).
     * The solution is u_loc(i) = sum[v=1:N] G_v(x-x_v; i,j)*f_v(j)
     * Eqn (3) in PRL 98, 140602(2007), JP Hernandez-Ortiz et al.
     * or Eqn (30) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
     */
-    DenseMatrix<Number> green_tensor_local(const Point& x,     /* vector x = pt1 - pt0 */
-                                           const bool& zero_limit) const;    /* x-->0  */
+    DenseMatrix<Number> green_tensor_local_singular(const Point& x    /* vector x = pt1 - pt0 */
+                                           ) const;  
 
 
     /*
-    * Regularized Green function in order to remove the singularity of v
-    * For ksi^-1 = 3a/sqrt(PI), the max fluid velocity is equal to that
-    * of a particle with radius a and the pair mobility remains positive definite.
-    *
+    * Green function for the local force density. The local force density is regularized 
+    * in order to remove the singularity. For ksi^-1 = 3a/sqrt(PI), the max fluid velocity 
+    * is equal to that of a particle with radius a and the pair mobility remains positive definite.
     * See Eqn (4) in PRL 98, 140602(2007), JP Hernandez-Ortiz et al.
     * or Eqn (31)(32) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
     */
-    DenseMatrix<Number> green_tensor_local_regularized(const Point& x,     /* vector x = pt1 - pt0 */
-                                                       const bool& zero_limit) const;   /* x-->0  */
+    DenseMatrix<Number> green_tensor_local_regularized(const Point& x     /* vector x = pt1 - pt0 */
+                                                       ) const; 
 
 
     /* Compute the local vel-solution of the fluid at a given point ptx
     * due to smoothed/regularized point forces.
-    * force_type: regularized, smooth
+    * force_type: regularized
     *
     * NOTE: due to the fast convergence of gaussian function, only a small group of 
     * particles within the neighbor list are considered. There are two ways
@@ -160,16 +146,17 @@ public:
                                            const Point&   ptx,      /* a pt in space */
                                            const std::string& force_type) const;
 
+
     /* Compute the local vel-solution of the fluid at a given point ptx
     * due to smoothed/regularized point forces.
-    * force_type: regularized, smooth
+    * force_type: regularized
     *
     * NOTE: due to the fast convergence of gaussian function, only a small group of 
     * particles within the neighbor list are considered. There are two ways
     * to construct this neighbor list:
     * (1) element independent: directly search particles near the given point using KDTree;
     * (2) element dependent: directly use the neighbor list of the parent element;
-    * this function implement method (1), which contains a short neighbor list
+    * this function implement method (2), which contains a short neighbor list
     *
     * Eqn (33) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
     */
@@ -205,11 +192,6 @@ public:
     //! set Immersed boundary method regularization parameter, ibm_beta
     void set_ibm_beta(const Real& _ibm_beta) {ibm_beta = _ibm_beta;};
     Real get_ibm_beta() {return ibm_beta;};
-
-
-    //! set PointType 
-    void set_point_type(const PointType& _point_type) {point_type = _point_type;};
-    PointType get_point_type() {return point_type;};
     
     
     //! set kinematic viscosity
@@ -218,21 +200,9 @@ public:
 
     //! set GGEM alpha
     void set_alpha(const Real& _alpha);
-    Real get_alpha() {return alpha;};
 
     //! set regularization parameter
     void set_ksi();
-    Real get_ksi() {return ksi;};
-
-
-    //! set Delta funtion type
-    void set_delta_type(DeltaFunType _delta_type) {delta_type = _delta_type;};
-    Real get_delta_type() {return delta_type;};
-
-
-    //! set bead radius (non-dimensional), it should be 1.
-    void set_br0(const Real& _br0) {br0 = _br0;};
-    Real get_br0() {return br0;};
 
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -296,24 +266,6 @@ public:
 
   
 private:
-
-  std::vector<std::vector<Real>> _kronecker_delta;
-  
-  //! Pi = 3.1415926...
-  const Real  PI      = libMesh::pi;
-  
-  //! pi^(1/2)
-  const Real  sqrt_pi = std::sqrt(PI);
-  
-  //! pi^(3/2)
-  const Real pi_23 = std::pow(PI, 3./2.);
-  
-  // tolerance
-  const Real  r_eps   = 1E-6;  
-  
-  // dimensions
-  const int dim = 3;
-  
   
   //! kinematic viscosity
   Real mu = NAN;
@@ -321,7 +273,6 @@ private:
   
   
   //! alpha
-  Real alpha = NAN;
   Real alpha2 = NAN; // alpha2 = alpha * alpha
   Real alpha3 = NAN; // alpha3 = alpha * alpha * alpha
   Real alpha3_pi_23 = NAN; // alpha3_pi_23 = alpha^3. / pi^(3./2.)
@@ -330,7 +281,6 @@ private:
   
   
   //! regularization parameter
-  Real ksi = NAN;
   Real ksi2 = NAN; // ksi2 = ksi * ksi
   Real ksi3 = NAN; // ksi3 = ksi^3.
   Real ksi3_pi_23 = NAN; // ksi3_pi_23 = ksi^3. / pi^(3./2.)
@@ -343,16 +293,7 @@ private:
 
   //! ibm_beta for Immersed boundary method
   Real ibm_beta = NAN;
-  
-  //! point type: POLYMER_BEAD or LAGRANGIAN_POINT or POINT_PARTICLE
-  PointType point_type = NOT_DEFINED_POINTTYPE;
-  
-  //! delta function type
-  DeltaFunType delta_type = NOT_DEFINED_DELTAFUNTYPE;
-  
-  //! bead radius
-  Real br0 = NAN;
-  
+
 };
 
   

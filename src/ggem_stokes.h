@@ -108,7 +108,7 @@ public:
 
     /*
     * Green function for the local force density, which is written as a singular point 
-    * force (delta) + a 'local' smoothed force (g)    
+    * force (delta) - a 'local' smoothed force (g)    
     * with exp form: rho = sum[v=1:N] f_v*( delta - g ).
     * The solution is u_loc(i) = sum[v=1:N] G_v(x-x_v; i,j)*f_v(j)
     * Eqn (3) in PRL 98, 140602(2007), JP Hernandez-Ortiz et al.

@@ -119,7 +119,7 @@ public:
 
     /*
     * Green tensor for the local charge density. The charge density is written as a singular
-    * point charge (delta) + a "local" smoothed charge density (g)
+    * point charge (delta) - a "local" smoothed charge density (g)
     * with exp form: rho = sum[v=1:N] f_v*( delta - g ).
     * The solution is u_loc(i) = sum[v=1:N] G_v(x-x_v; i,j)*f_v(j)
     * Reference: Equation (14) in J. Chem. Theory Comput. 2018, 14, 4901-4913

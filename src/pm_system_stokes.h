@@ -25,6 +25,8 @@
 #include "assemble_stokes.h"
 #include "solver_stokes.h"
 #include "pm_linear_implicit_system.h"
+#include "analytical_solution.h"
+#include "ggem_stokes.h"
 
 namespace libMesh
 {
@@ -34,8 +36,6 @@ namespace libMesh
  * equation with regularized Gaussian point forces
  * due to particles using mixed FEM.
  */
-
-//class Fix;
 
 class PMSystemStokes : public PMLinearImplicitSystem
 {
@@ -202,7 +202,7 @@ public:
    * force_type: "regularized"  or "smooth"
    */
   Point local_velocity_bead(const std::size_t& bead_id,
-                                        const std::string& force_type) const;
+                            const std::string& force_type) const;
 
 
   /*
@@ -241,8 +241,14 @@ private:
   SolverStokes _stokes_solver;
 
   // Assemble Stokes system
-  AssembleStokes* _assemble_stokes;
-
-};
+  AssembleStokes* assemble_stokes;
+  
+  // Get a pointer to AnalyticalSolution
+  AnalyticalSolution* analytical_solution;
+  
+  // Get a pointer to GGEMStokes
+  GGEMStokes* ggem_stokes;
+  
+}; // end class
 
 } // end namespace libMesh

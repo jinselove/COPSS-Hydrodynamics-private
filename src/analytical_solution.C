@@ -26,57 +26,73 @@
 
 // user defined headers
 #include "pm_toolbox.h"
-#include "ggem_system.h"
 #include "analytical_solution.h"
-
+#include "point_mesh.h"
 
 // ======================================================================
-AnalyticalSolution::AnalyticalSolution(PMSystemStokes& pm_system)
-: _pm_system(pm_system)
+AnalyticalSolution::AnalyticalSolution(const std::string& name)
 {
-  // Do nothing
+    if (name != "Stokes") libmesh_error();
 }
-
 
 
 // ======================================================================
 AnalyticalSolution::~AnalyticalSolution()
 {
-  // Do nothing
+    //do nothing
 }
 
 
+// ======================================================================
+void AnalyticalSolution::attach_point_mesh(PointMesh<3>* point_mesh) 
+{
+    START_LOG("attach_point_mesh()", "AnalyticalSolution");  
+    
+    _point_mesh = point_mesh;
+
+    STOP_LOG("attach_point_mesh()", "AnalyticalSolution")  
+}
+
 
 // ======================================================================
-std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point& pt0) const
+PointMesh<3>* AnalyticalSolution::get_point_mesh() 
+{
+    START_LOG("get_point_mesh()", "AnalyticalSolution");  
+    
+    return _point_mesh;
+
+    STOP_LOG("get_point_mesh()", "AnalyticalSolution");    
+}
+
+
+// ======================================================================
+std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(GGEMStokes& ggem_stokes,
+                                                                     const Point& pt0) const
 {
   
   START_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
   
-  // ksi's value should be consistent with that in GGEMSystem::regularization_parameter()
-  const Real ksi = std::sqrt(libMesh::pi)/3.0;  // = 0.591
-  const Real muc = 1.0/(6*libMesh::pi);
-  const unsigned int dim = 3;
-  std::vector<Real> UA(dim,0.);
+  std::vector<Real> UA(dim, 0.);
+  
   DenseMatrix<Number> GT;
   
   // GGEM object and number of points in the system
-  GGEMSystem ggem_system;
-  const std::size_t n_points = _pm_system.point_mesh()->num_particles();
+  // GGEMStokes ggem_stokes;
+  
+  const std::size_t n_points = _point_mesh->num_particles();
   
   // loop over each point
   for(std::size_t i=0; i<n_points; ++i)
   {
-    const Point pti = _pm_system.point_mesh()->particles()[i]->point();
+    const Point pti = _point_mesh->particles()[i]->point();
     const Point x   = pt0 - pti;
     
     bool  zero_limit  = false;
     if(x.norm()<1E-6) zero_limit  = true;
     
     // use ksi instead of alpha
-    GT = ggem_system.green_tensor_exp(x,ksi,muc,dim,zero_limit);
-    const Point fv = _pm_system.point_mesh()->particles()[i]->particle_force();
-    //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv(0),fv(1),fv(2);
+    GT = ggem_stokes.green_tensor_unbounded_smoothed(x, ggem_stokes.get_ksi(), zero_limit);
+    const Point fv = _point_mesh->particles()[i]->particle_force();
     
     // 3. compute u due to this particle
     for (std::size_t k=0; k<dim; ++k){
@@ -89,7 +105,6 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(const Point
   STOP_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
   return UA;
 }
-
 
 
 // ======================================================================
@@ -118,7 +133,3 @@ Real AnalyticalSolution::correction_factor_haberman(const Real r_r0) const
   STOP_LOG("correction_factor_haberman()", "AnalyticalSolution");
   return f1/f2;
 }
-
-
-
-

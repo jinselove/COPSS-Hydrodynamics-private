@@ -22,6 +22,8 @@
 
 // Local includes
 #include "assemble_system.h"
+#include "analytical_solution.h"
+#include "ggem_stokes.h"
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
@@ -39,7 +41,8 @@ public:
 
   @param[in,out] es EquationSystem
   */
-  AssembleStokes(EquationSystems& es);
+  AssembleStokes(EquationSystems& es,
+                 const std::string& name);
 
 
   /*! \brief Destructor
@@ -117,7 +120,6 @@ public:
                            const std::vector<std::size_t> n_list,
                            const bool& pf_flag,
                            const std::string& option,
-                           const Real& alpha,
                            DenseVector<Number>& Fe) override;
 
   
@@ -147,4 +149,30 @@ public:
 
   */
   Real boundary_traction(const std::string& which_side) const;
+  
+  
+  /*! \brief Pointer to ggem_stokes
+  */
+  void init_ggem_stokes(const std::string& system_name);
+  
+  
+  /*! \brief Pointer to analytical_solution
+  */
+  AnalyticalSolution* get_analytical_solution() {return analytical_solution;};
+  
+  
+  /*! \brief Pointer to ggem_stokes
+  */
+  GGEMStokes* get_ggem_stokes() {return ggem_stokes;};
+  
+  
+private:
+
+    //! Get a reference to AnalyticalSolution 
+    AnalyticalSolution* analytical_solution;   
+    
+    //! Get a reference to GGEMStokes
+    GGEMStokes* ggem_stokes;
+    
+    
 };

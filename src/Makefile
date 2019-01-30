@@ -48,7 +48,7 @@ dust:
 	@rm -f out*.m job_output.txt output.txt* *.gmv.* *.plt.* out*.xdr* out*.xda* PI* complete
 
 clean: dust
-	@rm -f $(objects) *.$(obj-suffix) *.lo
+	@rm -f $(objects) *.$(obj-suffix) *.lo $(target)
 
 clobber: clean 
 	@rm -f $(target)

@@ -3,10 +3,10 @@
 # ---------------------------------------------------------------------------------
 
 #############################################
-#			   simulation_name         			
+#			   system_name         			
 #############################################
 
-simulation_name = general
+simulation_name = ggem_validation
 
 #############################################
 #			   Physical parameters         			
@@ -16,9 +16,8 @@ simulation_name = general
 particle_type = point_particle
 
 # point_particle_model #
-#point_particle_model = polymer_chain
+point_particle_model = bead
 
-point_particle_model = polymer_chain
 # viscosity. Here we use the unit (cP)
 # The visocity of water is
 # 1 cP = 1 mPa·s = 0.001 Pa·s = 0.001 N·s·m−2 = 1E-15 N*s/um^2
@@ -26,14 +25,6 @@ viscosity = 1.018E-15
 
 # temperature # (K)
 temperature = 297
-
-# Kuhn length (um)
-bk  = 0.106
-
-
-# number of Kuhn length per spring
-Nks = 19.8
-
 
 # radius of the bead (um)
 radius = 0.077
@@ -50,37 +41,37 @@ dimension = 3
 wall_type = slit
 
 # domain size #
-slit = '-130. 130. -130. 130. -13. 13.'
+slit = '-15. 15. -15. 15. -15. 15.'
 
 # periodicity #
-periodicity = 'true true false'
+periodicity = 'false false false'
 
 # inlet info #
 inlet = 'false false false'
 inlet_pressure = '0 0 0'
 
-# shear info#
+# shear info #
 shear = 'false false false'
-shear_rate = '0 0 0'
-shear_direction = '0 0 0'
+shear_rate = '0. 0. 0.'
+shear_direction = '0. 0. 0.'
 
 #############################################
 #			   Mesh info         			
 #############################################
 generate_mesh = true
-n_mesh = '37 37 4'
+n_mesh = '15 15 15'
 
 #############################################
-#	 Force info (particle-particle force)         			
+#	 Force info         			
 #############################################
-force_field = 'gaussian_dna worm_like_spring wall/empirical_dna'
-gaussian_dna = '2.628506592'
+force_field = 'p_constant'
+p_constant = '0.3333 0. 0.'
 
 #############################################
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.1
+alpha = 0.35
 
 #############################################
 #			   Solver info         			
@@ -124,8 +115,12 @@ schur_pc_type = SMp
 #############################################
 #	Chebyshev info (only for brownian system)         			
 #############################################
-# compute eigen
+# compute_eigen 
 compute_eigen = true
+
+# specify eig_min and eig_max if compute_eigen=false
+# eig_min = 
+# eig_max = 
 
 # max number of chebyshev polynomial #
 max_n_cheb = 50
@@ -146,13 +141,13 @@ tol_eigen = 0.01
 with_hi	       = true
 with_brownian  = true
 adaptive_dt    = true
-max_dr_coeff   = '0 0.1 0.1'
+max_dr_coeff   = '0. 0.1 0.1'
 update_neighbor_list_everyStep = true
 restart        = false
 random_seed    = 123456789
 nstep          = 5
 n_relax_step   = 1
 write_interval = 1
-output_file = 'equation_systems trajectory center_of_mass chain_stretch radius_of_gyration mean_square_displacement'
-debug_info = false
+output_file    = 'equation_systems trajectory center_of_mass mean_square_displacement' 
+debug_info     = false
 print_info = false

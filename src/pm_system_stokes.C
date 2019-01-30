@@ -34,9 +34,8 @@
 
 // local header files
 #include "pm_toolbox.h"
-#include "ggem_system.h"
+#include "ggem_stokes.h"
 #include "brownian_system.h"
-#include "analytical_solution.h"
 #include "pm_system_stokes.h"
 
 
@@ -50,8 +49,10 @@ PMSystemStokes::PMSystemStokes(EquationSystems& es,
 : PMLinearImplicitSystem (es, name, number),
   _stokes_solver(es)
 {
-  // Stokes equation assembly
-  _assemble_stokes = ( new AssembleStokes(es) );
+  if (name != "Stokes") libmesh_error();
+  assemble_stokes = ( new AssembleStokes(es, name) );
+  analytical_solution = assemble_stokes -> get_analytical_solution();
+  ggem_stokes = assemble_stokes -> get_ggem_stokes();
 }
 
 
@@ -68,10 +69,12 @@ PMSystemStokes::~PMSystemStokes()
 // ==================================================================================
 void PMSystemStokes::clear ()
 {
-  // delete the pointer
-  if(_assemble_stokes) {
-    delete _assemble_stokes;
-  }
+    // delete the pointer
+    if(assemble_stokes) {
+        delete assemble_stokes;
+    }
+    
+    // analytical_solution and ggem_stokes pointer will be destroyed in AssembleStokes 
 }
 
 
@@ -160,7 +163,6 @@ void PMSystemStokes::reinit_fd_system(bool& neighbor_list_update_flag)
 }
 
 
-
 // ===========================================================
 void PMSystemStokes::assemble_matrix(const std::string& system_name,
              			     const std::string& option)
@@ -181,7 +183,7 @@ void PMSystemStokes::assemble_matrix(const std::string& system_name,
 
   // Call assemble function to assemble matrix
   //assemble_matrix_sedimentation_ex1(this->get_equation_systems(), system_name, option);
-  _assemble_stokes->assemble_global_K(system_name, option);
+  assemble_stokes->assemble_global_K(system_name, option);
 
   // close the matrices
   this->matrix->close();  // close the matrix
@@ -189,7 +191,6 @@ void PMSystemStokes::assemble_matrix(const std::string& system_name,
 
   STOP_LOG("assemble_matrix()", "PMSystemStokes");
 }
-
 
 
 // ==================================================================================
@@ -207,7 +208,7 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
 //perf_log.pop("zero");
   //assemble_rhs_sedimentation_ex1 (this->get_equation_systems(), system_name, option);
 //perf_log.push("assemble");
-  _assemble_stokes->assemble_global_F(system_name, option);
+  assemble_stokes->assemble_global_F(system_name, option);
 //perf_log.pop("assemble");
 //perf_log.push("close");
   this->rhs->close();
@@ -215,7 +216,6 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
 
   STOP_LOG("assemble_rhs()", "PMSystemStokes");
 }
-
 
 
 // ==================================================================================
@@ -263,7 +263,6 @@ void PMSystemStokes::solve (const std::string& option,
 
   STOP_LOG("solve()", "PMSystemStokes");
 }
-
 
 
 // ==================================================================================
@@ -345,7 +344,6 @@ void PMSystemStokes::add_local_solution()
 }
 
 
-
 // ==================================================================================
 void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
 {
@@ -365,7 +363,7 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
   const unsigned int n_nodes    = mesh.n_nodes();
   Real val0_norm = 0., val1_norm = 0.;
   Real val2_norm = 0., val3_norm = 0.;
-  AnalyticalSolution analytical_solution(*this);
+  // AnalyticalSolution analytical_solution(*this);
 
   // Loop over each node and compute the nodal velocity value
   MeshBase::node_iterator       nd     = mesh.local_nodes_begin();
@@ -388,8 +386,7 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
     this->solution->get(dof_nums, Unum);
 
     // compute the local velocity of fluid at the current node
-    //const std::vector<Real> Uexact = this->exact_solution(pt);
-    const std::vector<Real> Uexact = analytical_solution.exact_solution_infinite_domain(pt);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(*ggem_stokes, pt);
 
     // compute the errors
     for(unsigned int i=0; i<dim; ++i){
@@ -513,7 +510,6 @@ void PMSystemStokes::write_equation_systems(const std::size_t time_step,
 }
 
 
-
 // ==================================================================================
 void PMSystemStokes::compute_point_velocity(const std::string& option,
                                             std::vector<Real>& pv)
@@ -633,7 +629,6 @@ void PMSystemStokes::compute_point_velocity(const std::string& option,
 }
 
 
-
 // ==================================================================================
 std::vector<Real> PMSystemStokes::compute_unperturbed_point_velocity()
 {
@@ -653,7 +648,6 @@ std::vector<Real> PMSystemStokes::compute_unperturbed_point_velocity()
 }
 
 
-
 // ==================================================================================
 std::vector<Real> PMSystemStokes::point_velocity(const std::vector<Real>& vel_beads,
                                                  const std::size_t i) const
@@ -671,41 +665,16 @@ std::vector<Real> PMSystemStokes::point_velocity(const std::vector<Real>& vel_be
 }
 
 
-
 // ==================================================================================
 std::vector<Number> PMSystemStokes::local_velocity_fluid(const Point &p,
                                                          const std::string& force_type) const
 {
   START_LOG("local_velocity_fluid()", "PMSystemStokes");
-
-  // get parameters of equation systems:
-  // mu = 1/(6*PI) and bead_r0 = 1 are normalized viscosity and bead radius, respectively!
-  const std::size_t dim  =  this->get_mesh().mesh_dimension();
-  const Real         mu  =  this->get_equation_systems().parameters.get<Real> ("viscosity_0");
-  const Real      alpha  =  this->get_equation_systems().parameters.get<Real> ("alpha");
-  const Real    bead_r0  =  this->get_equation_systems().parameters.get<Real> ("br0");
-
-  // FIXME: When system contains different "particle_type", for example, interaction of
-  // particle and polymer chain, this becomes invalid!
-  const std::string particle_type
-           = this->get_equation_systems().parameters.get<std::string> ("particle_type");
-
-  // Mesh size for fluid and solid, which will be used to get the local solution.
-  // For point particle simulation, there is no solid mesh. "hmin" actually is NOT used.
-  // For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
-  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
-  Real ibm_beta = 0.;
-  if(particle_type=="rigid_particle"){
-    hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
-    ibm_beta = this->get_equation_systems().parameters.get<Real> ("ibm_beta");
-  }
-
-  // compute the local velocity corresponding to the unbounded domain
-  GGEMSystem ggem_sys;
-  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,p,alpha, ibm_beta, mu,bead_r0,
-                                                           hmin,dim,force_type);
-
+                                                         
+  std::vector<Real> Ulocal = ggem_stokes -> local_velocity_fluid(_point_mesh, p, force_type);
+                                                                                                                  
   STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
+  
   return Ulocal;
 }
 
@@ -718,34 +687,10 @@ std::vector<Number> PMSystemStokes::local_velocity_fluid(const Elem* elem,
 {
   START_LOG("local_velocity_fluid()", "PMSystemStokes");
 
-  // get parameters of equation systems:
-  // mu = 1/(6*PI) and bead_r0 = 1 are normalized viscosity and bead radius, respectively!
-  const std::size_t dim  =  this->get_mesh().mesh_dimension();
-  const Real         mu  =  this->get_equation_systems().parameters.get<Real> ("viscosity_0");
-  const Real      alpha  =  this->get_equation_systems().parameters.get<Real> ("alpha");
-  const Real    bead_r0  =  this->get_equation_systems().parameters.get<Real> ("br0");
-
-  // FIXME: When system contains different "particle_type", for example, interaction of
-  // particle and polymer chain, this becomes invalid!
-  const std::string particle_type
-           = this->get_equation_systems().parameters.get<std::string> ("particle_type");
-
-  // Mesh size for fluid and solid, which will be used to get the local solution.
-  // For point particle simulation, there is no solid mesh. "hmin" actually is NOT used.
-  // For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
-  Real hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
-  Real ibm_beta = 0.;
-  if(particle_type=="rigid_particle"){
-    hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
-    ibm_beta = this->get_equation_systems().parameters.get<Real> ("ibm_beta");
-  }
-
-  // compute the local velocity corresponding to the unbounded domain
-  GGEMSystem ggem_sys;
-  std::vector<Real> Ulocal = ggem_sys.local_velocity_fluid(_point_mesh,elem,p,alpha,ibm_beta, mu,bead_r0,
-                                                           hmin,dim,force_type);
-
+  std::vector<Real> Ulocal = ggem_stokes -> local_velocity_fluid(_point_mesh, elem, p, force_type);
+ 
   STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
+ 
   return Ulocal;
 }
 
@@ -757,32 +702,7 @@ Point PMSystemStokes::local_velocity_bead(const std::size_t& bead_id,
 {
   START_LOG("local_velocity_bead()", "PMSystemStokes");
 
-  // get parameters of equation systems:
-  // mu = 1/(6*PI) and bead_r0 = 1 are normalized viscosity and bead radius, respectively!
-  const std::size_t dim  =  this->get_mesh().mesh_dimension();
-  const Real         mu  =  this->get_equation_systems().parameters.get<Real> ("viscosity_0");
-  const Real      alpha  =  this->get_equation_systems().parameters.get<Real> ("alpha");
-  const Real    bead_r0  =  this->get_equation_systems().parameters.get<Real> ("br0");
-
-  // FIXME: When system contains different "particle_type", for example, interaction of
-  // particle and polymer chain, this becomes invalid!
-  const std::string particle_type
-        = this->get_equation_systems().parameters.get<std::string> ("particle_type");
-
-  // Mesh size for fluid and solid, which will be used to get the local solution.
-  // For point particle simulation, there is no solid mesh. "hmin" actually is NOT used.
-  // For non-point particle cases, hmin will be used to evaluate the screening parameter ksi
-  Real  hmin =  this->get_equation_systems().parameters.get<Real> ("minimum fluid mesh size");
-  Real ibm_beta = 0.;
-  if(particle_type == "rigid_particle"){
-    hmin  =  this->get_equation_systems().parameters.get<Real> ("minimum solid mesh size");
-    ibm_beta = this->get_equation_systems().parameters.get<Real> ("ibm_beta");
-  }
-
-  // compute the local velocity corresponding to the unbounded domain
-  GGEMSystem ggem_sys;
-  Point Ulocal = ggem_sys.local_velocity_bead(_point_mesh,bead_id,alpha, ibm_beta, mu,bead_r0,
-                                                          hmin,dim,force_type);
+  Point Ulocal = ggem_stokes -> local_velocity_bead(_point_mesh, bead_id, force_type);
 
   STOP_LOG("local_velocity_bead()", "PMSystemStokes");
   return Ulocal;
@@ -795,14 +715,7 @@ Point PMSystemStokes::global_self_exclusion(const std::size_t p_id) const
 {
   START_LOG("global_self_exclusion()", "PMSystemStokes");
 
-  // get parameters of equation systems.
-  const std::size_t dim  =  this->get_mesh().mesh_dimension();
-  const Real mu      =  this->get_equation_systems().parameters.get<Real> ("viscosity_0");
-  const Real alpha   =  this->get_equation_systems().parameters.get<Real> ("alpha");
-
-  // compute the global self-exclusion velocity
-  GGEMSystem ggem_sys;
-  Point self_v = ggem_sys.global_self_exclusion(_point_mesh,p_id,alpha,mu,dim);
+  Point self_v = ggem_stokes -> global_self_exclusion(_point_mesh,p_id);
 
   STOP_LOG("global_self_exclusion()", "PMSystemStokes");
   return self_v;
@@ -828,7 +741,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
   const Real xn = 200, yn = 80, zn = 80;
   const Real dx = box_len(0)/xn, dy = box_len(1)/yn, dz = box_len(2)/zn;
   const unsigned int NP = _point_mesh->num_particles();
-  AnalyticalSolution analytical_solution(*this);
+  // AnalyticalSolution analytical_solution(*this);
 
   std::ofstream outfile;
   int o_width = 12, o_precision = 9;
@@ -855,7 +768,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution.exact_solution_infinite_domain(pt);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(*ggem_stokes, pt);
 
     // write the velocity, x vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
@@ -890,7 +803,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution.exact_solution_infinite_domain(pt);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(*ggem_stokes, pt);
 
     // write the velocity, y vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
@@ -925,7 +838,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
     for(std::size_t j=0; j<3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
 
     // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact = analytical_solution.exact_solution_infinite_domain(pt);
+    const std::vector<Real> Uexact = analytical_solution -> exact_solution_infinite_domain(*ggem_stokes, pt);
 
     // write the velocity, z vx vy vz
     outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
@@ -956,7 +869,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
 //{
 //  START_LOG("exact_solution()", "PMSystemStokes");
 //
-//  // ksi's value should be consistent with that in GGEMSystem::regularization_parameter()
+//  // ksi's value should be consistent with that in GGEMStokes::regularization_parameter()
 //  const Real ksi = std::sqrt(libMesh::pi)/3.0;  // = 0.591
 //  const Real muc = 1.0/(6*libMesh::pi);
 //  const unsigned int dim = 3;
@@ -964,7 +877,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
 //  DenseMatrix<Number> GT;
 //
 //  // GGEM object and number of points in the system
-//  GGEMSystem ggem_system;
+//  GGEMStokes ggem_stokes;
 //  const std::size_t n_points = _point_mesh->num_particles();
 //
 //  // loop over each point
@@ -977,7 +890,7 @@ void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
 //    if(x.size()<1E-6) zero_limit  = true;
 //
 //    // use ksi instead of alpha
-//    GT = ggem_system.green_tensor_exp(x,ksi,muc,dim,zero_limit);
+//    GT = ggem_stokes.green_tensor_exp(x,ksi,muc,dim,zero_limit);
 //    const std::vector<Real> fv = _point_mesh->particles()[i]->particle_force();
 //    //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n", i,fv[0],fv[1],fv[2]);
 //

@@ -44,7 +44,6 @@
 
 // User defined header includes
 #include "analytical_solution.h"
-#include "ggem_system.h"
 #include "pm_toolbox.h"
 #include "assemble_nernst_planck.h"
 
@@ -112,7 +111,6 @@ void AssembleNP::compute_element_rhs(const Elem* elem,
                                          const std::vector<std::size_t> n_list,
                                          const bool& pf_flag,
                                          const std::string& option,
-                                         const Real& alpha,
                                          DenseVector<Number>& Fe)
 {
   START_LOG("compute_element_rhs()", "AssembleNP");  // libMesh log

@@ -61,7 +61,6 @@
 #include "polymer_chain.h"
 #include "random_generator.h"
 #include "solver.h"
-#include "ggem_system.h"
 #include "copss_init.h"
 #include "fix/fix_factory.h"
 #include "fix/fix.h"
@@ -79,6 +78,7 @@ namespace libMesh{
 
 class Copss
 {
+    
 public: 
   // PETSC MPI communicator
   Parallel::Communicator *comm_in;
@@ -91,7 +91,7 @@ public:
   // control file name
   std::string control_fileName;
   // test name
-  std::string test_name;
+  std::string simulation_name;
   bool print_info;
   // physical parameters
   const Real kB = 1.380662E-17;//1.380662E-23(J/K) = 1.3806623E-23(N*m/K) = 1.380662E-17(N*um/K)

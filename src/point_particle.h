@@ -37,10 +37,10 @@ namespace libMesh
    * Type of a point
    */
   enum PointType {
-    POLYMER_BEAD      = 0,
-    LAGRANGIAN_POINT  = 1,
-    POINT_PARTICLE    = 2,
-    NOT_DEFINED       = 100
+    POLYMER_BEAD = 0,
+    LAGRANGIAN_POINT = 1,
+    POINT_PARTICLE = 2,
+    NOT_DEFINED_POINTTYPE = -1
   };
   
   

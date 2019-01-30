@@ -34,7 +34,7 @@
 
 // local header files
 #include "pm_toolbox.h"
-#include "ggem_system.h"
+#include "ggem_poisson.h"
 #include "brownian_system.h"
 #include "analytical_solution.h"
 #include "pm_system_poisson.h"

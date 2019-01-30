@@ -10,7 +10,7 @@ else
   echo "COPSS source library not found. Exiting..."
   echo "Suggestion: please add 'export COPSS_DIR=[/path/to/COPSS/DIRECTORY]' to\
 your environment, e.g., .bashrc file"
-  exit 0
+  exit -1
 fi
 cd $COPSS_DIR/src
 
@@ -25,7 +25,7 @@ while test $# -gt 0; do
                         echo "-h, --help:   show brief help"
                         echo "-p, --package [PACKAGE]: Please specify an package to compile, options are: POINTPARTICLE, RIGIDPARTICLE"
                         echo "-a, --action [ACTION]:   specify additional actions, options are: clean_first, clean_only"
-                        exit 0
+                        exit -1
                         ;;
                 -p|--packa*)
                         shift
@@ -34,7 +34,7 @@ while test $# -gt 0; do
                                   package=$1
                                 else
                                   echo "Package $1 not supported. Exiting ..."
-                                  exit 1
+                                  exit -1
                                 fi
                         fi
                         shift
@@ -46,14 +46,14 @@ while test $# -gt 0; do
                                   action=$1
                                 else
                                   echo "Action $1 not supported. Exiting ..."
-                                  exit 1
+                                  exit -1
                                 fi
                         fi
                         shift
                         ;;
                 *)
                         echo "Flag '$1' not supported. Use -h for help"
-                        exit 1
+                        exit -1
                         ;;
         esac
 done
@@ -70,12 +70,16 @@ function compile(){
   fi
   echo "Start compiling package $package ..."
   echo "${s// /*}"
-  make package=$package
-  # export exectuble
-  copss_exec="${COPSS_DIR}/src/copss-$package-opt"
-  echo "${s// /*}"
-  echo "Compilation is done, the compiled executable is at $copss_exec"
-  echo "${s// /*}"
+  if make package=$package; then
+      # export exectuble
+      copss_exec="${COPSS_DIR}/src/copss-$package-opt"
+      echo "${s// /*}"
+      echo "Compilation is done, the compiled executable is at $copss_exec"
+      echo "${s// /*}"
+  else
+      echo "Error: Compilation failed"
+      exit -1
+  fi
 }
 
 if [[ $action = "clean_only" ]]; then

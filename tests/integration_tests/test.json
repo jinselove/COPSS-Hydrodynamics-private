@@ -1,6 +1,6 @@
 {
 "PointParticle_Polymer_BD_HI":{
-                                "executable": "copss-POINTPARTICLE-opt",
+                                "package": "POINTPARTICLE",
                                 "required_inputs": ["point_particle_control.in",
                                                     "point_particle_data.in",
                                                     "run.sh",
@@ -8,10 +8,23 @@
                                 "validation_outputs": ["output_polymer_0.vtk",
                                                         "output_polymer_5.vtk",
                                                         "out.time",
-                                                        "out.eigenvalue"]
+                                                        "out.eigenvalue"],
+                                "cmp_method": "cmpfile"
                               },
+"PointParticle_Stokes_GGEM":{
+                              "package": "POINTPARTICLE",
+                              "required_inputs": ["point_particle_control.in",
+                                                  "point_particle_data.in",
+                                                  "run.sh",
+                                                  "zclean.sh",
+                                                  "compare_output.py"],
+                              "validation_outputs": ["output_velocity_profile_x_3P.txt",
+                                                     "output_velocity_profile_y_3P.txt",
+                                                     "output_velocity_profile_z_3P.txt"],
+                              "cmp_method": "cmpdf"
+                            },                                  
 "RigidParticle_Sphere_Sedimentation_HI": {
-                                          "executable": "copss-RIGIDPARTICLE-opt",
+                                          "package": "RIGIDPARTICLE",
                                           "required_inputs": ["rigid_particle_control.in",
                                                               "rigid_particle_data.in",
                                                               "surface_mesh_sphere_triMesh_0.4.e",
@@ -19,6 +32,7 @@
                                                               "zclean.sh"],
                                           "validation_outputs": ["output_particle_trajectory.csv",
                                                                  "output_surface_node.csv",
-                                                                 "out.time"]
+                                                                 "out.time"],
+                                          "cmp_method": "cmpfile"
                                         }
 }

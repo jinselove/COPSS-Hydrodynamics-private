@@ -32,15 +32,10 @@ public:
 
 	~FixPointConstant(){};
 
-	void initParams();
-
 	void print_fix();
 
 	void compute();
 
-private:
-	
-	Point pforce;
 };
 
 }

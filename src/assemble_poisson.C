@@ -43,16 +43,16 @@
 #include "libmesh/mesh.h"
 
 // User defined header includes
-#include "analytical_solution.h"
-#include "ggem_system.h"
 #include "pm_toolbox.h"
 #include "assemble_poisson.h"
 
 // ==================================================================================
-AssemblePoisson::AssemblePoisson(EquationSystems& es)
+AssemblePoisson::AssemblePoisson(EquationSystems& es,
+                                 const std::string& name)
 : AssembleSystem(es)
 {
-    //do nothing
+  if (name != "Poisson") libmesh_error();
+  ggem_poisson = new GGEMPoisson();
 }
 
 
@@ -60,7 +60,9 @@ AssemblePoisson::AssemblePoisson(EquationSystems& es)
 // ==================================================================================
 AssemblePoisson::~AssemblePoisson()
 {
-  // do nothing
+  if (ggem_poisson){
+    delete ggem_poisson;
+  }
 }
 
 
@@ -125,6 +127,9 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
       // printf("finished select_boundary_side\n");
     }
   }
+
+  // Initialize (set) parameters in ggem_poisson
+  this -> init_ggem_poisson(system_name);
 
   // Loop over all the elements in the mesh that live on the local processor.
   // We will compute the element matrix Ke. In case users
@@ -310,7 +315,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     // perf_log.pop("apply_bc_by_penalty");
 
     // Impose Neumann BC (surface charge density) to the right hand side 
-    this->apply_bc_neumann(elem, *fe_face, Fe);
+    this->apply_bc_neumann(elem, *fe_phi, *fe_face, Fe);
 
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
@@ -378,25 +383,25 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
 
     // Initialize variables for position, charge, distance, etc.
     Point np_pos(0.);
-    Real r = 0., charge_val = 0., np_charge = 0.;
+    Real r = 0., charge_val = 0.;
     unsigned int qp_size = q_xyz.size();
     //printf("qp_size = %d\n", q_xyz.size());
 
     // Now we will build the element RHS using gauss quadrature integration.
     // first loop over all neighboring particles near this element
     for(unsigned int np = 0; np<n_pts; ++np){
-      // FIXME:need to read-in charge in the beginning of simulation
-      np_charge = _particles[n_list[np]]->particle_charge();
+      // Charge on this bead
+      const Real np_charge = _particles[n_list[np]]->charge();
 
       // Get the location of this bead
       np_pos = _particles[n_list[np]]->point();
 
       for(unsigned int qp=0; qp<qp_size; qp++){
-        // distance from quadrature point to the charge point
+        // Distance from quadrature point to the charge point
         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
 
-        // FIXME:new ggem function to evaluate the value of regularized gaussian charge at this quadrature point
-        charge_val = ggem_sys.smoothed_charge_exp(r, alpha);
+        // Evaluate the value of regularized gaussian charge at this quadrature point
+        charge_val = ggem_poisson -> smoothed_charge_exp(r);
 
         // FIXME:Need to add nodal space charge density from ion concentration fields
         // this will need to access PMSystemNP, and approximate ion concentration on
@@ -521,12 +526,10 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
     {
       // Calculate local part of the electrical potential from GGEM
       const Point ptx = side->point(nn); // Coordinate of the node
-      // FIXME: implement local_electrical_potential in PMSystemPoisson, which depends
-      // on local_electrical_potential from GGEMSystem
-      const Real phi_local = pm_system.local_electrical_potential(elem, ptx,"regularized");
-      //const std::vector<Real> phi_local = pm_system.local_electrical_potential(ptx,"regularized");
+      const Real phi_local = pm_system.local_potential_field(elem, ptx, "regularized");
+      //const Real phi_local = pm_system.local_potential_field(ptx, "regularized");
 
-      // Ewald split: global_potential = total_potential - ggem_local_potential
+      // Because of Ewald split: global_potential = total_potential - ggem_local_potential
       Real phi_global = phi_total - phi_local;
 
       // Find the node on the element matching this node on the side.
@@ -589,10 +592,8 @@ void AssemblePoisson::apply_bc_neumann(const Elem* elem,
     // Coordinate of the node
     const Point ptx = elem->point(nn);
     // Evaluate local electrical potential (phi) on each node
-    // FIXME: implement local_electrical_potential in PMSystemPoisson, which depends
-    // on local_electrical_potential from GGEMSystem
-    phi_local[nn] = pm_system.local_electrical_potential(elem, ptx, "regularized");
-    //const std::vector<Real> phi_local = pm_system.local_electrical_potential(ptx,"regularized");
+    phi_local[nn] = pm_system.local_potential_field(elem, ptx, "regularized");
+    //phi_local[nn] = pm_system.local_potential_field(ptx, "regularized");
   }
 
   // Gradient of electrical potential on all nodes in this element
@@ -643,7 +644,7 @@ void AssemblePoisson::apply_bc_neumann(const Elem* elem,
     for (unsigned int nn=0; nn<side->n_nodes(); nn++)
       sigma_global[nn] = sigma_total - sigma_local[nn];
 
-    // Integrate on this side 
+    // Integrate on this side
     for (unsigned int qp=0; qp<JxW_face.size(); qp++)
       for (unsigned int i=0; i<phi_face.size(); i++)
         Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global[i];
@@ -651,4 +652,25 @@ void AssemblePoisson::apply_bc_neumann(const Elem* elem,
   } // end for s-loop
 
   STOP_LOG("apply_bc_neumann()", "AssemblePoisson");
+}
+
+
+
+// ============================================================================================
+void AssemblePoisson::init_ggem_poisson(const std::string& system_name)
+{
+  START_LOG("init_ggem_poisson()", "AssemblePoisson");
+
+  libmesh_assert_equal_to(system, "Poisson");
+
+  PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson> (system_name);
+  PointMesh<3>* _point_mesh = _pm_system.point_mesh();
+  const PointType point_type = _point_mesh->particles()[0]->point_type();
+  ggem_poisson -> set_alpha(_eqn_sys.parameters.get<Real> ("alpha"));
+  ggem_poisson -> set_br0(_eqn_sys.parameters.get<Real> ("br0"));
+  ggem_poisson -> set_point_type(point_type);
+  ggem_poisson -> set_ksi();
+  ggem_poisson -> set_phi0(_eqn_sys.parameters.get<Real> ("phi0"));
+
+  STOP_LOG("init_ggem_poisson()", "AssemblePoisson");
 }

@@ -22,6 +22,7 @@
 
 // Local includes
 #include "assemble_system.h"
+#include "ggem_poisson.h"
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
@@ -40,7 +41,8 @@ public:
 
   @param[in,out] es EquationSystem
   */
-  AssemblePoisson(EquationSystems& es);
+  AssemblePoisson(EquationSystems& es,
+                  const std::string& name);
 
 
   /*! \brief Destructor
@@ -84,13 +86,13 @@ public:
                            DenseVector<Number>& Fe) override;
 
 
-  /*! \brief select sides on the boundary for all elements
+  /*! \brief Select sides on Dirichlet and Neumann boundaries for all elements
   *
   */
   void select_boundary_side(const Elem* elem) override;
 
 
-  /*! \brief Apply Dirichlet BC by penalty method.
+  /*! \brief Apply Dirichlet BC by penalty method to impose electrical potential on relevant boundaries.
 
   */
   void apply_bc_by_penalty(const Elem* elem,
@@ -100,12 +102,25 @@ public:
                            const std::string& option) override;
 
 
-  /*! \brief Apply Neumann BC.
+  /*! \brief Apply Neumann BC to impose surface charge density on relevant boundaries.
 
   */
   void apply_bc_neumann(const Elem* elem,
+                        FEBase& fe_phi,
                         FEBase& fe_face,
                         DenseVector<Number>& Fe);
+
+
+  /*! \brief Pointer to ggem_poisson
+
+  */
+  void init_ggem_poisson(const std::string& system_name);
+
+
+  /*! \brief Pointer to ggem_poisson
+
+  */
+  GGEMPoisson* get_ggem_poisson() {return ggem_poisson;};
 
 
 
@@ -113,5 +128,8 @@ private:
 
   // Boundary sides that Dirichlet and Neumann BCs are applied.
   std::vector<std::vector<unsigned int> > _boundary_sides_dirichlet_poisson, _boundary_sides_neumann_poisson;
+
+  // Get a reference to GGEMPoisson
+  GGEMPoisson* ggem_poisson;
  
 };

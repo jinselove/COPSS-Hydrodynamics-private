@@ -25,6 +25,7 @@
 #include "assemble_poisson.h"
 #include "solver_poisson.h"
 #include "pm_linear_implicit_system.h"
+#include "ggem_poisson.h"
 
 namespace libMesh
 {
@@ -96,10 +97,51 @@ public:
 
 
   /*
+   * Add the local solution to the global solution for electrical potential
+   */
+  void add_local_solution();
+
+
+  /*
+   * Compute electrical potential at all bead locations
+   */
+  void compute_point_potential(std::vector<Real>& pv);
+
+
+  /*
    * Return the SolverPoisson
    */
   SolverPoisson& solver_poisson() { return _solver_poisson; }
 
+
+  /**
+   * Local electrical potential of a point in an unbounded space,
+   * which is computed from Green's function. This function directly
+   * search the neighbor list around Point &p.
+   * charge_type: "regularized"
+   */
+  Real local_potential_field(const Point &p,
+                             const std::string& charge_type) const;
+
+
+  /**
+   * Local electrical potential of a point in an unbounded space,
+   * which is computed from Green's function. This function uses
+   * already-built neighbor list of Elem* elem.
+   * charge_type: "regularized"
+   */
+  Real local_potential_field(const Elem* elem,
+                             const Point &p,
+                             const std::string& charge_type) const;
+
+
+  /**
+   * Local electrical potential at a bead in an unbounded space,
+   * which is computed from Green's function.
+   * charge_type: "regularized"
+   */
+  Real local_potential_bead(const std::size_t& bead_id,
+                            const std::string& charge_type) const;
 
 
 private:
@@ -107,8 +149,11 @@ private:
   // Poisson solver
   SolverPoisson _solver_poisson;
 
-  // Assemble Stokes system
+  // Assemble Poisson system
   AssemblePoisson* _assemble_poisson;
+
+  // Get a pointer to GGEMPoisson
+  GGEMPoisson* ggem_poisson;
 
 };
 

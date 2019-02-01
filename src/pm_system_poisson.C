@@ -307,7 +307,7 @@ void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
   for(std::size_t i=0; i<NP; ++i){
     const std::size_t p_id = _pid_send_list[i];
     pv[p_id] = _pv_send_list[i];
-    // ---------------------------- output for test -----------------------------
+    // ---------------------------- output for debug -----------------------------
     // if (this->comm().rank()==0)
     // {
     //   printf("\n--->test in compute_point_potential(): output electrical potential at the point:\n");
@@ -318,6 +318,141 @@ void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
   }
 
   STOP_LOG("compute_point_potential()", "PMSystemPoisson");
+}
+
+
+
+// ==================================================================================
+void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
+{
+  START_LOG("compute_point_efield()", "PMSystemPoisson");
+
+  // dim*NP: size of the electric field vector
+  const MeshBase& mesh = this->get_mesh();
+  const std::size_t NP     =  _point_mesh->num_particles();
+  const std::size_t dim    = mesh.mesh_dimension();
+  const dof_id_type n_elem = mesh.n_elem();
+  //std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
+  std::vector<Real> _pv_send_list;         // point electric field send list
+  std::vector<Real> _pglobal_send_list;
+  std::vector<Real> _plocal_send_list;
+  std::vector<std::size_t> _pid_send_list; // point id send list
+  const unsigned int phi_var = this->variable_number ("phi"); // phi_var = 0
+  const std::string charge_type = "regularized";
+
+  // Loop over each point, and compute electric field in its location
+  // Collect the global electrical potential from FEM through Allgather operation
+  for(std::size_t i=0; i<NP; ++i)
+  {
+    // 0. point coordinates & its residing element
+    const Point pt  = _point_mesh->particles()[i]->point();
+    const PointType point_type = _point_mesh->particles()[i]->point_type();
+    const dof_id_type elem_id = _point_mesh->particles()[i]->elem_id();
+    if(elem_id>n_elem)
+    {
+      std::cout << "---> Error in PMSystemPoisson::compute_point_efield():\n"
+                << "      "<<i<<"-th particle (position = "<<pt(0) <<", "<<pt(1) <<", "<<pt(2)<<") is out of domain"
+                <<std::endl<<std::endl;
+    }
+    const Elem* elem = mesh.elem(elem_id);
+    // 1. Global(FEM) solution at the current point. This is done on local processors
+    Gradient efield_global;
+    // 2. Local electric field at particle i, This is also done on local processors
+    RealGradient efield_local;
+    // 3. total electric field
+    Point efield_total;
+    if(elem->processor_id()==this->processor_id())
+    {
+      // Global electric field
+      efield_global = this->point_gradient(phi_var, pt, *elem);
+
+      // Extract shape function derivatives to be evaluated at the bead location
+      const std::vector<std::vector<RealGradient> > & dphi = fe_phi->get_dphi();
+      // Extract bead coordinates in the reference frame
+      std::vector<Point> bead_ptx;
+      bead_ptx.resize(1);
+      bead_ptx[0] = fe_phi->inverse_map(elem, pt);
+      // Evaluate the shape functions derivatives at this bead location
+      fe_phi->reinit(elem, &bead_ptx);
+
+      // Local electrical potential on all nodes in this element
+      std::vector<Real> phi_local;
+      phi_local.resize(elem->n_nodes());
+      // Loop through nodes on this element
+      for (unsigned int nn=0; nn<elem->n_nodes(); nn++)
+      {
+        // Coordinate of the node
+        const Point ptx = elem->point(nn);
+        // Evaluate local electrical potential (phi) on each node
+        phi_local[nn] = this->local_potential_field(elem, ptx, "regularized");
+        //phi_local[nn] = this->local_potential_field(ptx, "regularized");
+      }
+      // Interpolate local electric field on this bead location
+      for (unsigned int j=0; j<phi_local.size(); j++)
+        efield_local += phi_local[j] * dphi[j][0];
+
+      // FIXME: do we need to exclude self exclusion term for point_type = "POLYMER_BEAD"
+      if(point_type==POLYMER_BEAD){
+        efield_total(0) = efield_global(0) + efield_local(0);
+        efield_total(1) = efield_global(1) + efield_local(1);
+        efield_total(2) = efield_global(2) + efield_local(2);
+      }
+      else(point_type==LAGRANGIAN_POINT){
+        std::cout<<"---> Error in PMSystemPoisson::compute_point_potential: \n"
+                 <<"     point_type LAGRANGIAN_POINT is not supported yet for electrostatics."
+                 <<std::endl <<std::endl;
+
+        libmesh_error();
+      }
+
+      // pack particle id and its velocity
+      _pid_send_list.push_back(i);
+      for(unsigned int j=0; j<dim; j++){
+        _pv_send_list.push_back(efield_total(j));
+        // _pglobal_send_list.push_back(efield_global(j));
+        // _plocal_send_list.push_back(efield_local(j));
+      }
+    // printf("i = %i, processor_id = %i, efield_local = %f, %f, %f\n", i, this->processor_id(), efield_local(0), efield_local(1), efield_local(2));
+    } // end if (elem->processor_id() == this->processor_id)
+  } // end for i-loop
+
+  // Check the size of local_pv and the size of list on each process after allgather
+  this->comm().allgather(_pid_send_list); // allgather the particle id
+  this->comm().allgather(_pv_send_list);  // allgather the total electric field
+  // this->comm().allgather(_pglobal_send_list);
+  // this->comm().allgather(_plocal_send_list);
+  if (_pid_send_list.size() != NP)
+  {
+    std::cout<<"---> Error in PMSystemPoisson::compute_point_efield: \n"
+             <<"       _pid_send_list.size() != NP"
+             <<std::endl<<std::endl;
+    libmesh_error();
+  }
+
+  for(std::size_t i=0; i<NP; ++i){
+    const std::size_t p_id = _pid_send_list[i];
+    for(unsigned int j=0; j<dim; ++j){
+      pv[dim*p_id+j] = _pv_send_list[i*dim+j];
+    }
+    // ---------------------------- output for debug -----------------------------
+    // if (this->comm().rank()==0)
+    // {
+    //   printf("\n--->test in compute_point_efield(): output electric field at this point:\n");
+    //   printf("point %lu: efield_global (FEM) = (%E, %E, %E)\n",
+    //          p_id, _pglobal_send_list[dim*i], _pglobal_send_list[dim*i+1], _pglobal_send_list[dim*i+2] );
+    //   printf("              efield_local (Green Function) = (%E, %E, %E)\n",
+    //          _plocal_send_list[dim*i],_plocal_send_list[dim*i+1],_plocal_send_list[dim*i+2] );
+    //   printf("           ---efield_total = (%E, %E, %E)\n\n",
+    //          pv[dim*pid], pv[dim*pid+1], pv[dim*pid+2] );
+    // }
+  }
+  // std::cout <<"pv = ";
+  // for(std::size_t i=0; i<pv.size(); i++){
+  //   std::cout << pv[i] <<";";
+  // }
+  // std::cout<<std::endl;
+
+  STOP_LOG("compute_point_efield()", "PMSystemPoisson");
 }
 
 

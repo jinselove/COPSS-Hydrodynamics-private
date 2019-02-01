@@ -103,9 +103,15 @@ public:
 
 
   /*
-   * Compute electrical potential at all bead locations
+   * Compute electrical potential at all beads' locations
    */
   void compute_point_potential(std::vector<Real>& pv);
+
+
+  /*
+   * Compute electric field (Ex, Ey, Ez) at all beads' locations
+   */
+  void compute_point_efield(std::vector<Real>& pv);
 
 
   /*

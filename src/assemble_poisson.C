@@ -114,9 +114,11 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
   // Element vector contribution, input of compute_element_rhs()
   DenseVector<Number> Fe;
 
-  // Build _boundary_sides_poisson vector at beginning of simulation
-  if(_boundary_sides_dirichlet_poisson.size() == 1){
+  // Build _boundary_sides_dirichlet_poisson and
+  //       _boundary_sides_neumann_poisson vectors at beginning of simulation
+  if(_boundary_sides_dirichlet_poisson.size() == 1 and _boundary_sides_neumann_poisson.size() == 1 ){
     _boundary_sides_dirichlet_poisson.resize(n_mesh_elem);
+    _boundary_sides_neumann_poisson.resize(n_mesh_elem);
     MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
     const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
     for ( ; el != end_el; ++el)
@@ -124,20 +126,17 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
       // Store a pointer to the element we are currently working on.
       const Elem* elem = *el;
       this->select_boundary_side(elem);
-      // printf("finished select_boundary_side\n");
+      //printf("finished select_boundary_side\n");
     }
   }
 
   // Initialize (set) parameters in ggem_poisson
-  this -> init_ggem_poisson(system_name);
+  this->init_ggem_poisson(system_name);
 
   // Loop over all the elements in the mesh that live on the local processor.
-  // We will compute the element matrix Ke. In case users
-  // later modify the program to include refinement, we will be safe and will only
-  // consider the active elements.
+  // We will compute the element matrix Ke.
   MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
   const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
-
   for ( ; el != end_el; ++el)
   {
     // Store a pointer to the element we are currently working on.
@@ -208,20 +207,19 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   // Get FE type for "phi"
   FEType fe_phi_type = _pm_system.variable_type(phi_var);
   UniquePtr<FEBase> fe_phi (FEBase::build(_dim, fe_phi_type));
-
   // Define Gauss quadrature rule for numerical integration.
   QGauss qrule (_dim, SECOND);
   fe_phi->attach_quadrature_rule (&qrule);
 
-  // build the face element for boundary potential
+  // build the face element for boundary integration
   UniquePtr<FEBase> fe_face (FEBase::build(_dim, fe_phi_type));
   QGauss qface(_dim-1, SECOND);
   fe_face->attach_quadrature_rule (&qface);
 
   // The element Jacobian * quadrature weight at each integration point.
-  const std::vector<Real>& JxW                = fe_phi->get_JxW();
-  const std::vector<std::vector<Real>>& phi   = fe_phi->get_phi();
-  const std::vector<Point>& q_xyz             = fe_phi->get_xyz(); // xyz coords of quad pts
+  const std::vector<Real>& JxW              = fe_phi->get_JxW();
+  const std::vector<std::vector<Real>>& phi = fe_phi->get_phi();
+  const std::vector<Point>& q_xyz           = fe_phi->get_xyz(); // xyz coords of quad pts
 
   // A reference to the DofMap object for this system.
   const DofMap & dof_map = _pm_system.get_dof_map();
@@ -231,8 +229,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   DenseVector<Number> Fe;
 
   // System parameters
-  const Real epsilon_r = _eqn_sys.parameters.get<Real> ("epsilon_r");
-  const Real alpha     = _eqn_sys.parameters.get<Real> ("alpha");
+  const Real alpha = _eqn_sys.parameters.get<Real> ("alpha");
 
   // Build _int_force vector at the beginning of Poisson solver
   // This can work for both Poisson and Stokes equations, since there is only one
@@ -248,8 +245,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     _n_dofs.resize(n_mesh_elem);
     _dof_indices.resize(n_mesh_elem);
 
-    // Now we will loop over all the elements in the mesh that live
-    // on the local processor.
+    // Now we will loop over all the elements in the mesh that live on the local processor.
     MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
     const MeshBase::const_element_iterator end_el = _mesh.active_local_elements_end();
     for ( ; el != end_el; ++el)
@@ -285,7 +281,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     const unsigned int elem_id = elem->id();
 
     // Get the degree of freedom indices for the current element.
-    // Why do we update dof_indices again?
+    // FIXME:Why do we update dof_indices again?
     dof_map.dof_indices (elem, _dof_indices[elem_id]);
 
     // const unsigned int n_dofs = dof_indices.size();
@@ -300,33 +296,28 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     const std::vector<std::size_t>& n_list = _pm_system.point_mesh()->elem_neighbor_list(elem);
 
     // if this elem has no neighboring particle we turn the pc_flag to 'false'
-    bool pc_flag = true;                   // a flag for the point charge
+    bool pc_flag = true;                  // a flag for the point charge
     if(n_list.size()==0) pc_flag = false; // No point force because no point list.
 
-    // Now compute Fe caused by the regularized point charge and space charge density.
-    // perf_log.push("compute_element_rhs");
+    // Now compute Fe caused by the regularized point charge.
+    // FIXME: need to implement space charge density when considering Nernst-Planck solver
     this->compute_element_rhs(elem, _n_dofs[elem_id], *fe_phi, n_list,
                               pc_flag, option, alpha, Fe);
-    // perf_log.pop("compute_element_rhs");
 
     // Impose the Dirichlet BC (electrical potential) via the penalty method.
-    // perf_log.push("apply_bc_by_penalty");
     this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
-    // perf_log.pop("apply_bc_by_penalty");
 
     // Impose Neumann BC (surface charge density) to the right hand side 
     this->apply_bc_neumann(elem, *fe_phi, *fe_face, Fe);
 
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
-    // perf_log.push("finish");
     dof_map.constrain_element_vector (Fe, _dof_indices[elem_id]);
 
     // Add the element rhs vector to the global system.
     //PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
     //PMToolBox::output_dense_vector(Fe);
     _pm_system.rhs->add_vector (Fe,_dof_indices[elem_id]);
-    // perf_log.pop("finish");
   }// end for elem-loop
 
   STOP_LOG ("assemble_global_F()", "AssemblePoisson");

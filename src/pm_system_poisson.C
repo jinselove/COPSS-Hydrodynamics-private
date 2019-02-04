@@ -31,12 +31,13 @@
 #include "libmesh/exodusII_io.h"
 #include "libmesh/gmv_io.h"
 #include "libmesh/vtk_io.h"
+#include "libmesh/fe.h"
+#include "libmesh/quadrature_gauss.h"
 
 // local header files
 #include "pm_toolbox.h"
 #include "ggem_system.h"
 #include "brownian_system.h"
-#include "analytical_solution.h"
 #include "pm_system_poisson.h"
 
 
@@ -339,6 +340,15 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
   std::vector<std::size_t> _pid_send_list; // point id send list
   const unsigned int phi_var = this->variable_number ("phi"); // phi_var = 0
   const std::string charge_type = "regularized";
+
+  // Get Finite Element type for "phi"
+  FEType fe_phi_type = this->variable_type(phi_var);
+  // Build a Finite Element object of the specified type for the potential variable
+  UniquePtr<FEBase> fe_phi (FEBase::build(dim, fe_phi_type));
+  // Gauss quadrature rule for numerical integration
+  QGauss qrule (dim, SECOND);
+  // Tell finite element objects to use the quadrature rule
+  fe_phi->attach_quadrature_rule (&qrule);
 
   // Loop over each point, and compute electric field in its location
   // Collect the global electrical potential from FEM through Allgather operation

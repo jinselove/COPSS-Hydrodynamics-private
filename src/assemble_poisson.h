@@ -25,12 +25,18 @@
 #include "ggem_poisson.h"
 
 /*! \brief This class provides the basic components
- * for assembling the matrix and vector when solving
- * Poisson equation.
+ * for assembling the matrix and vector for solving
+ * Poisson equation with point charges suspended in
+ * low-Reynolds number fluids.
  *
  * For details of the implementation, refer to
  * J. Chem. Phys. 142, 014108 (2015)
  * J. Chem. Theory Comput. 2018, 14, 4901-4913
+ *
+ * The method uses Ewald-split to seperate total
+ * electrical potential in to local and global
+ * components. This class is for solving global
+ * electrical potential using finite element method.
  *
  */
 
@@ -55,7 +61,7 @@ public:
 
     \param[in] system_name Name of the system (should be "Poisson")
     \param[in] Option options of assembling the system
-    \param[out] Ke Add element matrix to system
+    \param[out] Ke Add element matrix to global matrix K
 
   */
   void assemble_global_K(const std::string& system_name,
@@ -66,13 +72,13 @@ public:
 
     @param[in] system_name Name of the system (should be "Poisson")
     @param[in] option Options of assembling the system
-    @param[out] Fe Add rhs vector to system.
+    @param[out] Fe Add rhs vector to global vector F
   */
   void assemble_global_F(const std::string& system_name,
                          const std::string& option) override;
 
 
-  /*! \brief Assemble function for the right-hand-side in Poisson equation.
+  /*! \brief Assemble function on each element for the right-hand-side in Poisson equation.
 
       This calculates each element's contribution to the right-hand-side vector.
   */
@@ -111,13 +117,13 @@ public:
                         DenseVector<Number>& Fe);
 
 
-  /*! \brief Pointer to ggem_poisson
+  /*! \brief Initialize ggem_poisson for local field calcualtions
 
   */
   void init_ggem_poisson(const std::string& system_name);
 
 
-  /*! \brief Pointer to ggem_poisson
+  /*! \brief Pointer to ggem_poisson for local field calculations
 
   */
   GGEMPoisson* get_ggem_poisson() {return ggem_poisson;};

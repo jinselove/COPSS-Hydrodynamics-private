@@ -6,7 +6,7 @@
 #			   system_name        
 #############################################
 
-test_name = finite-size
+simulation_name = finite-size
 
 #############################################
 #			   Physical parameters 

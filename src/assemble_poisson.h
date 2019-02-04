@@ -88,7 +88,6 @@ public:
                            const std::vector<std::size_t> n_list,
                            const bool& pf_flag,
                            const std::string& option,
-                           const Real& alpha,
                            DenseVector<Number>& Fe) override;
 
 

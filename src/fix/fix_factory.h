@@ -10,6 +10,7 @@
 #include "fix_point_discretizedWall_lj_cut.h"
 #include "fix_point_slitWall_empirical_dna.h"
 #include "fix_point_sphereWall_empirical_dna.h"
+#include "fix_point_constant.h"
 #include "fix_rigid_surface_constraint.h"
 #include "fix_rigid_sedimentation.h"
 #include "fix_rigid_lj_cut.h"

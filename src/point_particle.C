@@ -36,11 +36,14 @@ namespace libMesh
 PointParticle::PointParticle(const Point pt,
                              const dof_id_type point_id)
 : _center(pt), _counter(3,0), _id(point_id),
-  _point_type(NOT_DEFINED), _parent_id(-1),
+  _point_type(NOT_DEFINED_POINTTYPE), _parent_id(-1),
   _processor_id(-1),
   _elem_id(-1),
-  _force(3,0.),
-  _velocity(0.)
+  _force(0.),
+  _velocity(0.),
+  _orientation(0.),
+  _constant_force(0.),
+  _charge(0.)
 {
   // do nothing
 }
@@ -56,7 +59,10 @@ _parent_id(-1), _point_type(point_type),
 _processor_id(-1),
 _elem_id(-1),
 _force(0.),
-_velocity(0.)
+_velocity(0.), 
+_orientation(0.),
+_constant_force(0.),
+_charge(0.)
 {
   // do nothing
 }
@@ -73,13 +79,33 @@ PointParticle::PointParticle(const Point pt,
   _processor_id(-1),
   _elem_id(-1),
   _force(0.),
- _velocity(0.),
-  _orientation(rot_vec)
+  _velocity(0.),
+  _orientation(rot_vec),
+  _constant_force(0.),
+  _charge(0.)
 {
   // do nothing
 }
-  
-  
+
+// ======================================================================
+PointParticle::PointParticle(const Point pt,
+                              const dof_id_type point_id,
+                              const PointType point_type,
+                              const std::vector<Real>& rot_vec,
+                              const Point constant_force,
+                              const Real charge)
+  : _center(pt), _counter(3,0), _id(point_id),
+  _parent_id(-1), _point_type(point_type),
+  _processor_id(-1),
+  _elem_id(-1),
+  _force(0.),
+  _velocity(0.),
+  _orientation(rot_vec),
+  _constant_force(constant_force),
+  _charge(charge)
+{
+  // do nothing
+}
 
 // ======================================================================
 PointParticle::PointParticle(const PointParticle& particle)
@@ -95,6 +121,8 @@ PointParticle::PointParticle(const PointParticle& particle)
   _force        = particle._force;
   _velocity     = particle._velocity;
   _orientation  = particle._orientation;
+  _constant_force = particle._constant_force;
+  _charge       = particle._charge;
 }
 
 
@@ -155,11 +183,15 @@ void PointParticle::print_info(const bool & print_neighbor_list) const
    * Scheme 1: using printf. Then every process will print out info on its own.
    * --------------------------------------------------------------------------*/
   printf("point particle[%d]: \n", _id);
-  printf("      center = (%.12e, %.12e, %.12e)\n", _center(0), _center(1), _center(2));
+  printf("      center = (%.6e, %.6e, %.6e)\n", _center(0), _center(1), _center(2));
   printf("      PBC counter = (%d, %d, %d)\n", _counter[0],_counter[1],_counter[2]);
-  printf("      force  = (%.18e, %.18e, %.18e)\n", _force(0),_force(1),_force(2));
-  printf("      velocity = (%.12e, %.12e, %.12e)\n", _velocity(0), _velocity(1), _velocity(2));
+  printf("      force  = (%.6e, %.6e, %.6e)\n", _force(0),_force(1),_force(2));
+  printf("      velocity = (%.6e, %.6e, %.6e)\n", _velocity(0), _velocity(1), _velocity(2));
+  printf("      orientation = (%.6e, %.6e, %.6e)\n", _orientation[0], _orientation[1], _orientation[2]);
+  printf("      constant_force = (%.6e, %.6e, %.6e)\n", _constant_force(0), _constant_force(1), _constant_force(2));
+  printf("      charge = %.6e\n", _charge);
   
+
   // output elem id and process id
   printf("      parent_id   = %d\n",    _parent_id);
   printf("      point_type  = %d\n",   _point_type);

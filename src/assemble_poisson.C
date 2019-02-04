@@ -43,6 +43,7 @@
 #include "libmesh/mesh.h"
 
 // User defined header includes
+#include "ggem_poisson.h"
 #include "pm_toolbox.h"
 #include "assemble_poisson.h"
 
@@ -337,7 +338,6 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
                                          const std::vector<std::size_t> n_list,
                                          const bool& pc_flag,
                                          const std::string& option,
-                                         const Real& alpha,
                                          DenseVector<Number>& Fe)
 {
   START_LOG("compute_element_rhs()", "AssemblePoisson");

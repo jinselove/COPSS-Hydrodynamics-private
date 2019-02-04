@@ -6,7 +6,7 @@
 #			   system_name         			
 #############################################
 
-test_name = general
+simulation_name = general
 
 #############################################
 #			   Physical parameters         			

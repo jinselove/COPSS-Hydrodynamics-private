@@ -108,11 +108,11 @@ void Copss::read_input()
 //====================================================================
 void Copss::read_system_info()
 {
-    test_name = input_file("test_name", "validation");
+    simulation_name = input_file("simulation_name", "validation");
     cout <<"\n##########################################################\n"
-         <<  "#                       system_name                       \n"
+         <<  "#                       simulation_name                       \n"
          <<  "##########################################################\n\n"
-         <<  "-----------> system_name: "<< test_name.c_str() << endl;
+         <<  "-----------> simulation_name: "<< simulation_name.c_str() << endl;
     print_info = input_file("print_info", false);
 }
 
@@ -1328,25 +1328,22 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
 
 void Copss::destroy()
 {
-  MatDestroy(&M);
   VecDestroy(&U0);
   VecDestroy(&R0);
   VecDestroy(&R_mid);
   VecDestroy(&dw_mid);
   PetscRandomDestroy(&rand_ctx);
-  if(with_brownian){
+  if(&dw){
     VecDestroy(&dw);
   }
   if(exodus_ptr and with_hi) {
     delete exodus_ptr;
+  }
+  if (&viewer){
+      PetscViewerDestroy(&viewer);
   }
   PetscViewerDestroy(&viewer);
 }
 
 
 } // end namespace
-
-
-
-
-

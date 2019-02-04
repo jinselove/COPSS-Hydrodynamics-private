@@ -62,6 +62,36 @@ public:
   ~PolymerChain();
   
   
+  /*
+   * Read point_particle_data.in
+   * The data format is as follows:
+       
+       LAMMPS FENE chain data file
+       11 atoms # total number of beads
+       10 bonds # total number of bonds, for bead system, it equals to number of beads - 1
+       1 atom types # atom types, this used to assign different mass
+       1 bond types
+       -129.872397092 129.872397092 xlo xhi 
+       -129.872397092 129.872397092 ylo yhi 
+       -12.9872397092 12.9872397092 zlo zhi 
+
+       Masses
+
+       1 1.0 
+
+       Atoms
+
+
+       1     1 1  -100.493 124.921 -9.297    1  1 1 0. 0. 0. 0.
+       2     1 1  -98.1669 114.712 -8.822    1  1 1 0. 0. 0. 0.
+       3     1 1  -105.113 111.118 -6.809    1  1 1 0. 0. 0. 0.
+       4     1 1  -109.612 107.256 -4.316     1  1 1 0. 0. 0. 0.
+     # bead_id, chain_id, bead_type, x, y, z, rot_x, rot_y, rot_z, f_x, f_y, f_z, Q
+   */
+   
+   void read_particles_data(const std::string& filename);
+   
+  
   /* 
    * Read the data of chain from local file, whose data structure is:
    * Nb
@@ -88,10 +118,26 @@ public:
   void read_data_vtk(const std::string& filename);
   
   /*
+   * Update polymer chain read from point_particle_data.in with positions in 
+   * saved restart vtk file (for polymer chain)
+   * This will be useful to restart the simulation
+   */
+  void read_particles_data_restart_vtk(const std::string& filename);
+  
+  
+  /*
    * Read the data of chain from local file with csv format.
    * This will be useful to restart the simulation
    */
   void read_data_csv(const std::string& filename); 
+
+
+  /*
+   * Update polymer chain read from point_particle_data.in with positions in 
+   * saved restart csv file (for bead system)
+   * This will be useful to restart the simulation
+   */
+  void read_particles_data_restart_csv(const std::string& filename); 
 
 
    /*
@@ -437,4 +483,3 @@ private:
 }; // end of class
   
 }  // end of namespace
-

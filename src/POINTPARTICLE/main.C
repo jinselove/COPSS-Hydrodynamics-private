@@ -19,9 +19,6 @@ int main (int argc, char **argv){
   // Run simulation
   system.run(equation_systems);
 
-  // Destroy equation_systems and objects generated during simulation
-  system.destroy();
-
   // Print end time
   time ( &rawtime );
   timeinfo = localtime ( &rawtime );

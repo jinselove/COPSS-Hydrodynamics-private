@@ -44,15 +44,18 @@
 
 // User defined header includes
 #include "analytical_solution.h"
-#include "ggem_system.h"
 #include "pm_toolbox.h"
 #include "assemble_stokes.h"
+#include "pm_system_stokes.h"
 
 // ==================================================================================
-AssembleStokes::AssembleStokes(EquationSystems& es)
+AssembleStokes::AssembleStokes(EquationSystems& es,
+                               const std::string& name)
 : AssembleSystem(es)
 {
-    //do nothing
+    if (name != "Stokes") libmesh_error();
+    analytical_solution = new AnalyticalSolution(name);
+    ggem_stokes = new GGEMStokes();
 }
 
 
@@ -60,7 +63,12 @@ AssembleStokes::AssembleStokes(EquationSystems& es)
 // ==================================================================================
 AssembleStokes::~AssembleStokes()
 {
-  // do nothing
+    if (analytical_solution){
+        delete analytical_solution;
+    }
+    if (ggem_stokes){
+        delete ggem_stokes;
+    }
 }
 
 
@@ -71,7 +79,6 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
 {
   START_LOG ("assemble_global_K()", "AssembleStokes");
   /*! It is a good idea to make sure we are assembling the proper system.
-
   */
   libmesh_assert_equal_to (system_name, "Stokes");
   const unsigned int n_mesh_elem = _mesh.n_elem();
@@ -141,7 +148,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
   const bool user_defined_pc      =  _eqn_sys.parameters.get<bool>        ("user_defined_pc");
   const Real mu                   =  _eqn_sys.parameters.get<Real>        ("viscosity_0");
 
-  // build _int_force vector at the beginning of simulation
+  // select boundary side at the Initialization of the simulation
   if(_boundary_sides.size() == 1){
     _boundary_sides.resize(n_mesh_elem);
     MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
@@ -154,6 +161,16 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
       // printf("finished select_boundary_side\n");
     }
   }
+  
+  // attach PointMesh to AnalyticalSolution (only do this once for "ggem_validation")
+  if (_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation" &&
+      !analytical_solution -> get_point_mesh()) 
+  {
+      analytical_solution -> attach_point_mesh(_pm_system.point_mesh());
+  }
+  
+  // Initialize (set) parameters in ggem_stokes
+  this -> init_ggem_stokes(system_name);
 
   // Now we will loop over all the elements in the mesh that live
   // on the local processor. We will compute the element matrix Ke. In case users
@@ -198,7 +215,6 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
       this->assemble_element_KIJ(JxW,dphi,n_u_dofs,i,i,Kij);
       Ktt += Kij;
     }
-
     // Compute KIJ and add it to Ke
     for (unsigned int i=0; i<_dim; i++)
     {
@@ -235,7 +251,6 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
       }
 
     } // end for I-loop
-
 //    if(_eqn_sys.comm().rank()==0){
 //      printf("----->TEST: element id = %u\n", elem->id());
 //      PMToolBox::output_dense_matrix(Ktt);
@@ -244,18 +259,13 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
     // apply BCs by penalty method
     this->apply_bc_by_penalty(elem, "matrix", Ke, Fe, option);
 
-
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
     dof_map.constrain_element_matrix (Ke, dof_indices);
-
-
     // Add the element matrix and rhs vector to the global system.
     //GeomTools::zero_filter_dense_matrix(Ke, 1e-10);
     //PMToolBox::output_dense_matrix(Ke);
     _pm_system.matrix->add_matrix (Ke, dof_indices);
-
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      * The following will modify the elem pc matrix, then add it to the global PCMatrix
      * It has to be done after the penalty, because Ke and Fe have been changed!
@@ -278,7 +288,6 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
       // Mp pc
       if(schur_pc_type=="SMp")
         _pm_system.get_matrix("Preconditioner").add_matrix (Mp, dof_indices_p);
-      // -------------------------------------------------------------------------------
 
       //
       if(schur_pc_type=="SMp_lump")
@@ -347,10 +356,6 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
 
-
-  // retrieve system parameters
-  const Real alpha   =  _eqn_sys.parameters.get<Real> ("alpha");
-
   // perf_log.pop("preparation");
 
   // build _int_force vector at the beginning of simulation
@@ -401,7 +406,6 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   // perf_log.pop("compute_int_force");
   }
 
-
   // Now we will loop over all the elements in the mesh that live
   // on the local processor, and compute the element matrix Ke.
   MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
@@ -450,7 +454,7 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 
     // perf_log.push("compute_element_rhs");
     this->compute_element_rhs(elem, _n_u_dofs[elem_id], *fe_vel, n_list,
-                              pf_flag, option, alpha, Fe);
+                              pf_flag, option, Fe);
 
 
     // perf_log.pop("compute_element_rhs");
@@ -478,7 +482,7 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   STOP_LOG ("assemble_global_F()", "AssembleStokes");
 
   // ---------------------------------------------------------------------------------------------
-  //if (_pm_system.comm().rank()==0){
+  // if (_pm_system.comm().rank()==0){
   //  printf("assemble_global_F(): The global RHS vector has been assembled ...\n");
   // }
   // ---------------------------------------------------------------------------------------------
@@ -494,7 +498,6 @@ void AssembleStokes::compute_element_rhs(const Elem* elem,
                                          const std::vector<std::size_t> n_list,
                                          const bool& pf_flag,
                                          const std::string& option,
-                                         const Real& alpha,
                                          DenseVector<Number>& Fe)
 {
   START_LOG("compute_element_rhs()", "AssembleStokes");  // libMesh log
@@ -526,7 +529,6 @@ void AssembleStokes::compute_element_rhs(const Elem* elem,
   if( pf_flag && (option == "disturbed") )
   {
     // get the location of points in the neighbor list
-    GGEMSystem ggem_sys;
     const std::size_t n_pts = n_list.size();
     // Now we will build the element RHS using high order gauss quadrature.
     // first loop over all neighboring particles near this element
@@ -542,12 +544,11 @@ void AssembleStokes::compute_element_rhs(const Elem* elem,
       // distance from Gaussian point to the force point
         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
         // evaluate the value of gauss force at this quad pt.
-        force_val = ggem_sys.smoothed_force_exp(r, alpha);
+        force_val = ggem_stokes -> smoothed_force_exp(r);
         for (unsigned int j=0; j<_dim; ++j){
         	for (unsigned int k=0; k<n_u_dofs; ++k){
-//            Fe(j*n_u_dofs + k) += JxW[qp]*phi[k][qp]*fvalues_j;
+                 // force_val * np_force is the global force density contributed for this particle
         		 Fe(j*n_u_dofs + k) += _int_force[elem_id][k*qp_size+qp]*force_val*np_force(j);
-//              Fe(j*n_u_dofs + k) += _int_force[elem_id][k]*force_val*np_force(j);
          	} // end loop over nodes
         }// end loop over dimensions
       } // end loop over gaussian points
@@ -724,7 +725,6 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
                                          const std::string& option)
 {
   START_LOG("apply_bc_by_penalty()", "AssembleStokes");  // libMesh log
-
   // Get a reference to the Particle-Mesh linear implicit system object.
   PMSystemStokes & pm_system = _eqn_sys.get_system<PMSystemStokes> ("Stokes");
   std::vector<bool> shear = pm_system.get_equation_systems().parameters.get<std::vector<bool>>("shear");
@@ -738,7 +738,7 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
   const std::size_t elem_id = elem->id();
   const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::vector<bool>& inlet_direction = pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
-  AnalyticalSolution analytical_solution(pm_system);
+
   for (unsigned int s=0; s<_boundary_sides[elem_id].size(); s++)
   {
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -781,9 +781,9 @@ void AssembleStokes::apply_bc_by_penalty(const Elem* elem,
           const std::vector<Real> u_local = pm_system.local_velocity_fluid(elem, ptx,"regularized");
           // const std::vector<Real> u_local = pm_system.local_velocity_fluid(ptx,"regularized");
           // ---------------- setup for validation test 01 -------------
-          if(_eqn_sys.parameters.get<std::string> ("test_name") == "ggem_validation")
+          if(_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation")
           {
-            const std::vector<Real> u_boundary = analytical_solution.exact_solution_infinite_domain(ptx);
+            const std::vector<Real> u_boundary = analytical_solution -> exact_solution_infinite_domain(*ggem_stokes, ptx);
             for(unsigned int k=0;k<_dim;++k) uvw[k] = u_boundary[k] - u_local[k];
           }
           // Normally on the boundary, disturbed_velocity = undistrubed_velocity - ggem_local_velocity
@@ -859,6 +859,33 @@ Real AssembleStokes::boundary_traction(const std::string& which_side) const
               <<"******************************************************************"<<std::endl;
     return 1E100;
   } // end if-else
+}
+
+
+// ============================================================================================
+void AssembleStokes::init_ggem_stokes(const std::string& system_name)
+{
+    START_LOG("init_ggem_stokes()", "AssembleStokes");
+    
+    libmesh_assert_equal_to(system, "Stokes");
+    
+    PMSystemStokes& _pm_system = _eqn_sys.get_system<PMSystemStokes> (system_name);
+    PointMesh<3>* _point_mesh = _pm_system.point_mesh();
+    const PointType point_type = _point_mesh->particles()[0]->point_type();
+    ggem_stokes -> set_mu(_eqn_sys.parameters.get<Real> ("viscosity_0"));
+    ggem_stokes -> set_alpha(_eqn_sys.parameters.get<Real> ("alpha"));
+    ggem_stokes -> set_br0(_eqn_sys.parameters.get<Real> ("br0"));
+    ggem_stokes -> set_point_type(point_type);
+    if (point_type == LAGRANGIAN_POINT){
+        ggem_stokes -> set_ibm_beta(_eqn_sys.parameters.get<Real> ("ibm_beta") );
+        ggem_stokes -> set_hmin(_eqn_sys.parameters.get<Real> ("minimum solid mesh size") );
+    }
+    else{
+        ggem_stokes -> set_hmin(_eqn_sys.parameters.get<Real> ("minimum fluid mesh size") );
+    }
+    ggem_stokes -> set_ksi();
+
+    STOP_LOG("init_ggem_stokes()", "AssembleStokes");
 }
 
 

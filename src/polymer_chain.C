@@ -67,6 +67,155 @@ PolymerChain::~PolymerChain()
 
 
 // ======================================================================
+void PolymerChain::read_particles_data(const std::string& filename)
+{
+  START_LOG ("read_particles_data()", "PolymerChain");
+  
+  // Open the local file and check the existance
+//  std::cout <<"-----------------> Read polymer chain in pizza format from "<<filename <<std::endl;
+  std::ifstream infile;
+  infile.open (filename, std::ios_base::in);
+  if( !infile.good() )
+  {
+    printf("***warning: read_particles_data() can NOT read the polymer chain data!\n");
+    libmesh_error();
+  }
+  
+  // init variables:
+  // point_type:  0 - polymer bead point; 1 - tracking point; or user-defined type
+  const PointType point_type = POLYMER_BEAD;
+  int bead_id, chain_id, bead_type; //
+  std::vector<Real> rot_vec(4); // rotation vector (a,b,c) + theta.
+  std::size_t n1, n2, n3;
+  
+  
+  // Read file line by line
+  std::string line_str, str_tmpt;
+  std::getline(infile, line_str); // 0. Header line
+  infile >> _n_beads >> line_str; // 1. # of beads
+  if (line_str != "atoms") {
+      std::cout << "# of atoms is not defined in the data file" << std::endl;
+      libmesh_error();
+  }
+  infile >> _n_bonds >> line_str; // 2. # of bonds
+  if (line_str != "bonds") {
+      std::cout << "# of bonds is not defined in the data file" << std::endl;
+      libmesh_error();
+  }
+  infile >> _n_bead_types >> line_str >> str_tmpt; // 3. # of bead types
+  if (line_str != "atom" || str_tmpt != "types") {
+      std::cout << "# of atom types is not defined in the data file" << std::endl;
+      libmesh_error();
+  }
+  infile >> _n_bond_types >> line_str >> str_tmpt; // 4. # of bond types
+  if (line_str != "bond" || str_tmpt != "types") {
+      std::cout << "# of bond types is not defined in the data file" << std::endl;
+      libmesh_error();
+  }
+  
+  // init
+  _mass.resize(_n_bead_types);
+  _beads.resize(_n_beads);
+  _bonds.resize(_n_bonds);
+  for(std::size_t i=0; i<_n_bonds; ++i) _bonds[i].resize(3);
+  
+  // Read the bead mass
+  while (std::getline(infile, line_str)){
+    if(line_str=="Masses") break;
+  }
+  if (line_str != "Masses"){
+      std::cout << "Masses of atom types are not defined correctly in the data file" << std::endl;
+      libmesh_error();
+  }
+  std::getline(infile, line_str); // skip the empty line
+  for(std::size_t i=0; i<_n_bead_types; ++i)
+  {
+    infile >> n1 >> _mass[i];
+  }
+  
+  
+  // Read the beads
+  while (std::getline(infile, line_str)){
+    if(line_str=="Atoms") break;
+  }
+  if (line_str != "Atoms"){
+      std::cout << "Atoms are not defined correctly in the data file" << std::endl;
+      libmesh_error();
+  }
+  
+  std::getline(infile, line_str); // skip the empty line
+  
+  Point pos(0.);
+  Point constant_force(0.);
+  Real charge;
+  Real total_charge = 0.;
+  for(std::size_t i=0; i<_n_beads; ++i)
+  {
+    // read data in this line
+    infile >> bead_id 
+           >> chain_id 
+           >> bead_type 
+           >> pos(0) >> pos(1) >> pos(2)
+           >> rot_vec[0] >> rot_vec[1] >>rot_vec[2]
+           >> constant_force(0) >> constant_force(1) >> constant_force(2)
+           >> charge; 
+    total_charge += charge;
+    // create PointParticle
+    PointParticle* particle = new PointParticle(pos, 
+                                                bead_id-1, 
+                                                point_type, 
+                                                rot_vec,
+                                                constant_force,
+                                                charge);
+    particle->set_parent_id(chain_id-1);  // parent id = chain id
+    
+    // add to the beads list
+    _beads[i] = particle;
+  }
+  
+  // check charge neutrality
+  if (std::abs(total_charge) > 1e-6){
+      std::cout << "Error: Charge neutrality is not satisfied. Please check the data file..." <<std::endl;
+      libmesh_error();
+  }
+  
+  // Use id of the last chain to set number of chains, and initialize vector
+  _n_chains = chain_id;
+  _n_beads_per_chain.resize(_n_chains, 0);
+ 
+  // Read the bonds
+  while (std::getline(infile, line_str)){
+    if(line_str=="Bonds") break;
+  }
+  std::getline(infile, line_str); // skip the empty line
+  for(std::size_t i=0; i<_n_bonds; ++i)
+  {
+    // read data in this line
+    infile >> bead_id >> n1 >> n2 >> n3;
+    
+    // create PointParticle
+    _bonds[i][0] = n1-1;  // bond type
+    _bonds[i][1] = n2-1;  // id of connected bead 1
+    _bonds[i][2] = n3-1;  // id of connected bead 2
+  }
+
+  
+  // Finish and close the file
+  infile.close();
+  
+  // set number of beads on each chain 
+  for(std::size_t i=0; i<_n_beads; ++i)
+  {
+    // chain id
+    chain_id = _beads[i]->parent_id();
+    _n_beads_per_chain[chain_id] += 1; 
+  }
+
+  STOP_LOG ("read_particles_data()", "PolymerChain");
+}
+
+
+// ======================================================================
 void PolymerChain::read_data(const std::string& filename)
 {
   START_LOG ("read_data()", "PolymerChain");
@@ -316,6 +465,58 @@ void PolymerChain::read_data_vtk(const std::string& filename)
   STOP_LOG ("read_data_vtk()", "PolymerChain");
 }
 
+
+// ======================================================================
+void PolymerChain::read_particles_data_restart_vtk(const std::string& filename)
+{
+  START_LOG ("read_particles_data_restart_vtk()", "PolymerChain");
+  
+  // Open the local file and check the existance
+  std::cout <<"\n###Read polymer chain with vtk format"<<std::endl;
+  std::cout <<"   filename = "<<filename <<std::endl;
+  std::ifstream infile;
+  infile.open (filename, std::ios_base::in);
+  if( !infile.good() )
+  {
+    printf("***warning: read_particles_data_vtk() can NOT read the polymer chain data!");
+    libmesh_error();
+  }
+  
+  // init variables:
+  std::size_t n1, n2, n3;
+  
+  
+  // Read file line by line
+  std::string line_str, str_tmpt;
+  std::getline(infile, line_str); // 0. Header line
+  std::getline(infile, line_str); // 1. Header line
+  std::getline(infile, line_str); // 2. Header line
+  std::getline(infile, line_str); // 3. Header line
+  std::size_t n_beads;
+  infile >> line_str >> n_beads >> str_tmpt; // 4. # of beads
+  if (n_beads != _n_beads){
+      std::cout << "Error: number of beads in restart data file != number of beads in point_particle_data.in" << std::endl;
+      libmesh_error();
+  }
+  
+  // read positions
+  Point pos(0.);
+  
+  for(std::size_t i=0; i<_n_beads; ++i)
+  {
+    // read data in this line: coordinates
+    infile >> pos(0) >> pos(1) >> pos(2);
+    _beads[i]->set_particle_center(pos);
+  }
+  
+  // Finish and close the file
+  infile.close();
+
+  std::cout << "Reading polymer chain data from "<<filename<<" is completed!\n\n";
+  STOP_LOG ("read_particles_data_restart_vtk()", "PolymerChain");
+}
+
+
 //=======================================================================
 void PolymerChain::read_data_csv(const std::string& filename)
 {
@@ -376,7 +577,50 @@ void PolymerChain::read_data_csv(const std::string& filename)
   STOP_LOG ("read_data_csv()", "PolymerChain");
 
 }
+
+
+//=======================================================================
+void PolymerChain::read_particles_data_restart_csv(const std::string& filename)
+{
+  START_LOG ("read_particles_data_restart_csv()", "PolymerChain");
   
+  // Open the local file and check the existance
+  std::cout <<"\n###Read bead with csv format"<<std::endl;
+  std::cout <<"   filename = "<<filename <<std::endl;
+  std::ifstream infile;
+  infile.open (filename, std::ios_base::in);
+  if( !infile.good() )
+  {
+    printf("***warning: read_data_csv() can NOT read the bead data!");
+    libmesh_error();
+  }
+  
+  // init variables:
+  // point_type:  0 - polymer bead point; 1 - tracking point; or user-defined type
+  const PointType point_type = POLYMER_BEAD;
+  Point pos(0.);
+  Point velocity(0.);
+  Point force(0.);
+  std::size_t bead_id;
+  
+  // Read file line by line
+  std::string line_str, str_tmpt;
+  std::getline(infile, line_str); // 0. Header line
+  // Read beads data
+  std::cout << line_str << std::endl;
+  for (std::size_t i=0; i < _n_beads; i++){
+      infile >> bead_id 
+             >> pos(0) >> pos(1) >> pos(2)
+             >> velocity(0) >> velocity(1) >> velocity(2) 
+             >> force(0) >> force(1) >> force(2);
+      _beads[i]->set_particle_center(pos);
+  }
+  // Finish and close the file
+  infile.close();
+  std::cout << "Reading bead data from "<<filename<<" is completed!\n\n";
+  STOP_LOG ("read_particles_data_restart_csv()", "PolymerChain");
+}
+ 
   
 // ======================================================================
 void PolymerChain::read_pbc_count()

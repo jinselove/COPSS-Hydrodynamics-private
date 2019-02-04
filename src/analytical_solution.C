@@ -87,11 +87,8 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(GGEMStokes&
     const Point pti = _point_mesh->particles()[i]->point();
     const Point x   = pt0 - pti;
     
-    bool  zero_limit  = false;
-    if(x.norm()<1E-6) zero_limit  = true;
-    
     // use ksi instead of alpha
-    GT = ggem_stokes.green_tensor_unbounded_smoothed(x, ggem_stokes.get_ksi(), zero_limit);
+    GT = ggem_stokes.green_tensor_unbounded_smoothed(x, ggem_stokes.get_ksi());
     const Point fv = _point_mesh->particles()[i]->particle_force();
     
     // 3. compute u due to this particle

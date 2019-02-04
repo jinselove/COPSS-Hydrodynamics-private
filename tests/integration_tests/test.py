@@ -163,7 +163,7 @@ for key, value in tests.items():
         subprocess.call('bash zclean.sh', shell=True,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         sys.exit(-1)
-    print("--"*1 + "Timing for test --> '{0}': {1} s".format(key, end-start))
+    print("--"*1 + "Test '{0}' passed. Timing for test : {1} s".format(key, end-start))
     subprocess.call('bash zclean.sh', shell=True,
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

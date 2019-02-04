@@ -29,11 +29,7 @@ namespace libMesh
 
 // ======================================================================
 GGEMStokes::GGEMStokes()
-{
-  _kronecker_delta.resize(3, std::vector<Real>(3,0.));
-  for(int i=0; i<3; i++) _kronecker_delta[i][i] = 1.;
-  // do nothing
-}
+:GGEMSystem(){}
 
 
 // ======================================================================
@@ -131,11 +127,10 @@ Real GGEMStokes::smoothed_force_exp(const Real& r) const
 
   
 // ======================================================================
-DenseMatrix<Number> GGEMStokes::green_tensor(const Point& x,
-                                             const bool& zero_limit,
+DenseMatrix<Number> GGEMStokes::green_tensor_unbounded(const Point& x,
                                              const DeltaFunType& delta_type) const
 {
-    START_LOG ("green_tensor()", "GGEMStokes");
+    START_LOG ("green_tensor_unbounded()", "GGEMStokes");
     
     // Compute the values according to the delta_type
     DenseMatrix<Number> GT(dim,dim);
@@ -145,8 +140,7 @@ DenseMatrix<Number> GGEMStokes::green_tensor(const Point& x,
       GT = this->green_tensor_unbounded_singular(x);
       break;
     case SMOOTHED_EXP :
-      // GT = this->green_tensor_local(x, alpha_or_ksi, mu, dim, zero_limit);
-      GT = this->green_tensor_unbounded_smoothed(x, alpha, zero_limit);
+      GT = this->green_tensor_unbounded_smoothed(x, alpha);
       break;
     default:
       printf("*** error in GGEMStokes::green_tensor: undefined DeltaFunType!\n");
@@ -154,7 +148,7 @@ DenseMatrix<Number> GGEMStokes::green_tensor(const Point& x,
       libmesh_error();
     }
 
-    STOP_LOG ("green_tensor()", "GGEMStokes");
+    STOP_LOG ("green_tensor_unbounded()", "GGEMStokes");
     return GT;
 }
   
@@ -192,13 +186,16 @@ DenseMatrix<Number> GGEMStokes::green_tensor_unbounded_singular(const Point& x
 
 // ======================================================================
 DenseMatrix<Number> GGEMStokes::green_tensor_unbounded_smoothed(const Point& x,
-                                                                const Real& alpha_or_ksi,
-                                                                const bool& zero_limit) const
+                                                                const Real& alpha_or_ksi
+                                                               ) const
 {
     START_LOG ("green_tensor_unbounded_smoothed()", "GGEMStokes");
     
     DenseMatrix<Number> G(dim,dim);
-    if (zero_limit)
+    
+    const Real r = x.norm();
+    // check zero limit
+    if (r < r_eps)
     {
         Real c0 = one_eight_pi_mu * 4.0 * alpha_or_ksi / sqrt_pi;
         for (int i=0; i<dim; ++i)
@@ -208,7 +205,7 @@ DenseMatrix<Number> GGEMStokes::green_tensor_unbounded_smoothed(const Point& x,
     else
     {
         // coefficients
-        const Real  r = x.norm(), r2  = r * r, alpha_or_ksi2 = alpha_or_ksi * alpha_or_ksi;
+        const Real r2  = r * r, alpha_or_ksi2 = alpha_or_ksi * alpha_or_ksi;
         const Real c1 = std::erf(alpha_or_ksi*r) / r;
         const Real c2 = 2. * alpha_or_ksi / sqrt_pi * std::exp(-alpha_or_ksi2 * r2);
         // compute G tensor; since G is symmetric, we will built the upper half and
@@ -238,14 +235,15 @@ DenseMatrix<Number> GGEMStokes::green_tensor_unbounded_smoothed(const Point& x,
 
   
 // ======================================================================
-DenseMatrix<Number> GGEMStokes::green_tensor_local(const Point& x,
-                                                   const bool& zero_limit) const
+DenseMatrix<Number> GGEMStokes::green_tensor_local_singular(const Point& x) const
 {
-    START_LOG ("green_tensor_local()", "GGEMStokes");
+    START_LOG ("green_tensor_local_singular()", "GGEMStokes");
 
     DenseMatrix<Number> G(dim,dim);
+    
+    const Real r = x.norm();
     // check if zero limit is true.
-    if (zero_limit)
+    if (r < r_eps)
     {
         for (int i=0; i<dim; ++i)
             for (int j=0; j<dim; ++j)
@@ -254,7 +252,7 @@ DenseMatrix<Number> GGEMStokes::green_tensor_local(const Point& x,
     else
     {
         // coefficients
-        const Real  r = x.norm(), r2  = r * r;
+        const Real r2  = r * r;
         const Real c1 = std::erfc(alpha*r) / r;
         const Real c2 = two_alpha_sqrt_pi * std::exp(-alpha2 * r2);
 
@@ -278,21 +276,22 @@ DenseMatrix<Number> GGEMStokes::green_tensor_local(const Point& x,
         G *= one_eight_pi_mu;
     } // end if-else
 
-    STOP_LOG ("green_tensor_local()", "GGEMStokes");
+    STOP_LOG ("green_tensor_local_singular()", "GGEMStokes");
 
     // done
     return G;
 }
 
 // ======================================================================
-DenseMatrix<Number> GGEMStokes::green_tensor_local_regularized(const Point& x,
-                                                               const bool& zero_limit) const
+DenseMatrix<Number> GGEMStokes::green_tensor_local_regularized(const Point& x) const
 {
     START_LOG ("green_tensor_local_regularized()", "GGEMStokes");
 
     DenseMatrix<Number> G(dim,dim);
+    
+    const Real r = x.norm();
     // check if zero limit is true.
-    if (zero_limit)
+    if (r < r_eps)
     {
         for (int i=0; i<dim; ++i)
           for (int j=0; j<dim; ++j){
@@ -302,7 +301,7 @@ DenseMatrix<Number> GGEMStokes::green_tensor_local_regularized(const Point& x,
     else
     {
         // coefficients
-        const Real  r   = x.norm(), r2  = r * r;
+        const Real  r2  = r * r;
         const Real  kr  = ksi * r,   kr2 = kr * kr;
         const Real  ar  = alpha * r, ar2 = ar * ar;
         const Real  c1  = ( std::erf(kr) - std::erf(ar) )/r;
@@ -365,13 +364,10 @@ std::vector<Real> GGEMStokes::local_velocity_fluid(PointMesh<3>*  point_mesh,
         const Point x   = point_mesh->pm_periodic_boundary()->point_vector(pt0,ptx);
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        bool  zero_limit  = false;
-        Point dpt = pt0 - ptx;
-        if(dpt.norm()<r_eps) zero_limit  = true;
         // 1. compute the Green function (Oseen Tensor) of particle-v
         DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
         if(force_type == "regularized"){
-            GT = this->green_tensor_local_regularized(x, zero_limit);
+            GT = this->green_tensor_local_regularized(x);
         }
         else{
             libmesh_assert ("GGEMStokes::local_velocity_fluid, wrong force_type!");            
@@ -421,7 +417,6 @@ std::vector<Real> GGEMStokes::local_velocity_fluid(PointMesh<3>*  point_mesh,
     u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*f_v(j)
     zero_limit = false, if the given point is 'fluid' (not a bead/tracking pt.)
     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    bool zero_limit  = false;  // for fluid, we let it be false, and allow singularity
     std::vector<Real> u(dim,0.0);
     for (std::size_t v=0; v<elem_neighbors.size(); ++v)
     {
@@ -429,12 +424,10 @@ std::vector<Real> GGEMStokes::local_velocity_fluid(PointMesh<3>*  point_mesh,
         const std::size_t p_id = elem_neighbors[v];
         const Point pt0 = point_mesh->particles()[p_id]->point();
         const Point x   = point_mesh->pm_periodic_boundary()->point_vector(pt0,ptx);
-        Point dpt = pt0 - ptx;
-        if(dpt.norm()<r_eps) zero_limit  = true;
         // 1. compute the Green function (Oseen Tensor) of particle-v
         DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
         if (force_type=="regularized")
-          GT = this->green_tensor_local_regularized(x, zero_limit);
+          GT = this->green_tensor_local_regularized(x);
         else
           libmesh_assert ("GGEMStokes::local_velocity_fluid, wrong force_type!");
 
@@ -486,7 +479,6 @@ Point GGEMStokes::local_velocity_bead(PointMesh<3>*  point_mesh,
     u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*f_v(j)
     zero_limit = false, because the neighbor list does NOT include itself.
     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    bool zero_limit    = false;    // this will be changed to "true" for tracking points
     Point u;
     DenseMatrix<Number> GT;         // Green function Tesnosr has the size: dim x dim
     // const Real ksi = this->regularization_parameter(hmin, ibm_beta, br0, point_type0);
@@ -497,7 +489,7 @@ Point GGEMStokes::local_velocity_bead(PointMesh<3>*  point_mesh,
         const unsigned int p_id = IndicesDists[v].first;
         // 1. compute the Green function (Oseen Tensor) of particle-v
         if(force_type=="regularized")
-          GT = this->green_tensor_local_regularized(x, zero_limit);
+          GT = this->green_tensor_local_regularized(x);
         else
           libmesh_assert("GGEMStokes::local_velocity_bead, wrong force_type");
 
@@ -520,8 +512,8 @@ Point GGEMStokes::local_velocity_bead(PointMesh<3>*  point_mesh,
     if( point_type0==LAGRANGIAN_POINT )  // for Lagrangian tracking point type only
     {
         // 1. compute the Green function (Oseen Tensor) when x-->0
-        zero_limit      = true;
-        GT = this->green_tensor_local_regularized(ptx, zero_limit);
+        Point self_vector(0.);
+        GT = this->green_tensor_local_regularized(self_vector);
 
         // 2. compute the force vector of this particle
         const Point fv = point_mesh->particles()[pid0]->particle_force();

@@ -71,6 +71,14 @@ public:
                 const PointType point_type,
                 const std::vector<Real>& rot_vec);
   
+  // Constructor
+  PointParticle(const Point pt,
+                const dof_id_type point_id,
+                const PointType point_type,
+                const std::vector<Real>& rot_vec,
+                const Point constant_force,
+                const Real charge);
+
   
   // Copy constructor
   PointParticle(const PointParticle& particle);
@@ -85,6 +93,7 @@ public:
    */
   Point& point()  {  return _center;  };
   Point& center() {  return _center;  };
+  void set_particle_center(const Point& center) {_center = center;};
 
  
 
@@ -203,7 +212,12 @@ public:
    *
    */  
   const Point& particle_force() {return _force;};
-
+  
+  /*!\brief const particle force
+  */
+  const Point& constant_force() {return _constant_force;};
+  
+  
   /*
    * Set particle velocity
    */ 
@@ -219,9 +233,14 @@ public:
   /*
    * Return the orientation vector of the particle
    */
-  const std::vector<Real> orientation() const {  return _orientation;  };
+  const std::vector<Real>& orientation() const {  return _orientation;  };
   void set_orientation(const std::vector<Real>& rot_vec);
   
+ /*
+  * Return the charge of the particle
+  */
+  const Real& charge() const {return _charge;};
+  void set_charge(const Real& charge) {_charge = charge;};
   
   
   /*
@@ -253,6 +272,13 @@ private:
   // the force vector excerted on this particle(non-hydrodynamic and non-Brownian)
   Point _force;
   
+  // constant force vector excerted on the particle (non-hydrodynamic and non-Brownian)
+  // If 'p_constant' is added to the force_field, this force will be applied to the particle
+  // at each timestep
+  Point _constant_force;
+  
+  // charge
+  Real _charge;
 
   // Count how many times the point has crossed a boundary
   // Used to unfold point's coordinate with periodic boundaries

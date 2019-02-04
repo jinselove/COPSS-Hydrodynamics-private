@@ -76,26 +76,23 @@ void CopssPointParticleSystem::create_object(){
   const unsigned int chain_id = 0;
   polymer_chain = new PolymerChain(chain_id, *pm_periodic_boundary);
   std::ostringstream pfilename;
-  if(restart)
+  pfilename << "point_particle_data.in";
+  cout<<"--------------> skip generating datafile, will read in existed data file: "<<pfilename.str()<<endl;
+  polymer_chain->read_particles_data(pfilename.str());
+  
+  if (restart)
   {
-    cout <<"in restart mode ---------" << endl;
-    if(point_particle_model == "polymer_chain"){
-    	pfilename << "output_polymer_"<< o_step << ".vtk";
-      polymer_chain->read_data_vtk(pfilename.str());
-    }
-    else if (point_particle_model == "bead"){
-      pfilename << "output_bead_" << o_step << ".csv";
-      polymer_chain->read_data_csv(pfilename.str());
-    }
-    cout <<"-------------> read "<< point_particle_model << "data from " << pfilename.str() << " in restart mode" << endl;
-
-  } 
-  else
-  {
-  	pfilename << "point_particle_data.in";
-    cout<<"--------------> skip generating datafile, will read in existed pizza file: "<<pfilename.str()<<endl;
-    polymer_chain->read_data_pizza(pfilename.str());
-    cout<<"--------------> Polymer_chain class is built!\n";
+	  pfilename.str("");
+      pfilename.clear();
+	  cout <<"--------------> in restart mode, load particle positions from saved restart files" << endl;
+	  if(point_particle_model == "polymer_chain"){
+      	pfilename << "output_polymer_"<< o_step << ".vtk";
+        polymer_chain->read_particles_data_restart_vtk(pfilename.str());
+      }
+      else if (point_particle_model == "bead"){
+        pfilename << "output_bead_" << o_step << ".csv";
+        polymer_chain->read_particles_data_restart_csv(pfilename.str());
+      }
   }
   // output data read from file
   if(point_particle_model == "bead"){

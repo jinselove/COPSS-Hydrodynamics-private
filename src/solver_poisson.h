@@ -26,7 +26,8 @@
 
 /*
  * This class solves Poisson equation using either an iterative
- * solver with a preconditioner or direct solver (for example, superLU).
+ * solver with a preconditioner or direct solver (for example, superLU)
+ * using PETSc interface.
  */
 class SolverPoisson : public Solver
 {

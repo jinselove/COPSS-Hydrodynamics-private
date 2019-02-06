@@ -189,7 +189,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<SystemSolverType> ("solver_type") = solver_type;
   equation_systems.parameters.set<Real>              ("alpha") = alpha;
   equation_systems.parameters.set<Real>         ("kBT")        = kBT;
-  equation_systems.parameters.set<Real>   ("minimum fluid mesh size")  = hminf;
+  equation_systems.parameters.set<Real>   ("minimum fluid mesh size") = hminf;
   equation_systems.parameters.set<Real>       ("viscosity_0")  = muc;
   equation_systems.parameters.set<Real>               ("br0")  = 1.0;
   equation_systems.parameters.set<Real>               ("bk")   = bk;
@@ -199,6 +199,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>                ("tc")  = tc;
   equation_systems.parameters.set<Real>               ("Nks")  = Nks;
   equation_systems.parameters.set<Real>               ("Ss2")  = Ss2;
+  equation_systems.parameters.set<Real>              ("phi0")  = phi0;
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
   equation_systems.parameters.set<string> ("point_particle_model") = point_particle_model;
   equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;

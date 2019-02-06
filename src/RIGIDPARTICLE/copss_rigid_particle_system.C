@@ -193,6 +193,7 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>       ("bead radius")  = Rb;
   equation_systems.parameters.set<Real>              ("drag")  = drag_c;
   equation_systems.parameters.set<Real>                ("tc")  = tc;
+  equation_systems.parameters.set<Real>              ("phi0")  = phi0;
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
   equation_systems.parameters.set<string> ("particle_mesh_type") = particle_mesh_type;
   equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;

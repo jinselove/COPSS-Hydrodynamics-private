@@ -69,8 +69,7 @@ AssemblePoisson::~AssemblePoisson()
 
 
 // ==================================================================================
-void AssemblePoisson::assemble_global_K(const std::string& system_name,
-                                        const std::string& option)
+void AssemblePoisson::assemble_global_K(const std::string& system_name)
 {
   START_LOG ("assemble_global_K()", "AssemblePoisson");
 
@@ -112,7 +111,7 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
   // Element matrix contribution
   DenseMatrix<Number> Ke;
 
-  // Element vector contribution, input of compute_element_rhs()
+  // Element vector contribution
   DenseVector<Number> Fe;
 
   // Build _boundary_sides_dirichlet_poisson and
@@ -170,7 +169,7 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
     }
 
     // apply BCs by penalty method
-    this->apply_bc_by_penalty(elem, "matrix", Ke, Fe, option);
+    this->apply_bc_by_penalty(elem, "matrix", Ke, Fe);
 
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
@@ -192,8 +191,7 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
 
 
 // ==================================================================================
-void AssemblePoisson::assemble_global_F(const std::string& system_name,
-                                        const std::string& option)
+void AssemblePoisson::assemble_global_F(const std::string& system_name)
 {
   START_LOG ("assemble_global_F()", "AssemblePoisson");
 
@@ -228,9 +226,6 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   // Define data structures to contain the element matrix Ke and vector Fe
   DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
-
-  // System parameters
-  const Real alpha = _eqn_sys.parameters.get<Real> ("alpha");
 
   // Build _int_force vector at the beginning of Poisson solver
   // This can work for both Poisson and Stokes equations, since there is only one
@@ -283,7 +278,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
 
     // Get the degree of freedom indices for the current element.
     // FIXME:Why do we update dof_indices again?
-    dof_map.dof_indices (elem, _dof_indices[elem_id]);
+    //dof_map.dof_indices (elem, _dof_indices[elem_id]);
 
     // const unsigned int n_dofs = dof_indices.size();
     Fe.resize (_n_dofs[elem_id]);
@@ -302,11 +297,10 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
 
     // Now compute Fe caused by the regularized point charge.
     // FIXME: need to implement space charge density when considering Nernst-Planck solver
-    this->compute_element_rhs(elem, _n_dofs[elem_id], *fe_phi, n_list,
-                              pc_flag, option, alpha, Fe);
+    this->compute_element_rhs(elem, _n_dofs[elem_id], *fe_phi, n_list, pc_flag, Fe);
 
     // Impose the Dirichlet BC (electrical potential) via the penalty method.
-    this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
+    this->apply_bc_by_penalty(elem, "vector", Ke, Fe);
 
     // Impose Neumann BC (surface charge density) to the right hand side 
     this->apply_bc_neumann(elem, *fe_phi, *fe_face, Fe);
@@ -318,7 +312,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     // Add the element rhs vector to the global system.
     //PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
     //PMToolBox::output_dense_vector(Fe);
-    _pm_system.rhs->add_vector (Fe,_dof_indices[elem_id]);
+    _pm_system.rhs->add_vector (Fe, _dof_indices[elem_id]);
   }// end for elem-loop
 
   STOP_LOG ("assemble_global_F()", "AssemblePoisson");
@@ -337,7 +331,6 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
                                          FEBase& fe_v,
                                          const std::vector<std::size_t> n_list,
                                          const bool& pc_flag,
-                                         const std::string& option,
                                          DenseVector<Number>& Fe)
 {
   START_LOG("compute_element_rhs()", "AssemblePoisson");
@@ -361,20 +354,16 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
   const unsigned int elem_id = elem->id();
   const std::vector<Point>& q_xyz = _q_xyz[elem_id]; // xyz coords of quad pts
 
-  // 1. Add the regularized point charge, first examine if this element is
-  // "close to" the point charge sources
-  //if( pc_flag && (option == "disturbed") )
+  // 1. Add the regularized point charge, first examine if this element has
+  // neighboring point charge sources
   if( pc_flag )
   {
-    // Use GGEMSystem to access Green's function for electrostatics
-    GGEMSystem ggem_sys;
-
     // Number of particles in the neighbor list
     const std::size_t n_pts = n_list.size();
 
     // Initialize variables for position, charge, distance, etc.
     Point np_pos(0.);
-    Real r = 0., charge_val = 0.;
+    Real r=0., charge_val=0., np_charge=0.;
     unsigned int qp_size = q_xyz.size();
     //printf("qp_size = %d\n", q_xyz.size());
 
@@ -382,7 +371,7 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
     // first loop over all neighboring particles near this element
     for(unsigned int np = 0; np<n_pts; ++np){
       // Charge on this bead
-      const Real np_charge = _particles[n_list[np]]->charge();
+      np_charge = _particles[n_list[np]]->charge();
 
       // Get the location of this bead
       np_pos = _particles[n_list[np]]->point();
@@ -392,7 +381,7 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
 
         // Evaluate the value of regularized gaussian charge at this quadrature point
-        charge_val = ggem_poisson -> smoothed_charge_exp(r);
+        charge_val = ggem_poisson->smoothed_charge_exp(r) * np_charge;
 
         // FIXME:Need to add nodal space charge density from ion concentration fields
         // this will need to access PMSystemNP, and approximate ion concentration on
@@ -401,8 +390,8 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
 
        	for(unsigned int k=0; k<n_u_dofs; ++k){
         //Fe(k) += JxW[qp]*phi[k][qp]*fvalues_j;
-          Fe(k) += _int_force[elem_id][k*qp_size+qp]*charge_val*np_charge;
-       	} // end loop over nodes
+          Fe(k) += _int_force[elem_id][k*qp_size+qp]*charge_val;
+       	} // end loop over nodes (dofs)
       } // end loop over quadrature points
     } // end loop over beads
   } // end if( pc_flag )
@@ -420,7 +409,6 @@ void AssemblePoisson::select_boundary_side(const Elem* elem)
 
   // Get a reference to the Particle-Mesh System.
   PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson> ("Poisson");
-  const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::size_t elem_id = elem->id();
 
   // Get boundary ids for each BC
@@ -451,19 +439,6 @@ void AssemblePoisson::select_boundary_side(const Elem* elem)
           break;
         }
       }
-
-      //OLD CODE, DEPRECATE IF NEW CODE PASS INTEGRATION TEST
-      //apply_bc = true;
-      //// If this side is on the periodic side, don't apply penalty
-      //// The _boundary_id_3D only works with Cubic domain
-      //for(int i = 0; i < _dim; i++)
-      //{
-      //  if(periodicity[i]){
-      //    if(_mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+0]) or
-      //       _mesh.get_boundary_info().has_boundary_id(elem, s, _boundary_id_3D[2*i+1]))
-      //    { apply_bc = false; }
-      //  }
-      //}
     }
 
     // If BC is applied, store this side_id for this element
@@ -480,8 +455,7 @@ void AssemblePoisson::select_boundary_side(const Elem* elem)
 void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
                                           const std::string& matrix_or_vector,
                                           DenseMatrix<Number>& Ke,
-                                          DenseVector<Number>& Fe,
-                                          const std::string& option)
+                                          DenseVector<Number>& Fe)
 {
   START_LOG("apply_bc_by_penalty()", "AssemblePoisson");
 
@@ -491,7 +465,6 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
   const Real penalty = 1E6; //The penalty value
   const unsigned int n_nodes = elem->n_nodes();
   const std::size_t elem_id = elem->id();
-  const std::vector<bool>& periodicity = pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
 
   // Dirichlet boundaries
   const std::vector<unsigned int> boundary_id_dirichlet_poisson = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_dirichlet_poisson");
@@ -636,11 +609,12 @@ void AssemblePoisson::apply_bc_neumann(const Elem* elem,
       sigma_global[nn] = sigma_total - sigma_local[nn];
 
     // Integrate on this side
+    // FIXME: this can be optimized by store JxW_face * phi_face for face element
+    // in a vector similar to that in _int_force
     for (unsigned int qp=0; qp<JxW_face.size(); qp++)
       for (unsigned int i=0; i<phi_face.size(); i++)
         Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global[i];
-
-  } // end for s-loop
+  }//end for s-loop
 
   STOP_LOG("apply_bc_neumann()", "AssemblePoisson");
 }

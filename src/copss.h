@@ -96,9 +96,12 @@ public:
   // physical parameters
   const Real kB = 1.380662E-17;//1.380662E-23(J/K) = 1.3806623E-23(N*m/K) = 1.380662E-17(N*um/K)
   const Real PI = libMesh::pi;
+  const Real epsilon_0 = 8.85418781762039E-24; // 8.85418781762039E-12(F/m) = 8.85418781762039E-12( C^2/(N*m^2) ) = 8.85418781762039E-24 ( C^2/(N*um^2) )
+  const Real elementary_charge = 1.6021766208E-19; // C
   Real T; // simulation temperature (K)
   Real kBT;// (N*um)
   Real viscosity; // viscosity of the fluid (cp = N*s/um^2)
+  Real epsilon; // relative permittivity of the fluid
   Real Rb; // radius of the bead
   Real drag_c; // Drag coefficient (N*s/um)
   Real Db;
@@ -109,6 +112,7 @@ public:
   Real uc; // characteristic velocity (um/s)
   Real fc; // characteristic force (N)
   Real muc; // non-dimension viscosity
+  Real phi0; //non-dimensional electrical potential: e / (4 * pi * epsilon * epsilon_0 * a)
 
   // Geometry information
   unsigned int dim; // dimension of the box

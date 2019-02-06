@@ -60,22 +60,18 @@ public:
   /*! \brief Assemble the Global Matrix K
 
     \param[in] system_name Name of the system (should be "Poisson")
-    \param[in] Option options of assembling the system
     \param[out] Ke Add element matrix to global matrix K
 
   */
-  void assemble_global_K(const std::string& system_name,
-                         const std::string& option) override;
+  void assemble_global_K(const std::string& system_name);
 
 
   /*! \brief Assemble the Global force vector F
 
     @param[in] system_name Name of the system (should be "Poisson")
-    @param[in] option Options of assembling the system
     @param[out] Fe Add rhs vector to global vector F
   */
-  void assemble_global_F(const std::string& system_name,
-                         const std::string& option) override;
+  void assemble_global_F(const std::string& system_name);
 
 
   /*! \brief Assemble function on each element for the right-hand-side in Poisson equation.
@@ -87,7 +83,6 @@ public:
                            FEBase& fe_v,
                            const std::vector<std::size_t> n_list,
                            const bool& pf_flag,
-                           const std::string& option,
                            DenseVector<Number>& Fe) override;
 
 
@@ -103,8 +98,7 @@ public:
   void apply_bc_by_penalty(const Elem* elem,
                            const std::string& matrix_or_vector,
                            DenseMatrix<Number>& Ke,
-                           DenseVector<Number>& Fe,
-                           const std::string& option) override;
+                           DenseVector<Number>& Fe);
 
 
   /*! \brief Apply Neumann BC to impose surface charge density on relevant boundaries.

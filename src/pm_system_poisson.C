@@ -37,7 +37,6 @@
 // local header files
 #include "pm_toolbox.h"
 #include "ggem_poisson.h"
-#include "brownian_system.h"
 #include "pm_system_poisson.h"
 
 
@@ -80,8 +79,7 @@ void PMSystemPoisson::clear ()
 
 
 // ===========================================================
-void PMSystemPoisson::assemble_matrix(const std::string& system_name,
-                                      const std::string& option)
+void PMSystemPoisson::assemble_matrix(const std::string& system_name)
 {
   libmesh_assert (this->matrix);
   libmesh_assert (this->matrix->initialized());
@@ -98,7 +96,7 @@ void PMSystemPoisson::assemble_matrix(const std::string& system_name,
   }
 
   // Call assemble function to assemble matrix
-  _assemble_poisson->assemble_global_K(system_name, option);
+  _assemble_poisson->assemble_global_K(system_name);
 
   // close the matrices
   this->matrix->close();  // close the matrix
@@ -110,8 +108,7 @@ void PMSystemPoisson::assemble_matrix(const std::string& system_name,
 
 
 // ==================================================================================
-void PMSystemPoisson::assemble_rhs(const std::string& system_name,
-                                  const std::string& option)
+void PMSystemPoisson::assemble_rhs(const std::string& system_name)
 {
   libmesh_assert (this->rhs);
   libmesh_assert (this->rhs->initialized());
@@ -120,7 +117,7 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name,
 
   // init, assemble, and close the rhs vector
   this->rhs->zero();
-  _assemble_poisson->assemble_global_F(system_name, option);
+  _assemble_poisson->assemble_global_F(system_name);
   this->rhs->close();
 
   STOP_LOG("assemble_rhs()", "PMSystemPoisson");
@@ -129,8 +126,7 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name,
 
 
 // ==================================================================================
-void PMSystemPoisson::solve(const std::string& option,
-                            const bool& re_init)
+void PMSystemPoisson::solve(const bool& re_init)
 {
   START_LOG("solve()", "PMSystemPoisson");
 
@@ -138,7 +134,7 @@ void PMSystemPoisson::solve(const std::string& option,
   //std::string msg = "---> solve Poisson";
   //PMToolBox::output_message(msg, this->comm());
 
-  // Assemble the global matrix and pc matrix, and record the CPU wall time.
+  // Assemble the global matrix and pc matrix at the first step, when re_init=true.
   if(re_init)
   {
     //t1 = MPI_Wtime();
@@ -148,7 +144,7 @@ void PMSystemPoisson::solve(const std::string& option,
     _solver_poisson.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver
-    this->assemble_matrix("Poisson",option);
+    this->assemble_matrix("Poisson");
     _solver_poisson.init_ksp_solver();
 
     //t2 = MPI_Wtime();
@@ -157,7 +153,7 @@ void PMSystemPoisson::solve(const std::string& option,
 
   // assemble the rhs vector, and record the CPU wall time.
   //t1 = MPI_Wtime();
-  this->assemble_rhs ("Poisson",option);
+  this->assemble_rhs ("Poisson");
   //t2 = MPI_Wtime();
   //std::cout << "For Poisson equation, time used to assemble the right-hand-side vector is " <<t2-t1<<" s\n";
 
@@ -242,7 +238,7 @@ void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
   const std::size_t dim    = mesh.mesh_dimension();
   const dof_id_type n_elem = mesh.n_elem();
 
-  std::vector<Real> _pv_send_list;         // point potential send list
+  std::vector<Real> _pv_send_list; // point potential send list
   std::vector<Real> _pglobal_send_list;
   std::vector<Real> _plocal_send_list;
   std::vector<std::size_t> _pid_send_list; // point id send list
@@ -463,6 +459,36 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
   // std::cout<<std::endl;
 
   STOP_LOG("compute_point_efield()", "PMSystemPoisson");
+}
+
+
+
+// ==================================================================================
+void add_electrostatic_forces()
+{
+  START_LOG("add_electrostatic_forces()", "PMSystemPoisson");
+
+  const std::size_t NP  = _point_mesh->num_particles();
+  const MeshBase& mesh  = this->get_mesh();
+  const std::size_t dim = mesh.mesh_dimension();
+
+  // Compute electric field at every bead's location
+  std::vector<Real> pv(NP*dim,0.);
+  this->compute_point_efield(pv);
+
+  Point pforce;
+  Real charge;
+  for(std::size_t i=0; i<NP; ++i){
+    charge = _point_mesh->particles()[i]->charge();
+
+    pforce(0) = charge * pv[dim*i  ];
+    pforce(1) = charge * pv[dim*i+1];
+    pforce(2) = charge * pv[dim*i+2];
+
+    _point_mesh->particles()[i]->add_particle_force(pforce);
+  }
+ 
+  STOP_LOG("add_electrostatic_forces()", "PMSystemPoisson");
 }
 
 

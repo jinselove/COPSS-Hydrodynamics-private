@@ -32,7 +32,7 @@ namespace libMesh
 
 /*
  * The PMSystemPoisson is designed to solve the Poisson
- * equation
+ * equation with point charge sources on a finite element mesh.
  */
 
 class PMSystemPoisson : public PMLinearImplicitSystem
@@ -73,27 +73,21 @@ public:
 
   /**
    * Assemble the system matrix.
-   * option == "disturbed" or "undisturbed", only works for Stokes equation
    */
-  void assemble_matrix (const std::string& system_name,
-                        const std::string& option);
+  void assemble_matrix (const std::string& system_name);
 
 
   /**
    * Assemble the system rhs.
-   * option == "disturbed" or "undisturbed", only works for Stokes equation
    */
-  void assemble_rhs (const std::string& system_name,
-                     const std::string& option);
+  void assemble_rhs (const std::string& system_name);
 
 
   /*
    * Solve the system.
-   * FIXME:option = ...
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve (const std::string& option,
-              const bool& re_init);
+  void solve (const bool& re_init);
 
 
   /*
@@ -112,6 +106,12 @@ public:
    * Compute electric field (Ex, Ey, Ez) at all beads' locations
    */
   void compute_point_efield(std::vector<Real>& pv);
+
+
+  /*
+   * Add electrostatic forces for all beads
+   */
+  void add_electrostatic_forces();
 
 
   /*

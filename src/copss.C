@@ -116,22 +116,25 @@ void Copss::read_system_info()
     print_info = input_file("print_info", false);
 }
 
-  /*
-   * Read physical parameters 
-   */
+/*
+ * Read physical parameters 
+ */
 void Copss::read_physical_info()
 {
   T = input_file("temperature", 297);// K
   kBT    = kB * T; //(N*um)
-  viscosity            = input_file("viscosity", 1.0); // viscosity (cP = N*s/um^2)
-  Rb                   = input_file("radius", 0.10); // radius of the bead (um)
-  drag_c      = 6.*PI*viscosity*Rb;    // Drag coefficient (N*s/um)
-  Db          = kBT/drag_c;     // diffusivity of a bead (um^2/s)  
+  viscosity   = input_file("viscosity", 1.0); // viscosity (cP = N*s/um^2)
+  Rb          = input_file("radius", 0.10); // radius of the bead (um)
+  drag_c      = 6.*PI*viscosity*Rb; // Drag coefficient (N*s/um)
+  Db          = kBT/drag_c; // diffusivity of a bead (um^2/s)
 
-  tc   = drag_c*Rb*Rb/kBT;       // diffusion time (s)
-  uc   = kBT/(drag_c*Rb);        // characteristic velocity (um/s)
-  fc   = kBT/Rb;                 // characteristic force (N)
-  muc  = 1./(6.*PI);             // non-dimensional viscosity
+  tc   = drag_c*Rb*Rb/kBT; // diffusion time (s)
+  uc   = kBT/(drag_c*Rb);  // characteristic velocity (um/s)
+  fc   = kBT/Rb;           // characteristic force (N)
+  muc  = 1./(6.*PI);       // non-dimensional viscosity
+
+  epsilon = input_file("epsilon", 1.); // Relative permittivity of the fluid
+  phi0 = elementary_charge / (4.*PI * epsilon * epsilon_0 * Rb); // non-dimensional electrical potential
 
   // print out physical parameters information
   cout<<"\n ##########################################################\n"
@@ -151,10 +154,9 @@ void Copss::read_physical_info()
 }// end read_physical_parameter()
 
 
-  /*
-   * Read Geometry infomation
-   */
-
+/*
+ * Read Geometry infomation
+ */
 void Copss::read_domain_info()
 {
   dim = input_file("dimension", 3);

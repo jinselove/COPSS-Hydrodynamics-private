@@ -210,6 +210,10 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<std::vector<bool>> ("shear") = shear;
   equation_systems.parameters.set<std::vector<Real>> ("shear_rate") = shear_rate;
   equation_systems.parameters.set<std::vector<unsigned int>> ("shear_direction") = shear_direction;
+  equation_systems.parameters.set<std::vector<unsigned int>> ("boundary_id_dirichlet_poisson") = boundary_id_dirichlet_poisson;
+  equation_systems.parameters.set<std::vector<unsigned int>> ("boundary_id_neumann_poisson") = boundary_id_neumann_poisson;
+  equation_systems.parameters.set<std::vector<Real>> ("boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
+  equation_systems.parameters.set<std::vector<Real>> ("boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
 }
 
 void CopssPointParticleSystem::update_object()

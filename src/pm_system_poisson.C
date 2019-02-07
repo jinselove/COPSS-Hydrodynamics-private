@@ -52,7 +52,7 @@ PMSystemPoisson::PMSystemPoisson(EquationSystems& es,
 {
   if (name != "Poisson") libmesh_error();
   // Poisson equation assembly
-  _assemble_poisson = ( new AssemblePoisson(es) );
+  _assemble_poisson = new AssemblePoisson(es, name);
   ggem_poisson = _assemble_poisson -> get_ggem_poisson();
 }
 
@@ -79,7 +79,8 @@ void PMSystemPoisson::clear ()
 
 
 // ===========================================================
-void PMSystemPoisson::assemble_matrix(const std::string& system_name)
+void PMSystemPoisson::assemble_matrix(const std::string& system_name,
+                                      const std::string& option)
 {
   libmesh_assert (this->matrix);
   libmesh_assert (this->matrix->initialized());
@@ -96,7 +97,7 @@ void PMSystemPoisson::assemble_matrix(const std::string& system_name)
   }
 
   // Call assemble function to assemble matrix
-  _assemble_poisson->assemble_global_K(system_name);
+  _assemble_poisson->assemble_global_K(system_name, option);
 
   // close the matrices
   this->matrix->close();  // close the matrix
@@ -108,7 +109,8 @@ void PMSystemPoisson::assemble_matrix(const std::string& system_name)
 
 
 // ==================================================================================
-void PMSystemPoisson::assemble_rhs(const std::string& system_name)
+void PMSystemPoisson::assemble_rhs(const std::string& system_name,
+                                   const std::string& option)
 {
   libmesh_assert (this->rhs);
   libmesh_assert (this->rhs->initialized());
@@ -117,7 +119,7 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name)
 
   // init, assemble, and close the rhs vector
   this->rhs->zero();
-  _assemble_poisson->assemble_global_F(system_name);
+  _assemble_poisson->assemble_global_F(system_name, option);
   this->rhs->close();
 
   STOP_LOG("assemble_rhs()", "PMSystemPoisson");
@@ -126,7 +128,8 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name)
 
 
 // ==================================================================================
-void PMSystemPoisson::solve(const bool& re_init)
+void PMSystemPoisson::solve(const std::string& option,
+                            const bool& re_init)
 {
   START_LOG("solve()", "PMSystemPoisson");
 
@@ -144,7 +147,7 @@ void PMSystemPoisson::solve(const bool& re_init)
     _solver_poisson.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver
-    this->assemble_matrix("Poisson");
+    this->assemble_matrix("Poisson", option);
     _solver_poisson.init_ksp_solver();
 
     //t2 = MPI_Wtime();
@@ -153,7 +156,7 @@ void PMSystemPoisson::solve(const bool& re_init)
 
   // assemble the rhs vector, and record the CPU wall time.
   //t1 = MPI_Wtime();
-  this->assemble_rhs ("Poisson");
+  this->assemble_rhs ("Poisson", option);
   //t2 = MPI_Wtime();
   //std::cout << "For Poisson equation, time used to assemble the right-hand-side vector is " <<t2-t1<<" s\n";
 
@@ -377,7 +380,7 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
       // Extract bead coordinates in the reference frame
       std::vector<Point> bead_ptx;
       bead_ptx.resize(1);
-      bead_ptx[0] = fe_phi->inverse_map(elem, pt);
+      bead_ptx[0] = FE<3,LAGRANGE>::inverse_map(elem, pt);
       // Evaluate the shape functions derivatives at this bead location
       fe_phi->reinit(elem, &bead_ptx);
 
@@ -403,7 +406,7 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
         efield_total(1) = efield_global(1) + efield_local(1);
         efield_total(2) = efield_global(2) + efield_local(2);
       }
-      else(point_type==LAGRANGIAN_POINT){
+      else if(point_type==LAGRANGIAN_POINT){
         std::cout<<"---> Error in PMSystemPoisson::compute_point_potential: \n"
                  <<"     point_type LAGRANGIAN_POINT is not supported yet for electrostatics."
                  <<std::endl <<std::endl;
@@ -464,12 +467,12 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
 
 
 // ==================================================================================
-void add_electrostatic_forces()
+void PMSystemPoisson::add_electrostatic_forces()
 {
   START_LOG("add_electrostatic_forces()", "PMSystemPoisson");
 
-  const std::size_t NP  = _point_mesh->num_particles();
   const MeshBase& mesh  = this->get_mesh();
+  const std::size_t NP  = _point_mesh->num_particles();
   const std::size_t dim = mesh.mesh_dimension();
 
   // Compute electric field at every bead's location

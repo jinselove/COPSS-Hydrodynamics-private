@@ -82,20 +82,6 @@ public:
                                  const std::string& option) = 0;
 
 
-
-  /*! \brief Assemble the element matrix K_IJ
-
-      Reinit and compute the element matrix K_ij, which will be added into K
-      matrix after calling assemble_global_K(). For Stokes equation, size of
-      this submatrix is n_u_dofs * n_u_dofs = n_v_dofs * n_v_dofs = n_w_dofs * n_w_dofs
-  */
-  virtual void assemble_element_KIJ(const std::vector<Real>& JxW,
-                                    const std::vector<std::vector<RealGradient> >& dphi,
-                                    const unsigned int n_u_dofs,
-                                    const unsigned int I,
-                                    const unsigned int J,
-                                    DenseMatrix<Number>& Kij) = 0;
-
   /*! \brief  Assemble function for calculating each element's contribution to
    *          the right-hand-side vector. It is used in assemble_global_F()
 

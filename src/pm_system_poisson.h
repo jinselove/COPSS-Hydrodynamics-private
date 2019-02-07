@@ -74,20 +74,23 @@ public:
   /**
    * Assemble the system matrix.
    */
-  void assemble_matrix (const std::string& system_name);
+  void assemble_matrix (const std::string& system_name,
+                        const std::string& option) override;
 
 
   /**
    * Assemble the system rhs.
    */
-  void assemble_rhs (const std::string& system_name);
+  void assemble_rhs (const std::string& system_name,
+                     const std::string& option) override;
 
 
   /*
    * Solve the system.
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve (const bool& re_init);
+  void solve (const std::string& option,
+              const bool& re_init) override;
 
 
   /*

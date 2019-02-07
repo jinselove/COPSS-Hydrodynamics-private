@@ -54,6 +54,7 @@
 #include "particle_mesh.h"
 #include "point_mesh.h"
 #include "pm_system_stokes.h"
+#include "pm_system_poisson.h"
 #include "brownian_system.h"
 #include "pm_periodic_boundary.h"
 #include "chebyshev.h"
@@ -130,6 +131,10 @@ public:
   std::string domain_mesh_file; // domain mesh filename
   std::vector<unsigned int> n_mesh; // mesh size in all directions
 
+  // Boundary conditions
+  std::vector<unsigned int> boundary_id_dirichlet_poisson, boundary_id_neumann_poisson;
+  std::vector<Real> boundary_value_dirichlet_poisson, boundary_value_neumann_poisson;
+
   // Fix
   std::vector<Fix*> fixes;
   FixFactory* fix_factory;
@@ -153,6 +158,7 @@ public:
   std::string schur_pc_type;
   std::string solver_type_stokes;
   SystemSolverType solver_type; 
+  bool solver_poisson;
 
   // Chebyshev information
   unsigned int max_n_cheb; // max order of Chebyshev polynomianl 
@@ -282,7 +288,7 @@ public:
    * step 4: read_domain_info()
    * step 5: read_force_info()
    * step 6: read_ggem_info()
-   * step 7: read_solver_stokes_info()
+   * step 7: read_solver_info()
    * step 8: read_chebyshev_info()
    * step 9: read_run_info()
    */
@@ -336,7 +342,7 @@ protected:
   void read_domain_info(); 
   void read_force_info();
   virtual void read_ggem_info() = 0;
-  void read_solver_stokes_info();
+  void read_solver_info();
   void read_chebyshev_info();
   void read_run_info();
   void read_restart_time();

@@ -37,7 +37,7 @@
 #include "ggem_stokes.h"
 #include "brownian_system.h"
 #include "pm_system_stokes.h"
-
+#include "pm_system_poisson.h"
 
 namespace libMesh
 {
@@ -108,7 +108,7 @@ void PMSystemStokes::reinit_hi_system(bool& neighbor_list_update_flag)
       _fixes[i]->compute();
     }
     // sync forces on nodes to PointParticles in point mesh
-    _fixes[0] -> sync_node_to_pointmesh();
+    _fixes[0]->sync_node_to_pointmesh();
     // need to restore particle mesh after applying all fixes if particles are on pbc
     _fixes[0]->check_pbc_post_fix();
   }

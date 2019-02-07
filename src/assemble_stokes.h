@@ -83,7 +83,7 @@ public:
                             const unsigned int n_u_dofs,
                             const unsigned int I,
                             const unsigned int J,
-                            DenseMatrix<Number>& Kij) override;
+                            DenseMatrix<Number>& Kij);
 
 
   /*! \brief Assemble the element matrices Q_I, i.e., kup, kvp, kwp, for pressure

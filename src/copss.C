@@ -100,7 +100,7 @@ void Copss::read_input()
   this -> read_domain_info();
   this -> read_force_info();
   this -> read_ggem_info();
-  this -> read_solver_stokes_info();
+  this -> read_solver_info();
   this -> read_chebyshev_info();
   this -> read_run_info();
 } // end read_data function
@@ -221,6 +221,25 @@ void Copss::read_domain_info()
   shear_direction.resize(input_file.vector_variable_size("shear_direction"));
   for (unsigned int i=0; i < shear_direction.size(); i++){ shear_direction[i] = input_file("shear_direction", 0, i); }
 
+  // Boundary conditions
+  boundary_id_dirichlet_poisson.resize(input_file.vector_variable_size("boundary_id_dirichlet_poisson"));
+  boundary_id_neumann_poisson.resize(input_file.vector_variable_size("boundary_id_neumann_poisson"));
+  boundary_value_dirichlet_poisson.resize(input_file.vector_variable_size("boundary_value_dirichlet_poisson"));
+  boundary_value_neumann_poisson.resize(input_file.vector_variable_size("boundary_value_neumann_poisson"));
+
+  for (unsigned int i=0; i < boundary_id_dirichlet_poisson.size(); i++){
+    boundary_id_dirichlet_poisson[i] = input_file("boundary_id_dirichlet_poisson", 0, i);
+  }
+  for (unsigned int i=0; i < boundary_id_neumann_poisson.size(); i++){
+    boundary_id_neumann_poisson[i] = input_file("boundary_id_neumann_poisson", 0, i);
+  }
+  for (unsigned int i=0; i < boundary_value_dirichlet_poisson.size(); i++){
+    boundary_value_dirichlet_poisson[i] = input_file("boundary_value_dirichlet_poisson", 0.0, i);
+  }
+  for (unsigned int i=0; i < boundary_value_neumann_poisson.size(); i++){
+    boundary_value_neumann_poisson[i] = input_file("boundary_value_neumann_poisson", 0.0, i);
+  }
+
   cout <<endl<< "##########################################################"<<endl
        << "#                  Geometry information                   " <<endl
        << "##########################################################"<<endl<<endl
@@ -256,9 +275,9 @@ void Copss::read_domain_info()
   } // end else
 } // end read_domain_info()
 
-  /*
-   * read force types
-   */
+/*
+ * read force types
+ */
 void Copss::read_force_info(){
   // read particle-particle force types
   numForceTypes = input_file.vector_variable_size("force_field");
@@ -283,21 +302,20 @@ void Copss::read_force_info(){
     cout << "-----------> ";
     cout << forces[i].first <<"= '";
     for (int j = 0; j < forces[i].second.size(); j++){
-          cout << forces[i].second[j] <<"  ";       
+      cout << forces[i].second[j] <<"  ";
     }
     cout << "'" <<endl;
   }
-
 } // end read_force_info()
 
 /*
- * read Stokes Solver  
+ * read Solvers
  */
-void Copss::read_solver_stokes_info(){
+void Copss::read_solver_info(){
   max_linear_iterations = input_file("max_linear_iterations", 100);
   linear_solver_rtol   = input_file("linear_solver_rtol", 1E-6);
   linear_solver_atol   = input_file("linear_solver_atol", 1E-6);
-  user_defined_pc            = input_file("user_defined_pc", true);
+  user_defined_pc      = input_file("user_defined_pc", true);
   schur_user_ksp       = input_file("schur_user_ksp", false);
   schur_user_ksp_rtol  = input_file("schur_user_ksp_rtol", 1E-6);
   schur_user_ksp_atol  = input_file("schur_user_ksp_atol", 1E-6);
@@ -313,7 +331,9 @@ void Copss::read_solver_stokes_info(){
   }
   else {
     solver_type = user_define;
-  }  
+  }
+
+  solver_poisson = input_file("solver_poisson", false);
 
   cout <<endl<< "##########################################################"<<endl
        << "#                 Solver information                      " <<endl
@@ -326,9 +346,9 @@ void Copss::read_solver_stokes_info(){
             cout<<"----------->  user defined KSP is used for Schur Complement!"<< endl;
             cout<<"----------->  KSP rel tolerance for Schur Complement solver is = " << schur_user_ksp_rtol <<endl;
             cout<<"----------->  KSP abs tolerance for Schur Complement solver is = " << schur_user_ksp_atol <<endl;
-        }// end if(schur_user_ksp)
-    }// end if (solver_type_stokes == "field_split")
-}// end read_solver_stokes_info()
+      }// end if(schur_user_ksp)
+  }// end if (solver_type_stokes == "field_split")
+}// end read_solver_info()
 
 /*
  * read Chebyshev info
@@ -860,14 +880,26 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 //==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
-//  PerfLog perf_log("integration");
+  //PerfLog perf_log("integration");
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
-  // perf_log.push("reinit sytem");
+
+  bool solver_poisson = equation_systems.parameters.get<bool>("solver_poisson");
+
+  if(i==0){
+    // Solve Poisson equation for electrostatic forces, at the first step if Poisson solver is ON
+    if(solver_poisson == true){
+      // Assemble matrix and rhs for Poisson equation, and solve it
+      equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",true);
+      // Add electrostatic forces to beads
+      equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();
+    }
+  }
+  //perf_log.push("reinit sytem");
   if(i>0){
     *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
     // Update the local values to reflect the solution on neighboring processors
@@ -881,16 +913,22 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
        timestep_duration = 0;
     }
     system.reinit_hi_system(neighbor_list_update_flag);
+
+    // Add electrostatic forces to beads if Poisson solver is ON
+    if(solver_poisson == true){
+      // Only assemble rhs, solve Poisson equation, and add electrostatic forces to beads
+      equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",false);
+      equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();
+    }
   }
   if(print_info){
-  if(comm_in->rank()==0)
-    point_mesh->print_point_info();
+    if(comm_in->rank()==0) point_mesh->print_point_info();
   }
-  // perf_log.pop("reinit sytem");
-//  perf_log.push("compute_point_velocity undisturbed");
-  // compute undisturbed velocity of points 
+  //perf_log.pop("reinit sytem");
+  //perf_log.push("compute_point_velocity undisturbed");
+  // compute undisturbed velocity of points
   system.compute_point_velocity("undisturbed", vel0);
-//  perf_log.pop("compute_point_velocity undisturbed");
+  //perf_log.pop("compute_point_velocity undisturbed");
 
   reinit_stokes = false;
 //  perf_log.push("solve disturbed");

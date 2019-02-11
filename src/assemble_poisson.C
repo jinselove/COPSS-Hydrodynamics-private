@@ -54,6 +54,7 @@ AssemblePoisson::AssemblePoisson(EquationSystems& es,
 : AssembleSystem(es)
 {
   if (name != "Poisson") libmesh_error();
+  analytical_solution = new AnalyticalSolutionPoisson(name);
   ggem_poisson = new GGEMPoisson();
 }
 

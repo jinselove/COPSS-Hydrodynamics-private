@@ -53,6 +53,7 @@ PMSystemPoisson::PMSystemPoisson(EquationSystems& es,
   if (name != "Poisson") libmesh_error();
   // Poisson equation assembly
   _assemble_poisson = new AssemblePoisson(es, name);
+  analytical_solution = _assemble_poisson -> get_analytical_solution();
   ggem_poisson = _assemble_poisson -> get_ggem_poisson();
 }
 

@@ -36,7 +36,7 @@
 #include "pm_toolbox.h"
 #include "brownian_system.h"
 #include "pm_linear_implicit_system.h"
-#include "analytical_solution.h"
+
 
 namespace libMesh
 {

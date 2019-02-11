@@ -22,7 +22,7 @@
 
 // Local includes
 #include "assemble_system.h"
-#include "analytical_solution.h"
+#include "analytical_solution_stokes.h"
 #include "ggem_stokes.h"
 
 /*! \brief This class provides the basic components
@@ -158,7 +158,7 @@ public:
   
   /*! \brief Pointer to analytical_solution
   */
-  AnalyticalSolution* get_analytical_solution() {return analytical_solution;};
+  AnalyticalSolutionStokes* get_analytical_solution() {return analytical_solution;};
   
   
   /*! \brief Pointer to ggem_stokes
@@ -169,7 +169,7 @@ public:
 private:
 
     //! Get a reference to AnalyticalSolution 
-    AnalyticalSolution* analytical_solution;   
+    AnalyticalSolutionStokes* analytical_solution;   
     
     //! Get a reference to GGEMStokes
     GGEMStokes* ggem_stokes;

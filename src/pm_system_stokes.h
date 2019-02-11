@@ -25,7 +25,7 @@
 #include "assemble_stokes.h"
 #include "solver_stokes.h"
 #include "pm_linear_implicit_system.h"
-#include "analytical_solution.h"
+#include "analytical_solution_stokes.h"
 #include "ggem_stokes.h"
 
 namespace libMesh
@@ -243,8 +243,8 @@ private:
   // Assemble Stokes system
   AssembleStokes* assemble_stokes;
   
-  // Get a pointer to AnalyticalSolution
-  AnalyticalSolution* analytical_solution;
+  // Get a pointer to AnalyticalSolutionStokes
+  AnalyticalSolutionStokes* analytical_solution;
   
   // Get a pointer to GGEMStokes
   GGEMStokes* ggem_stokes;

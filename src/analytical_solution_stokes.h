@@ -39,7 +39,7 @@ namespace libMesh
  * (This is only used for validation and test purpose.)
  */
 
-class AnalyticalSolution : public ReferenceCountedObject<AnalyticalSolution>
+class AnalyticalSolutionStokes : public ReferenceCountedObject<AnalyticalSolutionStokes>
 //public ParallelObject
 {
 public:
@@ -47,13 +47,13 @@ public:
   /*! \brief Constructor
 
   */
-  AnalyticalSolution(const std::string& name);
+  AnalyticalSolutionStokes(const std::string& name);
 
 
   /*! \brief Destructor
 
   */
-  ~AnalyticalSolution();
+  ~AnalyticalSolutionStokes();
   
   
   /*! \brief Exact solution for point forces in an unbounded domain

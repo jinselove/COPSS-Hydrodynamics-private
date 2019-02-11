@@ -160,6 +160,9 @@ private:
 
   // Assemble Poisson system
   AssemblePoisson* _assemble_poisson;
+  
+  // Get a pointer to AnalyticalSolutionPoisson
+  AnalyticalSolutionPoisson* analytical_solution;
 
   // Get a pointer to GGEMPoisson
   GGEMPoisson* ggem_poisson;

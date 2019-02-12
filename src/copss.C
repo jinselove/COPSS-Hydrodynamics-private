@@ -660,7 +660,17 @@ EquationSystems Copss::create_equation_systems()
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   if( user_defined_pc ){
     system.add_matrix("Preconditioner");
-  } 
+  }
+
+  // Poisson equation
+  if(solver_poisson == true){
+    PMSystemPoisson& system_poisson = equation_systems.add_system<PMSystemPoisson> ("Poisson");
+    phi_var = system_poisson.add_variable ("phi", SECOND);
+    // Attach point_mesh to PMSystemPoisson
+    this->attach_object_mesh(system_poisson);
+    this->attach_period_boundary(system_poisson);
+  }
+
   /* Initialize the data structures for the equation system. */
   cout<<"==>(6/8) Init equation_systems (libmesh function, to init all systems in equation_systems)"<<endl;
   equation_systems.init();
@@ -704,105 +714,157 @@ void Copss::attach_fixes(PMLinearImplicitSystem& pm_system)
 //===============================================================================
 void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
 {
-  cout << "--------------> Get dof_map of 'Stokes' system"<<endl;  
-  DofMap& dof_map = system.get_dof_map();
-  cout << "--------------> Add periodicBoundary object to 'dof_map'"<<endl;
-  /*** set PBC in x-direction ***/
-  if (periodicity[0])
-  {
-    PeriodicBoundary pbcx(RealVectorValue(wall_params[1]-wall_params[0], 0., 0.));
-    pbcx.set_variable(u_var);
-    pbcx.set_variable(v_var);
-    if(dim==3) pbcx.set_variable(w_var);
-    //pbcx.set_variable(p_var); //*** NOT include p!
-    
-    // is this boundary number still true for 3D?
-    if(dim==2)
-    {
-      pbcx.myboundary = 3;
-      pbcx.pairedboundary = 1;
-    }
-    else if(dim==3)
-    {
-      pbcx.myboundary = 4; // left face (viewing from X negative to X positive)
-      pbcx.pairedboundary = 2; // right face (viewing from X positive to X negative)
+  if(system.name()=="Stokes"){
+      cout << "--------------> Get dof_map of 'Stokes' system"<<endl;  
+      DofMap& dof_map = system.get_dof_map();
+      cout << "--------------> Add periodicBoundary object to 'dof_map'"<<endl;
+      /*** set PBC in x-direction ***/
+      if (periodicity[0])
+      {
+        PeriodicBoundary pbcx(RealVectorValue(wall_params[1]-wall_params[0], 0., 0.));
+        pbcx.set_variable(u_var);
+        pbcx.set_variable(v_var);
+        pbcx.set_variable(w_var);
+        //pbcx.set_variable(p_var); //*** NOT include p!
 
-    } // end if
-    
-    dof_map.add_periodic_boundary(pbcx);    
-    // check
-    if (search_radius_p>=(wall_params[1]-wall_params[0])/2.)
-    {
-      output_msg = std::string("****************************** warning: ********************************\n")+
-                   "**** The search radius is larger than half domain length in x direction\n!"+
-                   "**** search radius = "+ std::to_string(search_radius_p) + 
-                   ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
-                   "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, *comm_in);
-      libmesh_error();
-    }
+        pbcx.myboundary = 4; // left face (viewing from X negative to X positive)
+        pbcx.pairedboundary = 2; // right face (viewing from X positive to X negative)
+
+        dof_map.add_periodic_boundary(pbcx);    
+        // check
+        if (search_radius_p>=(wall_params[1]-wall_params[0])/2.)
+        {
+          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
+                                   "**** The search radius is larger than half domain length in x direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) +
+                                   ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
+      /*** set PBC in y-direction ***/
+      if (periodicity[1])
+      {
+        PeriodicBoundary pbcy(RealVectorValue(0., wall_params[3]-wall_params[2], 0.));
+        pbcy.set_variable(u_var);
+        pbcy.set_variable(v_var);
+        pbcy.set_variable(w_var);
+        //pbcy.set_variable(p_var); //*** NOT include p!
+
+        pbcy.myboundary = 1; // bottom face, viewing from Y negative to Y positive
+        pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y negative
+
+        dof_map.add_periodic_boundary(pbcy);
+        // check
+        if (search_radius_p>=(wall_params[3]-wall_params[2])/2.)
+        {
+          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
+                                   "**** The search radius is larger than half domain length in y direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) +
+                                   ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
+      /*** set PBC in z-direction ***/
+      if (periodicity[2])
+      {
+        PeriodicBoundary pbcz(RealVectorValue(0., 0., wall_params[5]-wall_params[4]));
+        pbcz.set_variable(u_var);
+        pbcz.set_variable(v_var);
+        pbcz.set_variable(w_var);
+        //pbcz.set_variable(p_var); //*** NOT include p!
+
+        pbcz.myboundary = 0; // bottom face, viewing from Z negative to Z positive
+        pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z negative
+
+        dof_map.add_periodic_boundary(pbcz);
+        // check
+        if (search_radius_p>=(wall_params[5]-wall_params[4])/2.)
+        {
+          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
+                                   "**** The search radius is larger than half domain length in z direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) +
+                                   ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
   }
-  /*** set PBC in y-direction ***/
-  if (periodicity[1])
-  {
-    PeriodicBoundary pbcy(RealVectorValue(0., wall_params[3]-wall_params[2], 0.));
-    pbcy.set_variable(u_var);
-    pbcy.set_variable(v_var);
-    if(dim==3) pbcy.set_variable(w_var);
-    //pbcy.set_variable(p_var); //*** NOT include p!
-    
-    if(dim==2)
-    {
-      pbcy.myboundary = 0;
-      pbcy.pairedboundary = 2;
-    }
-    else if(dim==3)
-    {
-      pbcy.myboundary = 1; // bottom face, viewing from Y negative to Y positive
-      pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y negative
-    } // end if
-    
-    dof_map.add_periodic_boundary(pbcy);
-    // check
-    if (search_radius_p>=(wall_params[3]-wall_params[2])/2.)
-    {
-      output_msg = std::string("****************************** warning: ********************************\n")+
-                   "**** The search radius is larger than half domain length in y direction\n!"+
-                   "**** search radius = "+ std::to_string(search_radius_p) + 
-                   ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
-                   "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, *comm_in);
-      libmesh_error();
-    }
+  else if(system.name()=="Poisson"){
+      cout << "--------------> Get dof_map of 'Poisson' system"<<endl;
+      DofMap& dof_map = system.get_dof_map();
+      cout << "--------------> Add periodicBoundary object to 'dof_map'"<<endl;
+      /*** set PBC in x-direction ***/
+      if (periodicity[0])
+      {
+        PeriodicBoundary pbcx(RealVectorValue(wall_params[1]-wall_params[0], 0., 0.));
+        pbcx.set_variable(phi_var);
+
+        pbcx.myboundary = 4; // left face (viewing from X negative to X positive)
+        pbcx.pairedboundary = 2; // right face (viewing from X positive to X negative)
+
+        dof_map.add_periodic_boundary(pbcx);
+        // check
+        if (search_radius_p>=(wall_params[1]-wall_params[0])/2.)
+        {
+          output_msg = std::string("*********************** warning in Poisson PBC: ************************\n")+
+                                   "**** The search radius is larger than half domain length in x direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) +
+                                   ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
+      /*** set PBC in y-direction ***/
+      if (periodicity[1])
+      {
+        PeriodicBoundary pbcy(RealVectorValue(0., wall_params[3]-wall_params[2], 0.));
+        pbcy.set_variable(phi_var);
+
+        pbcy.myboundary = 1; // bottom face, viewing from Y negative to Y positive
+        pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y negative
+ 
+        dof_map.add_periodic_boundary(pbcy);
+        // check
+        if (search_radius_p>=(wall_params[3]-wall_params[2])/2.)
+        {
+          output_msg = std::string("********************** warning in Poisson PBC: *************************\n")+
+                                   "**** The search radius is larger than half domain length in y direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) + 
+                                   ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
+      /*** set PBC in z-direction ***/
+      if (periodicity[2])
+      {
+        PeriodicBoundary pbcz(RealVectorValue(0., 0., wall_params[5]-wall_params[4]));
+        pbcz.set_variable(phi_var);
+
+        pbcz.myboundary = 0; // bottom face, viewing from Z negative to Z positive
+        pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z negative
+ 
+        dof_map.add_periodic_boundary(pbcz);
+        // check
+        if (search_radius_p>=(wall_params[5]-wall_params[4])/2.)
+        {
+          output_msg = std::string("*********************** warning in Poisson PBC: ************************\n")+
+                                   "**** The search radius is larger than half domain length in z direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) + 
+                                   ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
   }
-  /*** set PBC in z-direction ***/
-  if (periodicity[2])
-  {
-    PeriodicBoundary pbcz(RealVectorValue(0., 0., wall_params[5]-wall_params[4]));
-    pbcz.set_variable(u_var);
-    pbcz.set_variable(v_var);
-    if(dim==3) pbcz.set_variable(w_var);
-    //pbcz.set_variable(p_var); //*** NOT include p!
-    
-    if(dim==3)
-    {
-      pbcz.myboundary = 0; // bottom face, viewing from Z negative to Z positive
-      pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z negative 
-    } // end if
-    
-    dof_map.add_periodic_boundary(pbcz);
-    // check
-    if (search_radius_p>=(wall_params[5]-wall_params[4])/2.)
-    {
-      output_msg = std::string("****************************** warning: ********************************\n")+
-                   "**** The search radius is larger than half domain length in z direction\n!"+
-                   "**** search radius = "+ std::to_string(search_radius_p) + 
-                   ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
-                   "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, *comm_in);
-      libmesh_error();
-    }
-  }  
 }
 
 //============================================================================================

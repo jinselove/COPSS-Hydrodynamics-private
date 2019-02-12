@@ -133,6 +133,13 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
     }
   }
 
+  // attach PointMesh to AnalyticalSolution (only do this once for "ggem_validation")
+  if (_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation_poisson" &&
+      !analytical_solution -> get_point_mesh())
+  {
+      analytical_solution -> attach_point_mesh(_pm_system.point_mesh());
+  }
+
   // Initialize (set) parameters in ggem_poisson
   this->init_ggem_poisson(system_name);
 
@@ -498,6 +505,14 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
       const Point ptx = side->point(nn); // Coordinate of the node
       const Real phi_local = pm_system.local_potential_field(elem, ptx, "regularized");
       //const Real phi_local = pm_system.local_potential_field(ptx, "regularized");
+
+      // When we run ggem_validation_poisson, Dirichelet boundary condition is applied on all
+      // boundaries, the electrical potential on boundaries due to point charges are evaluated
+      // using free-space Green's function.
+      if(_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation_poisson")
+      {
+        phi_total = analytical_solution -> exact_solution_infinite_domain(*ggem_poisson, ptx);
+      }
 
       // Because of Ewald split: global_potential = total_potential - ggem_local_potential
       Real phi_global = phi_total - phi_local;

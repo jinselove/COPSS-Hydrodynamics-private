@@ -232,6 +232,34 @@ void PMSystemPoisson::add_local_solution()
 
 
 // ==================================================================================
+void PMSystemPoisson::test_l2_norm(bool& neighbor_list_update_flag)
+{
+  START_LOG("test_l2_norm()", "PMSystemPoisson");
+  std::string msg = "--->test in PMSystemPoisson::test_l2_norm(): \n";
+  PMToolBox::output_message(msg, this->comm());
+
+  //FIXME: to be implemented
+
+  STOP_LOG("test_l2_norm()", "PMSystemPoisson");
+}
+
+
+
+// ==================================================================================
+void PMSystemPoisson::write_equation_systems(const std::size_t time_step,
+                                            const std::string& output_filename,
+                                            const std::string& output_format)
+{
+  START_LOG("write_equation_systems()", "PMSystemPoisson");
+
+  //FIXME: to be implemented
+
+  STOP_LOG("write_equation_systems()", "PMSystemPoisson");
+}
+
+
+
+// ==================================================================================
 void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
 {
   START_LOG("compute_point_potential()", "PMSystemPoisson");
@@ -536,6 +564,132 @@ Real PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,
 
   STOP_LOG("local_potential_bead()", "PMSystemPoisson");
   return phi_local;
+}
+
+
+
+// ==================================================================================
+void PMSystemPoisson::test_potential_profile(bool& neighbor_list_update_flag)
+{
+  START_LOG("test_potential_profile()", "PMSystemPoisson");
+
+  // Solve the electrical potential field: global solution by FEM
+  std::cout<< "========>2. Test in PMSystemPoisson::test_potential_profile(): \n";
+  const bool re_init = true; //assemble global matrix and init ksp_solver
+  this->solve("unused",re_init);
+
+  // Output electrical potential profiles along xyz directions, global + local solutions
+  const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
+  const Point& box_len = _point_mesh->pm_periodic_boundary()->box_length();
+  const Real xn = 200, yn = 80, zn = 80;
+  const Real dx = box_len(0)/xn, dy = box_len(1)/yn, dz = box_len(2)/zn;
+  const unsigned int NP = _point_mesh->num_particles();
+
+  std::ofstream outfile;
+  int o_width = 12, o_precision = 9;
+
+  // 1. write out electrical potential profile along x-direction.
+  std::ostringstream filenamex;
+  filenamex << "output_potential_profile_x_" << NP << "P.txt";
+  outfile.open(filenamex.str(), std::ios_base::out);
+  for(std::size_t i=0; i<xn+1; ++i)
+  {
+    Point pt (box_min(0)+Real(i)*dx, 0. ,0.);
+
+    // global potential from FEM
+    Real phi_global, phi_total;
+    const unsigned int phi_var = this->variable_number ("phi"); // phi_var = 0
+    phi_global = this->point_value(phi_var, pt); // this is slow, but we tolerate it only for test
+
+    // local potential from analytical function
+    const Real phi_local = this->local_potential_field(pt,"regularized");
+    phi_total = phi_global + phi_local;
+
+    // Exact solution for an unbounded domain
+    const Real phi_exact = analytical_solution -> exact_solution_infinite_domain(*ggem_poisson, pt);
+
+    // write the potential, x phi
+    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
+    outfile.precision(o_precision);   outfile.width(o_width);
+    if( this->comm().rank()==0 )
+      outfile << pt(0) << "  " << phi_total
+                       << "  " << phi_global
+                       << "  " << phi_local
+                       << "  " << phi_exact <<"\n";
+  } // end for i-loop
+  outfile.close();
+
+  // 2. write out the potential profile along y-direction.
+  std::ostringstream filenamey;
+  filenamey << "output_potential_profile_y_" << NP << "P.txt";
+  outfile.open(filenamey.str(), std::ios_base::out);
+  for(std::size_t i=0; i<yn+1; ++i)
+  {
+    Point pt(0., box_min(1)+Real(i)*dy, 0.);
+
+    // global potential from FEM
+    Real phi_global, phi_total;
+    const unsigned int phi_var = this->variable_number ("phi");      // phi_var = 0
+    phi_global = this->point_value(phi_var, pt);  // this is slow, but we tolerate it only for test
+
+    // local potential from analytical function
+    const Real phi_local = this->local_potential_field(pt,"regularized");
+    phi_total = phi_global + phi_local;
+
+    // Exact solution for an unbounded domain
+    const Real phi_exact = analytical_solution -> exact_solution_infinite_domain(*ggem_poisson, pt);
+
+    // write the potential, y phi
+    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
+    outfile.precision(o_precision);   outfile.width(o_width);
+    if( this->comm().rank()==0 )
+      outfile << pt(1) << "  " << phi_total
+                       << "  " << phi_global
+                       << "  " << phi_local
+                       << "  " << phi_exact <<"\n";
+  } // end for i-loop
+  outfile.close();
+
+  // 3. write out the potential profile along z-direction.
+  std::ostringstream filenamez;
+  filenamez << "output_potential_profile_z_" << NP << "P.txt";
+  outfile.open(filenamez.str(), std::ios_base::out);
+  for(std::size_t i=0; i<zn+1; ++i)
+  {
+    Point pt(0., 0., box_min(2)+Real(i)*dz);
+
+    // global potential from FEM
+    Real phi_global, phi_total;
+    const unsigned int phi_var = this->variable_number ("phi"); // phi_var = 0
+    phi_global = this->point_value(phi_var, pt); // this is slow, but we tolerate it only for test
+
+    // local potential from analytical function
+    const Real phi_local = this->local_potential_field(pt,"regularized");
+    phi_total = phi_global + phi_local;
+
+    // Exact solution for an unbounded domain
+    const Real phi_exact = analytical_solution -> exact_solution_infinite_domain(*ggem_poisson, pt);
+
+    // write the potential, z phi
+    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
+    outfile.precision(o_precision);   outfile.width(o_width);
+    if( this->comm().rank()==0 )
+      outfile << pt(2) << "  " << phi_total
+                       << "  " << phi_global
+                       << "  " << phi_local
+                       << "  " << phi_exact <<"\n";
+  } // end for i-loop
+  outfile.close();
+
+  // done and write out the results
+  std::ostringstream output_filename;
+  output_filename << "output_potential_profile_" << NP << "P.e";
+#ifdef LIBMESH_HAVE_EXODUS_API
+  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+                                                   this->get_equation_systems() );
+#endif // #ifdef LIBMESH_HAVE_EXODUS_API
+
+  STOP_LOG("test_potential_profile()", "PMSystemPoisson");
 }
 
 } // end of namespace

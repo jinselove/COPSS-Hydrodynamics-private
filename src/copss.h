@@ -194,7 +194,7 @@ public:
   //std::unique_ptr<PMPeriodicBoundary> pm_periodic_boundary;
 
   // equation system
-  unsigned int u_var, v_var, w_var, p_var;
+  unsigned int u_var, v_var, w_var, p_var, phi_var;
 
   //integrate
   // paramters for dynamic process;

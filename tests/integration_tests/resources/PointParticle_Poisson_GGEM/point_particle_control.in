@@ -58,13 +58,16 @@ shear_rate = '0. 0. 0.'
 shear_direction = '0. 0. 0.'
 
 #############################################
-#			   Mesh info         			
+#			   Mesh info
 #############################################
 generate_mesh = true
 n_mesh = '15 15 15'
 
 boundary_id_dirichlet_poisson = '0 1 2 3 4 5'
 boundary_value_dirichlet_poisson = '0. 0. 0. 0. 0. 0.'
+
+#boundary_id_neumann_poisson = '0 1 2 3 4 5'
+#boundary_value_neumann_poisson = '0. 0. 0. 0. 0. 0.'
 
 #############################################
 #	 Force info         			
@@ -75,7 +78,7 @@ force_field = 'p_constant'
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.35
+alpha = 0.25
 
 #############################################
 #			   Solver info         			

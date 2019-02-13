@@ -426,7 +426,7 @@ void AssemblePoisson::select_boundary_side(const Elem* elem)
   // Get boundary ids for each BC
   const std::vector<unsigned int> boundary_id_dirichlet_poisson = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_dirichlet_poisson");
   const std::vector<unsigned int> boundary_id_neumann_poisson   = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_neumann_poisson");
-std::cout<<"boundary id dirichlet number is "<<boundary_id_dirichlet_poisson.size() <<std::endl;
+
   // The following loops over the sides of the element. If the element has NO
   // neighbors on a side then that side MUST live on a boundary of the domain.
   for(unsigned int s=0; s<elem->n_sides(); s++)
@@ -482,14 +482,10 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
   // Dirichlet boundaries
   const std::vector<unsigned int> boundary_id_dirichlet_poisson = _eqn_sys.parameters.get<std::vector<unsigned int>> ("boundary_id_dirichlet_poisson");
   const std::vector<Real> boundary_value_dirichlet_poisson = _eqn_sys.parameters.get<std::vector<Real>> ("boundary_value_dirichlet_poisson");
-std::cout<<"into apply_bc_by_penalty, after boundary_value "<<std::endl;
-std::cout<<"into apply_bc_by_penalty, _boundary_sides_dirichlet_poisson "<<_boundary_sides_dirichlet_poisson[elem_id].size() <<std::endl;
 
   // Loop through sides in this element that sits on system's boundary
   for (unsigned int s=0; s<_boundary_sides_dirichlet_poisson[elem_id].size(); s++)
   {
-std::cout<<"into apply_bc_by_penalty, into loop boundary sides "<<std::endl;
-
     // Build the full-order side element for "potential" Dirichlet BC at the walls.
     UniquePtr<Elem> side (elem->build_side(_boundary_sides_dirichlet_poisson[elem_id][s]));
 
@@ -501,7 +497,6 @@ std::cout<<"into apply_bc_by_penalty, into loop boundary sides "<<std::endl;
         break;
       }
     }
-std::cout<<"into apply_bc_by_penalty, after loop boundary value dirichlet "<<std::endl;
 
     // Loop through nodes on this side element
     for (unsigned int nn=0; nn<side->n_nodes(); nn++)

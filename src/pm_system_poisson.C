@@ -577,11 +577,12 @@ void PMSystemPoisson::test_potential_profile(bool& neighbor_list_update_flag)
   std::cout<< "========>2. Test in PMSystemPoisson::test_potential_profile(): \n";
   const bool re_init = true; //assemble global matrix and init ksp_solver
   this->solve("unused",re_init);
+  this->solution->print();
 
   // Output electrical potential profiles along xyz directions, global + local solutions
   const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
   const Point& box_len = _point_mesh->pm_periodic_boundary()->box_length();
-  const Real xn = 200, yn = 80, zn = 80;
+  const Real xn = 200, yn = 200, zn = 200;
   const Real dx = box_len(0)/xn, dy = box_len(1)/yn, dz = box_len(2)/zn;
   const unsigned int NP = _point_mesh->num_particles();
 

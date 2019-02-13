@@ -158,7 +158,7 @@ public:
   std::string schur_pc_type;
   std::string solver_type_stokes;
   SystemSolverType solver_type; 
-  bool solver_poisson;
+  bool module_poisson;
 
   // Chebyshev information
   unsigned int max_n_cheb; // max order of Chebyshev polynomianl 

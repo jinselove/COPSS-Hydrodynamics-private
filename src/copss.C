@@ -333,7 +333,7 @@ void Copss::read_solver_info(){
     solver_type = user_define;
   }
 
-  solver_poisson = input_file("solver_poisson", false);
+  module_poisson = input_file("module_poisson", false);
 
   cout <<endl<< "##########################################################"<<endl
        << "#                 Solver information                      " <<endl
@@ -663,7 +663,7 @@ EquationSystems Copss::create_equation_systems()
   }
 
   // Poisson equation
-  if(solver_poisson == true){
+  if(module_poisson == true){
     PMSystemPoisson& system_poisson = equation_systems.add_system<PMSystemPoisson> ("Poisson");
     phi_var = system_poisson.add_variable ("phi", SECOND);
     // Attach point_mesh to PMSystemPoisson
@@ -950,11 +950,11 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
 
-  bool solver_poisson = equation_systems.parameters.get<bool>("solver_poisson");
+  bool module_poisson = equation_systems.parameters.get<bool>("module_poisson");
 
   if(i==0){
     // Solve Poisson equation for electrostatic forces, at the first step if Poisson solver is ON
-    if(solver_poisson == true){
+    if(module_poisson == true){
       // Assemble matrix and rhs for Poisson equation, and solve it
       equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",true);
       // Add electrostatic forces to beads
@@ -977,7 +977,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     system.reinit_hi_system(neighbor_list_update_flag);
 
     // Add electrostatic forces to beads if Poisson solver is ON
-    if(solver_poisson == true){
+    if(module_poisson == true){
       // Only assemble rhs, solve Poisson equation, and add electrostatic forces to beads
       equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",false);
       equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();

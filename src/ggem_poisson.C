@@ -103,13 +103,14 @@ void GGEMPoisson::set_ksi()
 Real GGEMPoisson::smoothed_charge_exp(const Real& r) const
 {
   START_LOG ("smoothed_force_exp()", "GGEMSystem");
-  
+ 
   const Real r2   = r*r;
   const Real a2r2 = alpha2*r2;
+
   Real g = alpha3_pi_23 * std::exp(-a2r2);
 
   STOP_LOG ("smoothed_force_exp()", "GGEMSystem");
-  
+ 
   return g;
 }
 

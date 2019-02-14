@@ -78,7 +78,7 @@ force_field = 'p_constant'
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.25
+alpha = 0.35
 
 #############################################
 #			   Solver info         			

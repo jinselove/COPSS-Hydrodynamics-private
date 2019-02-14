@@ -511,7 +511,7 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
       // using free-space Green's function.
       if(_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation_poisson")
       {
-        //phi_total = analytical_solution -> exact_solution_infinite_domain(*ggem_poisson, ptx);
+        phi_total = analytical_solution -> exact_solution_infinite_domain(*ggem_poisson, ptx);
       }
 
       // Because of Ewald split: global_potential = total_potential - ggem_local_potential

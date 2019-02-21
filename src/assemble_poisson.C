@@ -375,15 +375,15 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
 
     // Initialize variables for position, charge, distance, etc.
     Point np_pos(0.);
-    Real r=0., charge_val=0., np_charge=0.;
+    Real r=0., charge_val=0., np_charge=0., pi_4=4.*libMesh::pi;
     unsigned int qp_size = q_xyz.size();
     //printf("qp_size = %d\n", q_xyz.size());
 
     // Now we will build the element RHS using gauss quadrature integration.
     // first loop over all neighboring particles near this element
     for(unsigned int np = 0; np<n_pts; ++np){
-      // Charge on this bead
-      np_charge = _particles[n_list[np]]->charge();
+      // Charge on this bead, multiplied by 4*PI in Poisson equation
+      np_charge = _particles[n_list[np]]->charge() * pi_4;
 
       // Get the location of this bead
       np_pos = _particles[n_list[np]]->point();
@@ -394,7 +394,7 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
 
         // Evaluate the value of regularized gaussian charge at this quadrature point
         charge_val = ggem_poisson->smoothed_charge_exp(r) * np_charge;
-//std::cout<<"np_charge="<<np_charge<<", r="<<r<<", smoothed_function="<<ggem_poisson->smoothed_charge_exp(r)<<", charge_val="<<charge_val<<std::endl;
+
         // FIXME:Need to add nodal space charge density from ion concentration fields
         // this will need to access PMSystemNP, and approximate ion concentration on
         // quadrature points?

@@ -81,7 +81,7 @@ force_field = 'p_constant'
 alpha = 0.35
 
 #############################################
-#			   Solver info         			
+#			   Solver info
 #############################################
 # max linear iterations for the iterative solver#
 max_linear_iterations = 300
@@ -98,6 +98,7 @@ solver_stokes = superLU_dist
 
 # Poisson solver
 module_poisson = true
+solver_poisson = superLU_dist
 
 # user defined KSP for schur complement #
 schur_user_ksp = true

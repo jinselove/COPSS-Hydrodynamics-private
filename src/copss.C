@@ -320,34 +320,49 @@ void Copss::read_solver_info(){
   schur_user_ksp_rtol  = input_file("schur_user_ksp_rtol", 1E-6);
   schur_user_ksp_atol  = input_file("schur_user_ksp_atol", 1E-6);
   schur_pc_type = input_file("schur_pc_type", "SMp");
-  solver_type_stokes = input_file("solver_stokes", "superLU_dist");
-  if(solver_type_stokes=="superLU_dist") {
-    solver_type = superLU_dist;
+
+  solver_stokes = input_file("solver_stokes", "superLU_dist");
+  if(solver_stokes=="superLU_dist") {
+    solver_type_stokes = superLU_dist;
     user_defined_pc = false;
   }
-  else if(solver_type_stokes=="field_split") {
-    solver_type = field_split;
+  else if(solver_stokes=="field_split") {
+    solver_type_stokes = field_split;
     user_defined_pc = true;
   }
   else {
-    solver_type = user_define;
+    solver_type_stokes = user_define;
   }
 
   module_poisson = input_file("module_poisson", false);
+  solver_poisson = input_file("solver_poisson", "superLU_dist");
+  if(solver_poisson=="superLU_dist") {
+    solver_type_poisson = superLU_dist;
+    user_defined_pc = false;
+  }
+  else if(solver_poisson=="field_split") {
+    solver_type_poisson = field_split;
+    user_defined_pc = false;
+  }
+  else {
+    solver_type_poisson = user_define;
+  }
 
   cout <<endl<< "##########################################################"<<endl
        << "#                 Solver information                      " <<endl
        << "##########################################################"<<endl<<endl;
-  cout << "-----------> Stokes solver type = " << solver_type_stokes <<endl;
-  if (solver_type_stokes=="field_split"){
+  cout << "-----------> Stokes solver type = " << solver_stokes <<endl;
+  if (solver_stokes=="field_split"){
     cout<<"-----------> FieldSplit Schur Complement Reduction Solver"<<endl;
     cout<<"-----------> schur_pc_type = " << schur_pc_type << endl;
-      if(schur_user_ksp){
-            cout<<"----------->  user defined KSP is used for Schur Complement!"<< endl;
-            cout<<"----------->  KSP rel tolerance for Schur Complement solver is = " << schur_user_ksp_rtol <<endl;
-            cout<<"----------->  KSP abs tolerance for Schur Complement solver is = " << schur_user_ksp_atol <<endl;
-      }// end if(schur_user_ksp)
-  }// end if (solver_type_stokes == "field_split")
+    if(schur_user_ksp){
+      cout<<"----------->  user defined KSP is used for Schur Complement!"<< endl;
+      cout<<"----------->  KSP rel tolerance for Schur Complement solver is = " << schur_user_ksp_rtol <<endl;
+      cout<<"----------->  KSP abs tolerance for Schur Complement solver is = " << schur_user_ksp_atol <<endl;
+    }
+  }
+
+  if (module_poisson == true) cout << "-----------> Poisson solver type = " << solver_poisson <<endl;
 }// end read_solver_info()
 
 /*

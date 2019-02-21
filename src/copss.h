@@ -156,8 +156,8 @@ public:
   Real schur_user_ksp_rtol;
   Real schur_user_ksp_atol;
   std::string schur_pc_type;
-  std::string solver_type_stokes;
-  SystemSolverType solver_type; 
+  std::string solver_stokes, solver_poisson;
+  SystemSolverType solver_type_stokes, solver_type_poisson;
   bool module_poisson;
 
   // Chebyshev information

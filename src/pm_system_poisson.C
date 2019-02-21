@@ -144,7 +144,7 @@ void PMSystemPoisson::solve(const std::string& option,
     //t1 = MPI_Wtime();
 
     // Set the solver type for the Poisson equation
-    const SystemSolverType solver_type  = this->get_equation_systems().parameters.get<SystemSolverType> ("solver_type");
+    const SystemSolverType solver_type  = this->get_equation_systems().parameters.get<SystemSolverType> ("solver_type_poisson");
     _solver_poisson.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver

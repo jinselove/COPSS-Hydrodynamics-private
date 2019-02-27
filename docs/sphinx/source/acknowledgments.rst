@@ -5,7 +5,7 @@ Acknowledgments
 
 (In Alphabetical order)
 
-This work was supported by MICCoM, as part of the Com-
+This work was supported by MICCoM, as a part of the Com-
 putational Materials Sciences Program funded by the U.S. De-
 partment of Energy, Office of Science, Basic Energy Sciences,
 Materials Sciences and Engineering Division and by the U.S.

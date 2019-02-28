@@ -293,7 +293,7 @@ as follows:
 
 - ``max_dr_coeff   = '9. 0.1 0.01'``
 
-    It is a unser defined quantity. In the above mentioned example, the simulation time is smaller than 9,
+    It is a user defined quantity. In the above mentioned example, the simulation time is smaller than 9,
     we use 0.1 as the maximum time step, i.e., :math:`dt = 0.1 / max(|v|)` (v is the velocity of particles);
     when simulation time is larger than 9, we use 0.01 as the maximum time step.
 

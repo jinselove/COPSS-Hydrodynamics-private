@@ -2,4 +2,4 @@
 
 How to Contribute
 =================
-Please contact `Jiyuan Li <jyli@uchicago.edu>` and `Xikai Jiang <jxk28@msn.com>` for details.
+Please contact `Jiyuan Li <jyli@uchicago.edu>`_ or `Xikai Jiang <jxk28@msn.com>`_ for details.

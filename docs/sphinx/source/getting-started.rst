@@ -105,7 +105,7 @@ Below are the instructions to install COPSS.
         - And then follow the instructions on screen to install and test the package.
 
  - Export environment variables: add the following codes to ``~/.bashrc`` and ``source ~/.bashrc``
-   before next step. (``/path/to/PETSC`` can be found on the screen after installation.)**
+   before next step. (``/path/to/PETSC`` can be found on the screen after installation.)
 
     - ``export LIBMESH_DIR=/path/to/LIBMESH``
 

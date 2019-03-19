@@ -299,13 +299,18 @@ public:
   
   
   /*
+   * Compute body sedimentation force
+   */
+  void compute_sedimentation_force(Point& body_force);
+  
+  /*
    * This function builds the nodal force vector from a constant force density \f
    * f = (fx,fy,fz) => nf = (f1x,f1y,f1z; f2x,f2y,f2z; ... fnx,fny,fnz;)
    *
    * It is an area density for surface mesh, and volume density of volume mesh!
    * NOTE: we don't use "()" const for constructing es
    */
-  void build_nodal_sedimentation_force();
+  void build_nodal_force(Point& body_force);
   
   /*
    * This function adds forces to the center of mass of rigid particles
@@ -454,6 +459,11 @@ public:
   *
   */
   const Point& centroid_force() {return _centroid_force;}; 
+  
+  /*! get epsilon_in
+  
+  */
+  const Real& get_epsilon_in() {return _epsilon_in;};
 
 private:
     
@@ -531,19 +541,8 @@ private:
   // check if particle is on the periodic boundary
   bool _on_pb;
 
-  // // body force density
-  // Point _body_force_density;
-
-  // // surface force density
-  // Point _surface_force_density;
-  // sedimentation force
-  Point _sedimentation_force;
-
   // sedimentation body force density
   Point _body_sedimentation_force_density;
-
-  // sedimentation surface force density
-  Point _surface_sedimentation_force_density;
 
   // forces on each nodes
   std::vector<Point> _node_force;
@@ -561,7 +560,3 @@ private:
   
   
 }  // end of namespace
-
-
-
-

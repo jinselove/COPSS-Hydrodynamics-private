@@ -514,25 +514,24 @@ void RigidParticle::restore_periodic_mesh()
   STOP_LOG("restore_periodic_mesh()", "RigidParticle");
 }
 
-// // ======================================================================
-// void RigidParticle::add_particle_force(const std::vector<Real>& pforce)
-// {
-//   for(std::size_t i=0; i<pforce.size(); ++i)
-//   {
-//     _force[i] += pforce[i];
-//   }
-// }
+
+// ======================================================================
+void RigidParticle::compute_sedimentation_force(Point& body_force)
+{
+    START_LOG("compute_sedimentation_force", "RigidParticle");
+    body_force = _body_sedimentation_force_density * _volume0;
+    STOP_LOG("compute_sedimentation_force", "RigidParticle");
+}
 
   
 // ======================================================================
-void RigidParticle::build_nodal_sedimentation_force()
+void RigidParticle::build_nodal_force(Point& body_force)
 {
-  START_LOG("build_nodal_sedimentation_force()", "RigidParticle");
+  START_LOG("build_nodal_force()", "RigidParticle");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    We will build the nodal force vector through the EquationSystems.
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-  _sedimentation_force =  _body_sedimentation_force_density * _volume0;
-  _surface_sedimentation_force_density = _sedimentation_force / _area0;
+  Point surface_force_density = body_force / _area0;
   EquationSystems equation_systems (_mesh);
   ExplicitSystem& system = equation_systems.add_system<ExplicitSystem>("Elasticity");
   unsigned int u_var = 0, v_var = 0, w_var = 0;
@@ -607,9 +606,9 @@ void RigidParticle::build_nodal_sedimentation_force()
       // Assemble the subvector
       for (unsigned int i=0; i<n_u_dofs; i++)
       {
-        Fu(i) += JxW[qp]*phi[i][qp]*_surface_sedimentation_force_density(0);
-        Fv(i) += JxW[qp]*phi[i][qp]*_surface_sedimentation_force_density(1);
-        if(_dim==3) Fw(i) += JxW[qp]*phi[i][qp]*_surface_sedimentation_force_density(2);
+        Fu(i) += JxW[qp] * phi[i][qp] * surface_force_density(0);
+        Fv(i) += JxW[qp] * phi[i][qp] * surface_force_density(1);
+        if(_dim==3) Fw(i) += JxW[qp] * phi[i][qp] * surface_force_density(2);
       }
     }
     
@@ -647,7 +646,7 @@ void RigidParticle::build_nodal_sedimentation_force()
       _node_force[node_id](k) += local_f[dof_num];
     }
   }
-  STOP_LOG("build_nodal_sedimentation_force()", "RigidParticle");
+  STOP_LOG("build_nodal_force()", "RigidParticle");
 }
 
 

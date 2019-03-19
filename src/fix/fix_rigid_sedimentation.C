@@ -29,7 +29,10 @@ void FixRigidSedimentation::compute()
 {
  START_LOG("FixRigidSedimentation::compute()", "FixRigidSedimentation");
  for (int i=0; i < num_rigid_particles; i++){
-  rigid_particles[i]->build_nodal_sedimentation_force();
+  Point body_force(0.);
+  rigid_particles[i]->compute_sedimentation_force(body_force);
+  // std::cout<<"sedimentation body force = " << body_force(0) << "; " << body_force(1) << ";" << body_force(2)<<std::endl;
+  rigid_particles[i]->build_nodal_force(body_force);
  }
  STOP_LOG("FixRigidSedimentation::compute()", "FixRigidSedimentation");  
 }

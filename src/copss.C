@@ -1373,7 +1373,7 @@ void Copss::destroy()
   VecDestroy(&R_mid);
   VecDestroy(&dw_mid);
   PetscRandomDestroy(&rand_ctx);
-  if(&dw){
+  if(with_brownian){
     VecDestroy(&dw);
   }
   if(exodus_ptr and with_hi) {

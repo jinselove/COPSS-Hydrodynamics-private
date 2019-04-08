@@ -94,6 +94,23 @@ public:
 
 
   /*
+   * Compute the L2-error in an unbounded domain
+   * This function will change the system solution vector by add local solution.
+   */
+  void test_l2_norm(bool& neighbor_list_update_flag) override;
+
+
+  /*
+   * Write out equation systems of Stokes. This requires combining the
+   * local and global solution, and update the solution vectors.
+   * output_format=="EXODUS" ; "VTK"; "GMV"
+   */
+  void write_equation_systems(const std::size_t time_step,
+                              const std::string& output_filename,
+                              const std::string& output_format) override;
+
+
+  /*
    * Add the local solution to the global solution for electrical potential
    */
   void add_local_solution();
@@ -153,6 +170,14 @@ public:
                             const std::string& charge_type) const;
 
 
+  /*
+   * Test function. Output electrical potential profile along x-y-z direction.
+   * Compare numerical solution with analytical solution for 3 charged beads
+   * in unbounded domain.
+   */
+  void test_potential_profile(bool& neighbor_list_update_flag);
+
+
 private:
 
   // Poisson solver
@@ -160,6 +185,9 @@ private:
 
   // Assemble Poisson system
   AssemblePoisson* _assemble_poisson;
+  
+  // Get a pointer to AnalyticalSolutionPoisson
+  AnalyticalSolutionPoisson* analytical_solution;
 
   // Get a pointer to GGEMPoisson
   GGEMPoisson* ggem_poisson;

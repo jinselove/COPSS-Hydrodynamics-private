@@ -23,6 +23,7 @@
 // Local includes
 #include "assemble_system.h"
 #include "ggem_poisson.h"
+#include "analytical_solution_poisson.h"
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector for solving
@@ -120,6 +121,11 @@ public:
   void init_ggem_poisson(const std::string& system_name);
 
 
+  /*! \brief Pointer to analytical_solution
+  */
+  AnalyticalSolutionPoisson* get_analytical_solution() {return analytical_solution;};
+  
+
   /*! \brief Pointer to ggem_poisson for local field calculations
 
   */
@@ -134,5 +140,8 @@ private:
 
   // Get a reference to GGEMPoisson
   GGEMPoisson* ggem_poisson;
+  
+  // Get a reference to AnalyticalSolutionPoisson
+  AnalyticalSolutionPoisson* analytical_solution;
  
 };

@@ -54,6 +54,7 @@ AssemblePoisson::AssemblePoisson(EquationSystems& es,
 : AssembleSystem(es)
 {
   if (name != "Poisson") libmesh_error();
+  analytical_solution = new AnalyticalSolutionPoisson(name);
   ggem_poisson = new GGEMPoisson();
 }
 
@@ -118,7 +119,7 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
 
   // Build _boundary_sides_dirichlet_poisson and
   //       _boundary_sides_neumann_poisson vectors at beginning of simulation
-  if(_boundary_sides_dirichlet_poisson.size() == 1 and _boundary_sides_neumann_poisson.size() == 1 ){
+  if(_boundary_sides_dirichlet_poisson.size() == 0 and _boundary_sides_neumann_poisson.size() == 0 ){
     _boundary_sides_dirichlet_poisson.resize(n_mesh_elem);
     _boundary_sides_neumann_poisson.resize(n_mesh_elem);
     MeshBase::const_element_iterator       el     = _mesh.active_local_elements_begin();
@@ -130,6 +131,13 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
       this->select_boundary_side(elem);
       //printf("finished select_boundary_side\n");
     }
+  }
+
+  // attach PointMesh to AnalyticalSolution (only do this once for "ggem_validation")
+  if (_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation_poisson" &&
+      !analytical_solution -> get_point_mesh())
+  {
+      analytical_solution -> attach_point_mesh(_pm_system.point_mesh());
   }
 
   // Initialize (set) parameters in ggem_poisson
@@ -349,9 +357,9 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
   std::vector<PointParticle*> _particles = _point_mesh->particles();
 
   // The element Jacobian * quadrature weight at each quad pt(high order Qgauss).
-  // const std::vector<Real>& JxW                = fe_v.get_JxW();
-  // const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
-  // const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords of quad pts
+  //const std::vector<Real>& JxW                = fe_v.get_JxW();
+  //const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
+  //const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords of quad pts
   //printf("q_xyz size = %d\n", q_xyz.size());
   //fe_v.reinit(elem);
 
@@ -367,15 +375,15 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
 
     // Initialize variables for position, charge, distance, etc.
     Point np_pos(0.);
-    Real r=0., charge_val=0., np_charge=0.;
+    Real r=0., charge_val=0., np_charge=0., pi_4=4.*libMesh::pi;
     unsigned int qp_size = q_xyz.size();
     //printf("qp_size = %d\n", q_xyz.size());
 
     // Now we will build the element RHS using gauss quadrature integration.
     // first loop over all neighboring particles near this element
     for(unsigned int np = 0; np<n_pts; ++np){
-      // Charge on this bead
-      np_charge = _particles[n_list[np]]->charge();
+      // Charge on this bead, multiplied by 4*PI in Poisson equation
+      np_charge = _particles[n_list[np]]->charge() * pi_4;
 
       // Get the location of this bead
       np_pos = _particles[n_list[np]]->point();
@@ -393,7 +401,7 @@ void AssemblePoisson::compute_element_rhs(const Elem* elem,
         //Real space_charge_density = 0.;
 
        	for(unsigned int k=0; k<n_u_dofs; ++k){
-        //Fe(k) += JxW[qp]*phi[k][qp]*fvalues_j;
+          //Fe(k) += JxW[qp]*phi[k][qp]*charge_val;
           Fe(k) += _int_force[elem_id][k*qp_size+qp]*charge_val;
        	} // end loop over nodes (dofs)
       } // end loop over quadrature points
@@ -484,7 +492,7 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
     // Total electrical potential on this side
     Real phi_total = 0.;
     for(unsigned int i=0; i<boundary_value_dirichlet_poisson.size(); i++){
-      if(_mesh.get_boundary_info().has_boundary_id(elem, s, boundary_id_dirichlet_poisson[i])){
+      if(_mesh.get_boundary_info().has_boundary_id(elem, _boundary_sides_dirichlet_poisson[elem_id][s] , boundary_id_dirichlet_poisson[i])){
         phi_total = boundary_value_dirichlet_poisson[i];
         break;
       }
@@ -497,6 +505,14 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem* elem,
       const Point ptx = side->point(nn); // Coordinate of the node
       const Real phi_local = pm_system.local_potential_field(elem, ptx, "regularized");
       //const Real phi_local = pm_system.local_potential_field(ptx, "regularized");
+
+      // When we run ggem_validation_poisson, Dirichelet boundary condition is applied on all
+      // boundaries, the electrical potential on boundaries due to point charges are evaluated
+      // using free-space Green's function.
+      if(_eqn_sys.parameters.get<std::string> ("simulation_name") == "ggem_validation_poisson")
+      {
+        phi_total = analytical_solution -> exact_solution_infinite_domain(*ggem_poisson, ptx);
+      }
 
       // Because of Ewald split: global_potential = total_potential - ggem_local_potential
       Real phi_global = phi_total - phi_local;
@@ -579,7 +595,7 @@ void AssemblePoisson::apply_bc_neumann(const Elem* elem,
     // dphi / dn (surface charge density) on this side
     Real sigma_total = 0.;
     for(unsigned int i=0; i<boundary_value_neumann_poisson.size(); i++){
-      if(_mesh.get_boundary_info().has_boundary_id(elem, s, boundary_id_neumann_poisson[i])){
+      if(_mesh.get_boundary_info().has_boundary_id(elem, _boundary_sides_neumann_poisson[elem_id][s], boundary_id_neumann_poisson[i])){
         sigma_total = boundary_value_neumann_poisson[i];
         break;
       }

@@ -156,9 +156,9 @@ public:
   Real schur_user_ksp_rtol;
   Real schur_user_ksp_atol;
   std::string schur_pc_type;
-  std::string solver_type_stokes;
-  SystemSolverType solver_type; 
-  bool solver_poisson;
+  std::string solver_stokes, solver_poisson;
+  SystemSolverType solver_type_stokes, solver_type_poisson;
+  bool module_poisson;
 
   // Chebyshev information
   unsigned int max_n_cheb; // max order of Chebyshev polynomianl 
@@ -194,7 +194,7 @@ public:
   //std::unique_ptr<PMPeriodicBoundary> pm_periodic_boundary;
 
   // equation system
-  unsigned int u_var, v_var, w_var, p_var;
+  unsigned int u_var, v_var, w_var, p_var, phi_var;
 
   //integrate
   // paramters for dynamic process;

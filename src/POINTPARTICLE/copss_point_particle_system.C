@@ -186,8 +186,9 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>("schur_user_ksp_rtol") = schur_user_ksp_rtol;
   equation_systems.parameters.set<Real>("schur_user_ksp_atol") = schur_user_ksp_atol;
   equation_systems.parameters.set<string>    ("schur_pc_type") = schur_pc_type;
-  equation_systems.parameters.set<SystemSolverType> ("solver_type") = solver_type;
-  equation_systems.parameters.set<bool>     ("solver_poisson") = solver_poisson;
+  equation_systems.parameters.set<SystemSolverType> ("solver_type_stokes") = solver_type_stokes;
+  equation_systems.parameters.set<SystemSolverType> ("solver_type_poisson") = solver_type_poisson;
+  equation_systems.parameters.set<bool>     ("module_poisson") = module_poisson;
   equation_systems.parameters.set<Real>              ("alpha") = alpha;
   equation_systems.parameters.set<Real>         ("kBT")        = kBT;
   equation_systems.parameters.set<Real>   ("minimum fluid mesh size") = hminf;
@@ -251,13 +252,24 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
-  // validate StokesGGEM if simulation_name = ggem_validation
+  // validate GGEMStokes if simulation_name = ggem_validation
   if (simulation_name == "ggem_validation"){
 	  perf_log.push("GGEM validation");
 	  system.test_velocity_profile(neighbor_list_update_flag);
 	  perf_log.pop("GGEM validation");
 	  return;
   }
+  // validate GGEMPoisson if simulation_name = ggem_validation_poisson
+  if (simulation_name == "ggem_validation_poisson"){
+	  perf_log.push("GGEMPoisson validation");
+          PMSystemPoisson& system_poisson = equation_systems.get_system<PMSystemPoisson> ("Poisson");
+          //Build neighbor list, will this update point_mesh in PMSystemPoisson?
+          system.reinit_hi_system(neighbor_list_update_flag);
+	  system_poisson.test_potential_profile(neighbor_list_update_flag);
+	  perf_log.pop("GGEMPoisson validation");
+	  return;
+  }
+
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Parameters for dynamic process

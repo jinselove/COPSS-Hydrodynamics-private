@@ -35,7 +35,6 @@
 // local header files
 #include "pm_toolbox.h"
 #include "brownian_system.h"
-#include "analytical_solution.h"
 #include "pm_system_np.h"
 
 

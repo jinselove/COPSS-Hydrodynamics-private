@@ -26,51 +26,51 @@
 
 // user defined headers
 #include "pm_toolbox.h"
-#include "analytical_solution.h"
+#include "analytical_solution_stokes.h"
 #include "point_mesh.h"
 
 // ======================================================================
-AnalyticalSolution::AnalyticalSolution(const std::string& name)
+AnalyticalSolutionStokes::AnalyticalSolutionStokes(const std::string& name)
 {
     if (name != "Stokes") libmesh_error();
 }
 
 
 // ======================================================================
-AnalyticalSolution::~AnalyticalSolution()
+AnalyticalSolutionStokes::~AnalyticalSolutionStokes()
 {
     //do nothing
 }
 
 
 // ======================================================================
-void AnalyticalSolution::attach_point_mesh(PointMesh<3>* point_mesh) 
+void AnalyticalSolutionStokes::attach_point_mesh(PointMesh<3>* point_mesh) 
 {
-    START_LOG("attach_point_mesh()", "AnalyticalSolution");  
+    START_LOG("attach_point_mesh()", "AnalyticalSolutionStokes");  
     
     _point_mesh = point_mesh;
 
-    STOP_LOG("attach_point_mesh()", "AnalyticalSolution")  
+    STOP_LOG("attach_point_mesh()", "AnalyticalSolutionStokes")  
 }
 
 
 // ======================================================================
-PointMesh<3>* AnalyticalSolution::get_point_mesh() 
+PointMesh<3>* AnalyticalSolutionStokes::get_point_mesh() 
 {
-    START_LOG("get_point_mesh()", "AnalyticalSolution");  
+    START_LOG("get_point_mesh()", "AnalyticalSolutionStokes");  
     
     return _point_mesh;
 
-    STOP_LOG("get_point_mesh()", "AnalyticalSolution");    
+    STOP_LOG("get_point_mesh()", "AnalyticalSolutionStokes");    
 }
 
 
 // ======================================================================
-std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(GGEMStokes& ggem_stokes,
+std::vector<Real> AnalyticalSolutionStokes::exact_solution_infinite_domain(GGEMStokes& ggem_stokes,
                                                                      const Point& pt0) const
 {
   
-  START_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
+  START_LOG("exact_solution_infinite_domain()", "AnalyticalSolutionStokes");
   
   std::vector<Real> UA(dim, 0.);
   
@@ -99,34 +99,34 @@ std::vector<Real> AnalyticalSolution::exact_solution_infinite_domain(GGEMStokes&
     } // end for k
   } // end for i
   
-  STOP_LOG("exact_solution_infinite_domain()", "AnalyticalSolution");
+  STOP_LOG("exact_solution_infinite_domain()", "AnalyticalSolutionStokes");
   return UA;
 }
 
 
 // ======================================================================
-Real AnalyticalSolution::correction_factor_bohlin(const Real r_r0) const
+Real AnalyticalSolutionStokes::correction_factor_bohlin(const Real r_r0) const
 {
-  START_LOG("correction_factor_bohlin()", "AnalyticalSolution");
+  START_LOG("correction_factor_bohlin()", "AnalyticalSolutionStokes");
   
   Real factor = 1.0 - 2.10443*r_r0 + 2.08877*std::pow(r_r0,3)
               - 0.94813*std::pow(r_r0,5) - 1.372*std::pow(r_r0,6)
               + 3.87*std::pow(r_r0,8) - 4.19*std::pow(r_r0,10);
   
-  STOP_LOG("correction_factor_bohlin()", "AnalyticalSolution");
+  STOP_LOG("correction_factor_bohlin()", "AnalyticalSolutionStokes");
   return 1.0/factor;
 }
 
 
 // ======================================================================
-Real AnalyticalSolution::correction_factor_haberman(const Real r_r0) const
+Real AnalyticalSolutionStokes::correction_factor_haberman(const Real r_r0) const
 {
-  START_LOG("correction_factor_haberman()", "AnalyticalSolution");
+  START_LOG("correction_factor_haberman()", "AnalyticalSolutionStokes");
   
   Real f1 = 1.0 - 0.75857*std::pow(r_r0,5);
   Real f2 = 1.0 - 2.1050*r_r0 + 2.0865*std::pow(r_r0,3)
           - 1.7068*std::pow(r_r0,5) + 0.72603*std::pow(r_r0,6);
   
-  STOP_LOG("correction_factor_haberman()", "AnalyticalSolution");
+  STOP_LOG("correction_factor_haberman()", "AnalyticalSolutionStokes");
   return f1/f2;
 }

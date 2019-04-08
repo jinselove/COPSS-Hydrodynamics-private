@@ -43,7 +43,6 @@
 #include "libmesh/mesh.h"
 
 // User defined header includes
-#include "analytical_solution.h"
 #include "pm_toolbox.h"
 #include "assemble_stokes.h"
 #include "pm_system_stokes.h"
@@ -54,7 +53,7 @@ AssembleStokes::AssembleStokes(EquationSystems& es,
 : AssembleSystem(es)
 {
     if (name != "Stokes") libmesh_error();
-    analytical_solution = new AnalyticalSolution(name);
+    analytical_solution = new AnalyticalSolutionStokes(name);
     ggem_stokes = new GGEMStokes();
 }
 

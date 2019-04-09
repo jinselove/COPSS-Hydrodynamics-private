@@ -226,7 +226,16 @@ void Copss::read_domain_info()
   boundary_id_neumann_poisson.resize(input_file.vector_variable_size("boundary_id_neumann_poisson"));
   boundary_value_dirichlet_poisson.resize(input_file.vector_variable_size("boundary_value_dirichlet_poisson"));
   boundary_value_neumann_poisson.resize(input_file.vector_variable_size("boundary_value_neumann_poisson"));
-
+  if (boundary_id_dirichlet_poisson.size() != boundary_value_dirichlet_poisson.size()){
+    err << "Error: size of 'boundary_id_dirichlet_poisson' does not match with "
+         << "'boundary_value_dirichlet_poisson'. Exiting ..." << endl;
+    libmesh_error();
+  }
+  if (boundary_id_neumann_poisson.size() != boundary_value_neumann_poisson.size()){
+    err << "Error: size of 'boundary_id_neumann_poisson' does not match with "
+         << "'boundary_value_neumann_poisson'. Exiting ..." << endl;
+    libmesh_error();
+  }
   for (unsigned int i=0; i < boundary_id_dirichlet_poisson.size(); i++){
     boundary_id_dirichlet_poisson[i] = input_file("boundary_id_dirichlet_poisson", 0, i);
   }

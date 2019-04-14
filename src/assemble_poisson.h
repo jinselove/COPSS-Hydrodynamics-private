@@ -22,12 +22,22 @@
 
 // Local includes
 #include "assemble_system.h"
+#include "ggem_poisson.h"
+#include "analytical_solution_poisson.h"
 
 /*! \brief This class provides the basic components
- * for assembling the matrix and vector when solving
- * Poisson equations.
+ * for assembling the matrix and vector for solving
+ * Poisson equation with point charges suspended in
+ * low-Reynolds number fluids.
  *
- * For details of the implementation, refer to ...
+ * For details of the implementation, refer to
+ * J. Chem. Phys. 142, 014108 (2015)
+ * J. Chem. Theory Comput. 2018, 14, 4901-4913
+ *
+ * The method uses Ewald-split to seperate total
+ * electrical potential in to local and global
+ * components. This class is for solving global
+ * electrical potential using finite element method.
  *
  */
 
@@ -38,7 +48,8 @@ public:
 
   @param[in,out] es EquationSystem
   */
-  AssemblePoisson(EquationSystems& es);
+  AssemblePoisson(EquationSystems& es,
+                  const std::string& name);
 
 
   /*! \brief Destructor
@@ -49,9 +60,8 @@ public:
 
   /*! \brief Assemble the Global Matrix K
 
-    \param[in] system_name Name of the system (should be "NP")
-    \param[in] Option options of assembling the system
-    \param[out] Ke Add element matrix to system
+    \param[in] system_name Name of the system (should be "Poisson")
+    \param[out] Ke Add element matrix to global matrix K
 
   */
   void assemble_global_K(const std::string& system_name,
@@ -60,29 +70,14 @@ public:
 
   /*! \brief Assemble the Global force vector F
 
-    @param[in] system_name Name of the system (should be "NP")
-    @param[in] option Options of assembling the system
-    @param[out] Fe Add rhs vector to system.
+    @param[in] system_name Name of the system (should be "Poisson")
+    @param[out] Fe Add rhs vector to global vector F
   */
   void assemble_global_F(const std::string& system_name,
                          const std::string& option) override;
 
 
-  /*! \brief Assemble the element matrix K_IJ
-
-      Reinit and compute the element matrix K_ij, which will be added into K
-      matrix after calling assemble_global_K(). Size of this submatrix is
-      n_u_dofs * n_u_dofs = n_v_dofs * n_v_dofs = n_w_dofs * n_w_dofs
-  */
-  void assemble_element_KIJ(const std::vector<Real>& JxW,
-                            const std::vector<std::vector<RealGradient> >& dphi,
-                            const unsigned int n_u_dofs,
-                            const unsigned int I,
-                            const unsigned int J,
-                            DenseMatrix<Number>& Kij) override;
-
-
-  /*! \brief Assemble function for the right-hand-side in NP equation.
+  /*! \brief Assemble function on each element for the right-hand-side in Poisson equation.
 
       This calculates each element's contribution to the right-hand-side vector.
   */
@@ -95,12 +90,13 @@ public:
                            DenseVector<Number>& Fe) override;
 
 
-  /*! \brief select sides on the boundary for all elements
+  /*! \brief Select sides on Dirichlet and Neumann boundaries for all elements
   *
   */
   void select_boundary_side(const Elem* elem) override;
 
-  /*! \brief Apply BCs by penalty method.
+
+  /*! \brief Apply Dirichlet BC by penalty method to impose electrical potential on relevant boundaries.
 
   */
   void apply_bc_by_penalty(const Elem* elem,
@@ -108,5 +104,44 @@ public:
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
                            const std::string& option) override;
-                           
+
+
+  /*! \brief Apply Neumann BC to impose surface charge density on relevant boundaries.
+
+  */
+  void apply_bc_neumann(const Elem* elem,
+                        FEBase& fe_phi,
+                        FEBase& fe_face,
+                        DenseVector<Number>& Fe);
+
+
+  /*! \brief Initialize ggem_poisson for local field calcualtions
+
+  */
+  void init_ggem_poisson(const std::string& system_name);
+
+
+  /*! \brief Pointer to analytical_solution
+  */
+  AnalyticalSolutionPoisson* get_analytical_solution() {return analytical_solution;};
+  
+
+  /*! \brief Pointer to ggem_poisson for local field calculations
+
+  */
+  GGEMPoisson* get_ggem_poisson() {return ggem_poisson;};
+
+
+
+private:
+
+  // Boundary sides that Dirichlet and Neumann BCs are applied.
+  std::vector<std::vector<unsigned int> > _boundary_sides_dirichlet_poisson, _boundary_sides_neumann_poisson;
+
+  // Get a reference to GGEMPoisson
+  GGEMPoisson* ggem_poisson;
+  
+  // Get a reference to AnalyticalSolutionPoisson
+  AnalyticalSolutionPoisson* analytical_solution;
+ 
 };

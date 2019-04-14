@@ -186,10 +186,12 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>("schur_user_ksp_rtol") = schur_user_ksp_rtol;
   equation_systems.parameters.set<Real>("schur_user_ksp_atol") = schur_user_ksp_atol;
   equation_systems.parameters.set<string>    ("schur_pc_type") = schur_pc_type;
-  equation_systems.parameters.set<SystemSolverType> ("solver_type") = solver_type;
+  equation_systems.parameters.set<SystemSolverType> ("solver_type_stokes") = solver_type_stokes;
+  equation_systems.parameters.set<SystemSolverType> ("solver_type_poisson") = solver_type_poisson;
+  equation_systems.parameters.set<bool>     ("module_poisson") = module_poisson;
   equation_systems.parameters.set<Real>              ("alpha") = alpha;
   equation_systems.parameters.set<Real>         ("kBT")        = kBT;
-  equation_systems.parameters.set<Real>   ("minimum fluid mesh size")  = hminf;
+  equation_systems.parameters.set<Real>   ("minimum fluid mesh size") = hminf;
   equation_systems.parameters.set<Real>       ("viscosity_0")  = muc;
   equation_systems.parameters.set<Real>               ("br0")  = 1.0;
   equation_systems.parameters.set<Real>               ("bk")   = bk;
@@ -199,6 +201,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>                ("tc")  = tc;
   equation_systems.parameters.set<Real>               ("Nks")  = Nks;
   equation_systems.parameters.set<Real>               ("Ss2")  = Ss2;
+  equation_systems.parameters.set<Real>              ("phi0")  = phi0;
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
   equation_systems.parameters.set<string> ("point_particle_model") = point_particle_model;
   equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;
@@ -209,6 +212,10 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<std::vector<bool>> ("shear") = shear;
   equation_systems.parameters.set<std::vector<Real>> ("shear_rate") = shear_rate;
   equation_systems.parameters.set<std::vector<unsigned int>> ("shear_direction") = shear_direction;
+  equation_systems.parameters.set<std::vector<unsigned int>> ("boundary_id_dirichlet_poisson") = boundary_id_dirichlet_poisson;
+  equation_systems.parameters.set<std::vector<unsigned int>> ("boundary_id_neumann_poisson") = boundary_id_neumann_poisson;
+  equation_systems.parameters.set<std::vector<Real>> ("boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
+  equation_systems.parameters.set<std::vector<Real>> ("boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
 }
 
 void CopssPointParticleSystem::update_object()
@@ -245,13 +252,24 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   PerfLog perf_log("Copss-Hydrodynamics-PointParticleSystem");
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
-  // validate StokesGGEM if simulation_name = ggem_validation
+  // validate GGEMStokes if simulation_name = ggem_validation
   if (simulation_name == "ggem_validation"){
 	  perf_log.push("GGEM validation");
 	  system.test_velocity_profile(neighbor_list_update_flag);
 	  perf_log.pop("GGEM validation");
 	  return;
   }
+  // validate GGEMPoisson if simulation_name = ggem_validation_poisson
+  if (simulation_name == "ggem_validation_poisson"){
+	  perf_log.push("GGEMPoisson validation");
+          PMSystemPoisson& system_poisson = equation_systems.get_system<PMSystemPoisson> ("Poisson");
+          //Build neighbor list, will this update point_mesh in PMSystemPoisson?
+          system.reinit_hi_system(neighbor_list_update_flag);
+	  system_poisson.test_potential_profile(neighbor_list_update_flag);
+	  perf_log.pop("GGEMPoisson validation");
+	  return;
+  }
+
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Parameters for dynamic process

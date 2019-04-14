@@ -54,6 +54,7 @@
 #include "particle_mesh.h"
 #include "point_mesh.h"
 #include "pm_system_stokes.h"
+#include "pm_system_poisson.h"
 #include "brownian_system.h"
 #include "pm_periodic_boundary.h"
 #include "chebyshev.h"
@@ -96,9 +97,12 @@ public:
   // physical parameters
   const Real kB = 1.380662E-17;//1.380662E-23(J/K) = 1.3806623E-23(N*m/K) = 1.380662E-17(N*um/K)
   const Real PI = libMesh::pi;
+  const Real epsilon_0 = 8.85418781762039E-24; // 8.85418781762039E-12(F/m) = 8.85418781762039E-12( C^2/(N*m^2) ) = 8.85418781762039E-24 ( C^2/(N*um^2) )
+  const Real elementary_charge = 1.6021766208E-19; // C
   Real T; // simulation temperature (K)
   Real kBT;// (N*um)
   Real viscosity; // viscosity of the fluid (cp = N*s/um^2)
+  Real epsilon; // relative permittivity of the fluid
   Real Rb; // radius of the bead
   Real drag_c; // Drag coefficient (N*s/um)
   Real Db;
@@ -109,6 +113,7 @@ public:
   Real uc; // characteristic velocity (um/s)
   Real fc; // characteristic force (N)
   Real muc; // non-dimension viscosity
+  Real phi0; //non-dimensional electrical potential: e / (4 * pi * epsilon * epsilon_0 * a)
 
   // Geometry information
   unsigned int dim; // dimension of the box
@@ -125,6 +130,10 @@ public:
   bool generate_mesh; // flag to generate mesh or load mesh
   std::string domain_mesh_file; // domain mesh filename
   std::vector<unsigned int> n_mesh; // mesh size in all directions
+
+  // Boundary conditions
+  std::vector<unsigned int> boundary_id_dirichlet_poisson, boundary_id_neumann_poisson;
+  std::vector<Real> boundary_value_dirichlet_poisson, boundary_value_neumann_poisson;
 
   // Fix
   std::vector<Fix*> fixes;
@@ -147,8 +156,9 @@ public:
   Real schur_user_ksp_rtol;
   Real schur_user_ksp_atol;
   std::string schur_pc_type;
-  std::string stokes_solver_type;
-  SystemSolverType solver_type; 
+  std::string solver_stokes, solver_poisson;
+  SystemSolverType solver_type_stokes, solver_type_poisson;
+  bool module_poisson;
 
   // Chebyshev information
   unsigned int max_n_cheb; // max order of Chebyshev polynomianl 
@@ -184,7 +194,7 @@ public:
   //std::unique_ptr<PMPeriodicBoundary> pm_periodic_boundary;
 
   // equation system
-  unsigned int u_var, v_var, w_var, p_var;
+  unsigned int u_var, v_var, w_var, p_var, phi_var;
 
   //integrate
   // paramters for dynamic process;
@@ -278,7 +288,7 @@ public:
    * step 4: read_domain_info()
    * step 5: read_force_info()
    * step 6: read_ggem_info()
-   * step 7: read_stokes_solver_info()
+   * step 7: read_solver_info()
    * step 8: read_chebyshev_info()
    * step 9: read_run_info()
    */
@@ -332,7 +342,7 @@ protected:
   void read_domain_info(); 
   void read_force_info();
   virtual void read_ggem_info() = 0;
-  void read_stokes_solver_info();
+  void read_solver_info();
   void read_chebyshev_info();
   void read_run_info();
   void read_restart_time();

@@ -183,13 +183,16 @@ public:
    */
   void set_neighbor_vector(std::vector<Point>& neighbor_vector) 
   { _neighbor_vector = neighbor_vector;};
-  
+
+ 
   /**
    * neighbor distance
    */
   const std::vector<Point> neighbor_vector() const{
     return _neighbor_vector;
   }
+
+
   /*
    * Set the force vector on the particle
    * This is set by the member function in the class "ParticleMesh"
@@ -208,11 +211,13 @@ public:
    */
   void zero_particle_force();
 
+
   /*!\ brief particle force
    *
    */  
   const Point& particle_force() {return _force;};
-  
+
+ 
   /*!\brief const particle force
   */
   const Point& constant_force() {return _constant_force;};
@@ -223,11 +228,11 @@ public:
    */ 
   void set_particle_velocity(const Point& p_velocity) {_velocity = p_velocity;};
 
+
   /*
    * Return the velocity vector of the particle
    */
   const Point& particle_velocity() const {return _velocity; };
-
 
   
   /*

@@ -37,7 +37,7 @@
 #include "ggem_stokes.h"
 #include "brownian_system.h"
 #include "pm_system_stokes.h"
-
+#include "pm_system_poisson.h"
 
 namespace libMesh
 {
@@ -47,7 +47,7 @@ PMSystemStokes::PMSystemStokes(EquationSystems& es,
                                const std::string& name,
                                const unsigned int number)
 : PMLinearImplicitSystem (es, name, number),
-  _stokes_solver(es)
+  _solver_stokes(es)
 {
   if (name != "Stokes") libmesh_error();
   assemble_stokes = ( new AssembleStokes(es, name) );
@@ -108,7 +108,7 @@ void PMSystemStokes::reinit_hi_system(bool& neighbor_list_update_flag)
       _fixes[i]->compute();
     }
     // sync forces on nodes to PointParticles in point mesh
-    _fixes[0] -> sync_node_to_pointmesh();
+    _fixes[0]->sync_node_to_pointmesh();
     // need to restore particle mesh after applying all fixes if particles are on pbc
     _fixes[0]->check_pbc_post_fix();
   }
@@ -235,12 +235,12 @@ void PMSystemStokes::solve (const std::string& option,
     //t1 = MPI_Wtime();
 
     // set the solver type for the Stokes equation
-    const SystemSolverType solver_type  = this->get_equation_systems().parameters.get<SystemSolverType> ("solver_type");
-    _stokes_solver.set_solver_type(solver_type);
+    const SystemSolverType solver_type  = this->get_equation_systems().parameters.get<SystemSolverType> ("solver_type_stokes");
+    _solver_stokes.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver
     this->assemble_matrix("Stokes",option);
-    _stokes_solver.init_ksp_solver();
+    _solver_stokes.init_ksp_solver();
     //perf_log.pop("assemble_matrix (undisturbed)");
 
     //t2 = MPI_Wtime();
@@ -258,7 +258,7 @@ void PMSystemStokes::solve (const std::string& option,
 
   // solve the problem
 // perf_log.push("solve()");
-  _stokes_solver.solve();
+  _solver_stokes.solve();
 // perf_log.pop("solve()");
 
   STOP_LOG("solve()", "PMSystemStokes");

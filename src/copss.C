@@ -100,7 +100,7 @@ void Copss::read_input()
   this -> read_domain_info();
   this -> read_force_info();
   this -> read_ggem_info();
-  this -> read_stokes_solver_info();
+  this -> read_solver_info();
   this -> read_chebyshev_info();
   this -> read_run_info();
 } // end read_data function
@@ -116,22 +116,25 @@ void Copss::read_system_info()
     print_info = input_file("print_info", false);
 }
 
-  /*
-   * Read physical parameters 
-   */
+/*
+ * Read physical parameters 
+ */
 void Copss::read_physical_info()
 {
   T = input_file("temperature", 297);// K
   kBT    = kB * T; //(N*um)
-  viscosity            = input_file("viscosity", 1.0); // viscosity (cP = N*s/um^2)
-  Rb                   = input_file("radius", 0.10); // radius of the bead (um)
-  drag_c      = 6.*PI*viscosity*Rb;    // Drag coefficient (N*s/um)
-  Db          = kBT/drag_c;     // diffusivity of a bead (um^2/s)  
+  viscosity   = input_file("viscosity", 1.0); // viscosity (cP = N*s/um^2)
+  Rb          = input_file("radius", 0.10); // radius of the bead (um)
+  drag_c      = 6.*PI*viscosity*Rb; // Drag coefficient (N*s/um)
+  Db          = kBT/drag_c; // diffusivity of a bead (um^2/s)
 
-  tc   = drag_c*Rb*Rb/kBT;       // diffusion time (s)
-  uc   = kBT/(drag_c*Rb);        // characteristic velocity (um/s)
-  fc   = kBT/Rb;                 // characteristic force (N)
-  muc  = 1./(6.*PI);             // non-dimensional viscosity
+  tc   = drag_c*Rb*Rb/kBT; // diffusion time (s)
+  uc   = kBT/(drag_c*Rb);  // characteristic velocity (um/s)
+  fc   = kBT/Rb;           // characteristic force (N)
+  muc  = 1./(6.*PI);       // non-dimensional viscosity
+
+  epsilon = input_file("epsilon", 1.); // Relative permittivity of the fluid
+  phi0 = elementary_charge / (4.*PI * epsilon * epsilon_0 * Rb); // non-dimensional electrical potential
 
   // print out physical parameters information
   cout<<"\n ##########################################################\n"
@@ -151,10 +154,9 @@ void Copss::read_physical_info()
 }// end read_physical_parameter()
 
 
-  /*
-   * Read Geometry infomation
-   */
-
+/*
+ * Read Geometry infomation
+ */
 void Copss::read_domain_info()
 {
   dim = input_file("dimension", 3);
@@ -219,6 +221,34 @@ void Copss::read_domain_info()
   shear_direction.resize(input_file.vector_variable_size("shear_direction"));
   for (unsigned int i=0; i < shear_direction.size(); i++){ shear_direction[i] = input_file("shear_direction", 0, i); }
 
+  // Boundary conditions
+  boundary_id_dirichlet_poisson.resize(input_file.vector_variable_size("boundary_id_dirichlet_poisson"));
+  boundary_id_neumann_poisson.resize(input_file.vector_variable_size("boundary_id_neumann_poisson"));
+  boundary_value_dirichlet_poisson.resize(input_file.vector_variable_size("boundary_value_dirichlet_poisson"));
+  boundary_value_neumann_poisson.resize(input_file.vector_variable_size("boundary_value_neumann_poisson"));
+  if (boundary_id_dirichlet_poisson.size() != boundary_value_dirichlet_poisson.size()){
+    err << "Error: size of 'boundary_id_dirichlet_poisson' does not match with "
+         << "'boundary_value_dirichlet_poisson'. Exiting ..." << endl;
+    libmesh_error();
+  }
+  if (boundary_id_neumann_poisson.size() != boundary_value_neumann_poisson.size()){
+    err << "Error: size of 'boundary_id_neumann_poisson' does not match with "
+         << "'boundary_value_neumann_poisson'. Exiting ..." << endl;
+    libmesh_error();
+  }
+  for (unsigned int i=0; i < boundary_id_dirichlet_poisson.size(); i++){
+    boundary_id_dirichlet_poisson[i] = input_file("boundary_id_dirichlet_poisson", 0, i);
+  }
+  for (unsigned int i=0; i < boundary_id_neumann_poisson.size(); i++){
+    boundary_id_neumann_poisson[i] = input_file("boundary_id_neumann_poisson", 0, i);
+  }
+  for (unsigned int i=0; i < boundary_value_dirichlet_poisson.size(); i++){
+    boundary_value_dirichlet_poisson[i] = input_file("boundary_value_dirichlet_poisson", 0.0, i);
+  }
+  for (unsigned int i=0; i < boundary_value_neumann_poisson.size(); i++){
+    boundary_value_neumann_poisson[i] = input_file("boundary_value_neumann_poisson", 0.0, i);
+  }
+
   cout <<endl<< "##########################################################"<<endl
        << "#                  Geometry information                   " <<endl
        << "##########################################################"<<endl<<endl
@@ -254,9 +284,9 @@ void Copss::read_domain_info()
   } // end else
 } // end read_domain_info()
 
-  /*
-   * read force types
-   */
+/*
+ * read force types
+ */
 void Copss::read_force_info(){
   // read particle-particle force types
   numForceTypes = input_file.vector_variable_size("force_field");
@@ -281,52 +311,68 @@ void Copss::read_force_info(){
     cout << "-----------> ";
     cout << forces[i].first <<"= '";
     for (int j = 0; j < forces[i].second.size(); j++){
-          cout << forces[i].second[j] <<"  ";       
+      cout << forces[i].second[j] <<"  ";
     }
     cout << "'" <<endl;
   }
-
 } // end read_force_info()
 
 /*
- * read Stokes Solver  
+ * read Solvers
  */
-void Copss::read_stokes_solver_info(){
+void Copss::read_solver_info(){
   max_linear_iterations = input_file("max_linear_iterations", 100);
   linear_solver_rtol   = input_file("linear_solver_rtol", 1E-6);
   linear_solver_atol   = input_file("linear_solver_atol", 1E-6);
-  user_defined_pc            = input_file("user_defined_pc", true);
+  user_defined_pc      = input_file("user_defined_pc", true);
   schur_user_ksp       = input_file("schur_user_ksp", false);
   schur_user_ksp_rtol  = input_file("schur_user_ksp_rtol", 1E-6);
   schur_user_ksp_atol  = input_file("schur_user_ksp_atol", 1E-6);
   schur_pc_type = input_file("schur_pc_type", "SMp");
-  stokes_solver_type = input_file("stokes_solver", "superLU_dist");
-  if(stokes_solver_type=="superLU_dist") {
-    solver_type = superLU_dist;
+
+  solver_stokes = input_file("solver_stokes", "superLU_dist");
+  if(solver_stokes=="superLU_dist") {
+    solver_type_stokes = superLU_dist;
     user_defined_pc = false;
   }
-  else if(stokes_solver_type=="field_split") {
-    solver_type = field_split;
+  else if(solver_stokes=="field_split") {
+    solver_type_stokes = field_split;
     user_defined_pc = true;
   }
   else {
-    solver_type = user_define;
-  }  
+    solver_type_stokes = user_define;
+  }
+
+  module_poisson = input_file("module_poisson", false);
+  solver_poisson = input_file("solver_poisson", "superLU_dist");
+  if(solver_poisson=="superLU_dist") {
+    solver_type_poisson = superLU_dist;
+    user_defined_pc = false;
+  }
+  else if(solver_poisson=="field_split") {
+    solver_type_poisson = field_split;
+    user_defined_pc = false;
+  }
+  else {
+    solver_type_poisson = user_define;
+  }
 
   cout <<endl<< "##########################################################"<<endl
        << "#                 Solver information                      " <<endl
        << "##########################################################"<<endl<<endl;
-  cout << "-----------> Stokes solver type = " << stokes_solver_type <<endl;
-  if (stokes_solver_type=="field_split"){
+  cout << "-----------> Stokes solver type = " << solver_stokes <<endl;
+  if (solver_stokes=="field_split"){
     cout<<"-----------> FieldSplit Schur Complement Reduction Solver"<<endl;
     cout<<"-----------> schur_pc_type = " << schur_pc_type << endl;
-      if(schur_user_ksp){
-            cout<<"----------->  user defined KSP is used for Schur Complement!"<< endl;
-            cout<<"----------->  KSP rel tolerance for Schur Complement solver is = " << schur_user_ksp_rtol <<endl;
-            cout<<"----------->  KSP abs tolerance for Schur Complement solver is = " << schur_user_ksp_atol <<endl;
-        }// end if(schur_user_ksp)
-    }// end if (stokes_solver_type == "field_split")
-}// end read_stokes_solver_info()
+    if(schur_user_ksp){
+      cout<<"----------->  user defined KSP is used for Schur Complement!"<< endl;
+      cout<<"----------->  KSP rel tolerance for Schur Complement solver is = " << schur_user_ksp_rtol <<endl;
+      cout<<"----------->  KSP abs tolerance for Schur Complement solver is = " << schur_user_ksp_atol <<endl;
+    }
+  }
+
+  if (module_poisson == true) cout << "-----------> Poisson solver type = " << solver_poisson <<endl;
+}// end read_solver_info()
 
 /*
  * read Chebyshev info
@@ -638,7 +684,17 @@ EquationSystems Copss::create_equation_systems()
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   if( user_defined_pc ){
     system.add_matrix("Preconditioner");
-  } 
+  }
+
+  // Poisson equation
+  if(module_poisson == true){
+    PMSystemPoisson& system_poisson = equation_systems.add_system<PMSystemPoisson> ("Poisson");
+    phi_var = system_poisson.add_variable ("phi", SECOND);
+    // Attach point_mesh to PMSystemPoisson
+    this->attach_object_mesh(system_poisson);
+    this->attach_period_boundary(system_poisson);
+  }
+
   /* Initialize the data structures for the equation system. */
   cout<<"==>(6/8) Init equation_systems (libmesh function, to init all systems in equation_systems)"<<endl;
   equation_systems.init();
@@ -682,105 +738,157 @@ void Copss::attach_fixes(PMLinearImplicitSystem& pm_system)
 //===============================================================================
 void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
 {
-  cout << "--------------> Get dof_map of 'Stokes' system"<<endl;  
-  DofMap& dof_map = system.get_dof_map();
-  cout << "--------------> Add periodicBoundary object to 'dof_map'"<<endl;
-  /*** set PBC in x-direction ***/
-  if (periodicity[0])
-  {
-    PeriodicBoundary pbcx(RealVectorValue(wall_params[1]-wall_params[0], 0., 0.));
-    pbcx.set_variable(u_var);
-    pbcx.set_variable(v_var);
-    if(dim==3) pbcx.set_variable(w_var);
-    //pbcx.set_variable(p_var); //*** NOT include p!
-    
-    // is this boundary number still true for 3D?
-    if(dim==2)
-    {
-      pbcx.myboundary = 3;
-      pbcx.pairedboundary = 1;
-    }
-    else if(dim==3)
-    {
-      pbcx.myboundary = 4; // left face (viewing from X negative to X positive)
-      pbcx.pairedboundary = 2; // right face (viewing from X positive to X negative)
+  if(system.name()=="Stokes"){
+      cout << "--------------> Get dof_map of 'Stokes' system"<<endl;  
+      DofMap& dof_map = system.get_dof_map();
+      cout << "--------------> Add periodicBoundary object to 'dof_map'"<<endl;
+      /*** set PBC in x-direction ***/
+      if (periodicity[0])
+      {
+        PeriodicBoundary pbcx(RealVectorValue(wall_params[1]-wall_params[0], 0., 0.));
+        pbcx.set_variable(u_var);
+        pbcx.set_variable(v_var);
+        pbcx.set_variable(w_var);
+        //pbcx.set_variable(p_var); //*** NOT include p!
 
-    } // end if
-    
-    dof_map.add_periodic_boundary(pbcx);    
-    // check
-    if (search_radius_p>=(wall_params[1]-wall_params[0])/2.)
-    {
-      output_msg = std::string("****************************** warning: ********************************\n")+
-                   "**** The search radius is larger than half domain length in x direction\n!"+
-                   "**** search radius = "+ std::to_string(search_radius_p) + 
-                   ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
-                   "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, *comm_in);
-      libmesh_error();
-    }
+        pbcx.myboundary = 4; // left face (viewing from X negative to X positive)
+        pbcx.pairedboundary = 2; // right face (viewing from X positive to X negative)
+
+        dof_map.add_periodic_boundary(pbcx);    
+        // check
+        if (search_radius_p>=(wall_params[1]-wall_params[0])/2.)
+        {
+          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
+                                   "**** The search radius is larger than half domain length in x direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) +
+                                   ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
+      /*** set PBC in y-direction ***/
+      if (periodicity[1])
+      {
+        PeriodicBoundary pbcy(RealVectorValue(0., wall_params[3]-wall_params[2], 0.));
+        pbcy.set_variable(u_var);
+        pbcy.set_variable(v_var);
+        pbcy.set_variable(w_var);
+        //pbcy.set_variable(p_var); //*** NOT include p!
+
+        pbcy.myboundary = 1; // bottom face, viewing from Y negative to Y positive
+        pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y negative
+
+        dof_map.add_periodic_boundary(pbcy);
+        // check
+        if (search_radius_p>=(wall_params[3]-wall_params[2])/2.)
+        {
+          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
+                                   "**** The search radius is larger than half domain length in y direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) +
+                                   ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
+      /*** set PBC in z-direction ***/
+      if (periodicity[2])
+      {
+        PeriodicBoundary pbcz(RealVectorValue(0., 0., wall_params[5]-wall_params[4]));
+        pbcz.set_variable(u_var);
+        pbcz.set_variable(v_var);
+        pbcz.set_variable(w_var);
+        //pbcz.set_variable(p_var); //*** NOT include p!
+
+        pbcz.myboundary = 0; // bottom face, viewing from Z negative to Z positive
+        pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z negative
+
+        dof_map.add_periodic_boundary(pbcz);
+        // check
+        if (search_radius_p>=(wall_params[5]-wall_params[4])/2.)
+        {
+          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
+                                   "**** The search radius is larger than half domain length in z direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) +
+                                   ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
   }
-  /*** set PBC in y-direction ***/
-  if (periodicity[1])
-  {
-    PeriodicBoundary pbcy(RealVectorValue(0., wall_params[3]-wall_params[2], 0.));
-    pbcy.set_variable(u_var);
-    pbcy.set_variable(v_var);
-    if(dim==3) pbcy.set_variable(w_var);
-    //pbcy.set_variable(p_var); //*** NOT include p!
-    
-    if(dim==2)
-    {
-      pbcy.myboundary = 0;
-      pbcy.pairedboundary = 2;
-    }
-    else if(dim==3)
-    {
-      pbcy.myboundary = 1; // bottom face, viewing from Y negative to Y positive
-      pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y negative
-    } // end if
-    
-    dof_map.add_periodic_boundary(pbcy);
-    // check
-    if (search_radius_p>=(wall_params[3]-wall_params[2])/2.)
-    {
-      output_msg = std::string("****************************** warning: ********************************\n")+
-                   "**** The search radius is larger than half domain length in y direction\n!"+
-                   "**** search radius = "+ std::to_string(search_radius_p) + 
-                   ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
-                   "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, *comm_in);
-      libmesh_error();
-    }
+  else if(system.name()=="Poisson"){
+      cout << "--------------> Get dof_map of 'Poisson' system"<<endl;
+      DofMap& dof_map = system.get_dof_map();
+      cout << "--------------> Add periodicBoundary object to 'dof_map'"<<endl;
+      /*** set PBC in x-direction ***/
+      if (periodicity[0])
+      {
+        PeriodicBoundary pbcx(RealVectorValue(wall_params[1]-wall_params[0], 0., 0.));
+        pbcx.set_variable(phi_var);
+
+        pbcx.myboundary = 4; // left face (viewing from X negative to X positive)
+        pbcx.pairedboundary = 2; // right face (viewing from X positive to X negative)
+
+        dof_map.add_periodic_boundary(pbcx);
+        // check
+        if (search_radius_p>=(wall_params[1]-wall_params[0])/2.)
+        {
+          output_msg = std::string("*********************** warning in Poisson PBC: ************************\n")+
+                                   "**** The search radius is larger than half domain length in x direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) +
+                                   ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
+      /*** set PBC in y-direction ***/
+      if (periodicity[1])
+      {
+        PeriodicBoundary pbcy(RealVectorValue(0., wall_params[3]-wall_params[2], 0.));
+        pbcy.set_variable(phi_var);
+
+        pbcy.myboundary = 1; // bottom face, viewing from Y negative to Y positive
+        pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y negative
+ 
+        dof_map.add_periodic_boundary(pbcy);
+        // check
+        if (search_radius_p>=(wall_params[3]-wall_params[2])/2.)
+        {
+          output_msg = std::string("********************** warning in Poisson PBC: *************************\n")+
+                                   "**** The search radius is larger than half domain length in y direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) + 
+                                   ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
+      /*** set PBC in z-direction ***/
+      if (periodicity[2])
+      {
+        PeriodicBoundary pbcz(RealVectorValue(0., 0., wall_params[5]-wall_params[4]));
+        pbcz.set_variable(phi_var);
+
+        pbcz.myboundary = 0; // bottom face, viewing from Z negative to Z positive
+        pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z negative
+ 
+        dof_map.add_periodic_boundary(pbcz);
+        // check
+        if (search_radius_p>=(wall_params[5]-wall_params[4])/2.)
+        {
+          output_msg = std::string("*********************** warning in Poisson PBC: ************************\n")+
+                                   "**** The search radius is larger than half domain length in z direction\n!"+
+                                   "**** search radius = "+ std::to_string(search_radius_p) + 
+                                   ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
+                                   "************************************************************************\n\n";
+          PMToolBox::output_message(output_msg, *comm_in);
+          libmesh_error();
+        }
+      }
   }
-  /*** set PBC in z-direction ***/
-  if (periodicity[2])
-  {
-    PeriodicBoundary pbcz(RealVectorValue(0., 0., wall_params[5]-wall_params[4]));
-    pbcz.set_variable(u_var);
-    pbcz.set_variable(v_var);
-    if(dim==3) pbcz.set_variable(w_var);
-    //pbcz.set_variable(p_var); //*** NOT include p!
-    
-    if(dim==3)
-    {
-      pbcz.myboundary = 0; // bottom face, viewing from Z negative to Z positive
-      pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z negative 
-    } // end if
-    
-    dof_map.add_periodic_boundary(pbcz);
-    // check
-    if (search_radius_p>=(wall_params[5]-wall_params[4])/2.)
-    {
-      output_msg = std::string("****************************** warning: ********************************\n")+
-                   "**** The search radius is larger than half domain length in z direction\n!"+
-                   "**** search radius = "+ std::to_string(search_radius_p) + 
-                   ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
-                   "************************************************************************\n\n";
-      PMToolBox::output_message(output_msg, *comm_in);
-      libmesh_error();
-    }
-  }  
 }
 
 //============================================================================================
@@ -858,14 +966,26 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 //==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
-//  PerfLog perf_log("integration");
+  //PerfLog perf_log("integration");
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
-  // perf_log.push("reinit sytem");
+
+  bool module_poisson = equation_systems.parameters.get<bool>("module_poisson");
+
+  if(i==0){
+    // Solve Poisson equation for electrostatic forces, at the first step if Poisson solver is ON
+    if(module_poisson == true){
+      // Assemble matrix and rhs for Poisson equation, and solve it
+      equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",true);
+      // Add electrostatic forces to beads
+      equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();
+    }
+  }
+  //perf_log.push("reinit sytem");
   if(i>0){
     *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
     // Update the local values to reflect the solution on neighboring processors
@@ -879,16 +999,22 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
        timestep_duration = 0;
     }
     system.reinit_hi_system(neighbor_list_update_flag);
+
+    // Add electrostatic forces to beads if Poisson solver is ON
+    if(module_poisson == true){
+      // Only assemble rhs, solve Poisson equation, and add electrostatic forces to beads
+      equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",false);
+      equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();
+    }
   }
   if(print_info){
-  if(comm_in->rank()==0)
-    point_mesh->print_point_info();
+    if(comm_in->rank()==0) point_mesh->print_point_info();
   }
-  // perf_log.pop("reinit sytem");
-//  perf_log.push("compute_point_velocity undisturbed");
-  // compute undisturbed velocity of points 
+  //perf_log.pop("reinit sytem");
+  //perf_log.push("compute_point_velocity undisturbed");
+  // compute undisturbed velocity of points
   system.compute_point_velocity("undisturbed", vel0);
-//  perf_log.pop("compute_point_velocity undisturbed");
+  //perf_log.pop("compute_point_velocity undisturbed");
 
   reinit_stokes = false;
 //  perf_log.push("solve disturbed");

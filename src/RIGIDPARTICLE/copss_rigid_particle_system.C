@@ -181,7 +181,9 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>("schur_user_ksp_rtol") = schur_user_ksp_rtol;
   equation_systems.parameters.set<Real>("schur_user_ksp_atol") = schur_user_ksp_atol;
   equation_systems.parameters.set<string>    ("schur_pc_type") = schur_pc_type;
-  equation_systems.parameters.set<SystemSolverType> ("solver_type") = solver_type;
+  equation_systems.parameters.set<SystemSolverType> ("solver_type_stokes") = solver_type_stokes;
+  equation_systems.parameters.set<SystemSolverType> ("solver_type_poisson") = solver_type_poisson;
+  equation_systems.parameters.set<bool>     ("module_poisson") = module_poisson;
   equation_systems.parameters.set<Real>              ("alpha") = alpha;
   equation_systems.parameters.set<Real>         ("kBT")        = kBT;
   equation_systems.parameters.set<Real>         ("ibm_beta")   = ibm_beta;
@@ -193,6 +195,7 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<Real>       ("bead radius")  = Rb;
   equation_systems.parameters.set<Real>              ("drag")  = drag_c;
   equation_systems.parameters.set<Real>                ("tc")  = tc;
+  equation_systems.parameters.set<Real>              ("phi0")  = phi0;
   equation_systems.parameters.set<string> ("particle_type")  = particle_type;
   equation_systems.parameters.set<string> ("particle_mesh_type") = particle_mesh_type;
   equation_systems.parameters.set<std::vector<string>> ("force_types") = forceTypes;
@@ -203,6 +206,10 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<std::vector<bool>> ("shear") = shear;
   equation_systems.parameters.set<std::vector<Real>> ("shear_rate") = shear_rate;
   equation_systems.parameters.set<std::vector<unsigned int>> ("shear_direction") = shear_direction;
+  equation_systems.parameters.set<std::vector<unsigned int>> ("boundary_id_dirichlet_poisson") = boundary_id_dirichlet_poisson;
+  equation_systems.parameters.set<std::vector<unsigned int>> ("boundary_id_neumann_poisson") = boundary_id_neumann_poisson;
+  equation_systems.parameters.set<std::vector<Real>> ("boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
+  equation_systems.parameters.set<std::vector<Real>> ("boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
 }
 
 void CopssRigidParticleSystem::write_object(unsigned int step_id)

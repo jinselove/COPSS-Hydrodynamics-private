@@ -87,8 +87,8 @@ linear_solver_atol = 1E-6
 # user defined preconditioning matrix #
 user_defined_pc = true
 
-# define the type of StokesSolver: field_split; superLU_dist #
-stokes_solver = superLU_dist
+# define the type of SolverStokes: field_split; superLU_dist #
+solver_stokes = superLU_dist
 
 # user defined KSP for schur complement #
 schur_user_ksp = true

@@ -82,20 +82,6 @@ public:
                                  const std::string& option) = 0;
 
 
-
-  /*! \brief Assemble the element matrix K_IJ
-
-      Reinit and compute the element matrix K_ij, which will be added into K
-      matrix after calling assemble_global_K(). For Stokes equation, size of
-      this submatrix is n_u_dofs * n_u_dofs = n_v_dofs * n_v_dofs = n_w_dofs * n_w_dofs
-  */
-  virtual void assemble_element_KIJ(const std::vector<Real>& JxW,
-                                    const std::vector<std::vector<RealGradient> >& dphi,
-                                    const unsigned int n_u_dofs,
-                                    const unsigned int I,
-                                    const unsigned int J,
-                                    DenseMatrix<Number>& Kij) = 0;
-
   /*! \brief  Assemble function for calculating each element's contribution to
    *          the right-hand-side vector. It is used in assemble_global_F()
 
@@ -141,9 +127,9 @@ public:
   void penalize_elem_matrix_vector(DenseMatrix<Number>& Ke,
                                    DenseVector<Number>& Fe,
                                    const std::string & matrix_or_vector,
-                                   const unsigned int& var_number,     // variable number
-                                   const unsigned int& local_node_id,  // local node id to be penalized
-                                   const unsigned int& n_nodes_elem,   // vel-node number of elem!
+                                   const unsigned int& var_number,    // variable number
+                                   const unsigned int& local_node_id, // local node id to be penalized
+                                   const unsigned int& n_nodes_elem,  // vel-node number of elem!
                                    const Real& penalty,
                                    const Real& value);
 
@@ -153,7 +139,7 @@ protected:
   // Equation systems
   EquationSystems& _eqn_sys;
 
-  // system dimension
+  // System dimension
   unsigned int _dim;
 
   // Fluid mesh
@@ -168,7 +154,6 @@ protected:
   // this matrix stores the product of JxW[qp] * phi[k][qp]
   // size = num_elem * (n_u_dofs * n_quad_points)
   std::vector<std::vector<Real>> _int_force;
-
 
   // vector stores q_xyz size
   // size = num_elem * q_xyz.size()
@@ -185,7 +170,10 @@ protected:
   std::vector<std::vector<dof_id_type> > _dof_indices_u;
   std::vector<std::vector<dof_id_type> > _dof_indices_p;
 
-  // sides on the boundary
+  // Sides on the boundary for different SubEquationSystems. Boundaries applied with
+  // Dirichlet BC using penalty method are different for different systems.
+  // For example, in Poisson system, we don't use pressure inlet/outlet condition
+  // to decide whether this side has to be included in the Dirichlet BC.
   std::vector<std::vector<unsigned int> > _boundary_sides;
 
 };

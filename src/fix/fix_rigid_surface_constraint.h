@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -21,30 +22,29 @@
 #pragma once
 
 #include "fix_rigid.h"
-namespace libMesh
-{
-
-class FixRigidSurfaceConstraint : public FixRigid
-{
+namespace libMesh {
+class FixRigidSurfaceConstraint : public FixRigid {
 public:
-	FixRigidSurfaceConstraint(PMLinearImplicitSystem& pm_sys);
 
-	~FixRigidSurfaceConstraint(){};
+  FixRigidSurfaceConstraint(PMLinearImplicitSystem& pm_sys);
 
-	void print_fix();
+  ~FixRigidSurfaceConstraint() {}
 
-	void initParams();
+  void print_fix();
 
-	void compute();
+  void initParams();
+
+  void compute();
 
 private:
-	void compute_constraint_force(const std::size_t& i,
-								  std::vector<Point>& nodal_force);
-	// surface spring constant
-  	Real surface_spring_constant;
 
-  	// center spring constant
- 	Real center_spring_constant;
+  void compute_constraint_force(const std::size_t & i,
+                                std::vector<Point>& nodal_force);
+
+  // surface spring constant
+  Real surface_spring_constant;
+
+  // center spring constant
+  Real center_spring_constant;
 };
-
 }

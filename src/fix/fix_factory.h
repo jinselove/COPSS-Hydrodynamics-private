@@ -18,23 +18,24 @@
 #include "fix_rigid_sphereWall_lj_cut.h"
 #include "../pm_linear_implicit_system.h"
 
-namespace libMesh
-{
-class FixFactory
-{
+namespace libMesh {
+class FixFactory {
 public:
-	// constructor
-	FixFactory(){};
-	// destructor
-	virtual ~FixFactory(){};
+
+  // constructor
+  FixFactory() {}
+
+  // destructor
+  virtual ~FixFactory() {}
 
 
-// add else branch if you need to implment new force field 
-	Fix* buildFix(std::string& fix_name, PMLinearImplicitSystem& pm_system);
+  // add else branch if you need to implment new force field
+  Fix* buildFix(std::string           & fix_name,
+                PMLinearImplicitSystem& pm_system);
 
 private:
-	std::string particle_type;
-	std::string wall_type;
-};
 
+  std::string particle_type;
+  std::string wall_type;
+};
 }

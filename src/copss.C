@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -20,140 +21,166 @@
 using std::cout;
 using std::endl;
 
-namespace libMesh
-{
-
-//==========================================================================
+namespace libMesh {
+// ==========================================================================
 Copss::Copss(CopssInit& init)
 {
   comm_in = &init.comm();
-  cout << endl <<"============================0.  Initialize libMesh.===========================" << endl;
-  this -> check_libmesh();
+  cout << endl <<
+    "============================0.  Initialize libMesh.==========================="
+       << endl;
+  this->check_libmesh();
 }
 
 Copss::~Copss()
-{
-}
+{}
 
-
-int Copss::check_libmesh(){
-
-  // This example NaNs with the Eigen sparse linear solvers and Trilinos solvers,
+int Copss::check_libmesh() {
+  // This example NaNs with the Eigen sparse linear solvers and Trilinos
+  // solvers,
   // but should work OK with either PETSc or Laspack.
   libmesh_example_requires(libMesh::default_solver_package() != EIGEN_SOLVERS,
                            "--enable-petsc or --enable-laspack");
   libmesh_example_requires(libMesh::default_solver_package() != TRILINOS_SOLVERS,
                            "--enable-petsc or --enable-laspack");
-  
+
   // check libmesh enables
   #ifndef LIBMESH_ENABLE_AMR
   libmesh_example_requires(false, "--enable-amr");
-  #endif
-  
+  #endif // ifndef LIBMESH_ENABLE_AMR
+
   #ifndef LIBMESH_HAVE_SLEPC
   libmesh_example_requires(false, "--enable-slepc");
-  #endif
-  
+  #endif // ifndef LIBMESH_HAVE_SLEPC
+
   // Skip this 2D example if libMesh was compiled as 1D-only.
   libmesh_example_requires(3 == LIBMESH_DIM, "--3D support");
 
   return 0;
 }
 
-
-//==========================================================================
-void Copss::start_time(struct tm * timeinfo){
-  cout <<"\n---------------------------------------------------------------------\n"
-         <<"The program starts. \n"
-         <<"The current date/time is: " << asctime (timeinfo)  << "\n"
-         <<"---------------------------------------------------------------------\n\n";
+// ==========================================================================
+void Copss::start_time(struct tm *timeinfo) {
+  cout <<
+    "\n---------------------------------------------------------------------\n"
+       << "The program starts. \n"
+       << "The current date/time is: " << asctime(timeinfo)  << "\n"
+       <<
+    "---------------------------------------------------------------------\n\n";
 }
 
-
-//==========================================================================
-void Copss::end_time(struct tm * timeinfo){
-    cout << "\n---------------------------------------------------------------------\n"
-              <<"The current date/time is: " <<asctime (timeinfo) << "\n"
-              <<"The program ends. \n"
-              <<"---------------------------------------------------------------------\n\n";
+// ==========================================================================
+void Copss::end_time(struct tm *timeinfo) {
+  cout <<
+    "\n---------------------------------------------------------------------\n"
+       << "The current date/time is: " << asctime(timeinfo) << "\n"
+       << "The program ends. \n"
+       <<
+    "---------------------------------------------------------------------\n\n";
 }
 
-//====================================================================
-EquationSystems Copss::init_system(std::string _control_fileName){
-   control_fileName = _control_fileName;
-   cout <<"\n============================1. read input parameters ============================\n";
-   this -> read_input();
-   cout <<"\n============================2. Create Point-mesh object =========================\n";
-   this -> create_object_mesh();
-   cout <<"\n==========3. Create equation_systems object (of type EquationSystems) ===========\n";   
-   return this -> create_equation_systems();
+// ====================================================================
+EquationSystems Copss::init_system(std::string _control_fileName) {
+  control_fileName = _control_fileName;
+  cout <<
+    "\n============================1. read input parameters ============================\n";
+  this->read_input();
+  cout <<
+    "\n============================2. Create Point-mesh object =========================\n";
+  this->create_object_mesh();
+  cout <<
+    "\n==========3. Create equation_systems object (of type EquationSystems) ===========\n";
+  return this->create_equation_systems();
 }
 
-//====================================================================
+// ====================================================================
 void Copss::read_input()
 {
   const GetPot tmp(control_fileName);
+
   input_file = tmp;
-  this -> read_system_info();
-  this -> read_physical_info();
-  this -> read_particle_info();
-  this -> read_domain_info();
-  this -> read_force_info();
-  this -> read_ggem_info();
-  this -> read_solver_info();
-  this -> read_chebyshev_info();
-  this -> read_run_info();
+  this->read_system_info();
+  this->read_physical_info();
+  this->read_particle_info();
+  this->read_domain_info();
+  this->read_force_info();
+  this->read_ggem_info();
+  this->read_solver_info();
+  this->read_chebyshev_info();
+  this->read_run_info();
 } // end read_data function
 
-//====================================================================
+// ====================================================================
 void Copss::read_system_info()
 {
-    simulation_name = input_file("simulation_name", "validation");
-    cout <<"\n##########################################################\n"
-         <<  "#                       simulation_name                       \n"
-         <<  "##########################################################\n\n"
-         <<  "-----------> simulation_name: "<< simulation_name.c_str() << endl;
-    print_info = input_file("print_info", false);
+  simulation_name = input_file("simulation_name", "validation");
+  cout << "\n##########################################################\n"
+       <<  "#                       simulation_name                       \n"
+       <<  "##########################################################\n\n"
+       <<  "-----------> simulation_name: " << simulation_name.c_str() << endl;
+  print_info = input_file("print_info", false);
 }
 
 /*
- * Read physical parameters 
+ * Read physical parameters
  */
 void Copss::read_physical_info()
 {
-  T = input_file("temperature", 297);// K
-  kBT    = kB * T; //(N*um)
-  viscosity   = input_file("viscosity", 1.0); // viscosity (cP = N*s/um^2)
-  Rb          = input_file("radius", 0.10); // radius of the bead (um)
-  drag_c      = 6.*PI*viscosity*Rb; // Drag coefficient (N*s/um)
-  Db          = kBT/drag_c; // diffusivity of a bead (um^2/s)
+  T         = input_file("temperature", 297);                         // K
+  kBT       = kB * T;                                                 // (N*um)
+  viscosity = input_file("viscosity", 1.0);                           // viscosity
+                                                                      // (cP =
+                                                                      // N*s/um^2)
+  Rb        = input_file("radius", 0.10);                             // radius
+                                                                      // of the
+                                                                      // bead
+                                                                      // (um)
+  drag_c    = 6. * PI * viscosity * Rb;                               // Drag
+                                                                      // coefficient
+                                                                      // (N*s/um)
+  Db        = kBT / drag_c;                                           // diffusivity
+                                                                      // of a
+                                                                      // bead
+                                                                      // (um^2/s)
 
-  tc   = drag_c*Rb*Rb/kBT; // diffusion time (s)
-  uc   = kBT/(drag_c*Rb);  // characteristic velocity (um/s)
-  fc   = kBT/Rb;           // characteristic force (N)
-  muc  = 1./(6.*PI);       // non-dimensional viscosity
+  tc  = drag_c * Rb * Rb / kBT;                                       // diffusion
+                                                                      // time
+                                                                      // (s)
+  uc  = kBT / (drag_c * Rb);                                          // characteristic
+                                                                      // velocity
+                                                                      // (um/s)
+  fc  = kBT / Rb;                                                     // characteristic
+                                                                      // force
+                                                                      // (N)
+  muc = 1. / (6. * PI);                                               // non-dimensional
+                                                                      // viscosity
 
-  epsilon = input_file("epsilon", 1.); // Relative permittivity of the fluid
-  phi0 = elementary_charge / (4.*PI * epsilon * epsilon_0 * Rb); // non-dimensional electrical potential
+  epsilon = input_file("epsilon", 1.);                                // Relative
+                                                                      // permittivity
+                                                                      // of the
+                                                                      // fluid
+  phi0    = elementary_charge / (4. * PI * epsilon * epsilon_0 * Rb); // non-dimensional
+                                                                      // electrical
+                                                                      // potential
 
   // print out physical parameters information
-  cout<<"\n ##########################################################\n"
-           <<" #                  System Physical Parameters             \n"
-           <<" ##########################################################\n\n"
-           <<"   temperature           T   = " << T <<"(K)\n"
-           <<"   viscosity             mu  = " << viscosity << " (cP = N*s/um^2)\n"
-           <<"   Energy unit           kBT = " << kBT << " (N*um = N*um)\n"
-           <<"   Radius of the bead     a  = " << Rb <<" (um)\n"
-           <<"   bead diffusivity      Db  = " << Db <<"(um^2/s)\n"
-           <<"   HI Drag coefficient  zeta = 6*PI*mu*a = "<<drag_c <<" (N*s/um)\n"
-           <<"   ksi = sqrt(PI)/(3a)       =  " <<std::sqrt(PI)/(3. * Rb) << " (1/um)\n"
-           <<"   ------------> The characteristic variables:\n"
-           <<"   characteristic time          = " << tc <<" (s)\n"
-           <<"   characteristic velocity      = " << uc <<" (um/s)\n"
-           <<"   characteristic force         = " << fc <<" (N)\n"
-           <<"   characteristic electrostatic potential = " << phi0 <<  "uV\n"; 
-}// end read_physical_parameter()
-
+  cout << "\n ##########################################################\n"
+       << " #                  System Physical Parameters             \n"
+       << " ##########################################################\n\n"
+       << "   temperature           T   = " << T << "(K)\n"
+       << "   viscosity             mu  = " << viscosity << " (cP = N*s/um^2)\n"
+       << "   Energy unit           kBT = " << kBT << " (N*um = N*um)\n"
+       << "   Radius of the bead     a  = " << Rb << " (um)\n"
+       << "   bead diffusivity      Db  = " << Db << "(um^2/s)\n"
+       << "   HI Drag coefficient  zeta = 6*PI*mu*a = " << drag_c << " (N*s/um)\n"
+       << "   ksi = sqrt(PI)/(3a)       =  " << std::sqrt(PI) / (3. * Rb) <<
+    " (1/um)\n"
+       << "   ------------> The characteristic variables:\n"
+       << "   characteristic time          = " << tc << " (s)\n"
+       << "   characteristic velocity      = " << uc << " (um/s)\n"
+       << "   characteristic force         = " << fc << " (N)\n"
+       << "   characteristic electrostatic potential = " << phi0 <<  "uV\n";
+} // end read_physical_parameter()
 
 /*
  * Read Geometry infomation
@@ -161,184 +188,263 @@ void Copss::read_physical_info()
 void Copss::read_domain_info()
 {
   dim = input_file("dimension", 3);
-  //=============== wall type and wall params
+
+  // =============== wall type and wall params
   wall_type = input_file("wall_type", "not_defined");
-  if (wall_type == "slit" or wall_type == "sphere"){
+
+  if (wall_type == "slit" or wall_type == "sphere") {
     wall_params.resize(input_file.vector_variable_size(wall_type));
-    for (unsigned int j = 0; j < wall_params.size(); j++) wall_params[j] = input_file(wall_type,0.0,j);
+
+    for (unsigned int j = 0; j < wall_params.size();
+         j++) wall_params[j] = input_file(wall_type, 0.0, j);
   }
-  else{
-    std::cout << "*** Error: wall_type ("<< wall_type <<") is not supported !!! (in check_wall)" << std::endl;
-    libmesh_error();    
-  }
-  //=============== periodicity
-  periodicity.resize(input_file.vector_variable_size("periodicity"));
-  if(periodicity.size() != dim){
-    cout <<"Warning: periodicity has to be defined for all dimensions" << endl;
+  else {
+    std::cout << "*** Error: wall_type (" << wall_type <<
+      ") is not supported !!! (in check_wall)" << std::endl;
     libmesh_error();
   }
-  for (unsigned int i=0; i < periodicity.size(); i++){ periodicity[i] = input_file("periodicity", false, i); }
-  if(periodicity[0]==true and periodicity[1] == true and periodicity[2]==true){
-    error_msg = "warning: The box cannot be periodic on all directions at the same time. (required by FEM)";
+
+  // =============== periodicity
+  periodicity.resize(input_file.vector_variable_size("periodicity"));
+
+  if (periodicity.size() != dim) {
+    cout << "Warning: periodicity has to be defined for all dimensions" << endl;
+    libmesh_error();
+  }
+
+  for (unsigned int i = 0; i < periodicity.size();
+       i++) periodicity[i] = input_file("periodicity", false, i);
+
+  if (periodicity[0] == true and periodicity[1] == true and periodicity[2] ==
+      true) {
+    error_msg =
+      "warning: The box cannot be periodic on all directions at the same time. (required by FEM)";
     PMToolBox::output_message(error_msg, *comm_in);
     libmesh_error();
   }
-  //============== inlet 
+
+  // ============== inlet
   inlet.resize(input_file.vector_variable_size("inlet"));
-  if(inlet.size() != dim){
-    cout <<"Warning: inlet has to be defined for all dimensions" << endl;
+
+  if (inlet.size() != dim) {
+    cout << "Warning: inlet has to be defined for all dimensions" << endl;
     libmesh_error();
   }
-  for (unsigned int i=0; i < inlet.size(); i++){ 
-     inlet[i] = input_file("inlet", false, i);
-     if(inlet[i]==true and periodicity[i]==true) {
+
+  for (unsigned int i = 0; i < inlet.size(); i++) {
+    inlet[i] = input_file("inlet", false, i);
+
+    if (inlet[i] == true and periodicity[i] == true) {
       error_msg = "warning: A inlet direction has to be non-periodic";
       PMToolBox::output_message(error_msg, *comm_in);
       libmesh_error();
-     }
+    }
   }
-  //============== inlet pressure
-  inlet_pressure.resize(input_file.vector_variable_size("inlet_pressure"));
-  for (unsigned int i=0; i < inlet_pressure.size(); i++){ inlet_pressure[i] = input_file("inlet_pressure", 0, i); }
 
-  //============== shear or not on each boundary pair
+  // ============== inlet pressure
+  inlet_pressure.resize(input_file.vector_variable_size("inlet_pressure"));
+
+  for (unsigned int i = 0; i < inlet_pressure.size();
+       i++) inlet_pressure[i] = input_file("inlet_pressure", 0, i);
+
+  // ============== shear or not on each boundary pair
   shear.resize(input_file.vector_variable_size("shear"));
-  if(shear.size() != dim){
-     cout <<"Warning: shear has to be defined for all boundary pairs" << endl;
-     libmesh_error();
+
+  if (shear.size() != dim) {
+    cout << "Warning: shear has to be defined for all boundary pairs" << endl;
+    libmesh_error();
   }
-  for (unsigned int i=0; i < shear.size(); i++){
-     shear[i] = input_file("shear", false, i);
-     if(shear[i]==true and periodicity[i]==true) {
-       error_msg = "warning: A shear direction has to be non-periodic";
-       PMToolBox::output_message(error_msg, *comm_in);
-       libmesh_error();
-     }
+
+  for (unsigned int i = 0; i < shear.size(); i++) {
+    shear[i] = input_file("shear", false, i);
+
+    if (shear[i] == true and periodicity[i] == true) {
+      error_msg = "warning: A shear direction has to be non-periodic";
+      PMToolBox::output_message(error_msg, *comm_in);
+      libmesh_error();
+    }
   }
-  //=============== shear stress on each boundary
+
+  // =============== shear stress on each boundary
   shear_rate.resize(input_file.vector_variable_size("shear_rate"));
-  for (unsigned int i=0; i < shear_rate.size(); i++){ shear_rate[i] = input_file("shear_rate", 0.0, i); }
-  //=============== shear direction on each boundary
+
+  for (unsigned int i = 0; i < shear_rate.size(); i++) shear_rate[i] = input_file(
+      "shear_rate",
+      0.0,
+      i);
+
+  // =============== shear direction on each boundary
   shear_direction.resize(input_file.vector_variable_size("shear_direction"));
-  for (unsigned int i=0; i < shear_direction.size(); i++){ shear_direction[i] = input_file("shear_direction", 0, i); }
+
+  for (unsigned int i = 0; i < shear_direction.size();
+       i++) shear_direction[i] = input_file("shear_direction", 0, i);
 
   // Boundary conditions
-  boundary_id_dirichlet_poisson.resize(input_file.vector_variable_size("boundary_id_dirichlet_poisson"));
-  boundary_id_neumann_poisson.resize(input_file.vector_variable_size("boundary_id_neumann_poisson"));
-  boundary_value_dirichlet_poisson.resize(input_file.vector_variable_size("boundary_value_dirichlet_poisson"));
-  boundary_value_neumann_poisson.resize(input_file.vector_variable_size("boundary_value_neumann_poisson"));
-  if (boundary_id_dirichlet_poisson.size() != boundary_value_dirichlet_poisson.size()){
+  boundary_id_dirichlet_poisson.resize(input_file.vector_variable_size(
+                                         "boundary_id_dirichlet_poisson"));
+  boundary_id_neumann_poisson.resize(input_file.vector_variable_size(
+                                       "boundary_id_neumann_poisson"));
+  boundary_value_dirichlet_poisson.resize(input_file.vector_variable_size(
+                                            "boundary_value_dirichlet_poisson"));
+  boundary_value_neumann_poisson.resize(input_file.vector_variable_size(
+                                          "boundary_value_neumann_poisson"));
+
+  if (boundary_id_dirichlet_poisson.size() !=
+      boundary_value_dirichlet_poisson.size()) {
     err << "Error: size of 'boundary_id_dirichlet_poisson' does not match with "
-         << "'boundary_value_dirichlet_poisson'. Exiting ..." << endl;
+        << "'boundary_value_dirichlet_poisson'. Exiting ..." << endl;
     libmesh_error();
-  }
-  if (boundary_id_neumann_poisson.size() != boundary_value_neumann_poisson.size()){
-    err << "Error: size of 'boundary_id_neumann_poisson' does not match with "
-         << "'boundary_value_neumann_poisson'. Exiting ..." << endl;
-    libmesh_error();
-  }
-  for (unsigned int i=0; i < boundary_id_dirichlet_poisson.size(); i++){
-    boundary_id_dirichlet_poisson[i] = input_file("boundary_id_dirichlet_poisson", 0, i);
-  }
-  for (unsigned int i=0; i < boundary_id_neumann_poisson.size(); i++){
-    boundary_id_neumann_poisson[i] = input_file("boundary_id_neumann_poisson", 0, i);
-  }
-  for (unsigned int i=0; i < boundary_value_dirichlet_poisson.size(); i++){
-    boundary_value_dirichlet_poisson[i] = input_file("boundary_value_dirichlet_poisson", 0.0, i);
-  }
-  for (unsigned int i=0; i < boundary_value_neumann_poisson.size(); i++){
-    boundary_value_neumann_poisson[i] = input_file("boundary_value_neumann_poisson", 0.0, i);
   }
 
-  cout <<endl<< "##########################################################"<<endl
-       << "#                  Geometry information                   " <<endl
-       << "##########################################################"<<endl<<endl
+  if (boundary_id_neumann_poisson.size() !=
+      boundary_value_neumann_poisson.size()) {
+    err << "Error: size of 'boundary_id_neumann_poisson' does not match with "
+        << "'boundary_value_neumann_poisson'. Exiting ..." << endl;
+    libmesh_error();
+  }
+
+  for (unsigned int i = 0; i < boundary_id_dirichlet_poisson.size(); i++) {
+    boundary_id_dirichlet_poisson[i] = input_file("boundary_id_dirichlet_poisson",
+                                                  0,
+                                                  i);
+  }
+
+  for (unsigned int i = 0; i < boundary_id_neumann_poisson.size(); i++) {
+    boundary_id_neumann_poisson[i] = input_file("boundary_id_neumann_poisson",
+                                                0,
+                                                i);
+  }
+
+  for (unsigned int i = 0; i < boundary_value_dirichlet_poisson.size(); i++) {
+    boundary_value_dirichlet_poisson[i] = input_file(
+      "boundary_value_dirichlet_poisson",
+      0.0,
+      i);
+  }
+
+  for (unsigned int i = 0; i < boundary_value_neumann_poisson.size(); i++) {
+    boundary_value_neumann_poisson[i] = input_file(
+      "boundary_value_neumann_poisson",
+      0.0,
+      i);
+  }
+
+  cout << endl << "##########################################################" <<
+    endl
+       << "#                  Geometry information                   " << endl
+       << "##########################################################" << endl <<
+    endl
        << "-----------> Dimension: " << dim << endl
        << "-----------> Wall type: " << wall_type << endl;
   cout << "-----------> Wall size parameters: ";
-       for (int i = 0; i < wall_params.size(); ++i)
-       {
-         cout << wall_params[i] <<"   ";
-       }
-       cout << endl;
-  cout << "-----------> Periodicity of the box: ";
-  for (int i=0; i<dim; i++) cout << std::boolalpha <<periodicity[i] <<", ";
-  cout <<endl;
-  cout << "-----------> Inlet/Outlet of the box: ";
-  for (int i=0; i<dim; i++) cout << std::boolalpha << inlet[i] <<"(pressure = " <<inlet_pressure[i] <<" ), ";
-  cout <<endl;
-  cout << "-----------> shear on boundary pairs: ";
-  for (int i=0; i<dim; i++) cout << std::boolalpha << shear[i] <<"(shear_rate = " <<shear_rate[i] <<" ), ";
-  cout <<endl;
-  cout <<endl<< "##########################################################"<<endl
-       << "#                  Domain Mesh information                     " <<endl
-       << "##########################################################"<<endl<<endl;
-  generate_mesh = input_file("generate_mesh", true); 
-  if (generate_mesh){
-    n_mesh.resize(input_file.vector_variable_size("n_mesh"));
-    for (unsigned int i=0; i < n_mesh.size(); i++){ n_mesh[i] = input_file("n_mesh", 1, i); }
-    cout << "------------> Generate Mesh using COPSS: n_mesh = " << n_mesh[0] <<";" << n_mesh[1] <<";" << n_mesh[2] << endl;
+
+  for (int i = 0; i < wall_params.size(); ++i)
+  {
+    cout << wall_params[i] << "   ";
   }
-  else{
-    domain_mesh_file = input_file("domain_mesh_file" , "nothing");
-    cout <<"------------> Load mesh file from "<< domain_mesh_file.c_str() << endl;
+  cout << endl;
+  cout << "-----------> Periodicity of the box: ";
+
+  for (int i = 0; i < dim; i++) cout << std::boolalpha << periodicity[i] << ", ";
+  cout << endl;
+  cout << "-----------> Inlet/Outlet of the box: ";
+
+  for (int i = 0; i < dim;
+       i++) cout << std::boolalpha << inlet[i] << "(pressure = " <<
+      inlet_pressure[i] << " ), ";
+  cout << endl;
+  cout << "-----------> shear on boundary pairs: ";
+
+  for (int i = 0; i < dim;
+       i++) cout << std::boolalpha << shear[i] << "(shear_rate = " <<
+      shear_rate[i] << " ), ";
+  cout << endl;
+  cout << endl << "##########################################################" <<
+    endl
+       << "#                  Domain Mesh information                     " <<
+    endl
+       << "##########################################################" << endl <<
+    endl;
+  generate_mesh = input_file("generate_mesh", true);
+
+  if (generate_mesh) {
+    n_mesh.resize(input_file.vector_variable_size("n_mesh"));
+
+    for (unsigned int i = 0; i < n_mesh.size(); i++) n_mesh[i] = input_file(
+        "n_mesh",
+        1,
+        i);
+    cout << "------------> Generate Mesh using COPSS: n_mesh = " << n_mesh[0] <<
+      ";" << n_mesh[1] << ";" << n_mesh[2] << endl;
+  }
+  else {
+    domain_mesh_file = input_file("domain_mesh_file", "nothing");
+    cout << "------------> Load mesh file from " << domain_mesh_file.c_str() <<
+      endl;
   } // end else
-} // end read_domain_info()
+}   // end read_domain_info()
 
 /*
  * read force types
  */
-void Copss::read_force_info(){
+void Copss::read_force_info() {
   // read particle-particle force types
   numForceTypes = input_file.vector_variable_size("force_field");
   forceTypes.resize(numForceTypes);
   forces.resize(numForceTypes);
-  for (unsigned int i=0; i < numForceTypes; i++){    
+
+  for (unsigned int i = 0; i < numForceTypes; i++) {
     forceTypes[i] = input_file("force_field", "nothing", i);
     std::vector<Real> params(input_file.vector_variable_size(forceTypes[i]));
-    if(forceTypes[i] != "nothing"){
-      for (unsigned int j = 0; j < params.size(); j++){
-        params[j] = input_file(forceTypes[i],0.0,j);
+
+    if (forceTypes[i] != "nothing") {
+      for (unsigned int j = 0; j < params.size(); j++) {
+        params[j] = input_file(forceTypes[i], 0.0, j);
       }
     }
-    forces[i].first = forceTypes[i];
+    forces[i].first  = forceTypes[i];
     forces[i].second = params;
   }
 
-  cout <<endl<< "##########################################################"<<endl
-       << "#    Force field (fixes)                " <<endl
-       << "##########################################################"<<endl<<endl;
-  for (int i = 0; i < numForceTypes; i++){
+  cout << endl << "##########################################################" <<
+    endl
+       << "#    Force field (fixes)                " << endl
+       << "##########################################################" << endl <<
+    endl;
+
+  for (int i = 0; i < numForceTypes; i++) {
     cout << "-----------> ";
-    cout << forces[i].first <<"= '";
-    for (int j = 0; j < forces[i].second.size(); j++){
-      cout << forces[i].second[j] <<"  ";
+    cout << forces[i].first << "= '";
+
+    for (int j = 0; j < forces[i].second.size(); j++) {
+      cout << forces[i].second[j] << "  ";
     }
-    cout << "'" <<endl;
+    cout << "'" << endl;
   }
 } // end read_force_info()
 
 /*
  * read Solvers
  */
-void Copss::read_solver_info(){
+void Copss::read_solver_info() {
   max_linear_iterations = input_file("max_linear_iterations", 100);
-  linear_solver_rtol   = input_file("linear_solver_rtol", 1E-6);
-  linear_solver_atol   = input_file("linear_solver_atol", 1E-6);
-  user_defined_pc      = input_file("user_defined_pc", true);
-  schur_user_ksp       = input_file("schur_user_ksp", false);
-  schur_user_ksp_rtol  = input_file("schur_user_ksp_rtol", 1E-6);
-  schur_user_ksp_atol  = input_file("schur_user_ksp_atol", 1E-6);
-  schur_pc_type = input_file("schur_pc_type", "SMp");
+  linear_solver_rtol    = input_file("linear_solver_rtol", 1E-6);
+  linear_solver_atol    = input_file("linear_solver_atol", 1E-6);
+  user_defined_pc       = input_file("user_defined_pc", true);
+  schur_user_ksp        = input_file("schur_user_ksp", false);
+  schur_user_ksp_rtol   = input_file("schur_user_ksp_rtol", 1E-6);
+  schur_user_ksp_atol   = input_file("schur_user_ksp_atol", 1E-6);
+  schur_pc_type         = input_file("schur_pc_type", "SMp");
 
   solver_stokes = input_file("solver_stokes", "superLU_dist");
-  if(solver_stokes=="superLU_dist") {
+
+  if (solver_stokes == "superLU_dist") {
     solver_type_stokes = superLU_dist;
-    user_defined_pc = false;
+    user_defined_pc    = false;
   }
-  else if(solver_stokes=="field_split") {
+  else if (solver_stokes == "field_split") {
     solver_type_stokes = field_split;
-    user_defined_pc = true;
+    user_defined_pc    = true;
   }
   else {
     solver_type_stokes = user_define;
@@ -346,1111 +452,1657 @@ void Copss::read_solver_info(){
 
   module_poisson = input_file("module_poisson", false);
   solver_poisson = input_file("solver_poisson", "superLU_dist");
-  if(solver_poisson=="superLU_dist") {
+
+  if (solver_poisson == "superLU_dist") {
     solver_type_poisson = superLU_dist;
-    user_defined_pc = false;
+    user_defined_pc     = false;
   }
-  else if(solver_poisson=="field_split") {
+  else if (solver_poisson == "field_split") {
     solver_type_poisson = field_split;
-    user_defined_pc = false;
+    user_defined_pc     = false;
   }
   else {
     solver_type_poisson = user_define;
   }
 
-  cout <<endl<< "##########################################################"<<endl
-       << "#                 Solver information                      " <<endl
-       << "##########################################################"<<endl<<endl;
-  cout << "-----------> Stokes solver type = " << solver_stokes <<endl;
-  if (solver_stokes=="field_split"){
-    cout<<"-----------> FieldSplit Schur Complement Reduction Solver"<<endl;
-    cout<<"-----------> schur_pc_type = " << schur_pc_type << endl;
-    if(schur_user_ksp){
-      cout<<"----------->  user defined KSP is used for Schur Complement!"<< endl;
-      cout<<"----------->  KSP rel tolerance for Schur Complement solver is = " << schur_user_ksp_rtol <<endl;
-      cout<<"----------->  KSP abs tolerance for Schur Complement solver is = " << schur_user_ksp_atol <<endl;
+  cout << endl << "##########################################################" <<
+    endl
+       << "#                 Solver information                      " << endl
+       << "##########################################################" << endl <<
+    endl;
+  cout << "-----------> Stokes solver type = " << solver_stokes << endl;
+
+  if (solver_stokes == "field_split") {
+    cout << "-----------> FieldSplit Schur Complement Reduction Solver" << endl;
+    cout << "-----------> schur_pc_type = " << schur_pc_type << endl;
+
+    if (schur_user_ksp) {
+      cout << "----------->  user defined KSP is used for Schur Complement!" <<
+        endl;
+      cout <<
+        "----------->  KSP rel tolerance for Schur Complement solver is = " <<
+        schur_user_ksp_rtol << endl;
+      cout <<
+        "----------->  KSP abs tolerance for Schur Complement solver is = " <<
+        schur_user_ksp_atol << endl;
     }
   }
 
-  if (module_poisson == true) cout << "-----------> Poisson solver type = " << solver_poisson <<endl;
-}// end read_solver_info()
+  if (module_poisson ==
+      true) cout << "-----------> Poisson solver type = " << solver_poisson <<
+      endl;
+} // end read_solver_info()
 
 /*
  * read Chebyshev info
  */
-void Copss::read_chebyshev_info(){
-  with_hi        = input_file("with_hi", false);
-  with_brownian  = input_file("with_brownian", false);
-  restart       = input_file("restart", false); 
+void Copss::read_chebyshev_info() {
+  with_hi       = input_file("with_hi", false);
+  with_brownian = input_file("with_brownian", false);
+  restart       = input_file("restart", false);
   compute_eigen = input_file("compute_eigen", false);
-  eig_min = 0.;
-  eig_max = 0.;
-  if(with_hi and with_brownian and restart and !compute_eigen){
-    read_eigen = true;  
-    this -> read_restart_eigenvalue();
+  eig_min       = 0.;
+  eig_max       = 0.;
+
+  if (with_hi and with_brownian and restart and !compute_eigen) {
+    read_eigen = true;
+    this->read_restart_eigenvalue();
   }
   max_n_cheb = input_file("max_n_cheb", 10);
-  tol_cheb = input_file("tol_cheb", 0.1);
+  tol_cheb   = input_file("tol_cheb", 0.1);
   eig_factor = input_file("eig_factor", 1.05);
-  tol_eigen = input_file("tol_eigen", 0.01);
-  if(with_brownian and with_hi){
-    cout <<endl<< "##########################################################"<<endl
-         << "#   Chebyshev information (only for brownian System)            " <<endl
-         << "##########################################################"<<endl<<endl;  
-    cout << "-----------> compute eigen values  = " <<std::boolalpha << compute_eigen <<endl;
-    cout << "-----------> max number of chebyshev polynomial = " <<max_n_cheb <<endl;
-    cout << "-----------> tolerance of chebyshev polynomial = " <<tol_cheb <<endl;
-    cout << "-----------> factor of eigenvalues range = " <<eig_factor <<endl;
-    cout << "-----------> tolerance of eigenvalues convergence = " <<tol_eigen <<endl;
-    if (read_eigen){
-      cout << "-----------> read eigen value range from 'out.eigenvalue = '"<<std::boolalpha<<read_eigen << endl
-           << "-----------> initial eigen value range = ( " << eig_min << ", " << eig_max << " )" << endl;
+  tol_eigen  = input_file("tol_eigen", 0.01);
+
+  if (with_brownian and with_hi) {
+    cout << endl <<
+      "##########################################################" << endl
+         << "#   Chebyshev information (only for brownian System)            " <<
+      endl
+         << "##########################################################" <<
+      endl << endl;
+    cout << "-----------> compute eigen values  = " << std::boolalpha <<
+      compute_eigen << endl;
+    cout << "-----------> max number of chebyshev polynomial = " << max_n_cheb <<
+      endl;
+    cout << "-----------> tolerance of chebyshev polynomial = " << tol_cheb <<
+      endl;
+    cout << "-----------> factor of eigenvalues range = " << eig_factor << endl;
+    cout << "-----------> tolerance of eigenvalues convergence = " << tol_eigen <<
+      endl;
+
+    if (read_eigen) {
+      cout << "-----------> read eigen value range from 'out.eigenvalue = '" <<
+        std::boolalpha << read_eigen << endl
+           << "-----------> initial eigen value range = ( " << eig_min << ", " <<
+        eig_max << " )" << endl;
     }
   }
-  // build elem-particle neighbor list if either with_hi or module_poisson is true
+
+  // build elem-particle neighbor list if either with_hi or module_poisson is
+  // true
   build_elem_neighbor_list = ((with_hi || module_poisson) == true) ? true : false;
 } // end read_chebyshev_info()
 
-
 /*
- * read run time info 
+ * read run time info
  */
-void Copss::read_run_info(){
-  //############## Without Brownian ###############################
-  // For polymer_chain and bead: maximum displacement (non dimensional) of one step = 0.1 * fluid mesh size minimum (hmin)
-  //############## With Brownian ##################################
-  // For polymer_chain: maximum displacement (non dimensional) of one step = 0.1 * Ss2/Rb/Rb
+void Copss::read_run_info() {
+  // ############## Without Brownian ###############################
+  // For polymer_chain and bead: maximum displacement (non dimensional) of one
+  // step = 0.1 * fluid mesh size minimum (hmin)
+  // ############## With Brownian ##################################
+  // For polymer_chain: maximum displacement (non dimensional) of one step = 0.1
+  // * Ss2/Rb/Rb
   // For bead: maximum displacement (non_dimensional) of one step = 0.1
-  if(with_brownian){
-    random_seed   = input_file("random_seed",111);
+  if (with_brownian) {
+    random_seed = input_file("random_seed", 111);
   }
   max_dr_coeff.resize(input_file.vector_variable_size("max_dr_coeff"));
-  if (max_dr_coeff.size()==3){
-   for (unsigned int i=0; i<max_dr_coeff.size();i++){
-     max_dr_coeff[i] = input_file("max_dr_coeff", 0.1, i);
-   }
+
+  if (max_dr_coeff.size() == 3) {
+    for (unsigned int i = 0; i < max_dr_coeff.size(); i++) {
+      max_dr_coeff[i] = input_file("max_dr_coeff", 0.1, i);
+    }
   }
-  else{
-     cout << "max_dr_coeff needs three parameters: t_milestone, max_dr_coeff before milestone, max_dr_coeff after milestone" <<endl;
-     libmesh_error();
+  else {
+    cout <<
+      "max_dr_coeff needs three parameters: t_milestone, max_dr_coeff before milestone, max_dr_coeff after milestone"
+         << endl;
+    libmesh_error();
   }
-  adaptive_dt    = input_file("adaptive_dt", true);  
-  if (restart){
+  adaptive_dt = input_file("adaptive_dt", true);
+
+  if (restart) {
     this->read_restart_time();
     istart = restart_step;
   }
-  else{
+  else {
     restart_step = -1;
-    istart = 0;
-    o_step = 0;
-    real_time = 0.;
+    istart       = 0;
+    o_step       = 0;
+    real_time    = 0.;
   }
+
   // neighbor list update
-  neighbor_list_update_flag = true; // set this to be ture before simulation
-  update_neighbor_list_everyStep = input_file("update_neighbor_list_everyStep", true);
-  // total number of steps 
+  neighbor_list_update_flag      = true; // set this to be ture before
+                                         // simulation
+  update_neighbor_list_everyStep = input_file("update_neighbor_list_everyStep",
+                                              true);
+
+  // total number of steps
   nstep = input_file("nstep", 1);
-  // free-draining steps when Chebysheve cannot converge even when eigenvalue is recomputed
+
+  // free-draining steps when Chebysheve cannot converge even when eigenvalue is
+  // recomputed
   n_relax_step = input_file("n_relax_step", 10);
+
   // write interval
   write_interval = input_file("write_interval", 1);
-  //output file flags
+
+  // output file flags
   output_file.resize(input_file.vector_variable_size("output_file"));
-  for (unsigned int i=0; i < output_file.size(); i++){
-    output_file[i] = input_file("output_file","not defined", i);
+
+  for (unsigned int i = 0; i < output_file.size(); i++) {
+    output_file[i] = input_file("output_file", "not defined", i);
   }
+
   // debug info
-  debug_info   = input_file("debug_info", false);
+  debug_info = input_file("debug_info", false);
+
   // write to screen
-  cout <<"\n##########################################################\n"
+  cout << "\n##########################################################\n"
        << "#                 Run information                      \n"
        << "##########################################################\n\n"
        << "-----------> adaptive_dt: " << std::boolalpha << adaptive_dt << endl
-       << "-----------> simulation milestone t_milestone = "<<max_dr_coeff[0]<<endl
-       << "-----------> before t_milestone, max_dr_coeff = "<<max_dr_coeff[1]<<"; after milestone, max_dr_coeff = "<<max_dr_coeff[2] << endl
-       << "-----------> debug_info: " << std::boolalpha << debug_info << endl; 
-  cout << "-----------> with_hi: "  <<std::boolalpha << with_hi <<endl;
-  if (with_brownian){
-	 cout << "-----------> with_brownian: " <<std::boolalpha<<with_brownian <<endl
-        << "-----------> random seed: " <<random_seed <<endl;
+       << "-----------> simulation milestone t_milestone = " << max_dr_coeff[0] <<
+    endl
+       << "-----------> before t_milestone, max_dr_coeff = " << max_dr_coeff[1] <<
+    "; after milestone, max_dr_coeff = " << max_dr_coeff[2] << endl
+       << "-----------> debug_info: " << std::boolalpha << debug_info << endl;
+  cout << "-----------> with_hi: "  << std::boolalpha << with_hi << endl;
+
+  if (with_brownian) {
+    cout << "-----------> with_brownian: " << std::boolalpha << with_brownian <<
+      endl
+         << "-----------> random seed: " << random_seed << endl;
   }
-  cout << "-----------> Restart mode: "<<std::boolalpha << restart <<endl;
-  if(restart){
-   cout <<"-----------> Restart step: "<<restart_step << endl;
-   cout <<"-----------> Restart from real_time: "<<real_time <<endl;
-   cout <<"-----------> Restart particle data read from o_step: " << o_step << endl;
+  cout << "-----------> Restart mode: " << std::boolalpha << restart << endl;
+
+  if (restart) {
+    cout << "-----------> Restart step: " << restart_step << endl;
+    cout << "-----------> Restart from real_time: " << real_time << endl;
+    cout << "-----------> Restart particle data read from o_step: " << o_step <<
+      endl;
   }
-  cout << "-----------> nstep: " <<nstep <<endl
+  cout << "-----------> nstep: " << nstep << endl
        << "-----------> write_interval: " << write_interval << endl
        << "-----------> write output file: " << endl;
-  for(int i = 0; i < output_file.size(); i++){
+
+  for (int i = 0; i < output_file.size(); i++) {
     cout << "                               " << output_file[i] << endl;
   }
 } // end read_run_info()
 
-//============================================================================
+// ============================================================================
 void Copss::read_restart_time()
 {
   // Open the local file and check the existance
-  std::cout <<"\n###Read time output: out.time"<<std::endl;
+  std::cout << "\n###Read time output: out.time" << std::endl;
   std::ifstream fin;
-  fin.open ("out.time", std::ios_base::ate);
+
+  fin.open("out.time", std::ios_base::ate);
   char c = '\0';
-  if( fin.is_open() ){
+
+  if (fin.is_open()) {
     const unsigned int length = fin.tellg();
-    cout << "length = " << length <<endl;
-    for (int i = length-2; i>0;i--){
+    cout << "length = " << length << endl;
+
+    for (int i = length - 2; i > 0; i--) {
       fin.seekg(i);
       c = fin.get();
-      if(c=='\r' || c=='\n') // new line?
+
+      if ((c == '\r') || (c == '\n')) // new line?
         break;
     }
     fin >> restart_step >> o_step >> real_time;
     fin.close();
   } // end if
-  else{
+  else {
     printf("***warning: read_restart_time can NOT read the time output: out.time");
     libmesh_error();
   }
 }
 
-//============================================================================
+// ============================================================================
 void Copss::read_restart_eigenvalue()
 {
-  //Open the local file and check the existance
-  std::cout <<"\n###Read eigenvalue from previous simulation to restart: out.eigenvalue" << std::endl;
+  // Open the local file and check the existance
+  std::cout <<
+    "\n###Read eigenvalue from previous simulation to restart: out.eigenvalue" <<
+    std::endl;
   std::ifstream fin;
-  fin.open ("out.eigenvalue", std::ios_base::ate);
+
+  fin.open("out.eigenvalue", std::ios_base::ate);
   std::string tmp;
   char c = '\0';
-  if( fin.is_open() ){
+
+  if (fin.is_open()) {
     const unsigned int length = fin.tellg();
-    cout << "length = " << length <<endl;
-    for (int i = length-2; i>0;i--){
+    cout << "length = " << length << endl;
+
+    for (int i = length - 2; i > 0; i--) {
       fin.seekg(i);
       c = fin.get();
-      if(c=='\r' || c=='\n') // new line?
+
+      if ((c == '\r') || (c == '\n')) // new line?
         break;
     }
     fin >> eig_min >> eig_max;
     fin.close();
   } // end if
-  else{
-    printf("***warning: read_restart_eigenvalue() can NOT read the time output: out.eigenvalue");
+  else {
+    printf(
+      "***warning: read_restart_eigenvalue() can NOT read the time output: out.eigenvalue");
     libmesh_error();
-  }  
+  }
 }
 
-//============================================================================
+// ============================================================================
 void Copss::create_domain_mesh()
 {
-  if(dim == 2) {
-    error_msg = "Copss::create_mesh() only works for 3D systems; 2D simulation needs extra implementation";
+  if (dim == 2) {
+    error_msg =
+      "Copss::create_mesh() only works for 3D systems; 2D simulation needs extra implementation";
     PMToolBox::output_message(error_msg, *comm_in);
     libmesh_error();
   }
   mesh = new SerialMesh(*comm_in);
-  //mesh = std::unique_ptr<SerialMesh> (new SerialMesh (*comm_in));
-  if(generate_mesh){
-    if (wall_type == "slit"){      
-        const Real meshsize_x   = (wall_params[1] - wall_params[0])/Real( n_mesh[0] );
-        const Real meshsize_y   = (wall_params[3] - wall_params[2])/Real( n_mesh[1] );
-        const Real meshsize_z   = (wall_params[5] - wall_params[4])/Real( n_mesh[2] );
-//        cout << "mesh_size = " <<meshsize_x  << "; "<<meshsize_y << "; "<<meshsize_z << endl;      
-        hminf  = std::min(meshsize_x, meshsize_y);
-        hminf  = std::min(hminf, meshsize_z);
-        hmaxf  = std::max(meshsize_x, meshsize_y);
-        hmaxf  = std::max(hmaxf, meshsize_z);
-        cout<<"\n##########################################################\n"
-            <<"#                 The created mesh information              \n"
-            << "########################################################## \n\n"
-            << "   nx_mesh = " << n_mesh[0] <<", Lx = " << wall_params[1]-wall_params[0] <<", hx = "<< meshsize_x <<endl
-            << "   ny_mesh = " << n_mesh[1] <<", Ly = " << wall_params[3]-wall_params[2] <<", hy = "<< meshsize_y <<endl
-            << "   nz_mesh = " << n_mesh[2] <<", Lz = " << wall_params[5]-wall_params[4] <<", hz = "<< meshsize_z <<endl
-            << "   minimum mesh size of fluid: hminf = " << hminf << endl
-            << "   maximum mesh size of fluid: hmaxf = " << hmaxf <<endl;
-     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     * Create a mesh, distributed across the default MPI communicator.
-     * We build a mesh with Quad9(8) elements for 2D and HEX27(20) element for 3D
-    / - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-        if(dim==2)
-        {
-        MeshTools::Generation::build_square (*mesh, n_mesh[0], n_mesh[1],
-                                           wall_params[0], wall_params[1], wall_params[2], wall_params[3], QUAD8);        // QUAD8/9
-        }else{
-          MeshTools::Generation::build_cube (*mesh, n_mesh[0], n_mesh[1], n_mesh[2],
-                                            wall_params[0], wall_params[1], wall_params[2], wall_params[3], wall_params[4], wall_params[5], HEX20);  // HEX20/27
-        }
+
+  // mesh = std::unique_ptr<SerialMesh> (new SerialMesh (*comm_in));
+  if (generate_mesh) {
+    if (wall_type == "slit") {
+      const Real meshsize_x = (wall_params[1] - wall_params[0]) / Real(n_mesh[0]);
+      const Real meshsize_y = (wall_params[3] - wall_params[2]) / Real(n_mesh[1]);
+      const Real meshsize_z = (wall_params[5] - wall_params[4]) / Real(n_mesh[2]);
+
+      //        cout << "mesh_size = " <<meshsize_x  << "; "<<meshsize_y << ";
+      // "<<meshsize_z << endl;
+      hminf = std::min(meshsize_x, meshsize_y);
+      hminf = std::min(hminf, meshsize_z);
+      hmaxf = std::max(meshsize_x, meshsize_y);
+      hmaxf = std::max(hmaxf, meshsize_z);
+      cout << "\n##########################################################\n"
+           << "#                 The created mesh information              \n"
+           << "########################################################## \n\n"
+           << "   nx_mesh = " << n_mesh[0] << ", Lx = " << wall_params[1] -
+        wall_params[0] << ", hx = " << meshsize_x << endl
+           << "   ny_mesh = " << n_mesh[1] << ", Ly = " << wall_params[3] -
+        wall_params[2] << ", hy = " << meshsize_y << endl
+           << "   nz_mesh = " << n_mesh[2] << ", Lz = " << wall_params[5] -
+        wall_params[4] << ", hz = " << meshsize_z << endl
+           << "   minimum mesh size of fluid: hminf = " << hminf << endl
+           << "   maximum mesh size of fluid: hmaxf = " << hmaxf << endl;
+
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+         - - -
+       * Create a mesh, distributed across the default MPI communicator.
+       * We build a mesh with Quad9(8) elements for 2D and HEX27(20) element for
+       *3D
+         / - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+          *- - - - */
+      if (dim == 2)
+      {
+        MeshTools::Generation::build_square(*mesh,
+                                            n_mesh[0],
+                                            n_mesh[1],
+                                            wall_params[0],
+                                            wall_params[1],
+                                            wall_params[2],
+                                            wall_params[3],
+                                            QUAD8); // QUAD8/9
+      } else {
+        MeshTools::Generation::build_cube(*mesh,
+                                          n_mesh[0],
+                                          n_mesh[1],
+                                          n_mesh[2],
+                                          wall_params[0],
+                                          wall_params[1],
+                                          wall_params[2],
+                                          wall_params[3],
+                                          wall_params[4],
+                                          wall_params[5],
+                                          HEX20); // HEX20/27
+      }
     } // end wall_type = "slit"
-    else if (wall_type == "sphere"){
-      cout << "create_domain_mesh () does not support sphere mesh so far ! " << endl;
-      libmesh_error (); 
-    }
-  }// end if (generate_mesh)
-  else{
-    if(domain_mesh_file != "nothing"){
-          mesh->read(domain_mesh_file);    
-          mesh->all_second_order();
-          mesh->prepare_for_use();
-          const std::vector<Real> mesh_size = PMToolBox::mesh_size(*mesh);
-          hminf = mesh_size[0];
-          hmaxf = mesh_size[1];
-          cout <<endl<< "##########################################################"<<endl
-           << "#                 The Read-in mesh information                      " <<endl
-           << "##########################################################"<<endl<<endl;
-            cout << "   minimum mesh size of fluid: hminf = " << hminf << endl;
-            cout << "   maximum mesh size of fliud: hmaxf = " << hmaxf << endl;
-          }
-    else{
-        cout <<"**************************************warning***********************************"<<endl;
-        cout << "domain_mesh_file has to be specified" << endl;
-        cout <<"********************************************************************************"<<endl;    
-        libmesh_error();
-    } 
-  } // end else (generate mesh)
-
-  search_radius_p = 4./alpha; 
-  search_radius_e = 0.5*hmaxf + 4./alpha;
-  // print mesh info
-  mesh -> print_info();
-} // end function
-
-//============================================================================
-void Copss::create_periodic_boundary(){
-  if (wall_type == "slit"){
-    const Point bbox_pmin(wall_params[0], wall_params[2], wall_params[4]);
-    const Point bbox_pmax(wall_params[1], wall_params[3], wall_params[5]);
-    // construct PMPeriodicBoundary class using info above  
-    pm_periodic_boundary = new PMPeriodicBoundary(bbox_pmin, bbox_pmax, periodicity, inlet, inlet_pressure);
-  }
-  else if (wall_type == "sphere"){
-    // check: No PBC, No inlet/outlet
-    bool error_flag = false;
-    for (int i=0; i<dim; i++){
-      if(periodicity[i] or inlet[i] or shear[i]) error_flag = true;
-    }
-    if (error_flag){
-      cout << "spherical domain cannot have PBC or inlet/outlet, check control file" << endl;
+    else if (wall_type == "sphere") {
+      cout << "create_domain_mesh () does not support sphere mesh so far ! " <<
+        endl;
       libmesh_error();
     }
-    cout << "spherical domain cannot have PBC, but we need to create a PBC object using a non-existed cubic box to keep COPSS running !" << endl; 
-    const Point bbox_pmin(-Real(wall_params[0]/2.),-Real(wall_params[0]/2.),-Real(wall_params[0]/2.));
-    const Point bbox_pmax(Real(wall_params[0]/2.),Real(wall_params[0]/2.),Real(wall_params[0]/2.));
-    // construct PMPeriodicBoundary class using info above  
-    pm_periodic_boundary = new PMPeriodicBoundary(bbox_pmin, bbox_pmax, periodicity, inlet, inlet_pressure);    
+  } // end if (generate_mesh)
+  else {
+    if (domain_mesh_file != "nothing") {
+      mesh->read(domain_mesh_file);
+      mesh->all_second_order();
+      mesh->prepare_for_use();
+      const std::vector<Real> mesh_size = PMToolBox::mesh_size(*mesh);
+      hminf = mesh_size[0];
+      hmaxf = mesh_size[1];
+      cout << endl <<
+        "##########################################################" << endl
+           <<
+        "#                 The Read-in mesh information                      " <<
+        endl
+           << "##########################################################" <<
+        endl << endl;
+      cout << "   minimum mesh size of fluid: hminf = " << hminf << endl;
+      cout << "   maximum mesh size of fliud: hmaxf = " << hmaxf << endl;
+    }
+    else {
+      cout <<
+        "**************************************warning***********************************"
+           << endl;
+      cout << "domain_mesh_file has to be specified" << endl;
+      cout <<
+        "********************************************************************************"
+           << endl;
+      libmesh_error();
+    }
+  } // end else (generate mesh)
+
+  search_radius_p = 4. / alpha;
+  search_radius_e = 0.5 * hmaxf + 4. / alpha;
+
+  // print mesh info
+  mesh->print_info();
+} // end function
+
+// ============================================================================
+void Copss::create_periodic_boundary() {
+  if (wall_type == "slit") {
+    const Point bbox_pmin(wall_params[0], wall_params[2], wall_params[4]);
+    const Point bbox_pmax(wall_params[1], wall_params[3], wall_params[5]);
+
+    // construct PMPeriodicBoundary class using info above
+    pm_periodic_boundary = new PMPeriodicBoundary(bbox_pmin,
+                                                  bbox_pmax,
+                                                  periodicity,
+                                                  inlet,
+                                                  inlet_pressure);
   }
-  else{
-    cout << "COPSS::create_periodic_boundary() only support 'slit' or 'sphere' wall_type for now !" << endl;
+  else if (wall_type == "sphere") {
+    // check: No PBC, No inlet/outlet
+    bool error_flag = false;
+
+    for (int i = 0; i < dim; i++) {
+      if (periodicity[i] or inlet[i] or shear[i]) error_flag = true;
+    }
+
+    if (error_flag) {
+      cout <<
+        "spherical domain cannot have PBC or inlet/outlet, check control file" <<
+        endl;
+      libmesh_error();
+    }
+    cout <<
+      "spherical domain cannot have PBC, but we need to create a PBC object using a non-existed cubic box to keep COPSS running !"
+         << endl;
+    const Point bbox_pmin(-Real(wall_params[0] / 2.),
+                          -Real(wall_params[0] / 2.),
+                          -Real(wall_params[0] / 2.));
+    const Point bbox_pmax(Real(wall_params[0] / 2.),
+                          Real(wall_params[0] / 2.),
+                          Real(wall_params[0] / 2.));
+
+    // construct PMPeriodicBoundary class using info above
+    pm_periodic_boundary = new PMPeriodicBoundary(bbox_pmin,
+                                                  bbox_pmax,
+                                                  periodicity,
+                                                  inlet,
+                                                  inlet_pressure);
+  }
+  else {
+    cout <<
+      "COPSS::create_periodic_boundary() only support 'slit' or 'sphere' wall_type for now !"
+         << endl;
   }
 } // end function
 
-
-//=============================================================================
+// =============================================================================
 EquationSystems Copss::create_equation_systems()
 {
   // Initialize equation_systems object using the 'mesh' we created before
-  //equation_systems = new EquationSystems(*mesh);
-  cout << "==>(1/8) Initialize equation_systems object using the 'mesh' we created before" <<endl;
+  // equation_systems = new EquationSystems(*mesh);
+  cout <<
+    "==>(1/8) Initialize equation_systems object using the 'mesh' we created before"
+       << endl;
   EquationSystems equation_systems(*mesh);
+
   // Add 'Stokes' system (of PMSystemStokes) to the 'equation_systems'
-  cout << "==>(2/8) Add 'Stokes' system (of PMSystemStokes) to the 'equation_systems'" <<endl;
-  PMSystemStokes& system = equation_systems.add_system<PMSystemStokes> ("Stokes");
-  cout << "==>(3/8) Add variables to 'Stokes' system" <<endl;
-  //Add variables to 'Stokes' system"
-  u_var = system.add_variable ("u", SECOND);
-  v_var = system.add_variable ("v", SECOND);
-  if(dim==3)  w_var  = system.add_variable ("w", SECOND);
-  const unsigned int p_var = system.add_variable ("p", FIRST);
+  cout <<
+    "==>(2/8) Add 'Stokes' system (of PMSystemStokes) to the 'equation_systems'"
+       << endl;
+  PMSystemStokes& system = equation_systems.add_system<PMSystemStokes>("Stokes");
+  cout << "==>(3/8) Add variables to 'Stokes' system" << endl;
+
+  // Add variables to 'Stokes' system"
+  u_var = system.add_variable("u", SECOND);
+  v_var = system.add_variable("v", SECOND);
+
+  if (dim == 3) w_var = system.add_variable("w", SECOND);
+  const unsigned int p_var = system.add_variable("p", FIRST);
 
   // attach object_mesh to pm_linear_implicit_system
-  cout << "==>(4/8) Attach object_mesh to the system" <<endl;  
+  cout << "==>(4/8) Attach object_mesh to the system" << endl;
   this->attach_object_mesh(system);
 
   // attach period boudary to pm_linear_implicit_system
-  cout<<"==>(5/8) Add period boundary conditions to 'Stokes' system"<<endl;
+  cout << "==>(5/8) Add period boundary conditions to 'Stokes' system" << endl;
   this->attach_period_boundary(system);
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Initialize the Preconditioning matrix for saddle point problems if required.
-   Initialize the equation system and zero the preconditioning matrix
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if( user_defined_pc ){
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    -
+     Initialize the Preconditioning matrix for saddle point problems if
+       required.
+     Initialize the equation system and zero the preconditioning matrix
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       - */
+  if (user_defined_pc) {
     system.add_matrix("Preconditioner");
   }
 
   // Poisson equation
-  if(module_poisson == true){
-    PMSystemPoisson& system_poisson = equation_systems.add_system<PMSystemPoisson> ("Poisson");
-    phi_var = system_poisson.add_variable ("phi", SECOND);
+  if (module_poisson == true) {
+    PMSystemPoisson& system_poisson =
+      equation_systems.add_system<PMSystemPoisson>("Poisson");
+    phi_var = system_poisson.add_variable("phi", SECOND);
+
     // Attach point_mesh to PMSystemPoisson
     this->attach_object_mesh(system_poisson);
     this->attach_period_boundary(system_poisson);
   }
 
   /* Initialize the data structures for the equation system. */
-  cout<<"==>(6/8) Init equation_systems (libmesh function, to init all systems in equation_systems)"<<endl;
+  cout <<
+    "==>(6/8) Init equation_systems (libmesh function, to init all systems in equation_systems)"
+       << endl;
   equation_systems.init();
+
   // zero the PC matrix, which MUST be done after es.init()
-  if( user_defined_pc ) {
-    cout<<"==> (If user_defined_pc) Zero preconditioner matrix"<<endl;
+  if (user_defined_pc) {
+    cout << "==> (If user_defined_pc) Zero preconditioner matrix" << endl;
     system.get_matrix("Preconditioner").zero();
   }
-  cout<<"--------------> Equation systems are initialized:\n"<<std::endl;
+  cout << "--------------> Equation systems are initialized:\n" << std::endl;
+
   // set parameters for equation systems
-  cout<<"==>(7/8) Set parameters of equation_systems"<<endl;
-  this -> set_parameters(equation_systems);
+  cout << "==>(7/8) Set parameters of equation_systems" << endl;
+  this->set_parameters(equation_systems);
+
   // initialized force field
-  cout<<"==>(8/8) Attach fixes to 'stokes' system"<<endl;
-  this -> attach_fixes(system); 
+  cout << "==>(8/8) Attach fixes to 'stokes' system" << endl;
+  this->attach_fixes(system);
+
   /* Print information about the mesh and system to the screen. */
-  cout << endl <<"--------------> Print equation systems info" <<endl;
-    equation_systems.print_info();
-    cout <<"  System has: "<< mesh->n_elem()<<" elements,\n"
-             <<"              "<< mesh->n_nodes()<<" nodes,\n"
-             <<"              "<< equation_systems.n_dofs()<<" degrees of freedom.\n"
-             <<"              "<< equation_systems.n_active_dofs()<<" active degrees of freedom.\n"
-             <<"              "<< point_mesh->num_particles()<<" particles.\n" << std::endl;
+  cout << endl << "--------------> Print equation systems info" << endl;
+  equation_systems.print_info();
+  cout << "  System has: " << mesh->n_elem() << " elements,\n"
+       << "              " << mesh->n_nodes() << " nodes,\n"
+       << "              " << equation_systems.n_dofs() <<
+    " degrees of freedom.\n"
+       << "              " << equation_systems.n_active_dofs() <<
+    " active degrees of freedom.\n"
+       << "              " << point_mesh->num_particles() << " particles.\n" <<
+    std::endl;
   return equation_systems;
 }
 
-//=======================================================================================
+// =======================================================================================
 void Copss::attach_fixes(PMLinearImplicitSystem& pm_system)
 {
-
   // Fix *f;
   fix_factory = new FixFactory();
   fixes.resize(numForceTypes);
-  for (int i=0; i < numForceTypes; i++){
-    fixes[i] = fix_factory -> buildFix(forceTypes[i], pm_system);
+
+  for (int i = 0; i < numForceTypes; i++) {
+    fixes[i] = fix_factory->buildFix(forceTypes[i], pm_system);
   }
   pm_system.attach_fixes(fixes);
 }
 
-
-//===============================================================================
+// ===============================================================================
 void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
 {
-  if(system.name()=="Stokes"){
-      cout << "--------------> Get dof_map of 'Stokes' system"<<endl;  
-      DofMap& dof_map = system.get_dof_map();
-      cout << "--------------> Add periodicBoundary object to 'dof_map'"<<endl;
-      /*** set PBC in x-direction ***/
-      if (periodicity[0])
+  if (system.name() == "Stokes") {
+    cout << "--------------> Get dof_map of 'Stokes' system" << endl;
+    DofMap& dof_map = system.get_dof_map();
+    cout << "--------------> Add periodicBoundary object to 'dof_map'" << endl;
+
+    /*** set PBC in x-direction ***/
+    if (periodicity[0])
+    {
+      PeriodicBoundary pbcx(RealVectorValue(wall_params[1] - wall_params[0],
+                                            0.,
+                                            0.));
+      pbcx.set_variable(u_var);
+      pbcx.set_variable(v_var);
+      pbcx.set_variable(w_var);
+
+      // pbcx.set_variable(p_var); //*** NOT include p!
+
+      pbcx.myboundary     = 4; // left face (viewing from X negative to X
+                               // positive)
+      pbcx.pairedboundary = 2; // right face (viewing from X positive to X
+                               // negative)
+
+      dof_map.add_periodic_boundary(pbcx);
+
+      // check
+      if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
       {
-        PeriodicBoundary pbcx(RealVectorValue(wall_params[1]-wall_params[0], 0., 0.));
-        pbcx.set_variable(u_var);
-        pbcx.set_variable(v_var);
-        pbcx.set_variable(w_var);
-        //pbcx.set_variable(p_var); //*** NOT include p!
-
-        pbcx.myboundary = 4; // left face (viewing from X negative to X positive)
-        pbcx.pairedboundary = 2; // right face (viewing from X positive to X negative)
-
-        dof_map.add_periodic_boundary(pbcx);    
-        // check
-        if (search_radius_p>=(wall_params[1]-wall_params[0])/2.)
-        {
-          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
-                                   "**** The search radius is larger than half domain length in x direction\n!"+
-                                   "**** search radius = "+ std::to_string(search_radius_p) +
-                                   ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
-                                   "************************************************************************\n\n";
-          PMToolBox::output_message(output_msg, *comm_in);
-          libmesh_error();
-        }
+        output_msg = std::string(
+          "*********************** warning in Stokes PBC: *************************\n")
+                     +
+                     "**** The search radius is larger than half domain length in x direction\n!"
+                     +
+                     "**** search radius = " + std::to_string(search_radius_p) +
+                     ", half domain size Lx/2 =" +
+                     std::to_string((wall_params[1] - wall_params[0]) / 2.) +
+                     "\n" +
+                     "************************************************************************\n\n";
+        PMToolBox::output_message(output_msg, *comm_in);
+        libmesh_error();
       }
-      /*** set PBC in y-direction ***/
-      if (periodicity[1])
+    }
+
+    /*** set PBC in y-direction ***/
+    if (periodicity[1])
+    {
+      PeriodicBoundary pbcy(RealVectorValue(0.,
+                                            wall_params[3] - wall_params[2],
+                                            0.));
+      pbcy.set_variable(u_var);
+      pbcy.set_variable(v_var);
+      pbcy.set_variable(w_var);
+
+      // pbcy.set_variable(p_var); //*** NOT include p!
+
+      pbcy.myboundary     = 1; // bottom face, viewing from Y negative to Y
+                               // positive
+      pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y
+                               // negative
+
+      dof_map.add_periodic_boundary(pbcy);
+
+      // check
+      if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
       {
-        PeriodicBoundary pbcy(RealVectorValue(0., wall_params[3]-wall_params[2], 0.));
-        pbcy.set_variable(u_var);
-        pbcy.set_variable(v_var);
-        pbcy.set_variable(w_var);
-        //pbcy.set_variable(p_var); //*** NOT include p!
-
-        pbcy.myboundary = 1; // bottom face, viewing from Y negative to Y positive
-        pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y negative
-
-        dof_map.add_periodic_boundary(pbcy);
-        // check
-        if (search_radius_p>=(wall_params[3]-wall_params[2])/2.)
-        {
-          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
-                                   "**** The search radius is larger than half domain length in y direction\n!"+
-                                   "**** search radius = "+ std::to_string(search_radius_p) +
-                                   ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
-                                   "************************************************************************\n\n";
-          PMToolBox::output_message(output_msg, *comm_in);
-          libmesh_error();
-        }
+        output_msg = std::string(
+          "*********************** warning in Stokes PBC: *************************\n")
+                     +
+                     "**** The search radius is larger than half domain length in y direction\n!"
+                     +
+                     "**** search radius = " + std::to_string(search_radius_p) +
+                     ", half domain size Ly/2 =" +
+                     std::to_string((wall_params[3] - wall_params[2]) / 2.) +
+                     "\n" +
+                     "************************************************************************\n\n";
+        PMToolBox::output_message(output_msg, *comm_in);
+        libmesh_error();
       }
-      /*** set PBC in z-direction ***/
-      if (periodicity[2])
+    }
+
+    /*** set PBC in z-direction ***/
+    if (periodicity[2])
+    {
+      PeriodicBoundary pbcz(RealVectorValue(0.,
+                                            0.,
+                                            wall_params[5] - wall_params[4]));
+      pbcz.set_variable(u_var);
+      pbcz.set_variable(v_var);
+      pbcz.set_variable(w_var);
+
+      // pbcz.set_variable(p_var); //*** NOT include p!
+
+      pbcz.myboundary     = 0; // bottom face, viewing from Z negative to Z
+                               // positive
+      pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z
+                               // negative
+
+      dof_map.add_periodic_boundary(pbcz);
+
+      // check
+      if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
       {
-        PeriodicBoundary pbcz(RealVectorValue(0., 0., wall_params[5]-wall_params[4]));
-        pbcz.set_variable(u_var);
-        pbcz.set_variable(v_var);
-        pbcz.set_variable(w_var);
-        //pbcz.set_variable(p_var); //*** NOT include p!
-
-        pbcz.myboundary = 0; // bottom face, viewing from Z negative to Z positive
-        pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z negative
-
-        dof_map.add_periodic_boundary(pbcz);
-        // check
-        if (search_radius_p>=(wall_params[5]-wall_params[4])/2.)
-        {
-          output_msg = std::string("*********************** warning in Stokes PBC: *************************\n")+
-                                   "**** The search radius is larger than half domain length in z direction\n!"+
-                                   "**** search radius = "+ std::to_string(search_radius_p) +
-                                   ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
-                                   "************************************************************************\n\n";
-          PMToolBox::output_message(output_msg, *comm_in);
-          libmesh_error();
-        }
+        output_msg = std::string(
+          "*********************** warning in Stokes PBC: *************************\n")
+                     +
+                     "**** The search radius is larger than half domain length in z direction\n!"
+                     +
+                     "**** search radius = " + std::to_string(search_radius_p) +
+                     ", half domain size Lx/2 =" +
+                     std::to_string((wall_params[5] - wall_params[4]) / 2.) +
+                     "\n" +
+                     "************************************************************************\n\n";
+        PMToolBox::output_message(output_msg, *comm_in);
+        libmesh_error();
       }
+    }
   }
-  else if(system.name()=="Poisson"){
-      cout << "--------------> Get dof_map of 'Poisson' system"<<endl;
-      DofMap& dof_map = system.get_dof_map();
-      cout << "--------------> Add periodicBoundary object to 'dof_map'"<<endl;
-      /*** set PBC in x-direction ***/
-      if (periodicity[0])
+  else if (system.name() == "Poisson") {
+    cout << "--------------> Get dof_map of 'Poisson' system" << endl;
+    DofMap& dof_map = system.get_dof_map();
+    cout << "--------------> Add periodicBoundary object to 'dof_map'" << endl;
+
+    /*** set PBC in x-direction ***/
+    if (periodicity[0])
+    {
+      PeriodicBoundary pbcx(RealVectorValue(wall_params[1] - wall_params[0],
+                                            0.,
+                                            0.));
+      pbcx.set_variable(phi_var);
+
+      pbcx.myboundary     = 4; // left face (viewing from X negative to X
+                               // positive)
+      pbcx.pairedboundary = 2; // right face (viewing from X positive to X
+                               // negative)
+
+      dof_map.add_periodic_boundary(pbcx);
+
+      // check
+      if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
       {
-        PeriodicBoundary pbcx(RealVectorValue(wall_params[1]-wall_params[0], 0., 0.));
-        pbcx.set_variable(phi_var);
-
-        pbcx.myboundary = 4; // left face (viewing from X negative to X positive)
-        pbcx.pairedboundary = 2; // right face (viewing from X positive to X negative)
-
-        dof_map.add_periodic_boundary(pbcx);
-        // check
-        if (search_radius_p>=(wall_params[1]-wall_params[0])/2.)
-        {
-          output_msg = std::string("*********************** warning in Poisson PBC: ************************\n")+
-                                   "**** The search radius is larger than half domain length in x direction\n!"+
-                                   "**** search radius = "+ std::to_string(search_radius_p) +
-                                   ", half domain size Lx/2 =" + std::to_string((wall_params[1]-wall_params[0])/2.)+"\n"+
-                                   "************************************************************************\n\n";
-          PMToolBox::output_message(output_msg, *comm_in);
-          libmesh_error();
-        }
+        output_msg = std::string(
+          "*********************** warning in Poisson PBC: ************************\n")
+                     +
+                     "**** The search radius is larger than half domain length in x direction\n!"
+                     +
+                     "**** search radius = " + std::to_string(search_radius_p) +
+                     ", half domain size Lx/2 =" +
+                     std::to_string((wall_params[1] - wall_params[0]) / 2.) +
+                     "\n" +
+                     "************************************************************************\n\n";
+        PMToolBox::output_message(output_msg, *comm_in);
+        libmesh_error();
       }
-      /*** set PBC in y-direction ***/
-      if (periodicity[1])
+    }
+
+    /*** set PBC in y-direction ***/
+    if (periodicity[1])
+    {
+      PeriodicBoundary pbcy(RealVectorValue(0.,
+                                            wall_params[3] - wall_params[2],
+                                            0.));
+      pbcy.set_variable(phi_var);
+
+      pbcy.myboundary     = 1; // bottom face, viewing from Y negative to Y
+                               // positive
+      pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y
+                               // negative
+
+      dof_map.add_periodic_boundary(pbcy);
+
+      // check
+      if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
       {
-        PeriodicBoundary pbcy(RealVectorValue(0., wall_params[3]-wall_params[2], 0.));
-        pbcy.set_variable(phi_var);
-
-        pbcy.myboundary = 1; // bottom face, viewing from Y negative to Y positive
-        pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y negative
- 
-        dof_map.add_periodic_boundary(pbcy);
-        // check
-        if (search_radius_p>=(wall_params[3]-wall_params[2])/2.)
-        {
-          output_msg = std::string("********************** warning in Poisson PBC: *************************\n")+
-                                   "**** The search radius is larger than half domain length in y direction\n!"+
-                                   "**** search radius = "+ std::to_string(search_radius_p) + 
-                                   ", half domain size Ly/2 =" + std::to_string((wall_params[3]-wall_params[2])/2.)+"\n"+
-                                   "************************************************************************\n\n";
-          PMToolBox::output_message(output_msg, *comm_in);
-          libmesh_error();
-        }
+        output_msg = std::string(
+          "********************** warning in Poisson PBC: *************************\n")
+                     +
+                     "**** The search radius is larger than half domain length in y direction\n!"
+                     +
+                     "**** search radius = " + std::to_string(search_radius_p) +
+                     ", half domain size Ly/2 =" +
+                     std::to_string((wall_params[3] - wall_params[2]) / 2.) +
+                     "\n" +
+                     "************************************************************************\n\n";
+        PMToolBox::output_message(output_msg, *comm_in);
+        libmesh_error();
       }
-      /*** set PBC in z-direction ***/
-      if (periodicity[2])
+    }
+
+    /*** set PBC in z-direction ***/
+    if (periodicity[2])
+    {
+      PeriodicBoundary pbcz(RealVectorValue(0.,
+                                            0.,
+                                            wall_params[5] - wall_params[4]));
+      pbcz.set_variable(phi_var);
+
+      pbcz.myboundary     = 0; // bottom face, viewing from Z negative to Z
+                               // positive
+      pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z
+                               // negative
+
+      dof_map.add_periodic_boundary(pbcz);
+
+      // check
+      if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
       {
-        PeriodicBoundary pbcz(RealVectorValue(0., 0., wall_params[5]-wall_params[4]));
-        pbcz.set_variable(phi_var);
-
-        pbcz.myboundary = 0; // bottom face, viewing from Z negative to Z positive
-        pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z negative
- 
-        dof_map.add_periodic_boundary(pbcz);
-        // check
-        if (search_radius_p>=(wall_params[5]-wall_params[4])/2.)
-        {
-          output_msg = std::string("*********************** warning in Poisson PBC: ************************\n")+
-                                   "**** The search radius is larger than half domain length in z direction\n!"+
-                                   "**** search radius = "+ std::to_string(search_radius_p) + 
-                                   ", half domain size Lx/2 =" + std::to_string((wall_params[5]-wall_params[4])/2.)+"\n"+
-                                   "************************************************************************\n\n";
-          PMToolBox::output_message(output_msg, *comm_in);
-          libmesh_error();
-        }
+        output_msg = std::string(
+          "*********************** warning in Poisson PBC: ************************\n")
+                     +
+                     "**** The search radius is larger than half domain length in z direction\n!"
+                     +
+                     "**** search radius = " + std::to_string(search_radius_p) +
+                     ", half domain size Lx/2 =" +
+                     std::to_string((wall_params[5] - wall_params[4]) / 2.) +
+                     "\n" +
+                     "************************************************************************\n\n";
+        PMToolBox::output_message(output_msg, *comm_in);
+        libmesh_error();
       }
+    }
   }
 }
 
-//============================================================================================
+// ============================================================================================
 void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
 {
   // get stokes system from equation systems
-  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
-  // if either with_hi or module_poisson is true, build_elem_neighbor_list will be true
+  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
+
+  // if either with_hi or module_poisson is true, build_elem_neighbor_list will
+  // be true
   if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
   system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
-  if(print_info){
-      cout << "print particle information after reinit system\n";
-      if(comm_in->rank()==0)
-      point_mesh->print_point_info();
+
+  if (print_info) {
+    cout << "print particle information after reinit system\n";
+
+    if (comm_in->rank() == 0) point_mesh->print_point_info();
   }
   reinit_stokes = true;
   system.solve("undisturbed", reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
-  // if module_poisson is true, solve the poisson equation and add the electrostatic
+
+  // if module_poisson is true, solve the poisson equation and add the
+  // electrostatic
   // force to particles
-  if(module_poisson == true){
+  if (module_poisson == true) {
     // Assemble matrix and rhs for Poisson equation, and solve it
-    equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",true);
+    equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused", true);
     equation_systems.get_system<PMSystemPoisson>("Poisson").add_local_solution();
-    equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();
+    equation_systems.get_system<PMSystemPoisson>("Poisson").
+    add_electrostatic_forces();
   }
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   write out the equation systems at Step 0 (undisturbed field)
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    -
+     write out the equation systems at Step 0 (undisturbed field)
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       - */
   exodus_ptr = new ExodusII_IO(*mesh);
-  if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end() && restart==false)
-  {  
-    //system.add_local_solution(); // Don't add local solution for undisturbed system!
+
+  if ((std::find(output_file.begin(), output_file.end(),
+                 "equation_systems") != output_file.end()) && (restart == false))
+  {
+    // system.add_local_solution(); // Don't add local solution for undisturbed
+    // system!
 #ifdef LIBMESH_HAVE_EXODUS_API
     exodus_ptr->write_equation_systems(out_system_filename, equation_systems);
-#endif
+#endif // ifdef LIBMESH_HAVE_EXODUS_API
   }
 }
 
-//============================================================================================
+// ============================================================================================
 void Copss::create_brownian_system(EquationSystems& equation_systems)
 {
- /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Create vectors and Shell Mat for use:
-   U0:          particle velocity vector;
-   R0/R_mid:    particle position vector;
-   dw/dw_mid:   random vector;
-   RIN/ROUT:    the initial and intermediate particle postion vector for msd output
-   RIN will not change, and ROUT excludes pbc
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    -
+     Create vectors and Shell Mat for use:
+     U0:          particle velocity vector;
+     R0/R_mid:    particle position vector;
+     dw/dw_mid:   random vector;
+     RIN/ROUT:    the initial and intermediate particle postion vector for msd
+       output
+     RIN will not change, and ROUT excludes pbc
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       - */
   brownian_sys = new BrownianSystem(equation_systems);
   brownian_sys->init_petsc_random(&rand_ctx);
   brownian_sys->_create_shell_mat(n_vec, &M);
-  brownian_sys->_create_petsc_vec(n_vec,&R0);
-  VecDuplicate(R0,&U0);
-  VecDuplicate(R0,&R_mid);
-  VecDuplicate(R0,&dw_mid);
-  brownian_sys->extract_particle_vector(&ROUT,"coordinate","extract");
-  VecDuplicate(ROUT,&RIN);
-  VecCopy(ROUT,RIN);  // RIN = ROUT = the initial position vector
-  brownian_sys->set_std_random_seed(random_seed);  // random seed
-  if(restart)
+  brownian_sys->_create_petsc_vec(n_vec, &R0);
+  VecDuplicate(R0, &U0);
+  VecDuplicate(R0, &R_mid);
+  VecDuplicate(R0, &dw_mid);
+  brownian_sys->extract_particle_vector(&ROUT, "coordinate", "extract");
+  VecDuplicate(ROUT, &RIN);
+  VecCopy(ROUT, RIN);                             // RIN = ROUT = the initial
+                                                  // position vector
+  brownian_sys->set_std_random_seed(random_seed); // random seed
+
+  if (restart)
   {
     // read RIN & ROUT from local file output during the previous simulation
-    PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_RIN.dat",FILE_MODE_READ,&viewer);
-    VecLoad(RIN,viewer);
-    PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_READ,&viewer);
-    VecLoad(ROUT,viewer);
+    PetscViewerBinaryOpen(PETSC_COMM_WORLD,
+                          "vector_RIN.dat",
+                          FILE_MODE_READ,
+                          &viewer);
+    VecLoad(RIN, viewer);
+    PetscViewerBinaryOpen(PETSC_COMM_WORLD,
+                          "vector_ROUT.dat",
+                          FILE_MODE_READ,
+                          &viewer);
+    VecLoad(ROUT, viewer);
   }
   else
   {
     // write out binary file of RIN, which may be used at restart mode.
-    PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_RIN.dat",FILE_MODE_WRITE,&viewer);
-    VecView(RIN,viewer);
+    PetscViewerBinaryOpen(PETSC_COMM_WORLD,
+                          "vector_RIN.dat",
+                          FILE_MODE_WRITE,
+                          &viewer);
+    VecView(RIN, viewer);
   }
   PetscViewerDestroy(&viewer);
   comm_in->barrier();
 }
 
-//==============================================================================================
+// ==============================================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
-  //PerfLog perf_log("integration");
+  // PerfLog perf_log("integration");
   // get stokes system from equation systems
-  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
+  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
-  //perf_log.push("reinit sytem");
-  if(i>0){
+     Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       */
+
+  // cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
+  // perf_log.push("reinit sytem");
+  if (i > 0) {
     *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
     // Update the local values to reflect the solution on neighboring processors
     system.update();
-    if(update_neighbor_list_everyStep){
+
+    if (update_neighbor_list_everyStep) {
       neighbor_list_update_flag = true;
     }
-    else if (timestep_duration > neighbor_list_update_interval){
-       cout << "======> update neighbor list at timestep " << i << endl;
-       neighbor_list_update_flag = true;
-       timestep_duration = 0;
+    else if (timestep_duration > neighbor_list_update_interval) {
+      cout << "======> update neighbor list at timestep " << i << endl;
+      neighbor_list_update_flag = true;
+      timestep_duration         = 0;
     }
     system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
 
     // Add electrostatic forces to beads if Poisson solver is ON
-    if(module_poisson == true){
-      // Only assemble rhs, solve Poisson equation, and add electrostatic forces to beads
-      equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",false);
-      equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();
+    if (module_poisson == true) {
+      // Only assemble rhs, solve Poisson equation, and add electrostatic forces
+      // to beads
+      equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",
+                                                                    false);
+      equation_systems.get_system<PMSystemPoisson>("Poisson").
+      add_electrostatic_forces();
     }
   }
-  if(print_info){
-    if(comm_in->rank()==0) point_mesh->print_point_info();
+
+  if (print_info) {
+    if (comm_in->rank() == 0) point_mesh->print_point_info();
   }
-  //perf_log.pop("reinit sytem");
-  //perf_log.push("compute_point_velocity undisturbed");
+
+  // perf_log.pop("reinit sytem");
+  // perf_log.push("compute_point_velocity undisturbed");
   // compute undisturbed velocity of points
   system.compute_point_velocity("undisturbed", vel0);
-  //perf_log.pop("compute_point_velocity undisturbed");
+
+  // perf_log.pop("compute_point_velocity undisturbed");
 
   reinit_stokes = false;
-//  perf_log.push("solve disturbed");
-  system.solve("disturbed",reinit_stokes); // Using SolverStokes
-//  perf_log.pop("solve disturbed");
+
+  //  perf_log.push("solve disturbed");
+  system.solve("disturbed", reinit_stokes); // Using SolverStokes
+  //  perf_log.pop("solve disturbed");
 
   // compute distrubed velocity of points
-//  perf_log.push("compute_point_velocity disturbed");
+  //  perf_log.push("compute_point_velocity disturbed");
   system.compute_point_velocity("disturbed", vel1);
-//  perf_log.pop("compute_point_velocity disturbed");
+
+  //  perf_log.pop("compute_point_velocity disturbed");
   // add up undistrubed and disturbed velocity of points
-  for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
- // transform total point velocity to U0 in Brownian_system
+  for (std::size_t j = 0; j < vel1.size(); ++j) vel1[j] += vel0[j];
+
+  // transform total point velocity to U0 in Brownian_system
   brownian_sys->vector_transform(vel1, &U0, "forward");
+
   // assign vel1 to particle velocity
   point_mesh->set_bead_velocity(vel1);
-  if (debug_info){
+
+  if (debug_info) {
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     * ---> test: output the particle velocity
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    * ---> test: output the particle velocity
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       **/
     const Real v0_min = v0_ptr->min();
     const Real v0_max = v0_ptr->max();
     const Real v0_sum = v0_ptr->sum();
-    if(comm_in->rank()==0){
-      for(unsigned int j=0; j<NP;++j)
-      {    
+
+    if (comm_in->rank() == 0) {
+      for (unsigned int j = 0; j < NP; ++j)
+      {
         std::vector<Real> vtest0(dim), vtest1(dim);
-        for(std::size_t k=0; k<dim;++k){
-          vtest0[k] = vel0[j*dim+k];
-          vtest1[k] = vel1[j*dim+k];
+
+        for (std::size_t k = 0; k < dim; ++k) {
+          vtest0[k] = vel0[j * dim + k];
+          vtest1[k] = vel1[j * dim + k];
         }
         Point vtest2 = point_mesh->particles()[j]->particle_velocity();
-        printf("--->velocity on the %u-th point:\n",j);
-        printf("            U0 = (%.12e,%.12e,%.12e)\n",   vtest0[0],vtest0[1],vtest0[2]);
-        printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n", vtest1[0],vtest1[1],vtest1[2]);
-        printf("     bead velocity(should be equal to U0+U1) = (%.12e,%.12e,%.12e)\n\n", vtest2(0), vtest2(1), vtest2(2));
-      }    
-      printf("fluid field v0_min = %.12e, v0_max = %.12e, v0_sum = %.12e)\n",v0_min,v0_max,v0_sum);
-    }    
+        printf("--->velocity on the %u-th point:\n",
+               j);
+        printf("            U0 = (%.12e,%.12e,%.12e)\n",
+               vtest0[0],
+               vtest0[1],
+               vtest0[2]);
+        printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n",
+               vtest1[0],
+               vtest1[1],
+               vtest1[2]);
+        printf(
+          "     bead velocity(should be equal to U0+U1) = (%.12e,%.12e,%.12e)\n\n",
+               vtest2(0),
+               vtest2(1),
+               vtest2(2));
+      }
+      printf("fluid field v0_min = %.12e, v0_max = %.12e, v0_sum = %.12e)\n",
+             v0_min,
+             v0_max,
+             v0_sum);
+    }
   }
+
   /*---------------------------------------------------------------------------------------
    * write equation system at step i
    * print out information at step 0
-   * do not print out information at the first step when restart since it is identical to the 
+   * do not print out information at the first step when restart since it is
+   *identical to the
    * last step before restart.
-  -----------------------------------------------------------------------------------------*/
-  if(i%write_interval == 0){
-    cout << "\nStarting Fixman integration at step "<< i << endl;
-    if (i != restart_step){
+     -----------------------------------------------------------------------------------------*/
+  if (i % write_interval == 0) {
+    cout << "\nStarting Fixman integration at step " << i << endl;
+
+    if (i != restart_step) {
       /*
        * write equation system to output file
        */
-      if (i != 0){
-        if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end())
+      if (i != 0) {
+        if (std::find(output_file.begin(), output_file.end(),
+                      "equation_systems") != output_file.end())
         {
-          system.add_local_solution();  // add local solution for the disturbed system
-          if(module_poisson == true){
-            equation_systems.get_system<PMSystemPoisson>("Poisson").add_local_solution();
-          }          
-          //system.solution->add(*v0_ptr);// (do not) add the undisturbed solution
+          system.add_local_solution(); // add local solution for the disturbed
+                                       // system
+
+          if (module_poisson == true) {
+            equation_systems.get_system<PMSystemPoisson>("Poisson").
+            add_local_solution();
+          }
+
+          // system.solution->add(*v0_ptr);// (do not) add the undisturbed
+          // solution
   #ifdef LIBMESH_HAVE_EXODUS_API
           exodus_ptr->append(true);
-          exodus_ptr->write_timestep(out_system_filename,equation_systems,o_step,o_step);
-  #endif
-        } // end if (write es)  
+          exodus_ptr->write_timestep(out_system_filename,
+                                     equation_systems,
+                                     o_step,
+                                     o_step);
+  #endif // ifdef LIBMESH_HAVE_EXODUS_API
+        } // end if (write es)
       }
+
       /*
        * write particle to output file
-       */ 
-      this -> write_object(i);
+       */
+      this->write_object(i);
+
       /*----------------------------------------------------------------------------------------------------
-       * Write out ROUT for restart mode at step i
-       ----------------------------------------------------------------------------------------------------*/
-      PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-      VecView(ROUT,viewer);
-      PetscViewerDestroy(&viewer);        
+      * Write out ROUT for restart mode at step i
+         ----------------------------------------------------------------------------------------------------*/
+      PetscViewerBinaryOpen(PETSC_COMM_WORLD,
+                            "vector_ROUT.dat",
+                            FILE_MODE_WRITE,
+                            &viewer);
+      VecView(ROUT, viewer);
+      PetscViewerDestroy(&viewer);
     }
+
     // update o_step
     o_step++;
   } // end if (i % write_interval == 0 )
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Adaptive time step.
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+     Adaptive time step.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       */
   Real dt = 0;
-  if(adaptive_dt){
+
+  if (adaptive_dt) {
     Real vp_max = point_mesh->maximum_bead_velocity();
     Real vp_min = point_mesh->minimum_bead_velocity();
-    if (real_time < max_dr_coeff[0]) dt = (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);  
-    else dt = (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);  
-    if(i % write_interval == 0){
-      cout << "       ##############################################################################################################" << endl
-           << "       # Max velocity magnitude is " <<std::setprecision(o_precision) <<std::fixed << vp_max << endl
-           << "       # Min velocity magnitude is " <<std::setprecision(o_precision) <<std::fixed << vp_min << endl
+
+    if (real_time <
+        max_dr_coeff[0]) dt =
+        (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);
+    else dt =
+        (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);
+
+    if (i % write_interval == 0) {
+      cout <<
+        "       ##############################################################################################################"
+           << endl
+           << "       # Max velocity magnitude is " << std::setprecision(
+        o_precision) << std::fixed << vp_max << endl
+           << "       # Min velocity magnitude is " << std::setprecision(
+        o_precision) << std::fixed << vp_min << endl
            << "       # minimum mesh size = " << hmin << endl
-	   << "       # The adaptive time increment at step "<< i << " is dt = " <<std::setprecision(o_precision) <<std::fixed << dt<<endl
-           << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
-           << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i) "<<endl      
+           << "       # The adaptive time increment at step " << i <<
+        " is dt = " << std::setprecision(o_precision) << std::fixed << dt << endl
+           <<
+        "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)"
+           << endl
+           <<
+        "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i) "
+           << endl
            << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
-           << "       ##############################################################################################################" << endl;
-    } // end if (i% write_interval)  
+           <<
+        "       ##############################################################################################################"
+           << endl;
+    } // end if (i% write_interval)
   }
-  else{
-    if (i==0) dt = max_dr_coeff[0] * 1.;
-    else dt = max_dr_coeff.back() * 1.; 
-    if(i % write_interval == 0){
-      cout << "       ##############################################################################################################" << endl
-           << "       # The fixed time increment at step "<< i << " is dt = " <<std::setprecision(o_precision)<<std::fixed << dt<<endl
-     	     << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
-           << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0 "<<endl
+  else {
+    if (i == 0) dt = max_dr_coeff[0] * 1.;
+    else dt = max_dr_coeff.back() * 1.;
+
+    if (i % write_interval == 0) {
+      cout <<
+        "       ##############################################################################################################"
+           << endl
+           << "       # The fixed time increment at step " << i << " is dt = " <<
+        std::setprecision(o_precision) << std::fixed << dt << endl
+           <<
+        "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0"
+           << endl
+           <<
+        "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0 "
+           << endl
            << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
-           << "       ##############################################################################################################" << endl;
+           <<
+        "       ##############################################################################################################"
+           << endl;
     } // end if (i % write_interval == 0)
-} // end if (adaptive_dt
+  }   // end if (adaptive_dt
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    If with Brownian motion, we use midpoint scheme
-    If without Brownian motion, we use normal stepping: dR = Utotal*dt
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
+     If with Brownian motion, we use midpoint scheme
+     If without Brownian motion, we use normal stepping: dR = Utotal*dt
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       */
   if (with_brownian)
   {
     /*-------------------------------------------
-    * For restarted Brownian system, to make sure the trajectory after is exactly 
-    * the same as a continus simulation, we need to let the random number generator
-    * run "restart_step" steps
-    * ------------------------------------------*/
-    if (i==restart_step){
-      cout << "       ##############################################################################################################" << endl
-           << "       # Run RandomGenerator for "<<restart_step<<" steps to make sure the trajectroy after restart is the same as a " <<endl
-	   << "       # continuous simulation (this is only done once at the first step of restarted simulation)" <<endl
-           << "       ##############################################################################################################" << endl;
+     * For restarted Brownian system, to make sure the trajectory after is
+     *exactly
+     * the same as a continus simulation, we need to let the random number
+     *generator
+     * run "restart_step" steps
+     * ------------------------------------------*/
+    if (i == restart_step) {
+      cout <<
+        "       ##############################################################################################################"
+           << endl
+           << "       # Run RandomGenerator for " << restart_step <<
+        " steps to make sure the trajectroy after restart is the same as a " <<
+        endl
+           <<
+        "       # continuous simulation (this is only done once at the first step of restarted simulation)"
+           << endl
+           <<
+        "       ##############################################################################################################"
+           << endl;
       Vec dw_prep; // this Vec is never used
-      for (unsigned int j=0; j<restart_step; j++){
-        brownian_sys->std_random_vector(0.0, 1.0,"gaussian", &dw_prep);
-	VecDestroy(&dw_prep);
+
+      for (unsigned int j = 0; j < restart_step; j++) {
+        brownian_sys->std_random_vector(0.0, 1.0, "gaussian", &dw_prep);
+        VecDestroy(&dw_prep);
       }
     }
+
     // PerfLog perf_log("BD step");
     // perf_log.push("bd");
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
-     petsc_random_vector generates a uniform distribution [0 1] whose
-     mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+       Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
+       petsc_random_vector generates a uniform distribution [0 1] whose
+       mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+         */
     Real mean_dw = 0.0, variance_dw = 0.0;
-    // A more precise way is to construct a random vector with gaussian distribution
-    const Real std_dev  = std::sqrt(dt);
-    brownian_sys->std_random_vector(0.0,std_dev,"gaussian",&dw);
+
+    // A more precise way is to construct a random vector with gaussian
+    // distribution
+    const Real std_dev = std::sqrt(dt);
+    brownian_sys->std_random_vector(0.0, std_dev, "gaussian", &dw);
     brownian_sys->_vector_mean_variance(dw, mean_dw, variance_dw);
-    VecScale(dw,std::sqrt(2.0));
+    VecScale(dw, std::sqrt(2.0));
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Print out the mean and variance or view the generated vector.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//      PetscPrintf(PETSC_COMM_WORLD,
-//                 "Generated random_vector: mean = %f, variance = %f\n",
-//                 mean_dw, variance_dw);
-//      PetscPrintf(PETSC_COMM_WORLD,
-//                 "Predicted random_vector: mean = %f, variance = %f\n",
-//                 0., std::sqrt(2.*dt));
+       Print out the mean and variance or view the generated vector.
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+         */
+
+    //      PetscPrintf(PETSC_COMM_WORLD,
+    //                 "Generated random_vector: mean = %f, variance = %f\n",
+    //                 mean_dw, variance_dw);
+    //      PetscPrintf(PETSC_COMM_WORLD,
+    //                 "Predicted random_vector: mean = %f, variance = %f\n",
+    //                 0., std::sqrt(2.*dt));
     // Compute dw = B^-1 * dw using Chebyshev polynomial, dw will be changed!
-    VecCopy (dw,dw_mid);  // save dw to dw_mid, which will be used for Chebyshev
+    VecCopy(dw, dw_mid); // save dw to dw_mid, which will be used for Chebyshev
+
     // perf_log.push("cheb_converge");
-    for(std::size_t j=0; j<2; j++)
+    for (std::size_t j = 0; j < 2; j++)
     {
-    //  cout << "j = "<<j<<endl;
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Compute the max/min eigenvalues if needed. Otherwise, magnify the interval.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      if(compute_eigen){
-        cout <<"compute_eigen = "<<compute_eigen << endl;
-        //cout << "Compute the max & min eigenvalues for Chebyshev polynomial at step "<<i+1<<endl;
-        brownian_sys->compute_eigenvalues(eig_min,eig_max,tol_eigen);
+      //  cout << "j = "<<j<<endl;
+
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        -
+         Compute the max/min eigenvalues if needed. Otherwise, magnify the
+           interval.
+         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+           - */
+      if (compute_eigen) {
+        cout << "compute_eigen = " << compute_eigen << endl;
+
+        // cout << "Compute the max & min eigenvalues for Chebyshev polynomial
+        // at step "<<i+1<<endl;
+        brownian_sys->compute_eigenvalues(eig_min, eig_max, tol_eigen);
+
         // Magnify the spectral range by a factor (1.05 by default).
-	      eig_max *= eig_factor; eig_min /= eig_factor;
-        if(eig_min < 0 or eig_max < 0 or eig_min > eig_max){
-          cout <<"--->Invalid eigenvalue range: eig_min = "<<eig_min <<"; eig_max = "<<eig_max << endl;
+        eig_max *= eig_factor; eig_min /= eig_factor;
+
+        if (eig_min < 0 or eig_max<0 or eig_min>eig_max) {
+          cout << "--->Invalid eigenvalue range: eig_min = " << eig_min <<
+            "; eig_max = " << eig_max << endl;
           cheb_converge = false;
-          break;  
-        } 
-        else{
-          cout <<"--->Valid eigenvalue range: recomputed eigen values and magnify the range by a factor eig_factor = " << eig_factor 
-               <<"; eig_min = " << eig_min
-               <<"; eig_max = " << eig_max
-               <<"; tol_cheb = "<< tol_cheb
-               <<"; max_n_cheb = " << max_n_cheb << endl
-               <<"--->Write this eigenvalue range to out.eigenvalue for restart purpose" << endl;
-          std::ofstream out_file;  
-          if(comm_in->rank() == 0){
-            if(i == 0){
+          break;
+        }
+        else {
+          cout <<
+            "--->Valid eigenvalue range: recomputed eigen values and magnify the range by a factor eig_factor = "
+               << eig_factor
+               << "; eig_min = " << eig_min
+               << "; eig_max = " << eig_max
+               << "; tol_cheb = " << tol_cheb
+               << "; max_n_cheb = " << max_n_cheb << endl
+               <<
+            "--->Write this eigenvalue range to out.eigenvalue for restart purpose"
+               << endl;
+          std::ofstream out_file;
+
+          if (comm_in->rank() == 0) {
+            if (i == 0) {
               out_file.open("out.eigenvalue", std::ios_base::out);
-              out_file << "eigen_min" <<"  " <<"eigen_max" <<"\n";      
+              out_file << "eigen_min" << "  " << "eigen_max" << "\n";
             }
-            else{
+            else {
               out_file.open("out.eigenvalue", std::ios_base::app);
             }
             out_file.precision(o_precision);
-            out_file <<eig_min <<"  " <<eig_max <<"\n";
-            out_file.close();  
+            out_file << eig_min << "  " << eig_max << "\n";
+            out_file.close();
           }
         }
       }
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Compute the Brownian displacement B^-1 * dw using Chebyshev approximation.
-       Here dw is both input and output variables, so it will be changed.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        -
+         Compute the Brownian displacement B^-1 * dw using Chebyshev
+           approximation.
+         Here dw is both input and output variables, so it will be changed.
+         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+           - */
       cheb_converge = brownian_sys->chebyshev_polynomial_approximation(max_n_cheb,
-                                                                      eig_min,eig_max,tol_cheb,&dw);  
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       If converged, dw returns the Brownian displacement, then break the j-loop;
-       Otherwise, recompute eigenvalues
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      if(cheb_converge){
+                                                                       eig_min,
+                                                                       eig_max,
+                                                                       tol_cheb,
+                                                                       &dw);
+
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        -
+         If converged, dw returns the Brownian displacement, then break the
+           j-loop;
+         Otherwise, recompute eigenvalues
+         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+           - */
+      if (cheb_converge) {
         compute_eigen = false; break;
       }
-      else{
+      else {
         compute_eigen = true;
-        VecCopy(dw_mid,dw); /*copy back, recompute eigenvalues*/
-        //cout << "It is necessry to re-compute the eigenvalues at step " <<i+1<<endl;
+        VecCopy(dw_mid, dw); /*copy back, recompute eigenvalues*/
+
+        // cout << "It is necessry to re-compute the eigenvalues at step "
+        // <<i+1<<endl;
       }
     } // end for j-loop
+
     // perf_log.pop("cheb_converge");
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Double-check the convergence of Chebyshev polynomial approximation
-     If cheb_converge = true continue fixman integration
-     otherwise, relax the system for serval free-draining steps
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+       Double-check the convergence of Chebyshev polynomial approximation
+       If cheb_converge = true continue fixman integration
+       otherwise, relax the system for serval free-draining steps
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+         */
+
     // perf_log.push("fixman step");
-    if(cheb_converge){
+    if (cheb_converge) {
       // Compute dw_mid = D*B^-1*dw, which can be obtained by solving the Stokes
-      brownian_sys->hi_ewald(M,dw,dw_mid);  // dw_mid = D * dw
+      brownian_sys->hi_ewald(M, dw, dw_mid); // dw_mid = D * dw
+
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Particle coordinate vector R0.
-       Move the particle R_mid = R0 + 0.5*(U0+U1)*dt (deterministic)
-       and R_mid = R_mid + 0.5*sqrt(2)*D*B^-1*dw     (stochastic)
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
-      VecWAXPY(R_mid,0.5*dt,U0,R0);  // R_mid = R0 + 0.5*dt*(U0+U1)  (R0 and U0 do NOT change)
-      coef = 0.5;                    // coefficient. sqrt(2) is introduced when generating dw
-      VecAXPY(R_mid,coef,dw_mid);    // R_mid = R_mid + 0.5*sqrt(2)*D*B^-1*dw
-      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
-      this -> update_object(); 
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Update the particle mesh for the mid-point step,
-       and recompute U0 + U1_mid, D_mid*(B^-1*dw)
-       NOTE: the FEM solution of undisturbed field doesn't change, but particles
-       move, so U0 needs to be re-evaluated at the new position.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      *(system.solution) = *v0_ptr;       // re-assign the undisturbed solution
+         Particle coordinate vector R0.
+         Move the particle R_mid = R0 + 0.5*(U0+U1)*dt (deterministic)
+         and R_mid = R_mid + 0.5*sqrt(2)*D*B^-1*dw     (stochastic)
+         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+            - */
+      brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
+      VecWAXPY(R_mid, 0.5 * dt, U0, R0);                                     // R_mid
+                                                                             // =
+                                                                             // R0
+                                                                             // +
+                                                                             // 0.5*dt*(U0+U1)
+                                                                             // 
+                                                                             // (R0
+                                                                             // and
+                                                                             // U0
+                                                                             // do
+                                                                             // NOT
+                                                                             // change)
+      coef = 0.5;                                                            // coefficient.
+                                                                             // sqrt(2)
+                                                                             // is
+                                                                             // introduced
+                                                                             // when
+                                                                             // generating
+                                                                             // dw
+      VecAXPY(R_mid, coef, dw_mid);                                          // R_mid
+                                                                             // =
+                                                                             // R_mid
+                                                                             // +
+                                                                             // 0.5*sqrt(2)*D*B^-1*dw
+      brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
+                                                                             // mid-point
+                                                                             // coords
+                                                                             // &&
+                                                                             // apply
+                                                                             // pbc
+                                                                             // to
+                                                                             // particle
+                                                                             // position
+      this->update_object();
+
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        -
+         Update the particle mesh for the mid-point step,
+         and recompute U0 + U1_mid, D_mid*(B^-1*dw)
+         NOTE: the FEM solution of undisturbed field doesn't change, but
+           particles
+         move, so U0 needs to be re-evaluated at the new position.
+         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+           - */
+      *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
       system.update();
+
       // comment the line below if not update neighbor list at each time step
-      if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;
+      if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
       system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
       system.compute_point_velocity("undisturbed", vel0);
       reinit_stokes = false;
-      system.solve("disturbed",reinit_stokes);   // solve the disturbed solution
+      system.solve("disturbed", reinit_stokes); // solve the disturbed solution
       system.compute_point_velocity("disturbed", vel1);
-      for(std::size_t j=0; j<vel1.size();++j) vel1[j] += vel0[j];
+
+      for (std::size_t j = 0; j < vel1.size(); ++j) vel1[j] += vel0[j];
       brownian_sys->vector_transform(vel1, &U0, "forward"); // (U0+U1)_mid
-      brownian_sys->hi_ewald(M,dw,dw_mid);  // dw_mid = D_mid*dw, where dw=B^-1*dw computed above
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       the mid-point to the NEW point, and update the particle coordinates
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-      //cout << "Update from mid-point to the NEW particle coordinates at step " <<i+1<<endl;
-      VecWAXPY(R_mid,dt,U0,R0);         // R_mid = R0 + dt*U0_mid
-      VecAXPY(R_mid,2.0*coef,dw_mid); // R_mid = R_mid + sqrt(2)*D_mid*B^-1*dw
-      brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
-      this -> update_object();
+      brownian_sys->hi_ewald(M, dw, dw_mid);                // dw_mid =
+                                                            // D_mid*dw, where
+                                                            // dw=B^-1*dw
+                                                            // computed above
+
+      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        -
+         the mid-point to the NEW point, and update the particle coordinates
+         - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+           - */
+
+      // cout << "Update from mid-point to the NEW particle coordinates at step
+      // " <<i+1<<endl;
+      VecWAXPY(R_mid, dt, U0, R0);                                           // R_mid
+                                                                             // =
+                                                                             // R0
+                                                                             // +
+                                                                             // dt*U0_mid
+      VecAXPY(R_mid, 2.0 * coef, dw_mid);                                    // R_mid
+                                                                             // =
+                                                                             // R_mid
+                                                                             // +
+                                                                             // sqrt(2)*D_mid*B^-1*dw
+      brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
+                                                                             // mid-point
+                                                                             // coords
+                                                                             // &&
+                                                                             // apply
+                                                                             // pbc
+                                                                             // to
+                                                                             // particle
+                                                                             // position
+      this->update_object();
+
       // Update ROUT (position vector excluding pbc) at the i-th step
-      VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
-      VecAXPY(ROUT,2.0*coef,dw_mid);  // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
+      VecAXPY(ROUT, dt,         U0);     // ROUT = ROUT + dt*U0_mid
+      VecAXPY(ROUT, 2.0 * coef, dw_mid); // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
     }// end if cheb_converge
     else {
       n_chebyshev_failure += 1;
-      PMToolBox::output_message("****** Warning: After recomputing eigenvalues, Chebysheve failed to converge at step " +std::to_string(i)+"; relax the system for "+std::to_string(n_relax_step)+" steps", *comm_in);
-      for (int relax_step=0; relax_step<n_relax_step; relax_step++){
+      PMToolBox::output_message("****** Warning: After recomputing eigenvalues, Chebysheve failed to converge at step " + std::to_string(
+                                  i) + "; relax the system for " + std::to_string(
+                                  n_relax_step) + " steps",
+                                *comm_in);
+
+      for (int relax_step = 0; relax_step < n_relax_step; relax_step++) {
         langevin_integrate(equation_systems, i);
         i++;
       }
-    }// end else cheb_converge
-    // perf_log.pop("fixman step");
-    // perf_log.pop("bd");
-  } // end if Brownian
-  else{ // if without Brownian
+    } // end else cheb_converge
+     // perf_log.pop("fixman step");
+     // perf_log.pop("bd");
+  }   // end if Brownian
+  else { // if without Brownian
     // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
-    brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
-    VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
-    brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords 
-    this -> update_object();
+    brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
+    VecWAXPY(R_mid, dt, U0, R0);                                           // R_mid
+                                                                           // = R0
+                                                                           // + dt*Utotal
+                                                                           // (U0
+                                                                           // is
+                                                                           // actually
+                                                                           // Utotal)
+    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
+                                                                           // mid-point
+                                                                           // coords
+    this->update_object();
+
     // Update ROUT (position vector excluding pbc) at the i-th step
-    VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
+    VecAXPY(ROUT, dt, U0); // ROUT = ROUT + dt*U0_mid
   } // end else (without_brownian)
-  real_time += dt;
+  real_time         += dt;
   timestep_duration += 1;
 }
 
 void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
   // get stokes system from equation systems
-  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
-  if(i>0){
+  PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
+
+  if (i > 0) {
     system.update();
-    if(update_neighbor_list_everyStep){
+
+    if (update_neighbor_list_everyStep) {
       neighbor_list_update_flag = true;
     }
-    else if (timestep_duration > neighbor_list_update_interval){
-       neighbor_list_update_flag = true;
-       timestep_duration = 0;
+    else if (timestep_duration > neighbor_list_update_interval) {
+      neighbor_list_update_flag = true;
+      timestep_duration         = 0;
     }
-    // whether or not reinit neighbor list depends on the neighbor_list_update_flag
+
+    // whether or not reinit neighbor list depends on the
+    // neighbor_list_update_flag
     system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
   }
   Point p_velocity(0.);
+
   for (std::size_t p_id = 0; p_id < NP; p_id++) {
-    for (int _dim = 0; _dim < dim; _dim++){
-      p_velocity(_dim) = point_mesh->particles()[p_id]->particle_force()(_dim);        
-      vel1[dim*p_id+_dim] = p_velocity(_dim);
-    } 
+    for (int _dim = 0; _dim < dim; _dim++) {
+      p_velocity(_dim) =
+        point_mesh->particles()[p_id]->particle_force()(_dim);
+      vel1[dim * p_id + _dim] = p_velocity(_dim);
+    }
   }
+
   // set vel1 to particle velocity
   point_mesh->set_bead_velocity(vel1);
+
   // transform total point velocity to U0 in Brownian_system
   brownian_sys->vector_transform(vel1, &U0, "forward");
+
   /*---------------------------------------------------------------------------------------
    * write equation system at step i
    * print out information at step 0
-   * do not print out information at the first step when restart since it is identical to the 
+   * do not print out information at the first step when restart since it is
+   *identical to the
    * last step before restart.
-  -----------------------------------------------------------------------------------------*/
-  if(i%write_interval == 0){
-      cout << "\nStarting Langevin integration at step "<< i << endl;
-      if (i != restart_step){
-          /*
-          * write equation system to output file
-          */
-          if (i != 0){
-              if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end() and module_poisson == true)
-              {
-                  equation_systems.get_system<PMSystemPoisson>("Poisson").add_local_solution();          
+     -----------------------------------------------------------------------------------------*/
+  if (i % write_interval == 0) {
+    cout << "\nStarting Langevin integration at step " << i << endl;
+
+    if (i != restart_step) {
+      /*
+       * write equation system to output file
+       */
+      if (i != 0) {
+        if (std::find(output_file.begin(), output_file.end(),
+                      "equation_systems") !=
+            output_file.end() and module_poisson == true)
+        {
+          equation_systems.get_system<PMSystemPoisson>("Poisson").
+          add_local_solution();
                   #ifdef LIBMESH_HAVE_EXODUS_API
-                      exodus_ptr->append(true);
-                      exodus_ptr->write_timestep(out_system_filename,equation_systems,o_step,o_step);
-                  #endif
-              } // end if (write es)
-          }    
-          //write particle to output file
-          this -> write_object(i);
-          /*----------------------------------------------------------------------------------------------------
-           * Write out ROUT for restart mode at step i
-           ----------------------------------------------------------------------------------------------------*/
-          PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-          VecView(ROUT,viewer);
-          PetscViewerDestroy(&viewer);        
+          exodus_ptr->append(true);
+          exodus_ptr->write_timestep(out_system_filename,
+                                     equation_systems,
+                                     o_step,
+                                     o_step);
+                  #endif // ifdef LIBMESH_HAVE_EXODUS_API
+        } // end if (write es)
       }
-      // update o_step
-      o_step++;
+
+      // write particle to output file
+      this->write_object(i);
+
+      /*----------------------------------------------------------------------------------------------------
+      * Write out ROUT for restart mode at step i
+         ----------------------------------------------------------------------------------------------------*/
+      PetscViewerBinaryOpen(PETSC_COMM_WORLD,
+                            "vector_ROUT.dat",
+                            FILE_MODE_WRITE,
+                            &viewer);
+      VecView(ROUT, viewer);
+      PetscViewerDestroy(&viewer);
+    }
+
+    // update o_step
+    o_step++;
   } // end if (i % write_interval == 0 )
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Adaptive time step.
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+     Adaptive time step.
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       */
   Real dt = 0;
-  if(adaptive_dt){
+
+  if (adaptive_dt) {
     Real vp_max = point_mesh->maximum_bead_velocity();
     Real vp_min = point_mesh->minimum_bead_velocity();
-    if (real_time < max_dr_coeff[0]) dt = (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);  
-    else dt = (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);  
-    if(i % write_interval == 0){
-      cout << "       ##############################################################################################################" << endl
-           << "       # Max velocity magnitude is " << std::setprecision(o_precision) <<std::fixed <<vp_max << endl
-           << "       # Min velocity magnitude is " << std::setprecision(o_precision) <<std::fixed <<vp_min << endl
+
+    if (real_time <
+        max_dr_coeff[0]) dt =
+        (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);
+    else dt =
+        (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);
+
+    if (i % write_interval == 0) {
+      cout <<
+        "       ##############################################################################################################"
+           << endl
+           << "       # Max velocity magnitude is " << std::setprecision(
+        o_precision) << std::fixed << vp_max << endl
+           << "       # Min velocity magnitude is " << std::setprecision(
+        o_precision) << std::fixed << vp_min << endl
            << "       # minimum mesh size = " << hmin << endl
-           << "       # The adaptive time increment at step "<< i << " is dt = " << std::setprecision(o_precision) <<std::fixed <<dt<<endl
-           << "       # adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)" << endl
-           << "       ##############################################################################################################" << endl;
-    } // end if (i% write_interval)  
+           << "       # The adaptive time increment at step " << i <<
+        " is dt = " << std::setprecision(o_precision) << std::fixed << dt << endl
+           <<
+        "       # adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)"
+           << endl
+           <<
+        "       ##############################################################################################################"
+           << endl;
+    } // end if (i% write_interval)
   }
-  else{
-    if (real_time<max_dr_coeff[0]) dt = max_dr_coeff[1] * 1.;
-    else dt = max_dr_coeff[2] * 1.; 
-    if(i % write_interval == 0){
-      cout << "       ##############################################################################################################" << endl
-           << "       # The fixed time increment at step "<< i << " is dt = " << std::setprecision(o_precision) <<std::fixed <<dt<<endl
-           << "       # fixed_time_step = max_dr_coeff * bead_radius / 1.0"<<endl
-           << "       ##############################################################################################################" << endl;
+  else {
+    if (real_time < max_dr_coeff[0]) dt = max_dr_coeff[1] * 1.;
+    else dt = max_dr_coeff[2] * 1.;
+
+    if (i % write_interval == 0) {
+      cout <<
+        "       ##############################################################################################################"
+           << endl
+           << "       # The fixed time increment at step " << i << " is dt = " <<
+        std::setprecision(o_precision) << std::fixed << dt << endl
+           << "       # fixed_time_step = max_dr_coeff * bead_radius / 1.0" <<
+        endl
+           <<
+        "       ##############################################################################################################"
+           << endl;
     } // end if (i % write_interval == 0)
-  } // end if (adaptive_dt)
+  }   // end if (adaptive_dt)
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    If with Brownian motion, we use midpoint scheme
-    If without Brownian motion, we use normal stepping: dR = Utotal*dt
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */  
+     If with Brownian motion, we use midpoint scheme
+     If without Brownian motion, we use normal stepping: dR = Utotal*dt
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       */
   if (with_brownian)
   {
     /*-------------------------------------------
-    * For restarted Brownian system, to make sure the trajectory after is exactly 
-    * the same as a continus simulation, we need to let the random number generator
-    * run "restart_step" steps
-    * ------------------------------------------*/
-    if (i==restart_step){
+     * For restarted Brownian system, to make sure the trajectory after is
+     *exactly
+     * the same as a continus simulation, we need to let the random number
+     *generator
+     * run "restart_step" steps
+     * ------------------------------------------*/
+    if (i == restart_step) {
       Vec dw_prep; // this Vec is never used
-      for (unsigned int j=0; j<restart_step; j++){
-        brownian_sys->std_random_vector(0.0, 1.0,"gaussian", &dw_prep);
-	VecDestroy(&dw_prep);
+
+      for (unsigned int j = 0; j < restart_step; j++) {
+        brownian_sys->std_random_vector(0.0, 1.0, "gaussian", &dw_prep);
+        VecDestroy(&dw_prep);
       }
     }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
-     petsc_random_vector generates a uniform distribution [0 1] whose
-     mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+       Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
+       petsc_random_vector generates a uniform distribution [0 1] whose
+       mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+         */
     Real mean_dw = 0.0, variance_dw = 0.0;
-    // A more precise way is to construct a random vector with gaussian distribution
-    const Real std_dev  = std::sqrt(dt);
-    brownian_sys->std_random_vector(0.0,std_dev,"gaussian",&dw);
+
+    // A more precise way is to construct a random vector with gaussian
+    // distribution
+    const Real std_dev = std::sqrt(dt);
+    brownian_sys->std_random_vector(0.0, std_dev, "gaussian", &dw);
     brownian_sys->_vector_mean_variance(dw, mean_dw, variance_dw);
-    VecScale(dw,std::sqrt(2.0));
+    VecScale(dw, std::sqrt(2.0));
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Print out the mean and variance or view the generated vector.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-//    PetscPrintf(PETSC_COMM_WORLD,
-//               "Generated random_vector: mean = %f, variance = %f\n",
-//               mean_dw, variance_dw);
-//    PetscPrintf(PETSC_COMM_WORLD,
-//               "Predicted random_vector: mean = %f, variance = %f\n",
-//               0., std::sqrt(2.*dt));
+       Print out the mean and variance or view the generated vector.
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+         */
+
+    //    PetscPrintf(PETSC_COMM_WORLD,
+    //               "Generated random_vector: mean = %f, variance = %f\n",
+    //               mean_dw, variance_dw);
+    //    PetscPrintf(PETSC_COMM_WORLD,
+    //               "Predicted random_vector: mean = %f, variance = %f\n",
+    //               0., std::sqrt(2.*dt));
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Particle coordinate vector R0.
-     Move the particle R_mid = R0 + U0*dt (deterministic)
-     and R_mid = R_mid + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1     (stochastic)
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
-    VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt * U0  (R0 and U0 do NOT change)
-    coef = 1.;                    // coefficient. 
-    VecAXPY(R_mid,coef,dw);    // R_mid = R_mid + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1
-    brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords && apply pbc to particle position
-    this -> update_object(); 
+       Particle coordinate vector R0.
+       Move the particle R_mid = R0 + U0*dt (deterministic)
+       and R_mid = R_mid + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1
+              (stochastic)
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+          */
+    brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
+    VecWAXPY(R_mid, dt, U0, R0);                                           // R_mid
+                                                                           // = R0
+                                                                           // + dt
+                                                                           // * U0
+                                                                           //  (R0
+                                                                           // and
+                                                                           // U0
+                                                                           // do
+                                                                           // NOT
+                                                                           // change)
+    coef = 1.;                                                             // coefficient.
+    VecAXPY(R_mid, coef, dw);                                              // R_mid
+                                                                           // = R_mid
+                                                                           // + dw,
+                                                                           // where
+                                                                           // dw
+                                                                           // = sqrt(2*dt)*R,
+                                                                           // where
+                                                                           // <R>=0,
+                                                                           // <R^2>=1
+    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
+                                                                           // mid-point
+                                                                           // coords
+                                                                           // &&
+                                                                           // apply
+                                                                           // pbc
+                                                                           // to
+                                                                           // particle
+                                                                           // position
+    this->update_object();
+
     // Update ROUT (position vector excluding pbc) at the i-th step
-    VecAXPY(ROUT,dt,U0);            // ROUT = ROUT + dt*U0_mid
-    VecAXPY(ROUT,coef,dw);   // ROUT = ROUT + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1
+    VecAXPY(ROUT, dt,   U0);                                               // ROUT
+                                                                           // = ROUT
+                                                                           // + dt*U0_mid
+    VecAXPY(ROUT, coef, dw);                                               // ROUT
+                                                                           // = ROUT
+                                                                           // + dw,
+                                                                           // where
+                                                                           // dw
+                                                                           // = sqrt(2*dt)*R,
+                                                                           // where
+                                                                           // <R>=0,
+                                                                           // <R^2>=1
   } // end if Brownian
-  
-  else{ // if without Brownian
+
+  else {                                                                   // if
+                                                                           // without
+                                                                           // Brownian
     // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
-    brownian_sys->extract_particle_vector(&R0,"coordinate","extract");
-    VecWAXPY(R_mid,dt,U0,R0);  // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
-    brownian_sys->extract_particle_vector(&R_mid,"coordinate","assign"); // Update mid-point coords
-    this -> update_object();
+    brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
+    VecWAXPY(R_mid, dt, U0, R0);                                           // R_mid
+                                                                           // = R0
+                                                                           // + dt*Utotal
+                                                                           // (U0
+                                                                           // is
+                                                                           // actually
+                                                                           // Utotal)
+    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
+                                                                           // mid-point
+                                                                           // coords
+    this->update_object();
+
     // Update ROUT (position vector excluding pbc) at the i-th step
-    VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
-  
+    VecAXPY(ROUT, dt, U0); // ROUT = ROUT + dt*U0_mid
   } // end else (without_brownian)
-  real_time += dt;
+  real_time         += dt;
   timestep_duration += 1;
 }
-
 
 void Copss::destroy()
 {
@@ -1459,17 +2111,18 @@ void Copss::destroy()
   VecDestroy(&R_mid);
   VecDestroy(&dw_mid);
   PetscRandomDestroy(&rand_ctx);
-  if(with_brownian){
+
+  if (with_brownian) {
     VecDestroy(&dw);
   }
-  if(exodus_ptr and with_hi) {
+
+  if (exodus_ptr and with_hi) {
     delete exodus_ptr;
   }
-  if (&viewer){
-      PetscViewerDestroy(&viewer);
+
+  if (&viewer) {
+    PetscViewerDestroy(&viewer);
   }
   PetscViewerDestroy(&viewer);
 }
-
-
 } // end namespace

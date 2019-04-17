@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -21,31 +22,26 @@
 #pragma once
 
 #include "fix_point.h"
-namespace libMesh
-{
-
-class FixPointSphereWallEmpiricalDNA : public FixPoint
-{
-
+namespace libMesh {
+class FixPointSphereWallEmpiricalDNA : public FixPoint {
 public:
 
-	FixPointSphereWallEmpiricalDNA(PMLinearImplicitSystem& pm_sys);
+  FixPointSphereWallEmpiricalDNA(PMLinearImplicitSystem& pm_sys);
 
-	~FixPointSphereWallEmpiricalDNA(){};
+  ~FixPointSphereWallEmpiricalDNA() {}
 
-	void initPointParticleType();
-	
-	void initParams();
+  void initPointParticleType();
 
-	void print_fix();
+  void initParams();
 
-	void compute();
+  void print_fix();
+
+  void compute();
 
 protected:
-	Real c0;
-	Real d0;
-	Real sphereWallRadius;
 
+  Real c0;
+  Real d0;
+  Real sphereWallRadius;
 };
-
 }

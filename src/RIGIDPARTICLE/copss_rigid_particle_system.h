@@ -25,80 +25,75 @@ using std::cout;
 using std::endl;
 using std::string;
 
-namespace libMesh{
-
-class CopssRigidParticleSystem : public Copss
-{
+namespace libMesh {
+class CopssRigidParticleSystem : public Copss {
 public:
-	
-	CopssRigidParticleSystem (CopssInit& init);
 
-	~CopssRigidParticleSystem();
+  CopssRigidParticleSystem(CopssInit& init);
 
-	// integrator
-	void run(EquationSystems& equation_systems) override;
+  ~CopssRigidParticleSystem();
+
+  // integrator
+  void run(EquationSystems& equation_systems) override;
 
 protected:
-	// override read_particle_info() function in Copss class
-	void read_particle_info () override;
 
-	// read ggem and ibm info
-	void read_ggem_info () override;
+  // override read_particle_info() function in Copss class
+  void read_particle_info() override;
 
-	// create objects, polymer chains
-	void create_object() override;
+  // read ggem and ibm info
+  void read_ggem_info() override;
 
-	// attach mesh spring network
-	void attach_mesh_spring_network();
+  // create objects, polymer chains
+  void create_object() override;
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Build MeshSpringNetwork according to the particle's mesh, which will be used to
-   apply the rigid-body constraint force.
+  // attach mesh spring network
+  void attach_mesh_spring_network();
 
-   Note: if the particles use different meshes, or have different sizes,
-   we need to build them for each of particles!
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-	void create_object_mesh() override;
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    -
+     Build MeshSpringNetwork according to the particle's mesh, which will be
+       used to
+     apply the rigid-body constraint force.
 
-	// attach object mesh to system
-	void attach_object_mesh(PMLinearImplicitSystem& system) override;
+     Note: if the particles use different meshes, or have different sizes,
+     we need to build them for each of particles!
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+       - */
+  void create_object_mesh() override;
 
-	// set parameters for equations systems
-	void set_parameters(EquationSystems& equation_systems) override;
+  // attach object mesh to system
+  void attach_object_mesh(PMLinearImplicitSystem& system) override;
 
-	// // update object due to PBC after check_wall()
-	void update_object() override {};
+  // set parameters for equations systems
+  void set_parameters(EquationSystems& equation_systems) override;
 
-	// write object to object file
-	void write_object(unsigned int step_id) override;
+  // // update object due to PBC after check_wall()
+  void update_object() override {}
 
-
-
+  // write object to object file
+  void write_object(unsigned int step_id) override;
 
 private:
 
-	std::string particle_mesh_type;
+  std::string particle_mesh_type;
 
-	std::vector<std::string> particle_mesh_file;
+  std::vector<std::string>particle_mesh_file;
 
-	std::vector<Real> surface_constraint;
-	
-	std::vector<Real> hsize_solid;
+  std::vector<Real>surface_constraint;
 
-	Real ibm_beta; // beta to calcualte GGEM-IBM ksi
+  std::vector<Real>hsize_solid;
 
-	Real hmins; // surface mesh hmin
+  Real ibm_beta; // beta to calcualte GGEM-IBM ksi
 
-	Real hmaxs;
+  Real hmins;    // surface mesh hmin
 
-  	ParticleMesh<3>* particle_mesh;
+  Real hmaxs;
 
-  	std::vector<MeshSpringNetwork*> mesh_spring_network;
+  ParticleMesh<3> *particle_mesh;
 
-  	std::size_t num_rigid_particles;
+  std::vector<MeshSpringNetwork *>mesh_spring_network;
 
-
+  std::size_t num_rigid_particles;
 };
-
-
 }

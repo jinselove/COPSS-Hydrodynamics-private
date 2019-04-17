@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -18,7 +19,6 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-
 #pragma once
 
 #include <stdio.h>
@@ -28,43 +28,36 @@
 #include "fix.h"
 #include "../point_particle.h"
 
-namespace libMesh
-{
+namespace libMesh {
+/*
+ * The class is designed for computing the force field
+ * of the system
+ */
 
-  /*
-   * The class is designed for computing the force field
-   * of the system
-   */
-  
-  
-class FixPoint: public Fix
-{
+
+class FixPoint : public Fix {
 public:
-  
-  //! Constructor for a system with point particles
+
+  // ! Constructor for a system with point particles
   FixPoint(PMLinearImplicitSystem& pm_sys);
 
-  virtual ~FixPoint(){}
+  virtual ~FixPoint() {}
 
   /*! Prepare for running
-  /*
+     /*
    * Check if particle_type == "point_particle"
    * this -> check_params()
-  */
-  void initParticleType();
+   */
+  void         initParticleType();
 
-  virtual void initPointParticleType() {};
+  virtual void initPointParticleType() {}
 
-  void check_walls();
+  void         check_walls();
 
-  void check_walls_pbcCount();
+  void         check_walls_pbcCount();
 
 protected:
-  
+
   std::string point_particle_model;
-
-
-
-};  // end of class
-  
+}; // end of class
 } // end of namespace

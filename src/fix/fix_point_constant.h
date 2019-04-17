@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -21,21 +22,16 @@
 #pragma once
 
 #include "fix_point.h"
-namespace libMesh
-{
-
-class FixPointConstant : public FixPoint
-{
-
+namespace libMesh {
+class FixPointConstant : public FixPoint {
 public:
-	FixPointConstant(PMLinearImplicitSystem& pm_sys);
 
-	~FixPointConstant(){};
+  FixPointConstant(PMLinearImplicitSystem& pm_sys);
 
-	void print_fix();
+  ~FixPointConstant() {}
 
-	void compute();
+  void print_fix();
 
+  void compute();
 };
-
 }

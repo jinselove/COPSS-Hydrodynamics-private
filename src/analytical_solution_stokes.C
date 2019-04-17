@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -32,101 +33,96 @@
 // ======================================================================
 AnalyticalSolutionStokes::AnalyticalSolutionStokes(const std::string& name)
 {
-    if (name != "Stokes") libmesh_error();
+  if (name != "Stokes") libmesh_error();
 }
-
 
 // ======================================================================
 AnalyticalSolutionStokes::~AnalyticalSolutionStokes()
 {
-    //do nothing
+  // do nothing
 }
 
-
 // ======================================================================
-void AnalyticalSolutionStokes::attach_point_mesh(PointMesh<3>* point_mesh) 
+void AnalyticalSolutionStokes::attach_point_mesh(PointMesh<3> *point_mesh)
 {
-    START_LOG("attach_point_mesh()", "AnalyticalSolutionStokes");  
-    
-    _point_mesh = point_mesh;
+  START_LOG("attach_point_mesh()", "AnalyticalSolutionStokes");
 
-    STOP_LOG("attach_point_mesh()", "AnalyticalSolutionStokes")  
+  _point_mesh = point_mesh;
+
+  STOP_LOG("attach_point_mesh()", "AnalyticalSolutionStokes")
 }
 
-
 // ======================================================================
-PointMesh<3>* AnalyticalSolutionStokes::get_point_mesh() 
+PointMesh<3> * AnalyticalSolutionStokes::get_point_mesh()
 {
-    START_LOG("get_point_mesh()", "AnalyticalSolutionStokes");  
-    
-    return _point_mesh;
+  START_LOG("get_point_mesh()", "AnalyticalSolutionStokes");
 
-    STOP_LOG("get_point_mesh()", "AnalyticalSolutionStokes");    
+  return _point_mesh;
+
+  STOP_LOG("get_point_mesh()", "AnalyticalSolutionStokes");
 }
 
-
 // ======================================================================
-std::vector<Real> AnalyticalSolutionStokes::exact_solution_infinite_domain(GGEMStokes& ggem_stokes,
-                                                                     const Point& pt0) const
+std::vector<Real>AnalyticalSolutionStokes::exact_solution_infinite_domain(
+  GGEMStokes & ggem_stokes,
+  const Point& pt0)
+const
 {
-  
   START_LOG("exact_solution_infinite_domain()", "AnalyticalSolutionStokes");
-  
+
   std::vector<Real> UA(dim, 0.);
-  
+
   DenseMatrix<Number> GT;
-  
+
   // GGEM object and number of points in the system
   // GGEMStokes ggem_stokes;
-  
+
   const std::size_t n_points = _point_mesh->num_particles();
-  
+
   // loop over each point
-  for(std::size_t i=0; i<n_points; ++i)
+  for (std::size_t i = 0; i < n_points; ++i)
   {
     const Point pti = _point_mesh->particles()[i]->point();
     const Point x   = pt0 - pti;
-    
+
     // use ksi instead of alpha
     GT = ggem_stokes.green_tensor_unbounded_smoothed(x, ggem_stokes.get_ksi());
     const Point fv = _point_mesh->particles()[i]->particle_force();
-    
+
     // 3. compute u due to this particle
-    for (std::size_t k=0; k<dim; ++k){
-      for (std::size_t l=0; l<dim; ++l){
-        UA[k] += GT(k,l)*fv(l);
+    for (std::size_t k = 0; k < dim; ++k) {
+      for (std::size_t l = 0; l < dim; ++l) {
+        UA[k] += GT(k, l) * fv(l);
       } // end for l
-    } // end for k
-  } // end for i
-  
+    }   // end for k
+  }     // end for i
+
   STOP_LOG("exact_solution_infinite_domain()", "AnalyticalSolutionStokes");
   return UA;
 }
-
 
 // ======================================================================
 Real AnalyticalSolutionStokes::correction_factor_bohlin(const Real r_r0) const
 {
   START_LOG("correction_factor_bohlin()", "AnalyticalSolutionStokes");
-  
-  Real factor = 1.0 - 2.10443*r_r0 + 2.08877*std::pow(r_r0,3)
-              - 0.94813*std::pow(r_r0,5) - 1.372*std::pow(r_r0,6)
-              + 3.87*std::pow(r_r0,8) - 4.19*std::pow(r_r0,10);
-  
-  STOP_LOG("correction_factor_bohlin()", "AnalyticalSolutionStokes");
-  return 1.0/factor;
-}
 
+  Real factor = 1.0 - 2.10443 * r_r0 + 2.08877 * std::pow(r_r0, 3)
+                - 0.94813 * std::pow(r_r0, 5) - 1.372 * std::pow(r_r0, 6)
+                + 3.87 * std::pow(r_r0, 8) - 4.19 * std::pow(r_r0, 10);
+
+  STOP_LOG("correction_factor_bohlin()", "AnalyticalSolutionStokes");
+  return 1.0 / factor;
+}
 
 // ======================================================================
 Real AnalyticalSolutionStokes::correction_factor_haberman(const Real r_r0) const
 {
   START_LOG("correction_factor_haberman()", "AnalyticalSolutionStokes");
-  
-  Real f1 = 1.0 - 0.75857*std::pow(r_r0,5);
-  Real f2 = 1.0 - 2.1050*r_r0 + 2.0865*std::pow(r_r0,3)
-          - 1.7068*std::pow(r_r0,5) + 0.72603*std::pow(r_r0,6);
-  
+
+  Real f1 = 1.0 - 0.75857 * std::pow(r_r0, 5);
+  Real f2 = 1.0 - 2.1050 * r_r0 + 2.0865 * std::pow(r_r0, 3)
+            - 1.7068 * std::pow(r_r0, 5) + 0.72603 * std::pow(r_r0, 6);
+
   STOP_LOG("correction_factor_haberman()", "AnalyticalSolutionStokes");
-  return f1/f2;
+  return f1 / f2;
 }

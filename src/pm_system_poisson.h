@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -18,7 +19,6 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-
 #pragma once
 
 // Local Includes
@@ -27,30 +27,27 @@
 #include "pm_linear_implicit_system.h"
 #include "ggem_poisson.h"
 
-namespace libMesh
-{
-
+namespace libMesh {
 /*
  * The PMSystemPoisson is designed to solve the Poisson
  * equation with point charge sources on a finite element mesh.
  */
 
-class PMSystemPoisson : public PMLinearImplicitSystem
-{
+class PMSystemPoisson : public PMLinearImplicitSystem {
 public:
 
   /**
    * Constructor.
    */
-  PMSystemPoisson (EquationSystems& es,
-                   const std::string& name,
-                   const unsigned int number); // number of systems
+  PMSystemPoisson(EquationSystems  & es,
+                  const std::string& name,
+                  const unsigned int number); // number of systems
 
 
   /**
    * Destructor.
    */
-  virtual ~PMSystemPoisson ();
+  virtual ~PMSystemPoisson();
 
 
   /**
@@ -62,35 +59,36 @@ public:
   /**
    * @returns a clever pointer to the system.
    */
-  sys_type & system () { return *this; }
-
+  sys_type& system() {
+    return *this;
+  }
 
   /**
    * Clear all the data structures associated with the system.
    */
-  void clear ();
+  void clear();
 
 
   /**
    * Assemble the system matrix.
    */
-  void assemble_matrix (const std::string& system_name,
-                        const std::string& option) override;
+  void assemble_matrix(const std::string& system_name,
+                       const std::string& option) override;
 
 
   /**
    * Assemble the system rhs.
    */
-  void assemble_rhs (const std::string& system_name,
-                     const std::string& option) override;
+  void assemble_rhs(const std::string& system_name,
+                    const std::string& option) override;
 
 
   /*
    * Solve the system.
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve (const std::string& option,
-              const bool& re_init) override;
+  void solve(const std::string& option,
+             const bool       & re_init) override;
 
 
   /*
@@ -105,7 +103,7 @@ public:
    * local and global solution, and update the solution vectors.
    * output_format=="EXODUS" ; "VTK"; "GMV"
    */
-  void write_equation_systems(const std::size_t time_step,
+  void write_equation_systems(const std::size_t  time_step,
                               const std::string& output_filename,
                               const std::string& output_format) override;
 
@@ -137,8 +135,9 @@ public:
   /*
    * Return the SolverPoisson
    */
-  SolverPoisson& solver_poisson() { return _solver_poisson; }
-
+  SolverPoisson& solver_poisson() {
+    return _solver_poisson;
+  }
 
   /**
    * Local electrical potential of a point in an unbounded space,
@@ -146,7 +145,7 @@ public:
    * search the neighbor list around Point &p.
    * charge_type: "regularized"
    */
-  Real local_potential_field(const Point &p,
+  Real local_potential_field(const Point      & p,
                              const std::string& charge_type) const;
 
 
@@ -156,8 +155,8 @@ public:
    * already-built neighbor list of Elem* elem.
    * charge_type: "regularized"
    */
-  Real local_potential_field(const Elem* elem,
-                             const Point &p,
+  Real local_potential_field(const Elem        *elem,
+                             const Point      & p,
                              const std::string& charge_type) const;
 
 
@@ -177,21 +176,18 @@ public:
    */
   void test_potential_profile();
 
-
 private:
 
   // Poisson solver
   SolverPoisson _solver_poisson;
 
   // Assemble Poisson system
-  AssemblePoisson* _assemble_poisson;
-  
+  AssemblePoisson *_assemble_poisson;
+
   // Get a pointer to AnalyticalSolutionPoisson
-  AnalyticalSolutionPoisson* analytical_solution;
+  AnalyticalSolutionPoisson *analytical_solution;
 
   // Get a pointer to GGEMPoisson
-  GGEMPoisson* ggem_poisson;
-
+  GGEMPoisson *ggem_poisson;
 };
-
 } // end namespace libMesh

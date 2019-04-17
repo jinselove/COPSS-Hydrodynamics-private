@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -22,28 +23,27 @@
 
 #include "fix_point.h"
 #include "../polymer_chain.h"
-namespace libMesh
-{
-
-class FixPointWLS : public FixPoint
-{
+namespace libMesh {
+class FixPointWLS : public FixPoint {
 public:
-	FixPointWLS(PMLinearImplicitSystem& pm_sys);
 
-	~FixPointWLS(){};
+  FixPointWLS(PMLinearImplicitSystem& pm_sys);
 
-	void print_fix();
+  ~FixPointWLS() {}
 
-	void initPointParticleType();
+  void print_fix();
 
-	void initParams();
+  void initPointParticleType();
 
-	void compute();
+  void initParams();
+
+  void compute();
+
 private:
-	Real c1;
-	Real Ls;
-	std::size_t n_bonds;
-	PolymerChain* polymer_chain;
-};
 
+  Real c1;
+  Real Ls;
+  std::size_t n_bonds;
+  PolymerChain *polymer_chain;
+};
 }

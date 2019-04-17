@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -21,26 +22,24 @@
 #pragma once
 
 #include "fix_rigid.h"
-namespace libMesh
-{
-
-class FixRigidLJCut : public FixRigid
-{
+namespace libMesh {
+class FixRigidLJCut : public FixRigid {
 public:
-	FixRigidLJCut(PMLinearImplicitSystem& pm_sys);
 
-	~FixRigidLJCut(){};
+  FixRigidLJCut(PMLinearImplicitSystem& pm_sys);
 
-	void print_fix();
+  ~FixRigidLJCut() {}
 
-	void initParams();
+  void print_fix();
 
-	void compute();
+  void initParams();
+
+  void compute();
 
 private:
-	Real epsilon;
-	Real sigma;
-	Real rCut;
-};
 
+  Real epsilon;
+  Real sigma;
+  Real rCut;
+};
 }

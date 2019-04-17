@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -32,93 +33,101 @@
 using namespace libMesh;
 
 
-namespace libMesh
-{
-  
-  
+namespace libMesh {
 /*
-* Type of a Dirac Delta function
-*/
+ * Type of a Dirac Delta function
+ */
 enum DeltaFunType {
-    NOT_DEFINED_DELTAFUNTYPE   = -1,   // NOT DEFINED delta function
-    SINGULAR      = 0,    // Original Dirac delta function with singularity
-    SMOOTHED_EXP  = 1,    // Smoothed (Exponent/Gaussian form)
-    SMOOTHED_POL1 = 2,    // (Polynomial type 1)
-    SMOOTHED_POL2 = 3     // (Polynomial type 2)
+  NOT_DEFINED_DELTAFUNTYPE = -1, // NOT DEFINED delta function
+  SINGULAR                 = 0,  // Original Dirac delta function with
+                                 // singularity
+  SMOOTHED_EXP             = 1,  // Smoothed (Exponent/Gaussian form)
+  SMOOTHED_POL1            = 2,  // (Polynomial type 1)
+  SMOOTHED_POL2            = 3   // (Polynomial type 2)
 };
-  
-class GGEMSystem : public ReferenceCountedObject<GGEMSystem>
-{
+
+class GGEMSystem : public ReferenceCountedObject<GGEMSystem> {
 public:
 
-    // Constructor
-    GGEMSystem(){
-        _kronecker_delta.resize(dim, std::vector<Real>(dim,0.));
-        for(int i=0; i<3; i++) _kronecker_delta[i][i] = 1.;
-    };
+  // Constructor
+  GGEMSystem() {
+    _kronecker_delta.resize(dim, std::vector<Real>(dim, 0.));
+
+    for (int i = 0; i < 3; i++) _kronecker_delta[i][i] = 1.;
+  }
+
+  // Destructor
+  ~GGEMSystem() {}
 
 
-    // Destructor
-    ~GGEMSystem(){};
-
-
-    /* 
-    * Kronecker delta function 
-    */
-    inline Real kronecker_delta(const std::size_t i,
+  /*
+   * Kronecker delta function
+   */
+  inline Real kronecker_delta(const std::size_t i,
                               const std::size_t j) const
-    { return  i==j ? 1.0 : 0.0; };
-    
+  {
+    return i == j ? 1.0 : 0.0;
+  }
 
-    //! set PointType 
-    void set_point_type(const PointType& _point_type) {point_type = _point_type;};
-    PointType get_point_type() {return point_type;};
-    
-    //! set GGEM alpha
-    virtual void set_alpha(const Real& _alpha) = 0;
-    Real get_alpha() {return alpha;};
+  // ! set PointType
+  void set_point_type(const PointType& _point_type) {
+    point_type = _point_type;
+  }
 
-    //! set regularization parameter
-    virtual void set_ksi() = 0;
-    Real get_ksi() {return ksi;};
+  PointType get_point_type() {
+    return point_type;
+  }
 
-    //! set bead radius (non-dimensional), it should be 1.
-    void set_br0(const Real& _br0) {br0 = _br0;};
-    Real get_br0() {return br0;};
+  // ! set GGEM alpha
+  virtual void set_alpha(const Real& _alpha) = 0;
+  Real         get_alpha() {
+    return alpha;
+  }
 
-  
+  // ! set regularization parameter
+  virtual void set_ksi() = 0;
+  Real         get_ksi() {
+    return ksi;
+  }
+
+  // ! set bead radius (non-dimensional), it should be 1.
+  void set_br0(const Real& _br0) {
+    br0 = _br0;
+  }
+
+  Real get_br0() {
+    return br0;
+  }
+
 protected:
 
-  std::vector<std::vector<Real>> _kronecker_delta;
-  
-  //! Pi = 3.1415926...
-  const Real  PI      = libMesh::pi;
-  
-  //! pi^(1/2)
-  const Real  sqrt_pi = std::sqrt(PI);
-  
-  //! pi^(3/2)
-  const Real pi_23 = std::pow(PI, 3./2.);
-  
+  std::vector<std::vector<Real> >_kronecker_delta;
+
+  // ! Pi = 3.1415926...
+  const Real PI = libMesh::pi;
+
+  // ! pi^(1/2)
+  const Real sqrt_pi = std::sqrt(PI);
+
+  // ! pi^(3/2)
+  const Real pi_23 = std::pow(PI, 3. / 2.);
+
   // tolerance
-  const Real  r_eps   = 1E-6;  
-  
+  const Real r_eps = 1E-6;
+
   // dimensions
   const int dim = 3;
-    
-  //! alpha
-  Real alpha = NAN;
-  
-  //! regularization parameter
-  Real ksi = NAN;
-  
-  //! point type: POLYMER_BEAD or LAGRANGIAN_POINT or POINT_PARTICLE
-  PointType point_type = NOT_DEFINED_POINTTYPE;
-    
-  //! bead radius
-  Real br0 = NAN;
-  
-};
 
-  
+  // ! alpha
+  Real alpha = NAN;
+
+  // ! regularization parameter
+  Real ksi = NAN;
+
+  // ! point type: POLYMER_BEAD or LAGRANGIAN_POINT or POINT_PARTICLE
+  PointType point_type = NOT_DEFINED_POINTTYPE;
+
+  // ! bead radius
+  Real br0 = NAN;
+};
 } // end of namespace

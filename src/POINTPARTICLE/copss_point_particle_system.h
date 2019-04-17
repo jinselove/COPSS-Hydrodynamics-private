@@ -24,74 +24,68 @@ using std::cout;
 using std::endl;
 using std::string;
 
-namespace libMesh{
-
-class CopssPointParticleSystem : public Copss
-{
+namespace libMesh {
+class CopssPointParticleSystem : public Copss {
 public:
-	
-	CopssPointParticleSystem (CopssInit& init);
 
-	~CopssPointParticleSystem();
+  CopssPointParticleSystem(CopssInit& init);
 
-	// integrator
-	void run(EquationSystems& equation_systems) override;
+  ~CopssPointParticleSystem();
+
+  // integrator
+  void run(EquationSystems& equation_systems) override;
 
 protected:
-	std::string point_particle_model;
-	// ===========for beads and polymer chains
-	unsigned int Nb; // total # of beads
-	unsigned int Ns; // total # of springs per Chain
-	unsigned int nBonds; // total # of springs/bonds
-	// ===========for polymer chains
-	unsigned int nChains; // total # of chains
-	Real bk; // Kuhn length (um)
-	Real Nks; // # of Kuhn length per Chain
-	Real Ss2; // (um^2)
-	Real q0; //maximum spring length (um)
-	Real chain_length; // contour length of the spring (um)
-	Real Dc; // Diffusivity of the chain (um^2/s)
 
-	// extra parameters for dynamic process
-	Real max_spring_len;
-	bool chain_broken;
+  std::string point_particle_model;
 
-	// override read_particle_parameters() function in Copss class
-	void read_particle_info () override;
+  // ===========for beads and polymer chains
+  unsigned int Nb;      // total # of beads
+  unsigned int Ns;      // total # of springs per Chain
+  unsigned int nBonds;  // total # of springs/bonds
+  // ===========for polymer chains
+  unsigned int nChains; // total # of chains
+  Real bk;              // Kuhn length (um)
+  Real Nks;             // # of Kuhn length per Chain
+  Real Ss2;             // (um^2)
+  Real q0;              // maximum spring length (um)
+  Real chain_length;    // contour length of the spring (um)
+  Real Dc;              // Diffusivity of the chain (um^2/s)
 
-	// read ggem and ibm info
-	void read_ggem_info () override;
-	
-	// create objects, polymer chains
-	void create_object() override;
+  // extra parameters for dynamic process
+  Real max_spring_len;
+  bool chain_broken;
 
-	// create object mesh
-	void create_object_mesh() override;
+  // override read_particle_parameters() function in Copss class
+  void read_particle_info() override;
 
-	// attach object mesh to system
-	void attach_object_mesh(PMLinearImplicitSystem& system) override;
+  // read ggem and ibm info
+  void read_ggem_info() override;
 
-	// set parameters for equations systems
-	void set_parameters(EquationSystems& equation_systems) override;
+  // create objects, polymer chains
+  void create_object() override;
 
-	// update object due to PBC after check_wall()
-	void update_object();
-        
-    // write object to output file
-    void write_object(unsigned int step_id) override;
+  // create object mesh
+  void create_object_mesh() override;
 
+  // attach object mesh to system
+  void attach_object_mesh(PMLinearImplicitSystem& system) override;
 
+  // set parameters for equations systems
+  void set_parameters(EquationSystems& equation_systems) override;
+
+  // update object due to PBC after check_wall()
+  void update_object();
+
+  // write object to output file
+  void write_object(unsigned int step_id) override;
 
 private:
 
-	PolymerChain* polymer_chain;
-	//std::unique_ptr<PolymerChain> polymer_chain;
+  PolymerChain *polymer_chain;
 
-	//std::unique_ptr<PointMesh<3> > point_mesh; 
+  // std::unique_ptr<PolymerChain> polymer_chain;
 
-
-
+  // std::unique_ptr<PointMesh<3> > point_mesh;
 };
-
-
 }

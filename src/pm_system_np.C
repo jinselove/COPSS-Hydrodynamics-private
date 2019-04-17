@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -38,21 +39,17 @@
 #include "pm_system_np.h"
 
 
-namespace libMesh
-{
-
+namespace libMesh {
 // ======================================================================================
-PMSystemNP::PMSystemNP(EquationSystems& es,
-                               const std::string& name,
-                               const unsigned int number)
-: PMLinearImplicitSystem (es, name, number),
+PMSystemNP::PMSystemNP(EquationSystems  & es,
+                       const std::string& name,
+                       const unsigned int number)
+  : PMLinearImplicitSystem(es, name, number),
   _np_solver(es)
 {
   // Stokes equation assembly
-  _assemble_np = ( new AssembleNP(es) );
+  _assemble_np = (new AssembleNP(es));
 }
-
-
 
 // ==================================================================================
 PMSystemNP::~PMSystemNP()
@@ -61,54 +58,45 @@ PMSystemNP::~PMSystemNP()
   this->clear();
 }
 
-
-
 // ==================================================================================
-void PMSystemNP::clear ()
+void PMSystemNP::clear()
 {
   // delete the pointer
-  if(_assemble_np) {
+  if (_assemble_np) {
     delete _assemble_np;
   }
 }
 
-
-
 // ===========================================================
 void PMSystemNP::assemble_matrix(const std::string& system_name,
-             			     const std::string& option)
+                                 const std::string& option)
 {
-  libmesh_assert (this->matrix);
-  libmesh_assert (this->matrix->initialized());
+  libmesh_assert(this->matrix);
+  libmesh_assert(this->matrix->initialized());
 
   START_LOG("assemble_matrix()", "PMSystemNP");
 
   STOP_LOG("assemble_matrix()", "PMSystemNP");
 }
 
-
-
 // ==================================================================================
 void PMSystemNP::assemble_rhs(const std::string& system_name,
-                                  const std::string& option)
+                              const std::string& option)
 {
-  libmesh_assert (this->rhs);
-  libmesh_assert (this->rhs->initialized());
+  libmesh_assert(this->rhs);
+  libmesh_assert(this->rhs->initialized());
 
   START_LOG("assemble_rhs()", "PMSystemNP");
 
   STOP_LOG("assemble_rhs()", "PMSystemNP");
 }
 
-
-
 // ==================================================================================
 void PMSystemNP::solve(const std::string& option,
-                            const bool& re_init)
+                       const bool       & re_init)
 {
   START_LOG("solve()", "PMSystemNP");
 
   STOP_LOG("solve()", "PMSystemNP");
 }
-
 } // end of namespace

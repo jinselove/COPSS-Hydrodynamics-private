@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -21,33 +22,29 @@
 #pragma once
 
 #include "fix_point.h"
-namespace libMesh
-{
-
-class FixPointDiscretizedWallLJCut : public FixPoint
-{
-
+namespace libMesh {
+class FixPointDiscretizedWallLJCut : public FixPoint {
 public:
 
-	FixPointDiscretizedWallLJCut(PMLinearImplicitSystem& pm_sys);
+  FixPointDiscretizedWallLJCut(PMLinearImplicitSystem& pm_sys);
 
-	~FixPointDiscretizedWallLJCut(){};
+  ~FixPointDiscretizedWallLJCut() {}
 
-	void initParams();
+  void initParams();
 
-	void print_fix();
+  void print_fix();
 
-	void compute();
+  void compute();
 
-	void read_wall_particle();
+  void read_wall_particle();
+
 protected:
-	Real epsilon;
-	Real sigma;
-	Real rCut;
-	unsigned int num_wall_particles;
-	const std::string wall_particle_filename = "wall_particle.pos";
-	std::vector<Point> wall_particle_pos;
 
+  Real epsilon;
+  Real sigma;
+  Real rCut;
+  unsigned int num_wall_particles;
+  const std::string wall_particle_filename = "wall_particle.pos";
+  std::vector<Point>wall_particle_pos;
 };
-
 }

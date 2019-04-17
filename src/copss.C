@@ -150,7 +150,8 @@ void Copss::read_physical_info()
            <<"   ------------> The characteristic variables:\n"
            <<"   characteristic time          = " << tc <<" (s)\n"
            <<"   characteristic velocity      = " << uc <<" (um/s)\n"
-           <<"   characteristic force         = " << fc <<" (N)\n"; 
+           <<"   characteristic force         = " << fc <<" (N)\n"
+           <<"   characteristic electrostatic potential = " << phi0 <<  "uV\n"; 
 }// end read_physical_parameter()
 
 
@@ -406,6 +407,8 @@ void Copss::read_chebyshev_info(){
            << "-----------> initial eigen value range = ( " << eig_min << ", " << eig_max << " )" << endl;
     }
   }
+  // build elem-particle neighbor list if either with_hi or module_poisson is true
+  build_elem_neighbor_list = ((with_hi || module_poisson) == true) ? true : false;
 } // end read_chebyshev_info()
 
 
@@ -466,7 +469,7 @@ void Copss::read_run_info(){
        << "-----------> simulation milestone t_milestone = "<<max_dr_coeff[0]<<endl
        << "-----------> before t_milestone, max_dr_coeff = "<<max_dr_coeff[1]<<"; after milestone, max_dr_coeff = "<<max_dr_coeff[2] << endl
        << "-----------> debug_info: " << std::boolalpha << debug_info << endl; 
-  if (with_hi) cout << "-----------> with_hi: " <<std::boolalpha <<with_hi <<endl;
+  cout << "-----------> with_hi: "  <<std::boolalpha << with_hi <<endl;
   if (with_brownian){
 	 cout << "-----------> with_brownian: " <<std::boolalpha<<with_brownian <<endl
         << "-----------> random seed: " <<random_seed <<endl;
@@ -606,17 +609,6 @@ void Copss::create_domain_mesh()
     } 
   } // end else (generate mesh)
 
- // initialize search radius
-  // if(with_hi == false){
-  //   search_radius_p = input_file("search_radius_p", 0.0);
-  //   if (search_radius_p <= 0.) {
-  //     cout <<"  Warning: for Free draining systems, a search_radius_p(> 0) needs to be given to build particle-particle neighborlist" << endl;
-  //     libmesh_error();
-  //   }
-  // }
-  // else{
-  //   search_radius_p = 4.0/alpha;
-  // }
   search_radius_p = 4./alpha; 
   search_radius_e = 0.5*hmaxf + 4./alpha;
   // print mesh info
@@ -894,28 +886,33 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
 //============================================================================================
 void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
 {
-   // get stokes system from equation systems
+  // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Compute undisturbed velocity field without particles.
-   NOTE: We MUST re-init particle-mesh before solving Stokes
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  // if either with_hi or module_poisson is true, build_elem_neighbor_list will be true
   if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-  system.reinit_hi_system(neighbor_list_update_flag); // neighbor_list_update is ture here
+  system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
   if(print_info){
-    cout << "print particle information after first reinit\n";
-    if(comm_in->rank()==0)
-    point_mesh->print_point_info();
+      cout << "print particle information after reinit system\n";
+      if(comm_in->rank()==0)
+      point_mesh->print_point_info();
   }
   reinit_stokes = true;
-  system.solve("undisturbed",reinit_stokes);
+  system.solve("undisturbed", reinit_stokes);
   v0_ptr = system.solution->clone(); // backup v0
+  // if module_poisson is true, solve the poisson equation and add the electrostatic
+  // force to particles
+  if(module_poisson == true){
+    // Assemble matrix and rhs for Poisson equation, and solve it
+    equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",true);
+    equation_systems.get_system<PMSystemPoisson>("Poisson").add_local_solution();
+    equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();
+  }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    write out the equation systems at Step 0 (undisturbed field)
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   exodus_ptr = new ExodusII_IO(*mesh);
   if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end() && restart==false)
-  {
+  {  
     //system.add_local_solution(); // Don't add local solution for undisturbed system!
 #ifdef LIBMESH_HAVE_EXODUS_API
     exodus_ptr->write_equation_systems(out_system_filename, equation_systems);
@@ -973,18 +970,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
    Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   //cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
-
-  bool module_poisson = equation_systems.parameters.get<bool>("module_poisson");
-
-  if(i==0){
-    // Solve Poisson equation for electrostatic forces, at the first step if Poisson solver is ON
-    if(module_poisson == true){
-      // Assemble matrix and rhs for Poisson equation, and solve it
-      equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",true);
-      // Add electrostatic forces to beads
-      equation_systems.get_system<PMSystemPoisson>("Poisson").add_electrostatic_forces();
-    }
-  }
   //perf_log.push("reinit sytem");
   if(i>0){
     *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
@@ -998,7 +983,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
        neighbor_list_update_flag = true;
        timestep_duration = 0;
     }
-    system.reinit_hi_system(neighbor_list_update_flag);
+    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
 
     // Add electrostatic forces to beads if Poisson solver is ON
     if(module_poisson == true){
@@ -1047,7 +1032,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
           vtest1[k] = vel1[j*dim+k];
         }
         Point vtest2 = point_mesh->particles()[j]->particle_velocity();
-        printf("--->test in test_move_particles(): velocity on the %u-th point:\n",j);
+        printf("--->velocity on the %u-th point:\n",j);
         printf("            U0 = (%.12e,%.12e,%.12e)\n",   vtest0[0],vtest0[1],vtest0[2]);
         printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n", vtest1[0],vtest1[1],vtest1[2]);
         printf("     bead velocity(should be equal to U0+U1) = (%.12e,%.12e,%.12e)\n\n", vtest2(0), vtest2(1), vtest2(2));
@@ -1071,6 +1056,9 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
         if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end())
         {
           system.add_local_solution();  // add local solution for the disturbed system
+          if(module_poisson == true){
+            equation_systems.get_system<PMSystemPoisson>("Poisson").add_local_solution();
+          }          
           //system.solution->add(*v0_ptr);// (do not) add the undisturbed solution
   #ifdef LIBMESH_HAVE_EXODUS_API
           exodus_ptr->append(true);
@@ -1124,7 +1112,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
            << "       # Chebyshev failure steps = " << n_chebyshev_failure << endl
            << "       ##############################################################################################################" << endl;
     } // end if (i % write_interval == 0)
-  } // end if (adaptive_dt)
+} // end if (adaptive_dt
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     If with Brownian motion, we use midpoint scheme
     If without Brownian motion, we use normal stepping: dR = Utotal*dt
@@ -1261,7 +1249,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       system.update();
       // comment the line below if not update neighbor list at each time step
       if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-      system.reinit_hi_system(neighbor_list_update_flag);
+      system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
       system.compute_point_velocity("undisturbed", vel0);
       reinit_stokes = false;
       system.solve("disturbed",reinit_stokes);   // solve the disturbed solution
@@ -1319,7 +1307,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
        timestep_duration = 0;
     }
     // whether or not reinit neighbor list depends on the neighbor_list_update_flag
-    system.reinit_fd_system(neighbor_list_update_flag);
+    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
   }
   Point p_velocity(0.);
   for (std::size_t p_id = 0; p_id < NP; p_id++) {
@@ -1339,21 +1327,32 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
    * last step before restart.
   -----------------------------------------------------------------------------------------*/
   if(i%write_interval == 0){
-    cout << "\nStarting Langevin integration at step "<< i << endl;
-    if (i != restart_step){  
-      /*
-       * write particle to output file
-       */ 
-      this -> write_object(i);
-      /*----------------------------------------------------------------------------------------------------
-       * Write out ROUT for restart mode at step i
-       ----------------------------------------------------------------------------------------------------*/
-      PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
-      VecView(ROUT,viewer);
-      PetscViewerDestroy(&viewer);        
-    }
-    // update o_step
-    o_step++;
+      cout << "\nStarting Langevin integration at step "<< i << endl;
+      if (i != restart_step){
+          /*
+          * write equation system to output file
+          */
+          if (i != 0){
+              if(std::find(output_file.begin(), output_file.end(), "equation_systems") != output_file.end() and module_poisson == true)
+              {
+                  equation_systems.get_system<PMSystemPoisson>("Poisson").add_local_solution();          
+                  #ifdef LIBMESH_HAVE_EXODUS_API
+                      exodus_ptr->append(true);
+                      exodus_ptr->write_timestep(out_system_filename,equation_systems,o_step,o_step);
+                  #endif
+              } // end if (write es)
+          }    
+          //write particle to output file
+          this -> write_object(i);
+          /*----------------------------------------------------------------------------------------------------
+           * Write out ROUT for restart mode at step i
+           ----------------------------------------------------------------------------------------------------*/
+          PetscViewerBinaryOpen(PETSC_COMM_WORLD,"vector_ROUT.dat",FILE_MODE_WRITE,&viewer);
+          VecView(ROUT,viewer);
+          PetscViewerDestroy(&viewer);        
+      }
+      // update o_step
+      o_step++;
   } // end if (i % write_interval == 0 )
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Adaptive time step.
@@ -1446,6 +1445,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
     this -> update_object();
     // Update ROUT (position vector excluding pbc) at the i-th step
     VecAXPY(ROUT,dt,U0); // ROUT = ROUT + dt*U0_mid   
+  
   } // end else (without_brownian)
   real_time += dt;
   timestep_duration += 1;

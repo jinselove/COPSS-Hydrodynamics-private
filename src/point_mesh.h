@@ -381,13 +381,13 @@ public:
   /*
    * Reinit the point-mesh system. This includes:
    * (1) build the point-point neighbor list according to search radius;
-   * (2) build the element-point neighbor list according to search radius;
+   * (2) build the element-point neighbor list according to search radius
+         (only if build_elem_neighbor_list is true);
    * (3) set the elem_id and proc_id for points
    * ---- force recalculation is not reinitialized here, but in ForceField:
    */
-  void reinit(const bool& with_hi,
-              bool& neighbor_list_update_flag);
-  
+  void reinit(bool& neighbor_list_update_flag,
+              const bool& build_elem_neighbor_list);
   
   
   /*

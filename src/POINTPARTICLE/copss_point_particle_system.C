@@ -157,7 +157,7 @@ void CopssPointParticleSystem::create_object_mesh(){
   point_mesh = new PointMesh<3> (*mesh, *polymer_chain, search_radius_p, search_radius_e);
   point_mesh->add_periodic_boundary(*pm_periodic_boundary);
   // reinit point mesh (including particles and neighbor list)
-  point_mesh->reinit(with_hi, neighbor_list_update_flag);
+  point_mesh->reinit(neighbor_list_update_flag, true);
   cout <<"-------------> Reinit point mesh object, finished! \n"
             <<"- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
 		        <<"### The point-mesh info:\n"
@@ -255,18 +255,19 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   // validate GGEMStokes if simulation_name = ggem_validation
   if (simulation_name == "ggem_validation"){
 	  perf_log.push("GGEM validation");
-	  system.test_velocity_profile(neighbor_list_update_flag);
+      system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
+	  system.test_velocity_profile();
 	  perf_log.pop("GGEM validation");
 	  return;
   }
   // validate GGEMPoisson if simulation_name = ggem_validation_poisson
   if (simulation_name == "ggem_validation_poisson"){
 	  perf_log.push("GGEMPoisson validation");
-          PMSystemPoisson& system_poisson = equation_systems.get_system<PMSystemPoisson> ("Poisson");
-          //Build neighbor list, will this update point_mesh in PMSystemPoisson?
-          system.reinit_hi_system(neighbor_list_update_flag);
-	  system_poisson.test_potential_profile(neighbor_list_update_flag);
-	  perf_log.pop("GGEMPoisson validation");
+      PMSystemPoisson& system_poisson = equation_systems.get_system<PMSystemPoisson> ("Poisson");
+      //Build neighbor list, will this update point_mesh in PMSystemPoisson?
+      system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
+      system_poisson.test_potential_profile();
+      perf_log.pop("GGEMPoisson validation");
 	  return;
   }
 
@@ -296,16 +297,10 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems){
   Compute undisturbed velocity field without particles.
   NOTE: We MUST re-init particle-mesh before solving Stokes
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  cout<<"==>(1/3) Compute the undisturbed velocity field"<<endl;
-  if (with_hi){
-    perf_log.push("solve undisturbed_system");
-    this->solve_undisturbed_system(equation_systems); 
-    perf_log.pop("solve undisturbed_system"); 
-  }
-  else{
-    if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-    system.reinit_fd_system(neighbor_list_update_flag); // neighbor_list_update is ture here
-  }
+  cout<<"==>(1/3) Solve the undisturbed system"<<endl;
+  perf_log.push("solve_undisturbed_system");
+  this->solve_undisturbed_system(equation_systems); 
+  perf_log.pop("solve_undisturbed_system");
   // create Brownian system for simulation
   cout<<"==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"<<endl;
   this -> create_brownian_system(equation_systems);

@@ -569,7 +569,7 @@ Real PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,
 
 
 // ==================================================================================
-void PMSystemPoisson::test_potential_profile(bool& neighbor_list_update_flag)
+void PMSystemPoisson::test_potential_profile()
 {
   START_LOG("test_potential_profile()", "PMSystemPoisson");
 

@@ -76,17 +76,8 @@ public:
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    */
-  void reinit_hi_system(bool& neighbor_list_update_flag);
-
-
-  /*
-   * Re-init free-draining system, including:
-   * (1) reinit() reinit point particles
-   *              build_particle_neighbor_list()
-   * (2) compute particle force (by force field)
-   *             modify the force field according to the vel_last_step.
-   */
-  void reinit_fd_system(bool& neighbor_list_update_flag);
+  void reinit_system(bool& neighbor_list_update_flag,
+                     const bool& build_elem_neighbor_list);
 
 
   /**
@@ -214,7 +205,7 @@ public:
   /*
    * Test function. output velocity profile along x-y-z direction
    */
-  void test_velocity_profile(bool& neighbor_list_update_flag);
+  void test_velocity_profile();
 
 
   /*

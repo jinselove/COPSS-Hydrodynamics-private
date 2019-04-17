@@ -175,7 +175,7 @@ public:
    * Compare numerical solution with analytical solution for 3 charged beads
    * in unbounded domain.
    */
-  void test_potential_profile(bool& neighbor_list_update_flag);
+  void test_potential_profile();
 
 
 private:

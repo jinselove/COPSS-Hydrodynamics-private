@@ -80,18 +80,17 @@ void PMSystemStokes::clear ()
 
 
 // ==================================================================================
-void PMSystemStokes::reinit_hi_system(bool& neighbor_list_update_flag)
+void PMSystemStokes::reinit_system(bool& neighbor_list_update_flag,
+                                   const bool& build_elem_neighbor_list)
 {
-  //PerfLog perf_log("reinit_hi_system");
-  START_LOG("reinit_hi_system()", "PMSystemStokes");
+  START_LOG("reinit_system()", "PMSystemStokes");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
   // reinit point-mesh system, including
   // (1) build the point-point neighbor list according to search radius;
   // (2) build the element-point neighbor list according to search radius;
   // (3) evaluate forces
   //perf_log.push("reinit point_mesh");
-  const bool with_hi = true;
-  _point_mesh->reinit(with_hi, neighbor_list_update_flag);
+  _point_mesh->reinit(neighbor_list_update_flag, build_elem_neighbor_list);
   //perf_log.pop("reinit point_mesh");
   //perf_log.push("fix compute");
   // update the tracking points position on the mesh if needed
@@ -119,47 +118,7 @@ void PMSystemStokes::reinit_hi_system(bool& neighbor_list_update_flag)
     }
   }
   //perf_log.pop("fix compute");
-  STOP_LOG("reinit_hi_system()", "PMSystemStokes");
-}
-
-
-
-// ==================================================================================
-void PMSystemStokes::reinit_fd_system(bool& neighbor_list_update_flag)
-{
-  START_LOG("reinit_fd_system()", "PMSystemStokes");
-  this->comm().barrier(); // Is this at the beginning or the end necessary?
-
-  // reinit point-mesh system, including
-  // (1) build the point-point neighbor list according to search radius;
-  // (2) set the elem_id and proc_id for points
-  const bool with_hi = false;
-  _point_mesh->reinit(with_hi, neighbor_list_update_flag);
-  // update the tracking points position on the mesh if needed
-  if(_particle_mesh != NULL){
-    // update node positions on particle mesh using updated point mesh information
-    _point_mesh->update_particle_mesh(_particle_mesh);
-    // zero force density of each rigid particle
-    _particle_mesh->zero_node_force();
-    // need to check if particles are on the pbc, if so, rebuild the particle mesh
-    _fixes[0]->check_pbc_pre_fix();
-    // compute forces on surface nodes
-    for (std::size_t i = 0; i < _fixes.size(); i++){
-      _fixes[i]->compute();
-    }
-    // sync forces on nodes to PointParticles in point mesh
-    _fixes[0] -> sync_node_to_pointmesh();
-    // need to restore particle mesh after applying all fixes if particles are on pbc
-    _fixes[0]->check_pbc_post_fix();
-  }
-  else
-  {
-    for (std::size_t i = 0; i < _fixes.size(); i++){
-      _fixes[i]->compute();
-    }
-  }
-
-  STOP_LOG("reinit_fd_system()", "PMSystemStokes");
+  STOP_LOG("reinit_system()", "PMSystemStokes");
 }
 
 
@@ -350,9 +309,10 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
   START_LOG("test_l2_norm()", "PMSystemStokes");
   std::string msg = "--->test in PMSystemStokes::test_l2_norm(): \n";
   PMToolBox::output_message(msg, this->comm());
-
+  bool build_elem_neighbor_list = true;
+  
   // Numerical solution: Global(FEM) + Local(Analytical)
-  this->reinit_hi_system(neighbor_list_update_flag);       // re-init particle-mesh before start
+  this->reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
   const bool re_init = true;
   this->solve("disturbed",re_init);
   this->add_local_solution();
@@ -724,17 +684,16 @@ Point PMSystemStokes::global_self_exclusion(const std::size_t p_id) const
 
 
 // ==================================================================================
-void PMSystemStokes::test_velocity_profile(bool& neighbor_list_update_flag)
+void PMSystemStokes::test_velocity_profile()
 {
   START_LOG("test_velocity_profile()", "PMSystemStokes");
-
+  bool neighbor_list_update_flag = true;
   // solve the disturbed velocity field: global solution(FEM solution)
   // In this test, we assume that undisturbed velocity is zero!
   std::cout<< "========>2. Test in PMSystemStokes::test_velocity_profile(): \n";
-  this->reinit_hi_system(neighbor_list_update_flag); // re-init particle-mesh before start
+  // build both particle-particle and particle-elem neighbor list
   const bool re_init = true;
   this->solve("disturbed",re_init);
-
   // output the velocity profiles along xyz directions, global + local solutions.
   const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
   const Point& box_len = _point_mesh->pm_periodic_boundary()->box_length();

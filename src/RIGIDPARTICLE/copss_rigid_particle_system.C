@@ -137,14 +137,12 @@ void CopssRigidParticleSystem::create_object_mesh(){
   this -> create_periodic_boundary();
   cout << "\n==>(3/4) Create particle mesh object\n";
   this -> create_object();
-
   cout << "\n==>(4/4) Create point_mesh object \n";
   // Create object mesh
   point_mesh = new PointMesh<3> (*particle_mesh, search_radius_p, search_radius_e);
   // No need to add periodic boundary, which is already included in particle_mesh
   // Reinit point_mesh
-  point_mesh->reinit(with_hi, neighbor_list_update_flag);
-
+  point_mesh->reinit(neighbor_list_update_flag, build_elem_neighbor_list);
   // finish point_mesh, print information
   cout << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n";
   cout << "### The particle-mesh and point-mesh info:\n";
@@ -228,7 +226,6 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
   cout<<endl<<"============================4. Start moving particles ============================"<<endl<<endl;
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes> ("Stokes");
-   
    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Parameters for dynamic process
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -253,19 +250,8 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems){
   Compute undisturbed velocity field without particles.
   NOTE: We MUST re-init particle-mesh before solving Stokes
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  cout<<"==>(1/3) Compute the undisturbed velocity field"<<endl;
-  if(with_hi){
-    perf_log.push ("solve undisturbed_system");
-    this -> solve_undisturbed_system(equation_systems); 
-    perf_log.pop ("solve undisturbed_system");  
-  }
-  else{
-    if(update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-    system.reinit_fd_system(neighbor_list_update_flag); // neighbor_list_update is ture here
-  }
-  // if(debug_info){
-  //   for (int i = 0; i<num_rigid_particles; i++) particle_mesh->particles()[i]->debug_body_force();
-  // }
+  cout<<"==>(1/3) Solve the undisturbed system"<<endl;
+  this -> solve_undisturbed_system(equation_systems); 
 
   cout<<"==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"<<endl;
   this -> create_brownian_system(equation_systems);

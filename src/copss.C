@@ -1200,39 +1200,24 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
 {
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
-
   // if either with_hi or module_poisson is true, build_elem_neighbor_list will
   // be true
   if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
   system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
-
   if (print_info) {
-    cout << "print particle information after reinit system\n";
-
     if (comm_in->rank() == 0) point_mesh->print_point_info();
   }
-  reinit_stokes = true;
-  system.solve("undisturbed", reinit_stokes);
-  v0_ptr = system.solution->clone(); // backup v0
-
-  // if module_poisson is true, solve the poisson equation and add the
-  // electrostatic
-  // force to particles
-  if (module_poisson == true) {
-    // Assemble matrix and rhs for Poisson equation, and solve it
-    equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused", true);
-    equation_systems.get_system<PMSystemPoisson>("Poisson").add_local_solution();
-    equation_systems.get_system<PMSystemPoisson>("Poisson").
-    add_electrostatic_forces();
+  // if with_hi is true, solve the undisturbed Stokes equation and backup the solution
+  if (with_hi) {
+    system.solve("undisturbed");
+    v0_ptr = system.solution->clone();
   }
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      write out the equation systems at Step 0 (undisturbed field)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
   exodus_ptr = new ExodusII_IO(*mesh);
-
   if ((std::find(output_file.begin(), output_file.end(),
                  "equation_systems") != output_file.end()) && (restart == false))
   {
@@ -1302,21 +1287,15 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
   // PerfLog perf_log("integration");
-  // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       */
-
-  // cout <<"Compute the disturbed particle velocity at step "<<i+1<<endl;
-  // perf_log.push("reinit sytem");
+  */
   if (i > 0) {
     *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
     // Update the local values to reflect the solution on neighboring processors
     system.update();
-
     if (update_neighbor_list_everyStep) {
       neighbor_list_update_flag = true;
     }
@@ -1326,91 +1305,18 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       timestep_duration         = 0;
     }
     system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
-
-    // Add electrostatic forces to beads if Poisson solver is ON
-    if (module_poisson == true) {
-      // Only assemble rhs, solve Poisson equation, and add electrostatic forces
-      // to beads
-      equation_systems.get_system<PMSystemPoisson>("Poisson").solve("unused",
-                                                                    false);
-      equation_systems.get_system<PMSystemPoisson>("Poisson").
-      add_electrostatic_forces();
-    }
   }
-
-  if (print_info) {
-    if (comm_in->rank() == 0) point_mesh->print_point_info();
-  }
-
-  // perf_log.pop("reinit sytem");
-  // perf_log.push("compute_point_velocity undisturbed");
   // compute undisturbed velocity of points
   system.compute_point_velocity("undisturbed", vel0);
-
-  // perf_log.pop("compute_point_velocity undisturbed");
-
-  reinit_stokes = false;
-
-  //  perf_log.push("solve disturbed");
-  system.solve("disturbed", reinit_stokes); // Using SolverStokes
-  //  perf_log.pop("solve disturbed");
-
-  // compute distrubed velocity of points
-  //  perf_log.push("compute_point_velocity disturbed");
+  // compute disturbed velocity of points
+  system.solve("disturbed"); // Using SolverStokes
   system.compute_point_velocity("disturbed", vel1);
-
-  //  perf_log.pop("compute_point_velocity disturbed");
-  // add up undistrubed and disturbed velocity of points
+  // add up undisturbed and disturbed velocity of points
   for (std::size_t j = 0; j < vel1.size(); ++j) vel1[j] += vel0[j];
-
   // transform total point velocity to U0 in Brownian_system
   brownian_sys->vector_transform(vel1, &U0, "forward");
-
   // assign vel1 to particle velocity
   point_mesh->set_bead_velocity(vel1);
-
-  if (debug_info) {
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    * ---> test: output the particle velocity
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       **/
-    const Real v0_min = v0_ptr->min();
-    const Real v0_max = v0_ptr->max();
-    const Real v0_sum = v0_ptr->sum();
-
-    if (comm_in->rank() == 0) {
-      for (unsigned int j = 0; j < NP; ++j)
-      {
-        std::vector<Real> vtest0(dim), vtest1(dim);
-
-        for (std::size_t k = 0; k < dim; ++k) {
-          vtest0[k] = vel0[j * dim + k];
-          vtest1[k] = vel1[j * dim + k];
-        }
-        Point vtest2 = point_mesh->particles()[j]->particle_velocity();
-        printf("--->velocity on the %u-th point:\n",
-               j);
-        printf("            U0 = (%.12e,%.12e,%.12e)\n",
-               vtest0[0],
-               vtest0[1],
-               vtest0[2]);
-        printf("       U0 + U1 = (%.12e,%.12e,%.12e)\n",
-               vtest1[0],
-               vtest1[1],
-               vtest1[2]);
-        printf(
-          "     bead velocity(should be equal to U0+U1) = (%.12e,%.12e,%.12e)\n\n",
-               vtest2(0),
-               vtest2(1),
-               vtest2(2));
-      }
-      printf("fluid field v0_min = %.12e, v0_max = %.12e, v0_sum = %.12e)\n",
-             v0_min,
-             v0_max,
-             v0_sum);
-    }
-  }
-
   /*---------------------------------------------------------------------------------------
    * write equation system at step i
    * print out information at step 0
@@ -1431,13 +1337,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
         {
           system.add_local_solution(); // add local solution for the disturbed
                                        // system
-
-          if (module_poisson == true) {
-            equation_systems.get_system<PMSystemPoisson>("Poisson").
-            add_local_solution();
-          }
-
-          // system.solution->add(*v0_ptr);// (do not) add the undisturbed
           // solution
   #ifdef LIBMESH_HAVE_EXODUS_API
           exodus_ptr->append(true);
@@ -1706,41 +1605,16 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
          - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
             - */
       brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
-      VecWAXPY(R_mid, 0.5 * dt, U0, R0);                                     // R_mid
-                                                                             // =
-                                                                             // R0
-                                                                             // +
-                                                                             // 0.5*dt*(U0+U1)
-                                                                             // 
-                                                                             // (R0
-                                                                             // and
-                                                                             // U0
-                                                                             // do
-                                                                             // NOT
-                                                                             // change)
-      coef = 0.5;                                                            // coefficient.
-                                                                             // sqrt(2)
-                                                                             // is
-                                                                             // introduced
-                                                                             // when
-                                                                             // generating
-                                                                             // dw
-      VecAXPY(R_mid, coef, dw_mid);                                          // R_mid
-                                                                             // =
-                                                                             // R_mid
-                                                                             // +
-                                                                             // 0.5*sqrt(2)*D*B^-1*dw
-      brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
-                                                                             // mid-point
-                                                                             // coords
-                                                                             // &&
-                                                                             // apply
-                                                                             // pbc
-                                                                             // to
-                                                                             // particle
-                                                                             // position
+      // R_mid = R0 + 0.5*dt*(U0+U1) (R0 and U0 do NOT change)
+      VecWAXPY(R_mid, 0.5 * dt, U0, R0);                  
+      // coefficient.                   
+      coef = 0.5;                                                            
+      // R_mid = R_mid + 0.5*sqrt(2)*D*B^-1*dw; 
+      // sqrt(2) is introduced when generating dw
+      VecAXPY(R_mid, coef, dw_mid);
+      // Update mid-point coords && apply pbc to particle position                                          
+      brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); 
       this->update_object();
-
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         -
          Update the particle mesh for the mid-point step,
@@ -1757,17 +1631,13 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
       system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
       system.compute_point_velocity("undisturbed", vel0);
-      reinit_stokes = false;
-      system.solve("disturbed", reinit_stokes); // solve the disturbed solution
+      system.solve("disturbed"); // solve the disturbed solution
       system.compute_point_velocity("disturbed", vel1);
 
       for (std::size_t j = 0; j < vel1.size(); ++j) vel1[j] += vel0[j];
-      brownian_sys->vector_transform(vel1, &U0, "forward"); // (U0+U1)_mid
-      brownian_sys->hi_ewald(M, dw, dw_mid);                // dw_mid =
-                                                            // D_mid*dw, where
-                                                            // dw=B^-1*dw
-                                                            // computed above
-
+      brownian_sys->vector_transform(vel1, &U0, "forward"); 
+      // dw_mid = D_mid*dw, where dw=B^-1*dw 
+      brownian_sys->hi_ewald(M, dw, dw_mid);                
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         -
          the mid-point to the NEW point, and update the particle coordinates
@@ -1776,25 +1646,12 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 
       // cout << "Update from mid-point to the NEW particle coordinates at step
       // " <<i+1<<endl;
-      VecWAXPY(R_mid, dt, U0, R0);                                           // R_mid
-                                                                             // =
-                                                                             // R0
-                                                                             // +
-                                                                             // dt*U0_mid
-      VecAXPY(R_mid, 2.0 * coef, dw_mid);                                    // R_mid
-                                                                             // =
-                                                                             // R_mid
-                                                                             // +
-                                                                             // sqrt(2)*D_mid*B^-1*dw
-      brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
-                                                                             // mid-point
-                                                                             // coords
-                                                                             // &&
-                                                                             // apply
-                                                                             // pbc
-                                                                             // to
-                                                                             // particle
-                                                                             // position
+      // R_mid = R0 + dt*U0_mid
+      VecWAXPY(R_mid, dt, U0, R0);                           
+      // R_mid = R_mid + sqrt(2)*D_mid*B^-1*dw                
+      VecAXPY(R_mid, 2.0 * coef, dw_mid);
+      // Update mid-point coords && apply pbc to particle position                                    
+      brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); 
       this->update_object();
 
       // Update ROUT (position vector excluding pbc) at the i-th step
@@ -1819,18 +1676,11 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
   else { // if without Brownian
     // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
     brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
-    VecWAXPY(R_mid, dt, U0, R0);                                           // R_mid
-                                                                           // = R0
-                                                                           // + dt*Utotal
-                                                                           // (U0
-                                                                           // is
-                                                                           // actually
-                                                                           // Utotal)
-    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
-                                                                           // mid-point
-                                                                           // coords
+    // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
+    VecWAXPY(R_mid, dt, U0, R0);
+    // Update mid-point coords                                           
+    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); 
     this->update_object();
-
     // Update ROUT (position vector excluding pbc) at the i-th step
     VecAXPY(ROUT, dt, U0); // ROUT = ROUT + dt*U0_mid
   } // end else (without_brownian)
@@ -2034,69 +1884,30 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
           */
     brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
-    VecWAXPY(R_mid, dt, U0, R0);                                           // R_mid
-                                                                           // = R0
-                                                                           // + dt
-                                                                           // * U0
-                                                                           //  (R0
-                                                                           // and
-                                                                           // U0
-                                                                           // do
-                                                                           // NOT
-                                                                           // change)
-    coef = 1.;                                                             // coefficient.
-    VecAXPY(R_mid, coef, dw);                                              // R_mid
-                                                                           // = R_mid
-                                                                           // + dw,
-                                                                           // where
-                                                                           // dw
-                                                                           // = sqrt(2*dt)*R,
-                                                                           // where
-                                                                           // <R>=0,
-                                                                           // <R^2>=1
-    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
-                                                                           // mid-point
-                                                                           // coords
-                                                                           // &&
-                                                                           // apply
-                                                                           // pbc
-                                                                           // to
-                                                                           // particle
-                                                                           // position
+    // R_mid = R0 + dt * U0 (R0 and U0 do NOT change)
+    VecWAXPY(R_mid, dt, U0, R0);                     
+    // coefficient.                      
+    coef = 1.;                
+    // R_mid = R_mid + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1                                             
+    VecAXPY(R_mid, coef, dw);                                    
+    // Update mid-point coords && apply pbc to particle position          
+    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); 
     this->update_object();
 
     // Update ROUT (position vector excluding pbc) at the i-th step
-    VecAXPY(ROUT, dt,   U0);                                               // ROUT
-                                                                           // = ROUT
-                                                                           // + dt*U0_mid
-    VecAXPY(ROUT, coef, dw);                                               // ROUT
-                                                                           // = ROUT
-                                                                           // + dw,
-                                                                           // where
-                                                                           // dw
-                                                                           // = sqrt(2*dt)*R,
-                                                                           // where
-                                                                           // <R>=0,
-                                                                           // <R^2>=1
+    // ROUT = ROUT + dt*U0_mid
+    VecAXPY(ROUT, dt,   U0);                                
+    // ROUT = ROUT + dw, where dw = sqrt(2*dt)*R, where <R>=0, <R^2>=1              
+    VecAXPY(ROUT, coef, dw);                                               
   } // end if Brownian
-
-  else {                                                                   // if
-                                                                           // without
-                                                                           // Brownian
+  else {                                                                   
     // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
     brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
-    VecWAXPY(R_mid, dt, U0, R0);                                           // R_mid
-                                                                           // = R0
-                                                                           // + dt*Utotal
-                                                                           // (U0
-                                                                           // is
-                                                                           // actually
-                                                                           // Utotal)
-    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); // Update
-                                                                           // mid-point
-                                                                           // coords
+    // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
+    VecWAXPY(R_mid, dt, U0, R0);                                
+    // Update mid-point coords           
+    brownian_sys->extract_particle_vector(&R_mid, "coordinate", "assign"); 
     this->update_object();
-
     // Update ROUT (position vector excluding pbc) at the i-th step
     VecAXPY(ROUT, dt, U0); // ROUT = ROUT + dt*U0_mid
   } // end else (without_brownian)

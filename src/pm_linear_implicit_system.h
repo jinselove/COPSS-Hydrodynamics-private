@@ -99,8 +99,7 @@ public:
   /**
    * Solve the system.
    */
-  virtual void solve(const std::string& option,
-                     const bool       & re_init) = 0;
+  virtual void solve(const std::string& option) = 0;
 
 
   /*
@@ -218,5 +217,9 @@ protected:
 
   // force field for particle/points
   std::vector<Fix *>_fixes;
+  
+  // bool _re_init: If true, global_matrix will be rebuilt. It's only true
+  // at the beginining of the simulation.
+  bool _re_init;
 };
 } // end namespace libMesh

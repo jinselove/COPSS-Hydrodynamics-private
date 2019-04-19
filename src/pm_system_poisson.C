@@ -122,8 +122,7 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name,
 }
 
 // ==================================================================================
-void PMSystemPoisson::solve(const std::string& option,
-                            const bool       & re_init)
+void PMSystemPoisson::solve(const std::string& option)
 {
   START_LOG("solve()", "PMSystemPoisson");
 
@@ -133,7 +132,7 @@ void PMSystemPoisson::solve(const std::string& option,
 
   // Assemble the global matrix and pc matrix at the first step, when
   // re_init=true.
-  if (re_init)
+  if (_re_init)
   {
     // t1 = MPI_Wtime();
 
@@ -146,7 +145,9 @@ void PMSystemPoisson::solve(const std::string& option,
     // Assemble the global matrix, and init the KSP solver
     this->assemble_matrix("Poisson", option);
     _solver_poisson.init_ksp_solver();
-
+    
+    //set _re_init to false once K matrix is built
+    _re_init = false;
     // t2 = MPI_Wtime();
     // std::cout << "For Poisson equation, time used to assemble the global
     // matrix and reinit KSP is " <<t2-t1<<" s\n\n";
@@ -635,8 +636,8 @@ void PMSystemPoisson::test_potential_profile()
   // Solve the electrical potential field: global solution by FEM
   std::cout <<
     "========>2. Test in PMSystemPoisson::test_potential_profile(): \n";
-  const bool re_init = true; // assemble global matrix and init ksp_solver
-  this->solve("unused", re_init);
+  _re_init = true; // assemble global matrix and init ksp_solver
+  this->solve("unused");
 
   // this->solution->print();
 

@@ -87,8 +87,7 @@ public:
    * Solve the system.
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve(const std::string& option,
-             const bool       & re_init) override;
+  void solve(const std::string& option) override;
 
 
   /*

@@ -120,6 +120,10 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
       _fixes[i]->compute();
     }
   }
+  // multi-Physics coupling
+  if (this->get_equation_systems().parameters.get<bool>("module_poisson")) {
+    this->couple_poisson(false);  
+  }
 
   // perf_log.pop("fix compute");
   STOP_LOG("reinit_system()", "PMSystemStokes");
@@ -171,7 +175,6 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
   // init, assemble, and close the rhs vector
   // perf_log.push("zero");
   this->rhs->zero();
-
   // perf_log.pop("zero");
   // assemble_rhs_sedimentation_ex1 (this->get_equation_systems(), system_name,
   // option);
@@ -188,8 +191,7 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
 }
 
 // ==================================================================================
-void PMSystemStokes::solve(const std::string& option,
-                           const bool       & re_init)
+void PMSystemStokes::solve(const std::string& option)
 {
   START_LOG("solve()", "PMSystemStokes");
 
@@ -199,7 +201,7 @@ void PMSystemStokes::solve(const std::string& option,
   // PMToolBox::output_message(msg, this->comm());
 
   // Assemble the global matrix and pc matrix, and record the CPU wall time.
-  if (re_init)
+  if (_re_init)
   {
     // perf_log.push("assemble_matrix (undisturbed)");
     // t1 = MPI_Wtime();
@@ -213,6 +215,9 @@ void PMSystemStokes::solve(const std::string& option,
     // Assemble the global matrix, and init the KSP solver
     this->assemble_matrix("Stokes", option);
     _solver_stokes.init_ksp_solver();
+    
+    // set re_init to false once K matrix is built
+    _re_init = false;
 
     // perf_log.pop("assemble_matrix (undisturbed)");
 
@@ -327,7 +332,12 @@ void PMSystemStokes::add_local_solution()
   this->solution->add_vector(local_solution, dof_indices);
   this->solution->close();
   this->update();
-
+  
+  // multi-Physics coupling
+  if (this->get_equation_systems().parameters.get<bool>("module_poisson")) {
+    this->couple_poisson(true);  
+  }
+  
   STOP_LOG("add_local_solution()", "PMSystemStokes");
 }
 
@@ -341,8 +351,8 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
 
   // Numerical solution: Global(FEM) + Local(Analytical)
   this->reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
-  const bool re_init = true;
-  this->solve("disturbed", re_init);
+  _re_init = true;
+  this->solve("disturbed");
   this->add_local_solution();
 
   // Theoretical solution(only velocity)
@@ -676,8 +686,8 @@ std::vector<Real>PMSystemStokes::compute_unperturbed_point_velocity()
   const std::size_t dim =  this->get_mesh().mesh_dimension();
 
   // first solve the undisturbed flow field.
-  const bool re_init = true;
-  this->solve("undisturbed", re_init);
+  _re_init = true;
+  this->solve("undisturbed");
   std::vector<Real> pv_unperturbed(NP * dim, 0);
 
   // only FEM solution without particles! (undistrubed solution)
@@ -774,8 +784,8 @@ void PMSystemStokes::test_velocity_profile()
   std::cout << "========>2. Test in PMSystemStokes::test_velocity_profile(): \n";
 
   // build both particle-particle and particle-elem neighbor list
-  const bool re_init = true;
-  this->solve("disturbed", re_init);
+  _re_init = true;
+  this->solve("disturbed");
 
   // output the velocity profiles along xyz directions, global + local
   // solutions.
@@ -1026,5 +1036,24 @@ void PMSystemStokes::write_fluid_velocity_data(const std::string& filename)
   this->comm().barrier();
 
   STOP_LOG("write_fluid_velocity_data()", "PMSystemStokes");
+}
+
+// ============================================================================
+void PMSystemStokes::couple_poisson(const bool &add_local_solution_to_output)
+{
+  START_LOG("couple_poisson()", "PMSystemStokes");
+  
+  if (add_local_solution_to_output) {
+    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
+      add_local_solution();
+  }
+  else {
+    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solve(
+      "unused");
+    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
+      add_electrostatic_forces();
+  }    
+
+  STOP_LOG("couple_poisson()", "PMSystemStokes");
 }
 } // end namespace libMesh

@@ -47,7 +47,9 @@ PMLinearImplicitSystem::PMLinearImplicitSystem(EquationSystems  & es,
   : LinearImplicitSystem(es, name, number),
   _point_mesh(NULL),
   _particle_mesh(NULL)
-{}
+{
+  _re_init = true;
+}
 
 // ==================================================================================
 PMLinearImplicitSystem::~PMLinearImplicitSystem()

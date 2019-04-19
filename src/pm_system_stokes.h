@@ -105,10 +105,8 @@ public:
    * option = "undisturbed", compute the undisturbed field of flow without
    *particles
    * option = "disturbed",   compute the disturbed field of flow with particles
-   * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve(const std::string& option,
-             const bool       & re_init);
+  void solve(const std::string& option);
 
 
   /*
@@ -225,6 +223,18 @@ public:
    * to the solution vector.
    */
   void write_fluid_velocity_data(const std::string& filename);
+
+  /*
+   * Couple Stokes System (HI or FD) with Poisson System by adding electrostatic
+   * force to all points (Point Particles or surface nodes on Rigid Particles.) 
+   * This electrostatic force includes contributions from both local and global
+   * solution of the Poisson system.
+   *  
+   * params add_local_solution_to_output: If add local part of the potential
+   *   field to the system output. This is only set to be true when trying to
+   *   write the total solution to equation_systems in the output stage.  
+   */  
+  void couple_poisson(const bool& add_local_solution_to_output); 
 
 private:
 

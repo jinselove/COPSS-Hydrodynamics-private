@@ -135,6 +135,8 @@ for key, value in tests.items():
 
 
 print("Performing tests ...")
+print("Current git tag : ")
+subprocess.call('git describe --always', shell=True)
 os.chdir(copss_dir+'/tests/integration_tests')
 for key, value in tests.items():    
     print("--"*1 + "Performing test --> '{0}'".format(key))

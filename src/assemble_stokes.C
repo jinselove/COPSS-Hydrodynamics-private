@@ -856,55 +856,39 @@ void AssembleStokes::apply_bc_by_penalty(const Elem          *elem,
     pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::vector<bool>& inlet_direction =
     pm_system.point_mesh()->pm_periodic_boundary()->inlet_direction();
-
+  
+  // Apply Dirichlet BC, i.e., velocity, at on boundary elements
   for (unsigned int s = 0; s < _boundary_sides[elem_id].size(); s++)
   {
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       -
-       // if this is neither the inlet nor the outlet, it MUST be no-slip walls
-       // the following part -2- will impose the no-slip BC by penalty method.
-
-       // -2.- build the full-order side element for "vel" Dirichlet BC at the
-          walls.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-          -*/
+    // build side s
     UniquePtr<Elem> side(elem->build_side(_boundary_sides[elem_id][s]));
-
-    for (unsigned int nn = 0; nn < side->n_nodes(); nn++)
+    // Begin by calculating undisturbed velocity on each boundary side
+    std::vector<Real> uvw_undisturbed_side(_dim, 0.0);
+    // apply shear velocity at boundaries is existed
+    for (unsigned int i = 0; i < 3; ++i)
     {
-      // Begin by calculating undisturbed velocity on boundaries
-      // Set u/v/w = 0 by default for no-slip boundary on walls
-      std::vector<Real> uvw(_dim, 0.0);
-
-      // If there is shearing, then impose velocities on relevant boudaries (for
-      // slit geometry ONLY)
-      // Loop through boundary pairs
-      for (unsigned int i = 0; i < 3; ++i)
+      if (shear[i] == true)
       {
-        if (shear[i] == true)
+        // if this side of elem is associated with the lower shear boundary
+        if (_mesh.get_boundary_info().has_boundary_id(elem,
+          _boundary_sides[elem_id][s], _boundary_id_3D[2 * i]))
         {
-          // if this side of elem is associated with the lower shear boundary
-          if (_mesh.get_boundary_info().has_boundary_id(elem,
-                                                        _boundary_sides[elem_id][s
-                                                        ],
-                                                        _boundary_id_3D[2 * i]))
-          {
-            uvw[shear_direction[i]] = shear_rate[i] * wall_params[2 * i];
-          } // then the upper shear boundary
-          else if (_mesh.get_boundary_info().has_boundary_id(elem,
-                                                             _boundary_sides[
-                                                               elem_id][s],
-                                                             _boundary_id_3D[2 *
-                                                                             i +
-                                                                             1]))
-          {
-            uvw[shear_direction[i]] = shear_rate[i] * wall_params[2 * i + 1];
-          }
+          uvw_undisturbed_side[shear_direction[i]] = shear_rate[i] * 
+            wall_params[2 * i];
+        } // then the upper shear boundary
+        else if (_mesh.get_boundary_info().has_boundary_id(elem,
+          _boundary_sides[elem_id][s], _boundary_id_3D[2 * i + 1]))
+        {
+          uvw_undisturbed_side[shear_direction[i]] = shear_rate[i] * 
+            wall_params[2 * i + 1];
         }
       }
-
-      // End of undisturbed velocity
-
+    }
+    // apply boundary velocity on each node of this side s.
+    // assuming all nodes on side s have the same undisturbed velocity, uvw_side
+    for (unsigned int nn = 0; nn < side->n_nodes(); nn++)
+    {
+      std::vector<Real> uvw = uvw_undisturbed_side;
       // For disturbed velocity, vel bc at the no-slip boundaries is u_bc =
       // -u_local in GGEM
       // Note this only influence the rhs vector

@@ -158,19 +158,20 @@ protected:
   MeshBase& _mesh;
 
   // Boundary ids
-  // defaults in cubic geometry generated from libMesh
-  const std::vector<boundary_id_type>_boundary_id_3D = { 4, 2, 1, 3, 0, 5 };
-  const std::vector<std::string>_boundary_name_3D    =
-  { "left", "right", "bottom", "top", "back", "front" };
+  const std::vector<boundary_id_type> _boundary_id_3D = { 4, 6, 3, 5, 2, 1};
+  
+  const std::vector<std::string> _boundary_name_3D    =
+  { "x_negative", "x_positive", "y_negative", "y_positive", "z_negative", 
+    "z_positive" };
 
   // int_force matrix
   // this matrix stores the product of JxW[qp] * phi[k][qp]
   // size = num_elem * (n_u_dofs * n_quad_points)
-  std::vector<std::vector<Real> >_int_force;
+  std::vector<std::vector<Real> > _int_force;
 
   // vector stores q_xyz size
   // size = num_elem * q_xyz.size()
-  std::vector<std::vector<Point> >_q_xyz;
+  std::vector<std::vector<Point> > _q_xyz;
 
   // vector stores dof sizes for all elems
   std::vector<unsigned int>_n_dofs;

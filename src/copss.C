@@ -711,75 +711,58 @@ void Copss::read_restart_eigenvalue()
 void Copss::create_domain_mesh()
 {
   if (dim == 2) {
-    error_msg =
-      "Copss::create_mesh() only works for 3D systems; 2D simulation needs extra implementation";
+    error_msg = "Error::Copss::create_domain_mesh() only works for 3D systems.\
+      2D simulation needs extra implementation. Exiting...";
     PMToolBox::output_message(error_msg, *comm_in);
     libmesh_error();
   }
   mesh = new SerialMesh(*comm_in);
-
-  // mesh = std::unique_ptr<SerialMesh> (new SerialMesh (*comm_in));
   if (generate_mesh) {
     if (wall_type == "slit") {
+      const std::vector<Real> mesh_size = PMToolBox::mesh_size(*mesh);
       const Real meshsize_x = (wall_params[1] - wall_params[0]) / Real(n_mesh[0]);
       const Real meshsize_y = (wall_params[3] - wall_params[2]) / Real(n_mesh[1]);
       const Real meshsize_z = (wall_params[5] - wall_params[4]) / Real(n_mesh[2]);
-
-      //        cout << "mesh_size = " <<meshsize_x  << "; "<<meshsize_y << ";
-      // "<<meshsize_z << endl;
       hminf = std::min(meshsize_x, meshsize_y);
       hminf = std::min(hminf, meshsize_z);
       hmaxf = std::max(meshsize_x, meshsize_y);
       hmaxf = std::max(hmaxf, meshsize_z);
-      cout << "\n##########################################################\n"
+      // Build HEX20 3D mesh
+      MeshTools::Generation::build_cube(*mesh,
+                                        n_mesh[0],
+                                        n_mesh[1],
+                                        n_mesh[2],
+                                        wall_params[0],
+                                        wall_params[1],
+                                        wall_params[2],
+                                        wall_params[3],
+                                        wall_params[4],
+                                        wall_params[5],
+                                        HEX20); // HEX20/27
+     cout << "\n##########################################################\n"
            << "#                 The created mesh information              \n"
            << "########################################################## \n\n"
-           << "   nx_mesh = " << n_mesh[0] << ", Lx = " << wall_params[1] -
-        wall_params[0] << ", hx = " << meshsize_x << endl
-           << "   ny_mesh = " << n_mesh[1] << ", Ly = " << wall_params[3] -
-        wall_params[2] << ", hy = " << meshsize_y << endl
-           << "   nz_mesh = " << n_mesh[2] << ", Lz = " << wall_params[5] -
-        wall_params[4] << ", hz = " << meshsize_z << endl
            << "   minimum mesh size of fluid: hminf = " << hminf << endl
            << "   maximum mesh size of fluid: hmaxf = " << hmaxf << endl;
-
-      /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-         - - -
-       * Create a mesh, distributed across the default MPI communicator.
-       * We build a mesh with Quad9(8) elements for 2D and HEX27(20) element for
-       *3D
-         / - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-          *- - - - */
-      if (dim == 2)
-      {
-        MeshTools::Generation::build_square(*mesh,
-                                            n_mesh[0],
-                                            n_mesh[1],
-                                            wall_params[0],
-                                            wall_params[1],
-                                            wall_params[2],
-                                            wall_params[3],
-                                            QUAD8); // QUAD8/9
-      } else {
-        MeshTools::Generation::build_cube(*mesh,
-                                          n_mesh[0],
-                                          n_mesh[1],
-                                          n_mesh[2],
-                                          wall_params[0],
-                                          wall_params[1],
-                                          wall_params[2],
-                                          wall_params[3],
-                                          wall_params[4],
-                                          wall_params[5],
-                                          HEX20); // HEX20/27
+      // need to first modify the boundary_id to a temporary code
+      // otherwise we might make mistake like change 1 -> 3 -> 5 -> 1
+      std::cout << "copss_slitMesh_boundary_id shape = " << copss_slitMesh_boundary_id.size() << std::endl;
+      for (int i = 0; i < copss_slitMesh_boundary_id.size(); i++) {
+        libMesh::MeshTools::Modification::change_boundary_id(*mesh,
+          copss_slitMesh_boundary_id[i], -copss_slitMesh_boundary_id[i]);
       }
-    } // end wall_type = "slit"
-    else if (wall_type == "sphere") {
-      cout << "create_domain_mesh () does not support sphere mesh so far ! " <<
-        endl;
+      for (int i = 0; i < copss_slitMesh_boundary_id.size(); i++) {
+        libMesh::MeshTools::Modification::change_boundary_id(*mesh,
+          -copss_slitMesh_boundary_id[i], slitMesh_boundary_id[i]);              
+      }
+    } 
+    else {
+      PMToolBox::output_message("Error: COPSS only supports generating domain" 
+        "mesh for 'slit' wall. Please load the domain mesh file for other wall" 
+        "types. Exiting ...", *comm_in);
       libmesh_error();
     }
-  } // end if (generate_mesh)
+  } 
   else {
     if (domain_mesh_file != "nothing") {
       mesh->read(domain_mesh_file);
@@ -788,33 +771,24 @@ void Copss::create_domain_mesh()
       const std::vector<Real> mesh_size = PMToolBox::mesh_size(*mesh);
       hminf = mesh_size[0];
       hmaxf = mesh_size[1];
-      cout << endl <<
-        "##########################################################" << endl
-           <<
-        "#                 The Read-in mesh information                      " <<
-        endl
-           << "##########################################################" <<
-        endl << endl;
-      cout << "   minimum mesh size of fluid: hminf = " << hminf << endl;
-      cout << "   maximum mesh size of fliud: hmaxf = " << hmaxf << endl;
+      cout << endl 
+        << "##########################################################" << endl
+        << "#              The Read-in mesh information               " << endl
+        << "##########################################################" << endl
+        << "   minimum mesh size of fluid: hminf = " << hminf << endl
+        << "   maximum mesh size of fliud: hmaxf = " << hmaxf << endl;
     }
     else {
-      cout <<
-        "**************************************warning***********************************"
-           << endl;
-      cout << "domain_mesh_file has to be specified" << endl;
-      cout <<
-        "********************************************************************************"
-           << endl;
+      PMToolBox::output_message("Error: 'domain_mesh_file' needs to be "
+        "specified. Exiting ...", *comm_in);
       libmesh_error();
     }
-  } // end else (generate mesh)
-
+  } 
   search_radius_p = 4. / alpha;
   search_radius_e = 0.5 * hmaxf + 4. / alpha;
-
   // print mesh info
   mesh->print_info();
+  mesh->get_boundary_info().print_summary();
 } // end function
 
 // ============================================================================
@@ -833,20 +807,17 @@ void Copss::create_periodic_boundary() {
   else if (wall_type == "sphere") {
     // check: No PBC, No inlet/outlet
     bool error_flag = false;
-
     for (int i = 0; i < dim; i++) {
       if (periodicity[i] or inlet[i] or shear[i]) error_flag = true;
     }
-
     if (error_flag) {
-      cout <<
-        "spherical domain cannot have PBC or inlet/outlet, check control file" <<
-        endl;
+      PMToolBox::output_message( 
+        "spherical domain cannot have PBC or inlet/outlet, Please check control" 
+        " file", *comm_in);
       libmesh_error();
     }
-    cout <<
-      "spherical domain cannot have PBC, but we need to create a PBC object using a non-existed cubic box to keep COPSS running !"
-         << endl;
+    // spherical domain cannot have PBC, but we need to create a PBC object 
+    // using a non-existed cubic box to keep COPSS running !"
     const Point bbox_pmin(-Real(wall_params[0] / 2.),
                           -Real(wall_params[0] / 2.),
                           -Real(wall_params[0] / 2.));
@@ -862,9 +833,8 @@ void Copss::create_periodic_boundary() {
                                                   inlet_pressure);
   }
   else {
-    cout <<
-      "COPSS::create_periodic_boundary() only support 'slit' or 'sphere' wall_type for now !"
-         << endl;
+    cout << "COPSS::create_periodic_boundary() only support 'slit' or 'sphere'" 
+      <<" wall_type for now !" << endl;
   }
 } // end function
 
@@ -927,7 +897,6 @@ EquationSystems Copss::create_equation_systems()
     "==>(6/8) Init equation_systems (libmesh function, to init all systems in equation_systems)"
        << endl;
   equation_systems.init();
-
   // zero the PC matrix, which MUST be done after es.init()
   if (user_defined_pc) {
     cout << "==> (If user_defined_pc) Zero preconditioner matrix" << endl;
@@ -987,16 +956,10 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       pbcx.set_variable(u_var);
       pbcx.set_variable(v_var);
       pbcx.set_variable(w_var);
-
       // pbcx.set_variable(p_var); //*** NOT include p!
-
-      pbcx.myboundary     = 4; // left face (viewing from X negative to X
-                               // positive)
-      pbcx.pairedboundary = 2; // right face (viewing from X positive to X
-                               // negative)
-
+      pbcx.myboundary     = slitMesh_boundary_id[0]; 
+      pbcx.pairedboundary = slitMesh_boundary_id[1];
       dof_map.add_periodic_boundary(pbcx);
-
       // check
       if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
       {
@@ -1024,16 +987,10 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       pbcy.set_variable(u_var);
       pbcy.set_variable(v_var);
       pbcy.set_variable(w_var);
-
       // pbcy.set_variable(p_var); //*** NOT include p!
-
-      pbcy.myboundary     = 1; // bottom face, viewing from Y negative to Y
-                               // positive
-      pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y
-                               // negative
-
+      pbcy.myboundary     = slitMesh_boundary_id[2]; 
+      pbcy.pairedboundary = slitMesh_boundary_id[3];
       dof_map.add_periodic_boundary(pbcy);
-
       // check
       if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
       {
@@ -1061,16 +1018,10 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       pbcz.set_variable(u_var);
       pbcz.set_variable(v_var);
       pbcz.set_variable(w_var);
-
       // pbcz.set_variable(p_var); //*** NOT include p!
-
-      pbcz.myboundary     = 0; // bottom face, viewing from Z negative to Z
-                               // positive
-      pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z
-                               // negative
-
+      pbcz.myboundary     = slitMesh_boundary_id[4];
+      pbcz.pairedboundary = slitMesh_boundary_id[5];
       dof_map.add_periodic_boundary(pbcz);
-
       // check
       if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
       {
@@ -1101,14 +1052,9 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                                             0.,
                                             0.));
       pbcx.set_variable(phi_var);
-
-      pbcx.myboundary     = 4; // left face (viewing from X negative to X
-                               // positive)
-      pbcx.pairedboundary = 2; // right face (viewing from X positive to X
-                               // negative)
-
+      pbcx.myboundary     = slitMesh_boundary_id[0];
+      pbcx.pairedboundary = slitMesh_boundary_id[1];
       dof_map.add_periodic_boundary(pbcx);
-
       // check
       if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
       {
@@ -1135,13 +1081,9 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                                             0.));
       pbcy.set_variable(phi_var);
 
-      pbcy.myboundary     = 1; // bottom face, viewing from Y negative to Y
-                               // positive
-      pbcy.pairedboundary = 3; // top face, viewing from Y positive to Y
-                               // negative
-
+      pbcy.myboundary     = slitMesh_boundary_id[2];
+      pbcy.pairedboundary = slitMesh_boundary_id[3];
       dof_map.add_periodic_boundary(pbcy);
-
       // check
       if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
       {
@@ -1167,14 +1109,9 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
                                             0.,
                                             wall_params[5] - wall_params[4]));
       pbcz.set_variable(phi_var);
-
-      pbcz.myboundary     = 0; // bottom face, viewing from Z negative to Z
-                               // positive
-      pbcz.pairedboundary = 5; // top face, viewing from Z positive to Z
-                               // negative
-
+      pbcz.myboundary     = slitMesh_boundary_id[4];
+      pbcz.pairedboundary = slitMesh_boundary_id[5];
       dof_map.add_periodic_boundary(pbcz);
-
       // check
       if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
       {

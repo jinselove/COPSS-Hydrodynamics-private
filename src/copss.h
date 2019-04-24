@@ -435,5 +435,23 @@ protected:
 
   // output precision
   const int o_precision = 6;
+  
+  // copss generated slit mesh boundary id
+  // x-negative surface boundary_id = 4
+  // x-positive surface boundary_id = 2
+  // y-negative surface boundary_id = 1
+  // y-positive surface boundary_id = 3
+  // z-negative surface boundary_id = 0
+  // z-positive surface boundary_id = 5
+  std::vector<boundary_id_type> copss_slitMesh_boundary_id{4, 2, 1, 3, 0, 5};
+  
+  // Unify slit mesh boundary id to the following order
+  // x-negative surface boundary_id = 4
+  // x-positive surface boundary_id = 6
+  // y-negative surface boundary_id = 3
+  // y-positive surface boundary_id = 5
+  // z-negative surface boundary_id = 2
+  // z-positive surface boundary_id = 1
+  std::vector<boundary_id_type> slitMesh_boundary_id{4, 6, 3, 5, 2, 1};
 };
 } // end namespace libMesh

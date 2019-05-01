@@ -112,7 +112,7 @@ void AssembleNP::compute_element_rhs(const Elem                   *elem,
 {
   START_LOG("compute_element_rhs()", "AssembleNP"); // libMesh log
 
-  libmesh_assert_equal_to(system_name, "NP");
+  // libmesh_assert_equal_to(system_name, "NP");
 
   STOP_LOG("compute_element_rhs()", "AssembleNP");
 }

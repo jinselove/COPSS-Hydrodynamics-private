@@ -570,7 +570,7 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
 {
   START_LOG("compute_element_rhs()", "AssembleStokes"); // libMesh log
 
-  libmesh_assert_equal_to(system_name, "Stokes");
+  // libmesh_assert_equal_to(system_name, "Stokes");
 
   //  const MeshBase& _mesh = _eqn_sys.get_mesh();
   PMSystemStokes& _pm_system = _eqn_sys.get_system<PMSystemStokes>("Stokes");
@@ -1012,7 +1012,7 @@ void AssembleStokes::init_ggem_stokes(const std::string& system_name)
 {
   START_LOG("init_ggem_stokes()", "AssembleStokes");
 
-  libmesh_assert_equal_to(system, "Stokes");
+  //libmesh_assert_equal_to(system, "Stokes");
 
   PMSystemStokes& _pm_system  = _eqn_sys.get_system<PMSystemStokes>(system_name);
   PointMesh<3>   *_point_mesh = _pm_system.point_mesh();

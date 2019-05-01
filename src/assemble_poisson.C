@@ -387,7 +387,7 @@ void AssemblePoisson::compute_element_rhs(const Elem                   *elem,
 {
   START_LOG("compute_element_rhs()", "AssemblePoisson");
 
-  libmesh_assert_equal_to(system_name, "Poisson");
+  // libmesh_assert_equal_to(system_name, "Poisson");
 
   PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
 
@@ -744,7 +744,7 @@ void AssemblePoisson::init_ggem_poisson(const std::string& system_name)
 {
   START_LOG("init_ggem_poisson()", "AssemblePoisson");
 
-  libmesh_assert_equal_to(system, "Poisson");
+  //libmesh_assert_equal_to(system, "Poisson");
 
   PMSystemPoisson& _pm_system =
     _eqn_sys.get_system<PMSystemPoisson>(system_name);

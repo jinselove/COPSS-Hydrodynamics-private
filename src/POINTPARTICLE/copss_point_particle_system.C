@@ -39,15 +39,13 @@ CopssPointParticleSystem::~CopssPointParticleSystem() {
 // ==========================================================================
 void CopssPointParticleSystem::read_ggem_info() {
   alpha = input_file("alpha", 0.1);
-  cout << endl << "##########################################################" <<
-    endl
-       << "#                 GGEM information                      " << endl
-       << "##########################################################" << endl <<
-    endl;
-  cout << "-----------> the smoothing parameter in GGEM alpha = " << alpha <<
-    endl;
-  cout << "-----------> recommend meshsize <= " << 1. / (std::sqrt(2) * alpha) <<
-    endl;
+  std::ostringstream ss;
+  ss << "##########################################################\n" 
+     << "#                 GGEM information                        \n" 
+     << "##########################################################\n"
+     << "-----------> the smoothing parameter in GGEM alpha = " << alpha << "\n" 
+     << "-----------> recommend meshsize <= " << 1. / (std::sqrt(2)* alpha);
+  PMToolBox::output_message(ss.str(), *comm_in); 
 }
 
 // ==========================================================================
@@ -84,19 +82,17 @@ void CopssPointParticleSystem::create_object() {
   polymer_chain = new PolymerChain(chain_id, *pm_periodic_boundary);
   std::ostringstream pfilename;
   pfilename << "point_particle_data.in";
-  cout <<
+  PMToolBox::output_message(
     "--------------> skip generating datafile, will read in existed data file: "
-       << pfilename.str() << endl;
+    + pfilename.str(), *comm_in);
   polymer_chain->read_particles_data(pfilename.str());
-
   if (restart)
   {
     pfilename.str("");
     pfilename.clear();
-    cout <<
-      "--------------> in restart mode, load particle positions from saved restart files"
-         << endl;
-
+    PMToolBox::output_message(
+      "--------------> in restart mode, load particle positions from saved restart files",
+      *comm_in);
     if (point_particle_model == "polymer_chain") {
       pfilename << "output_polymer_" << o_step << ".vtk";
       polymer_chain->read_particles_data_restart_vtk(pfilename.str());
@@ -122,61 +118,50 @@ void CopssPointParticleSystem::create_object() {
     Dc           = Db / Real(Nb); // Diffusivity of the chain (um^2/s)
     polymer_chain->initial_chain_center_of_mass(center0);
   }
-
   // for particular models
-  cout << "##########################################################\n"
-       << "#                  Particle Parameters                    \n"
-       << "##########################################################\n\n"
-       << "   particle type             : " << particle_type.c_str() << endl
-       << "   point Particle model      : " << point_particle_model.c_str() <<
-    endl
-       << "   number of point particles Nb = " << Nb << endl;
-
+  std::ostringstream ss;
+  ss << "##########################################################\n"
+     << "#                  Particle Parameters                    \n"
+     << "##########################################################\n"
+     << "   particle type             : " << particle_type.c_str() << "\n"
+     << "   point Particle model      : " << point_particle_model.c_str() << "\n"
+     << "   number of point particles Nb = " << Nb << "\n";
   if (point_particle_model == "polymer_chain") {
-    cout << "   number of springs per Chain       Ns  = " << Ns << endl
-         << "   number of Chains              nChains = " << nChains << endl
-         << "   Kuhn length                      bk  = " << bk << " (um)\n"
-         << "   # of Kuhn segment per spring      Nks = " << Nks << "\n"
-         << "   second moment of polymer chain    Ss2 = " << Ss2 << " (um^2)\n"
-         << "   maximum spring length             q0  = " << q0  << " (um)\n"
-         << "   chain length of polymer           Lc  = " << chain_length <<
-      " (um)\n"
-         << "   chain diffusivity                 Dc  = " << Dc << " (um^2/s)\n";
+    ss << "   number of springs per Chain       Ns  = " << Ns << endl
+       << "   number of Chains              nChains = " << nChains << endl
+       << "   Kuhn length                      bk  = " << bk << " (um)\n"
+       << "   # of Kuhn segment per spring      Nks = " << Nks << "\n"
+       << "   second moment of polymer chain    Ss2 = " << Ss2 << " (um^2)\n"
+       << "   maximum spring length             q0  = " << q0  << " (um)\n"
+       << "   chain length of polymer           Lc  = " << chain_length <<" (um)\n"
+       << "   chain diffusivity                 Dc  = " << Dc << " (um^2/s)\n";
   }
-
-  cout << "------------> The non-dimensional variables:\n";
-
-
-  cout << "   non-dimensional bead radius      a0     = " << 1.0 << "\n"
-       << "   non-dimensional ksi = sqrt(PI)/(3a0)    = " << std::sqrt(PI) / 3. <<
-    "\n";
-
+  ss << "------------> The non-dimensional variables:\n"
+     << "   non-dimensional bead radius      a0     = " << 1.0 << "\n"
+     << "   non-dimensional ksi = sqrt(PI)/(3a0)    = " << std::sqrt(PI) / 3. << "\n";
   if (point_particle_model == "polymer_chain") {
-    cout << "   non-dimensional Kuhn length    bk/a     = " << bk / Rb << "\n"
-         << "   non-dimensional spring length  q0/a     = " << q0 / Rb << "\n"
-         << "   non-dimensional contour length Lc/a     = " << chain_length /
-      Rb << "\n"
-         << "   non-dimensional Ss/a = sqrt(Ss2/a^2)    = " << std::sqrt(
-      Ss2 / Rb / Rb) << "\n"
-         << "   non-dimensional ksi = sqrt(PI)/(3a0)    = " << std::sqrt(PI) /
-    (3.) << "\n";
+    ss << "   non-dimensional Kuhn length    bk/a     = " << bk / Rb << "\n"
+       << "   non-dimensional spring length  q0/a     = " << q0 / Rb << "\n"
+       << "   non-dimensional contour length Lc/a     = " << chain_length / Rb << "\n"
+       << "   non-dimensional Ss/a = sqrt(Ss2/a^2)    = " << std::sqrt(Ss2 / Rb / Rb) << "\n"
+       << "   non-dimensional ksi = sqrt(PI)/(3a0)    = " << std::sqrt(PI) / (3.) << "\n";
   }
   pfilename.str(""); pfilename.clear();
+  PMToolBox::output_message(ss.str(), *comm_in);
   comm_in->barrier();
 } // end function
 
 // =====================================================================
 void CopssPointParticleSystem::create_object_mesh() {
   // prepare domain and objects
-  cout << "\n==>(1/4) Generate/Create domain Mesh\n";
+  PMToolBox::output_message("==>(1/4) Generate/Create domain Mesh", *comm_in);
   this->create_domain_mesh();
-  cout << "\n==>(2/4) Create periodic box \n ";
+  PMToolBox::output_message("==>(2/4) Create periodic box", *comm_in);
   this->create_periodic_boundary();
-  cout <<
-    "\n==>(3/4) Create polymer chain object (for beads or polymer_chain) \n";
+  PMToolBox::output_message("==>(3/4) Create polymer chain object \
+(for beads or polymer_chain)", *comm_in);
   this->create_object();
-
-  cout << "\n==>(4/4) Create point_mesh object \n";
+  PMToolBox::output_message("==>(4/4) Create point_mesh object", *comm_in);
   point_mesh = new PointMesh<3>(*mesh,
                                 *polymer_chain,
                                 search_radius_p,
@@ -185,16 +170,15 @@ void CopssPointParticleSystem::create_object_mesh() {
 
   // reinit point mesh (including particles and neighbor list)
   point_mesh->reinit(neighbor_list_update_flag, true);
-  cout << "-------------> Reinit point mesh object, finished! \n"
-       <<
-    "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
-       << "### The point-mesh info:\n"
-       <<
-    "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
-       << "Total number of point particles:" << point_mesh->num_particles() <<
-    endl
-       << "search_radius_p = " << search_radius_p << endl
-       << "search_radius_e = " << search_radius_e << endl;
+  std::ostringstream ss;
+  ss << "-------------> Reinit point mesh object, finished! \n"
+     << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - \n"
+     << "### The point-mesh info:\n"
+     << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - \n"
+     << "Total number of point particles:" << point_mesh->num_particles() <<"\n"
+     << "search_radius_p = " << search_radius_p << "\n"
+     << "search_radius_e = " << search_radius_e << "\n";
+  PMToolBox::output_message(ss.str(), *comm_in);
 } // end function
 
 // ==================================================================================
@@ -353,7 +337,6 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     perf_log.push("GGEMPoisson validation");
     PMSystemPoisson& system_poisson =
       equation_systems.get_system<PMSystemPoisson>("Poisson");
-
     // Build neighbor list, will this update point_mesh in PMSystemPoisson?
     system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
     system_poisson.test_potential_profile();
@@ -361,9 +344,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     return;
   }
 
-  cout << endl <<
-    "============================4. Start moving particles ============================"
-       << endl << endl;
+  PMToolBox::output_message(
+    "============================4. Start moving particles ====================",
+    *comm_in);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
@@ -384,8 +367,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   }
 
   if (update_neighbor_list_everyStep) {
-    std::cout <<
-      "====> neighbor_list is updated at every time step (including half step of fixman if available)\n";
+    PMToolBox::output_message(
+      "====> neighbor_list is updated at every time step (including half step of fixman if available)\n",
+      *comm_in);
   }
   else {
     neighbor_list_update_interval =
@@ -393,12 +377,11 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
        max_dr_coeff[0]) ? int(search_radius_p / 2. /
                               max_dr_coeff[1]) : int(search_radius_p / 2. /
                                                      max_dr_coeff[2]);
-    std::cout << "====> neighbor_list is updated every " <<
-      neighbor_list_update_interval << " steps\n\n";
-    std::cout <<
-      "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
-              <<
-      "updating neighborList at each step seems tiny, but we have not fully validated it.\n\n";
+    std::ostringstream ss;
+    ss << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n"
+       << "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
+       << "updating neighborList at each step seems tiny, but we have not fully validated it.\n";
+    PMToolBox::output_message(ss.str(), *comm_in);
   }
 
   // Get a better conformation of polymer chains before simulation.
@@ -410,23 +393,24 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
      NOTE: We MUST re-init particle-mesh before solving Stokes
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  cout << "==>(1/3) Solve the undisturbed system" << endl;
+  PMToolBox::output_message("==>(1/3) Solve the undisturbed system", *comm_in);
   perf_log.push("solve_undisturbed_system");
   this->solve_undisturbed_system(equation_systems);
   perf_log.pop("solve_undisturbed_system");
 
   // create Brownian system for simulation
-  cout <<
-    "==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"
-       << endl;
+  PMToolBox::output_message(
+    "==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0",
+    *comm_in);
   this->create_brownian_system(equation_systems);
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      Advancing in time. Fixman Mid-Point algorithm
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  cout << "==>(3/3) Start calculating dynamics and advancing time steps" << endl;
+  PMToolBox::output_message(
+    "==>(3/3) Start calculating dynamics and advancing time steps",
+    *comm_in);
   vel0.resize(n_vec);
   vel1.resize(n_vec);
 

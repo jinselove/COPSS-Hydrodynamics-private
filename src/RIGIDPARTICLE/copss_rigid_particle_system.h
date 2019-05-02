@@ -90,7 +90,7 @@ private:
 
   Real hmaxs;
 
-  ParticleMesh<3> *particle_mesh;
+  ParticleMesh<3> *particle_mesh = nullptr;
 
   std::vector<MeshSpringNetwork *>mesh_spring_network;
 

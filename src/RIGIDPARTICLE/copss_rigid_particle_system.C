@@ -1,7 +1,5 @@
 #include "copss_rigid_particle_system.h"
 
-using std::cout;
-using std::endl;
 using std::string;
 
 
@@ -14,29 +12,10 @@ CopssRigidParticleSystem::CopssRigidParticleSystem(CopssInit& init)
 }
 
 CopssRigidParticleSystem::~CopssRigidParticleSystem() {
-  delete mesh;
-  mesh = NULL;
-  delete point_mesh;
-  point_mesh = NULL;
-  delete pm_periodic_boundary;
-  pm_periodic_boundary = NULL;
-  delete brownian_sys;
-  brownian_sys = NULL;
-  delete fix_factory;
-  fix_factory = NULL;
-
-  for (int i = 0; i < fixes.size(); i++)
+  delete particle_mesh; particle_mesh = nullptr;
+  for (int i = 0; i < mesh_spring_network.size(); i++) 
   {
-    delete fixes[i];
-    fixes[i] = NULL;
-  }
-  fixes.clear();
-  delete particle_mesh;
-  particle_mesh = NULL;
-
-  for (int i = 0; i < mesh_spring_network.size(); i++) {
-    delete mesh_spring_network[i];
-    mesh_spring_network[i] = NULL;
+    delete mesh_spring_network[i]; mesh_spring_network[i] = nullptr;
   }
   mesh_spring_network.clear();
 }
@@ -45,18 +24,14 @@ CopssRigidParticleSystem::~CopssRigidParticleSystem() {
 void CopssRigidParticleSystem::read_ggem_info() {
   alpha    = input_file("alpha", 0.1);
   ibm_beta = input_file("ibm_beta", 0.75);
-  cout << endl << "##########################################################" <<
-    endl
-       << "#                 GGEM information                      " << endl
-       << "##########################################################" << endl <<
-    endl;
-  cout << "-----------> the smoothing parameter in GGEM alpha = " << alpha <<
-    endl;
-  cout << "-----------> recommend meshsize <= " << 1. / (std::sqrt(2) * alpha) <<
-    endl;
-  cout << "-----------> the ibm beta = " << ibm_beta <<
-    "    (IBM-GGEM ksi = 1./(beta*hmins), the optimized value of this variable depends on number of surface nodes"
-       << endl;
+  ss << "##########################################################\n"
+     << "#                 GGEM information                       \n"
+     << "##########################################################\n"
+     << "-----------> the smoothing parameter in GGEM alpha = " << alpha << "\n"
+     << "-----------> recommend meshsize <= " << 1. / (std::sqrt(2) * alpha) << "\n"
+     << "-----------> the ibm beta = " << ibm_beta <<"  (IBM-GGEM ksi = 1./(beta*hmins), the optimized value of this variable depends on number of surface nodes";
+  PMToolBox::output_message(ss, *comm_in);
+  ss.clear();
 }
 
 // ==========================================================================
@@ -105,29 +80,26 @@ void CopssRigidParticleSystem::create_object() {
     pfilename.str("");
     pfilename.clear();
     pfilename << "output_surface_node.csv";
-    cout << "in restart mode ---------" << endl
-         << "-------------> read rigid_particle surface node from " <<
-      pfilename.str()
-         << ", restart from output_id = " << o_step << endl;
     particle_mesh->read_particles_data_restart(pfilename.str(), o_step);
+    ss << "##################### Restart mode ##########################\n"
+       << "----> read rigid_particle surface node from " << pfilename.str() << "\n"
+       << "#############################################################";
+    PMToolBox::output_message(ss, *comm_in);
   }
-
   // reinit _particle_mesh
   particle_mesh->reinit();
-
   // print out information
-  cout << "##########################################################\n"
-       << "#                  Particle Parameters                    \n"
-       << "##########################################################\n\n"
-       << "   particle type             : " << particle_type.c_str() << endl
-       << "   particle mesh type        : " << particle_mesh_type.c_str() << endl
-       << "   minimum mesh size of particle surface: hmins  : " << hmins << endl
-       << "   maximum mesh size of particle surface: hmaxs = " << hmaxs << endl;
-  cout << "------------> The non-dimensional variables:\n"
-       << "   non-dimensional bead radius      a0     : " << 1.0 << "\n"
-       << "   non-dimensional ksi = sqrt(PI)/(3a0)    : " << std::sqrt(PI) / 3. <<
-    "\n";
-
+  ss << "##########################################################\n"
+     << "#                  Particle Parameters                    \n"
+     << "##########################################################\n\n"
+     << "   particle type             : " << particle_type.c_str() << "\n"
+     << "   particle mesh type        : " << particle_mesh_type.c_str() << "\n"
+     << "   minimum mesh size of particle surface: hmins  : " << hmins << "\n"
+     << "   maximum mesh size of particle surface: hmaxs = " << hmaxs << "\n"
+     << "------------> The non-dimensional variables:\n"
+     << "   non-dimensional bead radius      a0     : " << 1.0 << "\n"
+     << "   non-dimensional ksi = sqrt(PI)/(3a0)    : " << std::sqrt(PI) / 3.;
+  PMToolBox::output_message(ss, *comm_in);
   pfilename.str("");
   pfilename.clear();
   comm_in->barrier();
@@ -153,13 +125,13 @@ void CopssRigidParticleSystem::attach_mesh_spring_network()
 // =====================================================================
 void CopssRigidParticleSystem::create_object_mesh() {
   // prepare domain and objects
-  cout << "\n==>(1/4) Generate/Create domain Mesh\n";
+  PMToolBox::output_message("==>(1/4) Generate/Create domain Mesh", *comm_in);
   this->create_domain_mesh();
-  cout << "\n==>(2/4) Create periodic box \n ";
+  PMToolBox::output_message("==>(2/4) Create periodic box", *comm_in);
   this->create_periodic_boundary();
-  cout << "\n==>(3/4) Create particle mesh object\n";
+  PMToolBox::output_message("==>(3/4) Create particle mesh object", *comm_in);
   this->create_object();
-  cout << "\n==>(4/4) Create point_mesh object \n";
+  PMToolBox::output_message("==>(4/4) Create point_mesh object", *comm_in);
 
   // Create object mesh
   point_mesh = new PointMesh<3>(*particle_mesh, search_radius_p, search_radius_e);
@@ -170,16 +142,15 @@ void CopssRigidParticleSystem::create_object_mesh() {
   point_mesh->reinit(neighbor_list_update_flag, build_elem_neighbor_list);
 
   // finish point_mesh, print information
-  cout <<
-    "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n";
-  cout << "### The particle-mesh and point-mesh info:\n";
-  cout <<
-    "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n";
-  cout << "Total number of particles: " << particle_mesh->num_particles() << endl
-       << "Total number of points: " << particle_mesh->num_mesh_points() << endl
-       << "search_radius_p = " << search_radius_p << endl
-       << "search_radius_e = " << search_radius_e << endl;
-
+  ss << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
+     << "### The particle-mesh and point-mesh info:\n"
+     << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"
+     << "Total number of particles: " << particle_mesh->num_particles() << "\n"
+     << "Total number of points: " << particle_mesh->num_mesh_points() << "\n"
+     << "search_radius_p = " << search_radius_p << "\n"
+     << "search_radius_e = " << search_radius_e;
+  PMToolBox::output_message(ss, *comm_in);
+  ss.clear();
   // iterate over all particles for debug purpose
   if (debug_info) {
     const bool print_neighbor_list = false;
@@ -299,10 +270,10 @@ void CopssRigidParticleSystem::write_object(unsigned int step_id)
 void CopssRigidParticleSystem::run(EquationSystems& equation_systems) {
   PerfLog perf_log("Copss-Hydrodynamics-RigidParticleSystem");
 
-  cout << endl <<
-    "============================4. Start moving particles ============================"
-       << endl << endl;
-
+  PMToolBox::output_message(
+    "=====================4. Start moving particles ==========================\n",
+    *comm_in);
+    
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
 
@@ -327,8 +298,7 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems) {
   }
 
   if (update_neighbor_list_everyStep) {
-    std::cout <<
-      "====> neighbor_list is updated at every time step (including half step of fixman if available)\n";
+    ss << "====> neighbor_list is updated at every time step (including half step of fixman if available)";
   }
   else {
     neighbor_list_update_interval =
@@ -336,26 +306,24 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems) {
        max_dr_coeff[0]) ? int(search_radius_p / 2. /
                               max_dr_coeff[1]) : int(search_radius_p / 2. /
                                                      max_dr_coeff[2]);
-    std::cout << "====> neighbor_list is updated every " <<
-      neighbor_list_update_interval << " steps\n\n";
-    std::cout <<
-      "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
-              <<
-      "updating neighborList at each step seems tiny, but we have not fully validated it.\n\n";
+    ss << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n"
+       << "Warning: be careful of using this option. Although the difference"
+       << "between results from updating neighborList every some steps and from"
+       << "updating neighborList at each step seems tiny, but we have not fully validated it.\n";
   }
-
+  PMToolBox::output_message(ss, *comm_in);
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      Compute undisturbed velocity field without particles.
      NOTE: We MUST re-init particle-mesh before solving Stokes
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  cout << "==>(1/3) Solve the undisturbed system" << endl;
+  PMToolBox::output_message("==>(1/3) Solve the undisturbed system", *comm_in);
   this->solve_undisturbed_system(equation_systems);
 
-  cout <<
-    "==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0"
-       << endl;
+  PMToolBox::output_message(
+    "==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0",
+    *comm_in);
   this->create_brownian_system(equation_systems);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -363,7 +331,9 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems) {
      Advancing in time. Fixman Mid-Point algorithm
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  cout << "==>(3/3) Start calculating dynamics and advancing time steps" << endl;
+  PMToolBox::output_message(
+    "==>(3/3) Start calculating dynamics and advancing time steps",
+    *comm_in);
   vel0.resize(n_vec);
   vel1.resize(n_vec);
 

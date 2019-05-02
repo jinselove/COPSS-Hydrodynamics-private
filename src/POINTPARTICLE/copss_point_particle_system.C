@@ -13,28 +13,20 @@ CopssPointParticleSystem::CopssPointParticleSystem(CopssInit& init)
   // nothing
 }
 
-CopssPointParticleSystem::~CopssPointParticleSystem() {
+CopssPointParticleSystem::~CopssPointParticleSystem() 
+{
   delete polymer_chain; polymer_chain = nullptr;
-  delete mesh; mesh = nullptr;
-  delete point_mesh; point_mesh = nullptr;
-  delete pm_periodic_boundary; pm_periodic_boundary = nullptr;
-  delete brownian_sys; brownian_sys = nullptr;
-  delete fix_factory; fix_factory = nullptr;
-  delete polymer_chain; polymer_chain = nullptr;
-  delete point_mesh; point_mesh = nullptr;
-  for (int i = 0; i < fixes.size(); i++) {delete fixes[i]; fixes[i] = nullptr;}
 }
 
 // ==========================================================================
 void CopssPointParticleSystem::read_ggem_info() {
   alpha = input_file("alpha", 0.1);
-  std::ostringstream ss;
   ss << "##########################################################\n" 
      << "#                 GGEM information                        \n" 
      << "##########################################################\n"
      << "-----------> the smoothing parameter in GGEM alpha = " << alpha << "\n" 
      << "-----------> recommend meshsize <= " << 1. / (std::sqrt(2)* alpha);
-  PMToolBox::output_message(ss.str(), *comm_in); 
+  PMToolBox::output_message(ss, *comm_in); 
 }
 
 // ==========================================================================
@@ -42,8 +34,8 @@ void CopssPointParticleSystem::read_particle_info() {
   particle_type = input_file("particle_type", "other");
 
   if (particle_type != "point_particle") {
-    error_msg = "invalid particle type (" + particle_type + ") defined\n";
-    PMToolBox::output_message(error_msg, *comm_in);
+    ss << "invalid particle type (" + particle_type + ") defined\n";
+    PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
   point_particle_model = input_file("point_particle_model", "other");
@@ -58,8 +50,8 @@ void CopssPointParticleSystem::read_particle_info() {
                                               // length
   }
   else {
-    error_msg = "	Invalid point_particle_model !!!";
-    PMToolBox::output_message(error_msg, *comm_in);
+    ss << "	Invalid point_particle_model !!!";
+    PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
 } // end read_particle_parameter()
@@ -71,17 +63,14 @@ void CopssPointParticleSystem::create_object() {
   polymer_chain = new PolymerChain(chain_id, *pm_periodic_boundary);
   std::ostringstream pfilename;
   pfilename << "point_particle_data.in";
-  PMToolBox::output_message(
-    "--------------> skip generating datafile, will read in existed data file: "
-    + pfilename.str(), *comm_in);
+  ss << "--------------> skip generating datafile, will read in existed data file: "
+     << pfilename.str();
+  PMToolBox::output_message(ss, *comm_in);
   polymer_chain->read_particles_data(pfilename.str());
   if (restart)
   {
     pfilename.str("");
     pfilename.clear();
-    PMToolBox::output_message(
-      "--------------> in restart mode, load particle positions from saved restart files",
-      *comm_in);
     if (point_particle_model == "polymer_chain") {
       pfilename << "output_polymer_" << o_step << ".vtk";
       polymer_chain->read_particles_data_restart_vtk(pfilename.str());
@@ -90,6 +79,10 @@ void CopssPointParticleSystem::create_object() {
       pfilename << "output_bead_" << o_step << ".csv";
       polymer_chain->read_particles_data_restart_csv(pfilename.str());
     }
+    ss << "##################### Restart mode ##########################\n"
+       << "---> read point particle data from " << pfilename.str() << "\n"
+       << "#############################################################";
+    PMToolBox::output_message(ss, *comm_in);
   }
 
   // output data read from file
@@ -108,7 +101,6 @@ void CopssPointParticleSystem::create_object() {
     polymer_chain->initial_chain_center_of_mass(center0);
   }
   // for particular models
-  std::ostringstream ss;
   ss << "##########################################################\n"
      << "#                  Particle Parameters                    \n"
      << "##########################################################\n"
@@ -136,30 +128,36 @@ void CopssPointParticleSystem::create_object() {
        << "   non-dimensional ksi = sqrt(PI)/(3a0)    = " << std::sqrt(PI) / (3.) << "\n";
   }
   pfilename.str(""); pfilename.clear();
-  PMToolBox::output_message(ss.str(), *comm_in);
+  PMToolBox::output_message(ss, *comm_in);
   comm_in->barrier();
 } // end function
 
 // =====================================================================
 void CopssPointParticleSystem::create_object_mesh() {
   // prepare domain and objects
-  PMToolBox::output_message("==>(1/4) Generate/Create domain Mesh", *comm_in);
+  ss << "==>(1/4) Generate/Create domain Mesh";
+  PMToolBox::output_message(ss, *comm_in);
   this->create_domain_mesh();
-  PMToolBox::output_message("==>(2/4) Create periodic box", *comm_in);
+  ss << "==>(2/4) Create periodic box";
+  PMToolBox::output_message(ss, *comm_in);
   this->create_periodic_boundary();
-  PMToolBox::output_message("==>(3/4) Create polymer chain object \
-(for beads or polymer_chain)", *comm_in);
+  ss << "==>(3/4) Create polymer chain object (for beads or polymer_chain)";
+  PMToolBox::output_message(ss, *comm_in);
   this->create_object();
-  PMToolBox::output_message("==>(4/4) Create point_mesh object", *comm_in);
+  ss << "==>(4/4) Create point_mesh object";
+  PMToolBox::output_message(ss, *comm_in);
+  // PMToolBox::output_message("initialize pointmesh class", *comm_in);
   point_mesh = new PointMesh<3>(*mesh,
                                 *polymer_chain,
                                 search_radius_p,
                                 search_radius_e);
+  // PMToolBox::output_message("add pbc", *comm_in);
   point_mesh->add_periodic_boundary(*pm_periodic_boundary);
 
   // reinit point mesh (including particles and neighbor list)
+  // PMToolBox::output_message("before reinit point_mesh", *comm_in);
   point_mesh->reinit(neighbor_list_update_flag, true);
-  std::ostringstream ss;
+  // PMToolBox::output_message("after reinit point_mesh", *comm_in);
   ss << "-------------> Reinit point mesh object, finished! \n"
      << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - \n"
      << "### The point-mesh info:\n"
@@ -167,7 +165,7 @@ void CopssPointParticleSystem::create_object_mesh() {
      << "Total number of point particles:" << point_mesh->num_particles() <<"\n"
      << "search_radius_p = " << search_radius_p << "\n"
      << "search_radius_e = " << search_radius_e << "\n";
-  PMToolBox::output_message(ss.str(), *comm_in);
+  PMToolBox::output_message(ss, *comm_in);
 } // end function
 
 // ==================================================================================
@@ -266,9 +264,8 @@ void CopssPointParticleSystem::update_object()
     chain_broken = polymer_chain->check_chain(max_spring_len);
 
     if (chain_broken) {
-      output_msg =
-        "   ********** warning: Polymer chain is broken ---> bead position is corrected by scaling the chain length and moving the particle according to periodicity";
-      PMToolBox::output_message(output_msg, *comm_in);
+      ss <<"   ********** warning: Polymer chain is broken ---> bead position is corrected by scaling the chain length and moving the particle according to periodicity";
+      PMToolBox::output_message(ss, *comm_in);
     }
   }
 }
@@ -333,10 +330,8 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     return;
   }
 
-  PMToolBox::output_message(
-    "============================4. Start moving particles ====================",
-    *comm_in);
-
+  ss << "============================4. Start moving particles ====================";
+  PMToolBox::output_message(ss, *comm_in);
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      Parameters for dynamic process
@@ -356,9 +351,8 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   }
 
   if (update_neighbor_list_everyStep) {
-    PMToolBox::output_message(
-      "====> neighbor_list is updated at every time step (including half step of fixman if available)\n",
-      *comm_in);
+    ss << "====> neighbor_list is updated at every time step (including half step of fixman if available)\n";
+    PMToolBox::output_message(ss, *comm_in);
   }
   else {
     neighbor_list_update_interval =
@@ -366,11 +360,10 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
        max_dr_coeff[0]) ? int(search_radius_p / 2. /
                               max_dr_coeff[1]) : int(search_radius_p / 2. /
                                                      max_dr_coeff[2]);
-    std::ostringstream ss;
     ss << "====> neighbor_list is updated every " << neighbor_list_update_interval << " steps\n"
        << "Warning: be careful of using this option. Although the difference between results from updating neighborList every some steps and from"
        << "updating neighborList at each step seems tiny, but we have not fully validated it.\n";
-    PMToolBox::output_message(ss.str(), *comm_in);
+    PMToolBox::output_message(ss, *comm_in);
   }
 
   // Get a better conformation of polymer chains before simulation.
@@ -382,24 +375,23 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
      NOTE: We MUST re-init particle-mesh before solving Stokes
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  PMToolBox::output_message("==>(1/3) Solve the undisturbed system", *comm_in);
+  ss << "==>(1/3) Solve the undisturbed system";
+  PMToolBox::output_message(ss, *comm_in);
   perf_log.push("solve_undisturbed_system");
   this->solve_undisturbed_system(equation_systems);
   perf_log.pop("solve_undisturbed_system");
 
   // create Brownian system for simulation
-  PMToolBox::output_message(
-    "==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0",
-    *comm_in);
+  ss << "==>(2/3) Prepare RIN & ROUT and Brownian_system in binary format at step 0";
+  PMToolBox::output_message(ss, *comm_in);
   this->create_brownian_system(equation_systems);
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      Advancing in time. Fixman Mid-Point algorithm
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  PMToolBox::output_message(
-    "==>(3/3) Start calculating dynamics and advancing time steps",
-    *comm_in);
+  ss << "==>(3/3) Start calculating dynamics and advancing time steps";
+  PMToolBox::output_message(ss, *comm_in);
   vel0.resize(n_vec);
   vel1.resize(n_vec);
 

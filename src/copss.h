@@ -86,6 +86,8 @@ public:
 
   // output message string
   std::string output_msg;
+  
+  std::ostringstream ss;
 
   // control file object
   GetPot input_file;
@@ -283,7 +285,7 @@ public:
   /*!
    * class destructor
    */
-  ~Copss();
+  virtual ~Copss();
 
   /*! Check libmesh support
    *

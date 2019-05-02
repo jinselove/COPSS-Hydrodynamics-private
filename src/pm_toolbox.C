@@ -273,13 +273,25 @@ void PMToolBox::coordinate_rotation(Point      & pt,
 }
 
 // =============================================================================================
-void PMToolBox::output_message(const std::string           & msg,
+void PMToolBox::output_message(std::ostringstream           & ss,
                                const Parallel::Communicator& comm_in)
 {
   // comm_in.barrier();
   if (comm_in.rank() == 0)
   {
-    printf("%s \n", msg.c_str());
+    std::cout << ss.str() << std::endl;
+  }
+  ss.str("");
+}
+
+// =============================================================================================
+void PMToolBox::output_message(const std::string           & str,
+                               const Parallel::Communicator& comm_in)
+{
+  // comm_in.barrier();
+  if (comm_in.rank() == 0)
+  {
+    std::cout << str << std::endl;
   }
 }
 

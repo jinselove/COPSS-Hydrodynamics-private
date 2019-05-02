@@ -113,7 +113,10 @@ public:
   /*
    * Output a message on the screen
    */
-  static void output_message(const std::string           & msg,
+  static void output_message(std::ostringstream          & ss,
+                             const Parallel::Communicator& comm_in);
+                             
+  static void output_message(const std::string &ss,
                              const Parallel::Communicator& comm_in);
 
   /*

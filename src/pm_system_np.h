@@ -104,6 +104,6 @@ private:
   SolverStokes _np_solver;
 
   // Assemble Stokes system
-  AssembleNP *_assemble_np;
+  AssembleNP *_assemble_np = nullptr;
 };
 } // end namespace libMesh

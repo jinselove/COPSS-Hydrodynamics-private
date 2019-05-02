@@ -906,7 +906,7 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
                               const bool& build_elem_neighbor_list)
 {
   START_LOG("reinit()", "PointMesh<KDDim>");
-
+  PMToolBox::output_message("zero particle force", this->comm());
   // zero particle force at every time step
   for (std::size_t j = 0; j < _num_point_particles; ++j) {
     _particles[j]->zero_particle_force();
@@ -925,6 +925,7 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
          change?
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          - - */
+    PMToolBox::output_message("clear kd tree", this->comm());
     if (_kd_tree.get()) this->clear_kd_tree();
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -932,6 +933,7 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
        Then we re-construct the kd-tree after clearing it!
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          - - */
+      PMToolBox::output_message("construct kd tree", this->comm());
     this->construct_kd_tree();
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -941,7 +943,7 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
        Loop over ALL particles to calculate their neighbor lists and forces.
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          - - */
-
+     PMToolBox::output_message("build particle-particle neighbor list", this->comm());
     for (std::size_t j = 0; j < _num_point_particles; ++j)
     {
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1003,14 +1005,19 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
        Construct the element-particle neighbor list and particle-element id map
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          - - */
+        
     if (build_elem_neighbor_list) {
+          PMToolBox::output_message("before build elem particle neighbor list", this->comm());
       this->build_elem_neighbor_list();
+      PMToolBox::output_message("after build elem particle neighbor list", this->comm());
+      
     }
 
     // after reinit neighbor list, set the flag to false
     neighbor_list_update_flag = false;
   } // end if (reinit_neighbor_list)
   // update particle neighbor distance at each reinit step
+    PMToolBox::output_message("reinit neighbor vector", this->comm());
   this->reinit_neighbor_vector();
   STOP_LOG("reinit()", "PointMesh<KDDim>");
 }

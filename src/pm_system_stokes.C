@@ -778,15 +778,13 @@ void PMSystemStokes::test_velocity_profile()
 {
   START_LOG("test_velocity_profile()", "PMSystemStokes");
   bool neighbor_list_update_flag = true;
-
   // solve the disturbed velocity field: global solution(FEM solution)
   // In this test, we assume that undisturbed velocity is zero!
-  std::cout << "========>2. Test in PMSystemStokes::test_velocity_profile(): \n";
-
+  PMToolBox::output_message("========>2. Test in PMSystemStokes::\
+test_velocity_profile()", this->comm());
   // build both particle-particle and particle-elem neighbor list
   _re_init = true;
   this->solve("disturbed");
-
   // output the velocity profiles along xyz directions, global + local
   // solutions.
   const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
@@ -928,7 +926,6 @@ void PMSystemStokes::test_velocity_profile()
         "\n";
   } // end for i-loop
   outfile.close();
-
   // done and write out the results
   std::ostringstream output_filename;
   output_filename << "output_velocity_profile_" << NP << "P.e";
@@ -936,7 +933,6 @@ void PMSystemStokes::test_velocity_profile()
   ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
                                                        this->get_equation_systems());
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
-
   STOP_LOG("test_velocity_profile()", "PMSystemStokes");
 }
 

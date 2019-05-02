@@ -79,7 +79,7 @@ class Copss {
 public:
 
   // PETSC MPI communicator
-  Parallel::Communicator *comm_in;
+  Parallel::Communicator *comm_in = nullptr;
 
   // error message string
   std::string error_msg;
@@ -159,7 +159,7 @@ public:
 
   // Fix
   std::vector<Fix *>fixes;
-  FixFactory *fix_factory;
+  FixFactory *fix_factory = nullptr;
   unsigned int numForceTypes;
   std::vector<std::string>forceTypes;
   std::vector<Fix::type_force>forces;
@@ -212,15 +212,15 @@ public:
   std::vector<std::string>output_file;
 
   // mesh
-  SerialMesh *mesh;
-  PointMesh<3> *point_mesh;
+  SerialMesh *mesh = nullptr;
+  PointMesh<3> *point_mesh = nullptr;
 
   // std::unique_ptr<SerialMesh> mesh;
   Real min_mesh_size, max_mesh_size;
   Real search_radius_p, search_radius_e;
 
   // periodic boundary
-  PMPeriodicBoundary *pm_periodic_boundary;
+  PMPeriodicBoundary *pm_periodic_boundary = nullptr;
 
   // std::unique_ptr<PMPeriodicBoundary> pm_periodic_boundary;
 
@@ -239,7 +239,7 @@ public:
   Real eig_min = 0, eig_max = 0;
   const std::string out_system_filename = "output_pm_system.e";
   UniquePtr<NumericVector<Real> >v0_ptr;
-  ExodusII_IO *exodus_ptr;
+  ExodusII_IO *exodus_ptr = nullptr;
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
@@ -257,7 +257,7 @@ public:
   Mat M;
   PetscRandom rand_ctx;
   PetscScalar coef = 0.0;
-  BrownianSystem *brownian_sys;
+  BrownianSystem *brownian_sys = nullptr;
   std::vector<Point>center0;
 
   // variables in integrator

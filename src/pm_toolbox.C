@@ -279,13 +279,7 @@ void PMToolBox::output_message(const std::string           & msg,
   // comm_in.barrier();
   if (comm_in.rank() == 0)
   {
-    printf("\n");
-    printf(
-      "---------------------------------------------------------------------\n");
     printf("%s \n", msg.c_str());
-    printf(
-      "---------------------------------------------------------------------\n");
-    printf("\n");
   }
 }
 

@@ -554,13 +554,8 @@ void PointMesh<KDDim>::build_elem_neighbor_list(const Elem               *elem,
                                                 const bool                is_sorted,
                                                 std::vector<std::size_t>& n_list)
 {
-  // This function must be called on every processor.
-  parallel_object_only();
-
-#ifdef LIBMESH_HAVE_NANOFLANN
+  #ifdef LIBMESH_HAVE_NANOFLANN
   START_LOG("build_elem_neighbor_list(elem)", "PointMesh<KDDim>");
-
-
   // If the KD tree is not built, construct the KD tree first
   if (_kd_tree.get() == NULL) this->construct_kd_tree();
 
@@ -578,8 +573,6 @@ void PointMesh<KDDim>::build_elem_neighbor_list(const Elem               *elem,
   params.sorted = is_sorted; // with sorted/unsorted sequence
   std::vector<std::pair<std::size_t, Real> > IndicesDists;
   _kd_tree->radiusSearch(&query_pt[0], r_l2, IndicesDists, params);
-
-
   /* ------------------------------------------------------------------------
    * if the periodic boundary condition is applied, we must find the neighbor
    * list around its image particles for computing the interaction forces.
@@ -637,8 +630,7 @@ void PointMesh<KDDim>::build_elem_neighbor_list(const Elem               *elem,
   for (std::size_t j = 0; j < np; ++j) {
     n_list[j] = IndicesDists[j].first;
   }
-
-  STOP_LOG("build_elem_neighbor_list(elem)", "PointMesh<KDDim>");
+STOP_LOG("build_elem_neighbor_list(elem)", "PointMesh<KDDim>");
 #endif // ifdef LIBMESH_HAVE_NANOFLANN
 }
 
@@ -646,38 +638,27 @@ void PointMesh<KDDim>::build_elem_neighbor_list(const Elem               *elem,
 template<unsigned int KDDim>
 void PointMesh<KDDim>::build_elem_neighbor_list()
 {
+  // Let's be sure we properly initialize on every processor at once:
+  // This function is only useful in Debug Mode
+  parallel_object_only();
   START_LOG("build_elem_neighbor_list()", "PointMesh<KDDim>");
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
      init the container:
      the vector maps elem_id to the element neighbor list
      the local list stores the mapvector on each local processor
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
   _elem_neighbor_list.clear();
   _local_elem_neighbor_list.clear();
-
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      prepare the send list for particle and element pairs
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   std::vector<dof_id_type> particle_id_send_list_vec, element_id_send_list_vec;
-
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      loop over each element to build its local neighbor list
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  std::size_t call_count = 0;
-
-  //  MeshBase::const_element_iterator       el     =
-  // _mesh.active_elements_begin();
-  //  const MeshBase::const_element_iterator end_el =
-  // _mesh.active_elements_end();
   MeshBase::const_element_iterator el =
     _mesh.active_local_elements_begin();
   const MeshBase::const_element_iterator end_el =
@@ -691,24 +672,18 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
           */
     const Elem *elem          = *el;
     const std::size_t elem_id = elem->id();
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Find the elem neighbor list of particles around the elem's centroid
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
           */
     std::vector<std::size_t> n_list;
     this->build_elem_neighbor_list(elem, _is_sorted, n_list);
-    call_count++;
-
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Construct the local elem-neighbor list mapvector, and this will be
        distributed to all the processors through MPI_Allgather()
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
           */
     _local_elem_neighbor_list.insert(std::make_pair(elem_id, n_list));
-
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        Print out the element-particle neighbor list (for test purpose only)
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -745,7 +720,6 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
     // elem->point(k)(2));
     //    }
 
-
     for (std::size_t j = 0; j < n_list.size(); ++j)
     {
       const std::size_t pid = n_list[j];
@@ -761,19 +735,16 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
         particle_id_send_list_vec.push_back(pid);
         element_id_send_list_vec.push_back(elem_id);
 
-        // printf("*****pid = %lu, eid = %lu, processor_id =
-        // %i\n",pid,elem_id,elem->processor_id() );
+        // printf("*****pid = %lu, eid = %lu, processor_id =%i\n",pid,elem_id,elem->processor_id() );
         // printf("*****point xyz = (%f %f %f)"\n\n",pt(0),pt(1),pt(2));
-        // //elem->print_info();
+        //elem->print_info();
       } // end if
     }   // end for j-loop
   }     // end for elem-loop
-
   //  this->comm().barrier();
   //  printf("--->test in build_elem_neighbor_list() call_count = %lu on rank =
   // %d\n",
   //         call_count,this->comm().rank() );
-
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
@@ -782,8 +753,6 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
        - */
   this->comm().allgather(particle_id_send_list_vec);
   this->comm().allgather(element_id_send_list_vec);
-
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      Set the element id for each particle.
@@ -798,8 +767,6 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
   }
   particle_id_send_list_vec.clear(); // clear the space
   element_id_send_list_vec.clear();
-
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      If this elem neighbor list is constructed serially, NO communication
@@ -814,8 +781,6 @@ void PointMesh<KDDim>::build_elem_neighbor_list()
     STOP_LOG("build_elem_neighbor_list()", "PointMesh<KDDim>");
     return;
   }
-
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      If the above loop is performed over local elem on multiple processors,
@@ -906,7 +871,6 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
                               const bool& build_elem_neighbor_list)
 {
   START_LOG("reinit()", "PointMesh<KDDim>");
-  PMToolBox::output_message("zero particle force", this->comm());
   // zero particle force at every time step
   for (std::size_t j = 0; j < _num_point_particles; ++j) {
     _particles[j]->zero_particle_force();
@@ -925,7 +889,6 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
          change?
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          - - */
-    PMToolBox::output_message("clear kd tree", this->comm());
     if (_kd_tree.get()) this->clear_kd_tree();
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -933,7 +896,6 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
        Then we re-construct the kd-tree after clearing it!
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          - - */
-      PMToolBox::output_message("construct kd tree", this->comm());
     this->construct_kd_tree();
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -943,7 +905,6 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
        Loop over ALL particles to calculate their neighbor lists and forces.
        - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
          - - */
-     PMToolBox::output_message("build particle-particle neighbor list", this->comm());
     for (std::size_t j = 0; j < _num_point_particles; ++j)
     {
       /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1007,17 +968,13 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
          - - */
         
     if (build_elem_neighbor_list) {
-          PMToolBox::output_message("before build elem particle neighbor list", this->comm());
       this->build_elem_neighbor_list();
-      PMToolBox::output_message("after build elem particle neighbor list", this->comm());
-      
     }
 
     // after reinit neighbor list, set the flag to false
     neighbor_list_update_flag = false;
   } // end if (reinit_neighbor_list)
   // update particle neighbor distance at each reinit step
-    PMToolBox::output_message("reinit neighbor vector", this->comm());
   this->reinit_neighbor_vector();
   STOP_LOG("reinit()", "PointMesh<KDDim>");
 }

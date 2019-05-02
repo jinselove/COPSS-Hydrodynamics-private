@@ -61,13 +61,8 @@ AssembleStokes::AssembleStokes(EquationSystems  & es,
 // ==================================================================================
 AssembleStokes::~AssembleStokes()
 {
-  if (analytical_solution) {
-    delete analytical_solution;
-  }
-
-  if (ggem_stokes) {
-    delete ggem_stokes;
-  }
+  delete analytical_solution; analytical_solution = nullptr;
+  delete ggem_stokes; ggem_stokes = nullptr;
 }
 
 // ==================================================================================

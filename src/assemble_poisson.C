@@ -62,9 +62,8 @@ AssemblePoisson::AssemblePoisson(EquationSystems  & es,
 // ==================================================================================
 AssemblePoisson::~AssemblePoisson()
 {
-  if (ggem_poisson) {
-    delete ggem_poisson;
-  }
+  delete analytical_solution; analytical_solution = nullptr;
+  delete ggem_poisson; ggem_poisson = nullptr;
 }
 
 // ==================================================================================
@@ -304,7 +303,6 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
       // printf("finished assemble_int_force\n");
     }
   }
-
   // Now we will loop over all the elements in the mesh that live
   // on the local processor, and compute the element vector Fe.
   MeshBase::const_element_iterator el =
@@ -367,7 +365,6 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     // PMToolBox::output_dense_vector(Fe);
     _pm_system.rhs->add_vector(Fe, _dof_indices[elem_id]);
   } // end for elem-loop
-
   STOP_LOG("assemble_global_F()", "AssemblePoisson");
 
   // if (_pm_system.comm().rank()==0){
@@ -430,7 +427,6 @@ void AssemblePoisson::compute_element_rhs(const Elem                   *elem,
 
       // Get the location of this bead
       np_pos = _particles[n_list[np]]->point();
-
       for (unsigned int qp = 0; qp < qp_size; qp++) {
         // Distance from quadrature point to the charge point
         r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
@@ -445,7 +441,6 @@ void AssemblePoisson::compute_element_rhs(const Elem                   *elem,
         // concentration on
         // quadrature points?
         // Real space_charge_density = 0.;
-
         for (unsigned int k = 0; k < n_u_dofs; ++k) {
           // Fe(k) += JxW[qp]*phi[k][qp]*charge_val;
           Fe(k) += _int_force[elem_id][k * qp_size + qp] * charge_val;
@@ -526,18 +521,17 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
 
   // Get a reference to the Particle-Mesh System
   PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
-
-  const Real penalty         = 1E6; // The penalty value
-  const unsigned int n_nodes = elem->n_nodes();
-  const std::size_t  elem_id = elem->id();
-
   // Dirichlet boundaries
   const std::vector<unsigned int> boundary_id_dirichlet_poisson =
     _eqn_sys.parameters.get<std::vector<unsigned int> >(
       "boundary_id_dirichlet_poisson");
   const std::vector<Real> boundary_value_dirichlet_poisson =
     _eqn_sys.parameters.get<std::vector<Real> >("boundary_value_dirichlet_poisson");
-
+  // return None if there are no Dirichlet BC specified
+  if (boundary_id_dirichlet_poisson.size()==0) return;
+  const Real penalty         = 1E6; // The penalty value
+  const unsigned int n_nodes = elem->n_nodes();
+  const std::size_t  elem_id = elem->id();
   // Loop through sides in this element that sits on system's boundary
   for (unsigned int s = 0; s < _boundary_sides_dirichlet_poisson[elem_id].size();
        s++)
@@ -620,58 +614,47 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
                                        DenseVector<Number>& Fe)
 {
   START_LOG("apply_bc_neumann()", "AssemblePoisson");
-
   // Get a reference to the Particle-Mesh System
   PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
-
-  const unsigned int n_nodes = elem->n_nodes();
-  const std::size_t  elem_id = elem->id();
-
   // Neumann boundaries
   const std::vector<unsigned int> boundary_id_neumann_poisson =
     _eqn_sys.parameters.get<std::vector<unsigned int> >(
       "boundary_id_neumann_poisson");
   const std::vector<Real> boundary_value_neumann_poisson =
     _eqn_sys.parameters.get<std::vector<Real> >("boundary_value_neumann_poisson");
-
+  // return None if there are no neumann BC specified
+  // if (boundary_id_neumann_poisson.size()==0) return;
+  const unsigned int n_nodes = elem->n_nodes();
+  const std::size_t  elem_id = elem->id();
   // Integration terms for side element
   const std::vector<Real>& JxW_face               = fe_face.get_JxW();
   const std::vector<std::vector<Real> >& phi_face = fe_face.get_phi();
   const std::vector<Point>& face_normals          = fe_face.get_normals();
-
   // Extract the shape function derivatives to be evaluated at the nodes
   const std::vector<std::vector<RealGradient> >& dphi = fe_phi.get_dphi();
-
   // Extract the element node coordinates in the reference frame
   std::vector<Point> nodes;
   fe_phi.get_refspace_nodes(elem->type(), nodes);
-
   // Evaluate the shape functions derivatives at the nodes
   fe_phi.reinit(elem, &nodes);
-
   // Local electrical potential and its gradient on all nodes in this element
   std::vector<Real> phi_local;
   phi_local.resize(elem->n_nodes());
   std::vector<RealGradient> dphi_local;
   dphi_local.resize(elem->n_nodes());
-
   // Loop through nodes on this element
   for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
   {
     // Coordinate of the node
     const Point ptx = elem->point(nn);
-
     // Evaluate local electrical potential (phi) on each node
     phi_local[nn] = pm_system.local_potential_field(elem, ptx, "regularized");
-
     // phi_local[nn] = pm_system.local_potential_field(ptx, "regularized");
   }
-
   // Gradient of electrical potential on all nodes in this element
   for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
     for (unsigned int i = 0; i < phi_local.size();
          i++) dphi_local[nn] += phi_local[i] * dphi[i][nn];
-
   // Loop through sides in this element that sits on system's boundary
   for (unsigned int s = 0; s < _boundary_sides_neumann_poisson[elem_id].size();
        s++)

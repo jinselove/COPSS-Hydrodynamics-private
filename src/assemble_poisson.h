@@ -145,8 +145,8 @@ private:
                                          _boundary_sides_neumann_poisson;
 
   // Get a reference to GGEMPoisson
-  GGEMPoisson *ggem_poisson;
+  GGEMPoisson *ggem_poisson = nullptr;
 
   // Get a reference to AnalyticalSolutionPoisson
-  AnalyticalSolutionPoisson *analytical_solution;
+  AnalyticalSolutionPoisson *analytical_solution = nullptr;
 };

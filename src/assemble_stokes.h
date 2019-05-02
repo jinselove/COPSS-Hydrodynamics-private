@@ -176,8 +176,8 @@ public:
 private:
 
   // ! Get a reference to AnalyticalSolution
-  AnalyticalSolutionStokes *analytical_solution;
+  AnalyticalSolutionStokes *analytical_solution = nullptr;
 
   // ! Get a reference to GGEMStokes
-  GGEMStokes *ggem_stokes;
+  GGEMStokes *ggem_stokes = nullptr;
 };

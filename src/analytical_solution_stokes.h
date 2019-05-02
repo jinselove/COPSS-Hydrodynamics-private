@@ -90,7 +90,7 @@ public:
 private:
 
   // Initialization a null _point_mesh pointer
-  PointMesh<3> *_point_mesh = NULL;
+  PointMesh<3> *_point_mesh = nullptr;
 
 
   // System dimension

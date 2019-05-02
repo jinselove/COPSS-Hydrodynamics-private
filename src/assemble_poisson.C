@@ -623,7 +623,7 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   const std::vector<Real> boundary_value_neumann_poisson =
     _eqn_sys.parameters.get<std::vector<Real> >("boundary_value_neumann_poisson");
   // return None if there are no neumann BC specified
-  // if (boundary_id_neumann_poisson.size()==0) return;
+  if (boundary_id_neumann_poisson.size()==0) return;
   const unsigned int n_nodes = elem->n_nodes();
   const std::size_t  elem_id = elem->id();
   // Integration terms for side element

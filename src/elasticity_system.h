@@ -171,11 +171,11 @@ public:
 private:
 
   // particle mesh pointer
-  ParticleMesh<3> *_particle_mesh;
+  ParticleMesh<3> *_particle_mesh = nullptr;
 
 
   // (surface or volume) mesh spring network pointer
-  MeshSpringNetwork *_mesh_spring_network;
+  MeshSpringNetwork *_mesh_spring_network = nullptr;
 
 
   // label whether the system matrix is assembled

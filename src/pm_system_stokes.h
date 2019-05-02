@@ -242,12 +242,12 @@ private:
   SolverStokes _solver_stokes;
 
   // Assemble Stokes system
-  AssembleStokes *assemble_stokes;
+  AssembleStokes *assemble_stokes = nullptr;
 
   // Get a pointer to AnalyticalSolutionStokes
-  AnalyticalSolutionStokes *analytical_solution;
+  AnalyticalSolutionStokes *analytical_solution = nullptr;
 
   // Get a pointer to GGEMStokes
-  GGEMStokes *ggem_stokes;
+  GGEMStokes *ggem_stokes = nullptr;
 }; // end class
 } // end namespace libMesh

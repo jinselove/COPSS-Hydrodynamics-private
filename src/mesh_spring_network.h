@@ -126,7 +126,7 @@ private:
   MeshBase& _p_mesh;
 
   // Pointer to the Periodic boundary condition
-  PMPeriodicBoundary *_periodic_boundary;
+  PMPeriodicBoundary *_periodic_boundary = nullptr;
 
   // node neighbors: neighbor id and equilibrium distance
   std::vector<neighbor_connection>_nodes_neighbors;

@@ -181,12 +181,12 @@ private:
   SolverPoisson _solver_poisson;
 
   // Assemble Poisson system
-  AssemblePoisson *_assemble_poisson;
+  AssemblePoisson *_assemble_poisson = nullptr;
 
   // Get a pointer to AnalyticalSolutionPoisson
-  AnalyticalSolutionPoisson *analytical_solution;
+  AnalyticalSolutionPoisson *analytical_solution = nullptr;
 
   // Get a pointer to GGEMPoisson
-  GGEMPoisson *ggem_poisson;
+  GGEMPoisson *ggem_poisson = nullptr;
 };
 } // end namespace libMesh

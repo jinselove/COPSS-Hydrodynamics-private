@@ -531,7 +531,7 @@ private:
   std::size_t _num_rigid_particles;
 
   // Polymer chain
-  PolymerChain *_polymer_chain;
+  PolymerChain *_polymer_chain = nullptr;
 
   // The point list adapter
   // - interface to the nanoflann in order to construct KD-Tree
@@ -548,7 +548,7 @@ private:
   std::map<const std::size_t, std::vector<std::size_t> >_local_elem_neighbor_list;
 
   // Pointer to the Periodic boundary condition
-  PMPeriodicBoundary *_periodic_boundary;
+  PMPeriodicBoundary *_periodic_boundary = nullptr;
 
   // bead velocity magniture array
   std::vector<Real>_velocity_magnitude;

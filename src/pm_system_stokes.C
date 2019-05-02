@@ -288,7 +288,7 @@ void PMSystemStokes::add_local_solution()
       const unsigned int node_id = node->id();
       std::ostringstream oss;
       oss << "          NODE " << node_id;
-      PMToolBox::output_message(oss.str(), this->comm());
+      PMToolBox::output_message(oss, this->comm());
       node->print_info();
 
       if (this->comm().rank() == 0) printf("--->test: nodal dof number :");
@@ -345,8 +345,9 @@ void PMSystemStokes::add_local_solution()
 void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
 {
   START_LOG("test_l2_norm()", "PMSystemStokes");
-  std::string msg = "--->test in PMSystemStokes::test_l2_norm(): \n";
-  PMToolBox::output_message(msg, this->comm());
+  std::ostringstream ss;
+  ss << "--->test in PMSystemStokes::test_l2_norm(): \n";
+  PMToolBox::output_message(ss, this->comm());
   bool build_elem_neighbor_list = true;
 
   // Numerical solution: Global(FEM) + Local(Analytical)
@@ -410,10 +411,9 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
 
   const Real l1_norm = val0_norm / val1_norm;
   const Real l2_norm = std::sqrt(val2_norm) / std::sqrt(val3_norm);
-  printf("--->test in test_l1_norm: l1_norm = %E, l2_norm = %E\n",
-         l1_norm,
-         l2_norm);
-
+  ss << "--->test in test_l1_norm: l1_norm = " << l1_norm
+     << "; l2_norm = " << l2_norm << "\n";
+  PMToolBox::output_message(ss, this->comm());
   STOP_LOG("test_l2_norm()", "PMSystemStokes");
 }
 
@@ -778,10 +778,11 @@ void PMSystemStokes::test_velocity_profile()
 {
   START_LOG("test_velocity_profile()", "PMSystemStokes");
   bool neighbor_list_update_flag = true;
+  std::ostringstream ss;
   // solve the disturbed velocity field: global solution(FEM solution)
   // In this test, we assume that undisturbed velocity is zero!
-  PMToolBox::output_message("========>2. Test in PMSystemStokes::\
-test_velocity_profile()", this->comm());
+  ss <<"========>2. Test in PMSystemStokes:: test_velocity_profile()";
+  PMToolBox::output_message(ss, this->comm());
   // build both particle-particle and particle-elem neighbor list
   _re_init = true;
   this->solve("disturbed");

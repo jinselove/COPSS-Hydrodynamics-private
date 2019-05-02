@@ -125,7 +125,6 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name,
 void PMSystemPoisson::solve(const std::string& option)
 {
   START_LOG("solve()", "PMSystemPoisson");
-
   // Real t1, t2;
   // std::string msg = "---> solve Poisson";
   // PMToolBox::output_message(msg, this->comm());
@@ -152,17 +151,18 @@ void PMSystemPoisson::solve(const std::string& option)
     // std::cout << "For Poisson equation, time used to assemble the global
     // matrix and reinit KSP is " <<t2-t1<<" s\n\n";
   }
-
+  
+  
   // assemble the rhs vector, and record the CPU wall time.
   // t1 = MPI_Wtime();
   this->assemble_rhs("Poisson", option);
-
   // t2 = MPI_Wtime();
   // std::cout << "For Poisson equation, time used to assemble the
   // right-hand-side vector is " <<t2-t1<<" s\n";
 
   // solve the problem
   _solver_poisson.solve();
+  
 
   STOP_LOG("solve()", "PMSystemPoisson");
 }

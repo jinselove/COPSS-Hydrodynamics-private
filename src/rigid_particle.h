@@ -538,7 +538,7 @@ private:
 
 
   // Mesh - spring network
-  MeshSpringNetwork *_mesh_spring_network;
+  MeshSpringNetwork *_mesh_spring_network = nullptr;
 
   // Initial values (if it is the perfect shape)
   Real _volume0;

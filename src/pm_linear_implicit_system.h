@@ -210,10 +210,10 @@ public:
 protected:
 
   // particle mesh pointer
-  PointMesh<3> *_point_mesh;
+  PointMesh<3> *_point_mesh = nullptr;
 
   // particle mesh pointer
-  ParticleMesh<3> *_particle_mesh;
+  ParticleMesh<3> *_particle_mesh = nullptr;
 
   // force field for particle/points
   std::vector<Fix *>_fixes;

@@ -637,7 +637,7 @@ private:
   std::map<const std::size_t, std::vector<std::size_t> >_local_elem_neighbor_list;
 
   // Pointer to the Periodic boundary condition
-  PMPeriodicBoundary *_periodic_boundary;
+  PMPeriodicBoundary *_periodic_boundary = nullptr;
 
   // precision of output
   const int o_precision = 6;

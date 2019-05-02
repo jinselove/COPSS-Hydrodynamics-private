@@ -491,7 +491,7 @@ private:
   // std::vector<PointParticle*> _beads;
 
   // Pointer to the Periodic boundary condition
-  PMPeriodicBoundary *_periodic_boundary;
+  PMPeriodicBoundary *_periodic_boundary = nullptr;
 
   // precision of output
   const int o_precision = 6;

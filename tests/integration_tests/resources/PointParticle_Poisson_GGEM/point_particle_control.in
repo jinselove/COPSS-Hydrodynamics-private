@@ -63,7 +63,7 @@ shear_direction = '0. 0. 0.'
 generate_mesh = true
 n_mesh = '15 15 15'
 
-boundary_id_dirichlet_poisson = '0 1 2 3 4 5'
+boundary_id_dirichlet_poisson = '1 2 3 4 5 6'
 boundary_value_dirichlet_poisson = '0. 0. 0. 0. 0. 0.'
 
 #boundary_id_neumann_poisson = '0 1 2 3 4 5'

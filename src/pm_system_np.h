@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -18,7 +19,6 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-
 #pragma once
 
 // Local Includes -----------------------------------
@@ -26,30 +26,27 @@
 #include "solver_stokes.h"
 #include "pm_linear_implicit_system.h"
 
-namespace libMesh
-{
-
+namespace libMesh {
 /*
  * The PMSystemNP is designed to solve the Nernst-Planck
  * equation
  */
 
-class PMSystemNP : public PMLinearImplicitSystem
-{
+class PMSystemNP : public PMLinearImplicitSystem {
 public:
 
   /**
    * Constructor.
    */
-  PMSystemNP (EquationSystems& es,
-              const std::string& name,
-              const unsigned int number); // number of systems
+  PMSystemNP(EquationSystems  & es,
+             const std::string& name,
+             const unsigned int number); // number of systems
 
 
   /**
    * Destructor.
    */
-  virtual ~PMSystemNP ();
+  virtual ~PMSystemNP();
 
 
   /**
@@ -61,28 +58,29 @@ public:
   /**
    * @returns a clever pointer to the system.
    */
-  sys_type & system () { return *this; }
-
+  sys_type& system() {
+    return *this;
+  }
 
   /**
    * Clear all the data structures associated with the system.
    */
-  void clear ();
+  void clear();
 
 
   /**
    * Assemble the system matrix.
    * option ==
    */
-  void assemble_matrix (const std::string& system_name,
-                        const std::string& option);
+  void assemble_matrix(const std::string& system_name,
+                       const std::string& option);
 
 
   /**
    * Assemble the system rhs.
    */
-  void assemble_rhs (const std::string& system_name,
-                     const std::string& option);
+  void assemble_rhs(const std::string& system_name,
+                    const std::string& option);
 
 
   /*
@@ -90,15 +88,15 @@ public:
    * option = ...
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve (const std::string& option,
-              const bool& re_init);
-              
+  void solve(const std::string& option,
+             const bool       & re_init);
+
   // /*
   //  * Return the NPSolver
   //  */
-  SolverStokes& np_solver() { return _np_solver;  }
-
-
+  SolverStokes& np_solver() {
+    return _np_solver;
+  }
 
 private:
 
@@ -106,8 +104,6 @@ private:
   SolverStokes _np_solver;
 
   // Assemble Stokes system
-  AssembleNP* _assemble_np;
-
+  AssembleNP *_assemble_np = nullptr;
 };
-
 } // end namespace libMesh

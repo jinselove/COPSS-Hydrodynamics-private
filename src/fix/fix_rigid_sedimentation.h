@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -21,21 +22,18 @@
 #pragma once
 
 #include "fix_rigid.h"
-namespace libMesh
-{
-
-class FixRigidSedimentation : public FixRigid
-{
+namespace libMesh {
+class FixRigidSedimentation : public FixRigid {
 public:
-	FixRigidSedimentation(PMLinearImplicitSystem& pm_sys);
 
-	~FixRigidSedimentation(){};
+  FixRigidSedimentation(PMLinearImplicitSystem& pm_sys);
 
-	void print_fix();
+  ~FixRigidSedimentation() {}
 
-	void initParams();
+  void print_fix();
 
-	void compute();
+  void initParams();
+
+  void compute();
 };
-
 }

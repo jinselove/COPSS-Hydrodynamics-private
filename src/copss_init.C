@@ -20,26 +20,25 @@
 
 // PETSc
 #ifdef LIBMESH_HAVE_PETSC
-#include "petscsys.h"
-#endif
+# include "petscsys.h"
+#endif // ifdef LIBMESH_HAVE_PETSC
 
 #ifdef LIBMESH_HAVE_OPENMP
-#include <omp.h>
-#endif
+# include <omp.h>
+#endif // ifdef LIBMESH_HAVE_OPENMP
 
-namespace libMesh{
-
-CopssInit::CopssInit(int argc, char ** argv)
+namespace libMesh {
+CopssInit::CopssInit(int argc, char **argv)
   : LibMeshInit(argc, argv)
 {
 #ifdef LIBMESH_HAVE_PETSC
   PetscPopSignalHandler(); // get rid of Petsc error handler
-#endif
+#endif // ifdef LIBMESH_HAVE_PETSC
 
-// // Set the number of OpenMP threads to the same as the number of threads libMesh is going to use
-// #ifdef LIBMESH_HAVE_OPENMP
-//   omp_set_num_threads(libMesh::n_threads());
-// #endif
-
+  // // Set the number of OpenMP threads to the same as the number of threads
+  // libMesh is going to use
+  // #ifdef LIBMESH_HAVE_OPENMP
+  //   omp_set_num_threads(libMesh::n_threads());
+  // #endif
 }
-}// end namespace
+} // end namespace

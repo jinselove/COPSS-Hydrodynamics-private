@@ -26,18 +26,13 @@
  * This object must be created in the main() of any Copss application so
  * everything is properly initialized and finalized.
  */
-namespace libMesh
-{
-
-class CopssInit : public LibMeshInit
-{
+namespace libMesh {
+class CopssInit : public LibMeshInit {
 public:
 
-	CopssInit(int argc, char ** argv);
+  CopssInit(int    argc,
+            char **argv);
 
- 	virtual ~CopssInit() = default;
-
-
+  virtual ~CopssInit() = default;
 };
-
 }

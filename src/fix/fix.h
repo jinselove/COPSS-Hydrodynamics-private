@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -16,7 +17,6 @@
 // You should have received a copy of the GNU General Public
 // License along with this code; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 
 
 #pragma once
@@ -43,103 +43,103 @@
 #include "fix_base.h"
 
 
-namespace libMesh
-{
-
-  /*
-   * The class is designed for computing the force field
-   * of the system
-   */
+namespace libMesh {
+/*
+ * The class is designed for computing the force field
+ * of the system
+ */
 class FixBase;
-  
-class Fix
-{ 
-public:  
 
-  //! Constructor for a system with elastic structures (finite size particles)
+class Fix {
+public:
+
+  // ! Constructor for a system with elastic structures (finite size particles)
   Fix(PMLinearImplicitSystem& pm_sys,
-             ElasticitySystem& el_sys);
+      ElasticitySystem      & el_sys);
 
-  
-  //! Constructor for a system with point particles
+
+  // ! Constructor for a system with point particles
   Fix(PMLinearImplicitSystem& pm_sys);
 
   void initialization();
 
-  //! Destructor
-  virtual ~Fix(){};
+  // ! Destructor
+  virtual ~Fix() {}
 
   typedef std::string type_force_name;
-  
-  typedef std::vector<Real> type_force_parameter;
-  
-  typedef std::pair <type_force_name, type_force_parameter> type_force;
 
-  
+  typedef std::vector<Real> type_force_parameter;
+
+  typedef std::pair<type_force_name, type_force_parameter> type_force;
+
+
   /*! Prepare ForceField for run
-  /*!
+     /*!
    * Check force field parameters when build force field classes.
    * This function is only evaluated once at the beginning of a simulation
    * check the following things:
    * 1) if this "force field" is supported;
    * 2) if this "force field" is applicable to this "particle type"
    * 3) if correct number of parameters are assigned to this "force field"
-  */
-
+   */
   virtual void initParticleType() {}
 
 
-  //! Check if num of parameters are correct
-  virtual void initParams() {}
+  // ! Check if num of parameters are correct
+  virtual void initParams()           {}
 
   /*! Compute force field attach it to particles
-  /*!
+     /*!
    * User-defined function for reinitializing the force field
    * at each time step
    * The velocities of all beads are given (for calculating friction)
-   * This function is the same to reinit_force_field() unless velocities are given, 
+   * This function is the same to reinit_force_field() unless velocities are
+   *given,
    * i.e., friction need to be calculated
    */
-  virtual void compute() {}
- 
-  /* 
-   * Correct the CHAIN position if it moves out of the wall or periodic boundary.
-   */ 
-  virtual void check_walls(){}
+  virtual void compute()              {}
 
-  /* 
-   * Correct the CHAIN position if it moves out of the wall or periodic boundary, and
+  /*
+   * Correct the CHAIN position if it moves out of the wall or periodic
+   *boundary.
+   */
+  virtual void check_walls()          {}
+
+  /*
+   * Correct the CHAIN position if it moves out of the wall or periodic
+   *boundary, and
    * count how many times each bead has cross the boundary, which is used to
    * calculate its unfolded position.
-   */ 
+   */
   virtual void check_walls_pbcCount() {}
 
 
   // debug
-  virtual void print_fix(){}
+  virtual void print_fix()              {}
 
   /*! use this for rigid particle fixes
    * check if particle is on periodic boundary, if so, rebuild particle mesh
-   * this function is called once before all fix::compute(), no matter how many fixes we have 
+   * this function is called once before all fix::compute(), no matter how many
+   *fixes we have
    */
-  virtual void check_pbc_pre_fix(){}
+  virtual void check_pbc_pre_fix()      {}
 
   /* use this for rigid particle fixes
    * restore particle mesh after fix::compute()
    */
-  virtual void check_pbc_post_fix() {}
+  virtual void check_pbc_post_fix()     {}
 
   /*
    * sync force from nodes to point mesh
    */
-  virtual void sync_node_to_pointmesh(){}
+  virtual void sync_node_to_pointmesh() {}
 
 
   // the particle-mesh (linear implicit) system
-  PMLinearImplicitSystem* pm_system;
-  
+  PMLinearImplicitSystem *pm_system;
+
   // pointMesh object
-  PointMesh<3>* point_mesh;
+  PointMesh<3> *point_mesh;
 
   // system dimension
   unsigned int dim;
@@ -149,34 +149,32 @@ public:
 
   // force field
   std::string force_type;
-  std::vector<Real> force_params;
+  std::vector<Real>force_params;
   FixBase fix_base;
 
   // particle type
   std::string particle_type;
 
-  // bead 
+  // bead
   Real bead_r;
   std::size_t num_points;
-  std::vector<PointParticle*> point_particles;
+  std::vector<PointParticle *>point_particles;
 
   // kBT
   Real kBT;
 
-  // const 
-  const Real PI  = libMesh::pi;  //3.1415926
+  // const
+  const Real PI = libMesh::pi; // 3.1415926
 
 
   // boundaries
-  PMPeriodicBoundary* pbc;  //pmPeriodicBoundary object
+  PMPeriodicBoundary *pbc; // pmPeriodicBoundary object
   std::string wall_type;
-  std::vector<Real> wall_params;
+  std::vector<Real>wall_params;
   Point box_min;
   Point box_max;
   Point box_len;
-  std::vector<bool> periodic;
-  std::vector<bool> inlet;  
-
-};  // end of class
-  
+  std::vector<bool>periodic;
+  std::vector<bool>inlet;
+}; // end of class
 } // end of namespace

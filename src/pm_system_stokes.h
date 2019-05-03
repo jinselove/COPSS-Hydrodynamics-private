@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -18,7 +19,6 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-
 #pragma once
 
 // Local Includes -----------------------------------
@@ -28,31 +28,28 @@
 #include "analytical_solution_stokes.h"
 #include "ggem_stokes.h"
 
-namespace libMesh
-{
-
+namespace libMesh {
 /*
  * The PMSystemStokes is designed to solve the Stokes
  * equation with regularized Gaussian point forces
  * due to particles using mixed FEM.
  */
 
-class PMSystemStokes : public PMLinearImplicitSystem
-{
+class PMSystemStokes : public PMLinearImplicitSystem {
 public:
 
   /**
    * Constructor.
    */
-  PMSystemStokes (EquationSystems& es,
-                  const std::string& name,
-                  const unsigned int number); // number of systems
+  PMSystemStokes(EquationSystems  & es,
+                 const std::string& name,
+                 const unsigned int number); // number of systems
 
 
   /**
    * Destructor.
    */
-  virtual ~PMSystemStokes ();
+  virtual ~PMSystemStokes();
 
 
   /**
@@ -64,8 +61,9 @@ public:
   /**
    * @returns a clever pointer to the system.
    */
-  sys_type & system () { return *this; }
-
+  sys_type& system() {
+    return *this;
+  }
 
   /*
    * Re-init particle mesh, including:
@@ -76,23 +74,14 @@ public:
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    */
-  void reinit_hi_system(bool& neighbor_list_update_flag);
-
-
-  /*
-   * Re-init free-draining system, including:
-   * (1) reinit() reinit point particles
-   *              build_particle_neighbor_list()
-   * (2) compute particle force (by force field)
-   *             modify the force field according to the vel_last_step.
-   */
-  void reinit_fd_system(bool& neighbor_list_update_flag);
+  void reinit_system(bool      & neighbor_list_update_flag,
+                     const bool& build_elem_neighbor_list);
 
 
   /**
    * Clear all the data structures associated with the system.
    */
-  void clear ();
+  void clear();
 
 
   /**
@@ -100,25 +89,24 @@ public:
    * option == "undisturbed" : undisturbed velocity field (without particles)
    * option == "disturbed"   : disturbed velocity field   (with particles)
    */
-  void assemble_matrix (const std::string& system_name,
-                        const std::string& option);
+  void assemble_matrix(const std::string& system_name,
+                       const std::string& option);
 
 
   /**
    * Assemble the system rhs.
    */
-  void assemble_rhs (const std::string& system_name,
-                     const std::string& option);
+  void assemble_rhs(const std::string& system_name,
+                    const std::string& option);
 
 
   /*
    * Solve the Stokes system.
-   * option = "undisturbed", compute the undisturbed field of flow without particles
+   * option = "undisturbed", compute the undisturbed field of flow without
+   *particles
    * option = "disturbed",   compute the disturbed field of flow with particles
-   * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve (const std::string& option,
-              const bool& re_init);
+  void solve(const std::string& option);
 
 
   /*
@@ -139,7 +127,7 @@ public:
    * local and global solution, and update the solution vectors.
    * output_format=="EXODUS" ; "VTK"; "GMV"
    */
-  void write_equation_systems(const std::size_t time_step,
+  void write_equation_systems(const std::size_t  time_step,
                               const std::string& output_filename,
                               const std::string& output_format);
 
@@ -147,8 +135,9 @@ public:
   /*
    * Return the SolverStokes
    */
-  SolverStokes& solver_stokes() { return _solver_stokes;  }
-
+  SolverStokes& solver_stokes() {
+    return _solver_stokes;
+  }
 
   /**
    * Compute the purturbed velocity vector of moving points
@@ -161,20 +150,21 @@ public:
    * option = "disturbed" or "undistrubed"
    * pv = particle_velocity
    */
-  void compute_point_velocity(const std::string& option, std::vector<Real>& pv);
+  void compute_point_velocity(const std::string& option,
+                              std::vector<Real>& pv);
 
 
   /**
    * Compute the unperturbed velocity vector at the location of particles
    */
-  std::vector<Real> compute_unperturbed_point_velocity();
+  std::vector<Real>compute_unperturbed_point_velocity();
 
 
   /*
    * Obtain the velocity vector on the i-th point
    */
-  std::vector<Real> point_velocity(const std::vector<Real>& vel_beads,
-                                   const std::size_t i) const;
+  std::vector<Real>point_velocity(const std::vector<Real>& vel_beads,
+                                  const std::size_t        i) const;
 
 
   /**
@@ -182,8 +172,8 @@ public:
    * which is computed from Green's function
    * force_type: "regularized" or "smooth"
    */
-  std::vector<Real> local_velocity_fluid(const Point &p,
-                                         const std::string& force_type) const;
+  std::vector<Real>local_velocity_fluid(const Point      & p,
+                                        const std::string& force_type) const;
 
 
   /**
@@ -191,9 +181,9 @@ public:
    * which is computed from Green's function
    * force_type: "regularized" or "smooth"
    */
-  std::vector<Real> local_velocity_fluid(const Elem* elem,
-                                         const Point &p,
-                                         const std::string& force_type) const;
+  std::vector<Real>local_velocity_fluid(const Elem        *elem,
+                                        const Point      & p,
+                                        const std::string& force_type) const;
 
 
   /**
@@ -214,14 +204,15 @@ public:
   /*
    * Test function. output velocity profile along x-y-z direction
    */
-  void test_velocity_profile(bool& neighbor_list_update_flag);
+  void test_velocity_profile();
 
 
   /*
    * Return the exact solution of Stokes eqn for any given
    * point \pt0 in an unbounded domain.
    */
-  //const std::vector<Real> exact_solution(const Point& pt0) const;
+
+  // const std::vector<Real> exact_solution(const Point& pt0) const;
 
 
   /*
@@ -233,7 +224,17 @@ public:
    */
   void write_fluid_velocity_data(const std::string& filename);
 
-
+  /*
+   * Couple Stokes System (HI or FD) with Poisson System by adding electrostatic
+   * force to all points (Point Particles or surface nodes on Rigid Particles.) 
+   * This electrostatic force includes contributions from both local and global
+   * solution of the Poisson system.
+   *  
+   * params add_local_solution_to_output: If add local part of the potential
+   *   field to the system output. This is only set to be true when trying to
+   *   write the total solution to equation_systems in the output stage.  
+   */  
+  void couple_poisson(const bool& add_local_solution_to_output); 
 
 private:
 
@@ -241,14 +242,12 @@ private:
   SolverStokes _solver_stokes;
 
   // Assemble Stokes system
-  AssembleStokes* assemble_stokes;
-  
-  // Get a pointer to AnalyticalSolutionStokes
-  AnalyticalSolutionStokes* analytical_solution;
-  
-  // Get a pointer to GGEMStokes
-  GGEMStokes* ggem_stokes;
-  
-}; // end class
+  AssembleStokes *assemble_stokes = nullptr;
 
+  // Get a pointer to AnalyticalSolutionStokes
+  AnalyticalSolutionStokes *analytical_solution = nullptr;
+
+  // Get a pointer to GGEMStokes
+  GGEMStokes *ggem_stokes = nullptr;
+}; // end class
 } // end namespace libMesh

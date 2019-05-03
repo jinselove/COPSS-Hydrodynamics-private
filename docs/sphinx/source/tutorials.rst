@@ -35,17 +35,17 @@ for finite-size particle systems.
         Atoms
 
 
-        1     1 1  -100.493 124.921 -9.297    1  1 1
-        2     1 1  -98.1669 114.712 -8.822    1  1 1
-        3     1 1  -105.113 111.118 -6.809    1  1 1
-        4     1 1  -109.612 107.256 -4.316     1  1 1
-        5     1 1  -111.706 103.445 -8.997    1  1 1
-        6     1 1  -108.48 97.904 -8.306     1  1 1
-        7     1 1  -116.487 93.504 -3.521    1  1 1
-        8     1 1  -115.789 85.646 -4.134    1  1 1
-        9     1 1  -115.317 78.980 -4.137    1  1 1
-        10    1 1  -122.011 80.645 -1.357    1  1 1
-        11    1 1  -126.976 80.933 0.209    1  1 1
+        1     1 1  -100.493 124.921 -9.297    1  1 1 0 0 0 0
+        2     1 1  -98.1669 114.712 -8.822    1  1 1 0 0 0 0
+        3     1 1  -105.113 111.118 -6.809    1  1 1 0 0 0 0
+        4     1 1  -109.612 107.256 -4.316     1  1 1 0 0 0 0
+        5     1 1  -111.706 103.445 -8.997    1  1 1 0 0 0 0
+        6     1 1  -108.48 97.904 -8.306     1  1 1 0 0 0 0
+        7     1 1  -116.487 93.504 -3.521    1  1 1 0 0 0 0
+        8     1 1  -115.789 85.646 -4.134    1  1 1 0 0 0 0
+        9     1 1  -115.317 78.980 -4.137    1  1 1 0 0 0 0
+        10    1 1  -122.011 80.645 -1.357    1  1 1 0 0 0 0
+        11    1 1  -126.976 80.933 0.209    1  1 1 0 0 0 0
 
         Bonds
 
@@ -59,6 +59,31 @@ for finite-size particle systems.
         8 1 8 9
         9 1 9 10
         10 1 10 11
+            
+    The particles are defined as:
+
+        ``particle_id chain_id bead_type x y z rot_x rot_y rot_z f_x f_y f_z Q``
+
+        * ``particle_id``: the unique id each point particle, the value is from 1
+          to N_beads, where N_beads is the number of atoms defined at the beginning of this
+          data file. Any additional points with **id > N** will be ignored by the 
+          program. 
+        * ``chain_id``: id of the polymer chain that each bead belongs to, the value
+          is from 1 to N_chains, where N_chains = N_beads - N_bonds. If 
+          ``point_particle_model = bead`` is defined in the control file, one can
+          consider all single beads are on the same chain without springs connecting
+          each other, hence the ``chain_id`` will be ``1`` for all beads.
+        * ``bead_type``: beads of different ``bead_type`` are of different mass too. 
+          Typically, all the beads are assigned of the same mass since no inertia
+          is considered in Stokes flow. 
+        * ``rot_x, rot_y, rot_z``: the orientation in x, y, z directions, defining
+          the orientation of this point(bending, torque).
+        * ``f_x, f_y, f_z``: the constant force on each point, these parameters
+          are only useful when ``p_constant`` force field is defined in control file.
+        * ``Q``: the charge on the point particle, unit is unit charge ``e``.
+        
+    Notice: when ``point_particle_model = bead`` in the control file, the ``bonds`` 
+    section in this data file is not necessary. 
 
 - **rigid_particle_data.in**
 
@@ -95,10 +120,13 @@ for finite-size particle systems.
 
         ``particle_id p_type mesh_type x  y z magx magy magz th0 th1 th2 Q0 e_in G_x G_y G_z``
 
-        * magx, magy, magz  are scale ratio in x, y, z directions. This is useful for changing the size of the particle. If we use sphere with radius of 1, then 3, 3, 3 means changing its radius to 3.
-        * th0, th1, th2  are orientation angles for cylinderical particles.
-        * Q0, e_in are charge and dielectric constant of the particle.
-        * G_x, G_y, G_z are external body force density on the particle in x, y, z directions.
+        * ``magx, magy, magz``: the scale ratio in x, y, z directions. This is useful for changing the size of the particle. If we use sphere with radius of 1, then 3, 3, 3 means changing its radius to 3.
+        * ``th0, th1, th2``: the orientation angles for cylinderical particles.
+        * ``Q0``: the charge of the particle. Unit is the unit charge
+          charge `e`.
+        * ``e_in``: the dielectric constant of the particle. The unit is the dielectric
+          permittivity of vaccum. 
+        * ``G_x, G_y, G_z``: the external body force density on the particle in x, y, z directions.
 
 
 Input Control File

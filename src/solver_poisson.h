@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -29,8 +30,7 @@
  * solver with a preconditioner or direct solver (for example, superLU)
  * using PETSc interface.
  */
-class SolverPoisson : public Solver
-{
+class SolverPoisson : public Solver {
 public:
 
   /*
@@ -42,37 +42,36 @@ public:
   /*
    * Constructor
    */
-  SolverPoisson(EquationSystems& es,
+  SolverPoisson(EquationSystems      & es,
                 const SystemSolverType solver_type);
 
- 
+
   /*
    * Destructor
    */
   ~SolverPoisson();
 
- 
+
   /*
    * Init the KSP solver:
-   * The system matrix needs to be assembled before calling this init function! 
+   * The system matrix needs to be assembled before calling this init function!
    */
   void init_ksp_solver();
- 
+
 
   /*
    * solve the equation system Ax = b
    */
   void solve();
 
- 
 private:
- 
+
   // solver relative tolerance
   PetscReal _rtol;
- 
+
   // solver absolute tolerance
   PetscReal _atol;
- 
+
   // (iterative) solver maximum iteration
   PetscInt _max_it;
 

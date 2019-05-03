@@ -1,4 +1,5 @@
 // Parallel Finite Element-General Geometry Ewald-like Method.
+
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
 
 // This code is free software; you can redistribute it and/or
@@ -18,7 +19,6 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-
 #pragma once
 
 #include <stdio.h>
@@ -29,63 +29,57 @@
 #include "point_mesh.h"
 #include "ggem_poisson.h"
 
-namespace libMesh
-{
-
+namespace libMesh {
 /*! \brief Analytic solution to unbounded potential field
 
- * Define analytical solutions that are 
+ * Define analytical solutions that are
  * available for some special cases.
  * (This is only used for validation and test purpose.)
  */
 
 class AnalyticalSolutionPoisson : public ReferenceCountedObject<AnalyticalSolutionPoisson>
-//public ParallelObject
+
+// public ParallelObject
 {
 public:
 
   /*! \brief Constructor
 
-  */
+   */
   AnalyticalSolutionPoisson(const std::string& name);
 
 
   /*! \brief Destructor
 
-  */
+   */
   ~AnalyticalSolutionPoisson();
-  
-  
+
+
   /*! \brief Exact solution for point forces in an unbounded domain
 
-  */
+   */
   Real exact_solution_infinite_domain(GGEMPoisson& ggem_poisson,
                                       const Point& pt0) const;
-  
-  
+
+
   /*! \brief Attach point mesh to the class
-  *
-  */
-  void attach_point_mesh(PointMesh<3>* point_mesh);
-  
-  
+   *
+   */
+  void attach_point_mesh(PointMesh<3> *point_mesh);
+
+
   /*! \brief Get the pointer to the class member, point_mesh
-  *
-  */
+   *
+   */
   PointMesh<3>* get_point_mesh();
-  
-  
+
 private:
-    
-    // Initialization a null _point_mesh pointer
-    PointMesh<3>* _point_mesh = NULL;
-    
-    
-    // System dimension
-    const int dim = 3;
 
+  // Initialization a null _point_mesh pointer
+  PointMesh<3> *_point_mesh = nullptr;
+
+
+  // System dimension
+  const int dim = 3;
 }; // end of class defination
-
-
-
 }  // end of namespace

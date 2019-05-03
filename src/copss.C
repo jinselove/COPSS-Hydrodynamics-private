@@ -345,22 +345,35 @@ void Copss::read_domain_info()
      << "-----------> Wall size parameters: ";
 
   for (int i = 0; i < wall_params.size(); ++i)
-  {
     ss << wall_params[i] << "   ";
-  }
   ss << "\n";
+  
   ss << "-----------> Periodicity of the box: ";
-  for (int i = 0; i < dim; i++) ss << std::boolalpha << periodicity[i] << ", ";
+  for (int i = 0; i < dim; i++) 
+    ss << std::boolalpha << periodicity[i] << ", ";
   ss << "\n";
   
   ss << "-----------> Inlet/Outlet of the box: ";
-  for (int i = 0; i < dim; i++) ss << inlet[i] << "(pressure = " << inlet_pressure[i] << " ), ";
+  for (int i = 0; i < dim; i++) 
+    ss << inlet[i] << "(pressure = " << inlet_pressure[i] << " ), ";
   ss << "\n";
   
   ss << "-----------> shear on boundary pairs: ";
   for (int i = 0; i < dim; i++) 
-  ss << shear[i] << "(shear_rate = " << shear_rate[i] << " ), ";
+    ss << shear[i] << "(shear_rate = " << shear_rate[i] << " ), ";
   ss << "\n";
+   
+  ss << "-----------> Dirichlet boundary condition for Poisson (Potential):\n";
+  for (int i = 0; i < boundary_id_dirichlet_poisson.size(); i++)
+    ss << "Boundary ID " << boundary_id_dirichlet_poisson[i]
+       << " : value = " << boundary_value_dirichlet_poisson[i] << "\n";
+  ss << "\n";
+  ss << "-----------> Neumann boundary condition for Poisson (Surface Charge Density):\n";
+  for (int i = 0; i < boundary_id_neumann_poisson.size(); i++)
+    ss << "Boundary ID " << boundary_id_neumann_poisson[i]
+       << " : value = " << boundary_value_neumann_poisson[i] << "\n";
+  ss << "\n";
+  
   ss << "##########################################################" << "\n"
      << "#                  Domain Mesh information                " << "\n"
      << "##########################################################" << "\n";

@@ -123,16 +123,6 @@ public:
 
 
   /*
-   * Write out equation systems of Stokes. This requires combining the
-   * local and global solution, and update the solution vectors.
-   * output_format=="EXODUS" ; "VTK"; "GMV"
-   */
-  void write_equation_systems(const std::size_t  time_step,
-                              const std::string& output_filename,
-                              const std::string& output_format);
-
-
-  /*
    * Return the SolverStokes
    */
   SolverStokes& solver_stokes() {
@@ -235,6 +225,29 @@ public:
    *   write the total solution to equation_systems in the output stage.  
    */  
   void couple_poisson(const bool& add_local_solution_to_output); 
+  
+  
+   /*
+    * Write out Total solution of equation systems
+    * Total solution = local + global + undisturbed (if exists)
+    * 
+    * params o_step: output_step
+    * params real_time: current real simulation time
+    * params solution_name: "disturbed_total", "distrubed_global", or "total"
+    *   "disturbed_total" gives disturbed_global + distrubed_local
+    *   "distrubed_local" gives global part of the disturbed solution
+    *   "total" gives the disturbed solution + undisturbed solution
+    * params filename: filename for the output file
+    * params output_format: format of output file, supports 'EXODUS'; "VTK", "GMV"
+    */
+  void write_equation_systems(const unsigned int& o_step=0, 
+                              const Real& real_time=0.,
+                              const std::string& solution_name = "total",
+                              const std::string& filename = "output_equation_systems",
+                              const std::string& output_format = "EXODUS");
+  
+   // Save a pointer to undisturbed solution
+   UniquePtr<NumericVector<Real>> undisturbed_solution;
 
 private:
 

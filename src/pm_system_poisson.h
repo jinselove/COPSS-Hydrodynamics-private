@@ -98,16 +98,6 @@ public:
 
 
   /*
-   * Write out equation systems of Stokes. This requires combining the
-   * local and global solution, and update the solution vectors.
-   * output_format=="EXODUS" ; "VTK"; "GMV"
-   */
-  void write_equation_systems(const std::size_t  time_step,
-                              const std::string& output_filename,
-                              const std::string& output_format) override;
-
-
-  /*
    * Add the local solution to the global solution for electrical potential
    */
   void add_local_solution();

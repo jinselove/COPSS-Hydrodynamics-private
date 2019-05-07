@@ -245,17 +245,6 @@ void PMSystemPoisson::test_l2_norm(bool& neighbor_list_update_flag)
   STOP_LOG("test_l2_norm()", "PMSystemPoisson");
 }
 
-// ==================================================================================
-void PMSystemPoisson::write_equation_systems(const std::size_t  time_step,
-                                             const std::string& output_filename,
-                                             const std::string& output_format)
-{
-  START_LOG("write_equation_systems()", "PMSystemPoisson");
-
-  // FIXME: to be implemented
-
-  STOP_LOG("write_equation_systems()", "PMSystemPoisson");
-}
 
 // ==================================================================================
 void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)

@@ -239,9 +239,6 @@ public:
   bool cheb_converge = false;
   unsigned int n_chebyshev_failure = 0;
   Real eig_min = 0, eig_max = 0;
-  const std::string out_system_filename = "output_pm_system.e";
-  UniquePtr<NumericVector<Real> >v0_ptr;
-  ExodusII_IO *exodus_ptr = nullptr;
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -

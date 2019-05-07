@@ -194,18 +194,10 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
 void PMSystemStokes::solve(const std::string& option)
 {
   START_LOG("solve()", "PMSystemStokes");
-
-  // PerfLog perf_log("solve_stokes");
-  // Real t1, t2;
-  // std::string msg = "---> solve Stokes";
-  // PMToolBox::output_message(msg, this->comm());
-
+  
   // Assemble the global matrix and pc matrix, and record the CPU wall time.
   if (_re_init)
   {
-    // perf_log.push("assemble_matrix (undisturbed)");
-    // t1 = MPI_Wtime();
-
     // set the solver type for the Stokes equation
     const SystemSolverType solver_type =
       this->get_equation_systems().parameters.get<SystemSolverType>(
@@ -218,30 +210,19 @@ void PMSystemStokes::solve(const std::string& option)
     
     // set re_init to false once K matrix is built
     _re_init = false;
-
-    // perf_log.pop("assemble_matrix (undisturbed)");
-
-    // t2 = MPI_Wtime();
-    // std::cout << "Time used to assemble the global matrix and reinit KSP is "
-    // <<t2-t1<<" s\n\n";
   }
-
-  // assemble the rhs vector, and record the CPU wall time.
-  // t1 = MPI_Wtime();
-  // perf_log.push("assemble_rhs");
+  // assemble rhs 
   this->assemble_rhs("Stokes", option);
 
-  // perf_log.pop("assemble_rhs");
-
-  // t2 = MPI_Wtime();
-  // std::cout << "Time used to assemble the right-hand-side vector is "
-  // <<t2-t1<<" s\n";
-
   // solve the problem
-  // perf_log.push("solve()");
   _solver_stokes.solve();
+  
+  // update undisturbed solution when option="undisturbed"
+  if (option == "undisturbed")
+  {
+      undisturbed_solution = this->solution->clone();
+  }
 
-  // perf_log.pop("solve()");
 
   STOP_LOG("solve()", "PMSystemStokes");
 }
@@ -305,7 +286,6 @@ void PMSystemStokes::add_local_solution()
 
     // get the dof numbers at this node (only for velocity)
     std::vector<dof_id_type> dof_nums(dim);
-
     for (unsigned int i = 0; i < dim; ++i) { // var = 0, 1, 2 = i
       dof_nums[i] = node->dof_number(this->number(), i, 0);
     }
@@ -415,118 +395,6 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
      << "; l2_norm = " << l2_norm << "\n";
   PMToolBox::output_message(ss, this->comm());
   STOP_LOG("test_l2_norm()", "PMSystemStokes");
-}
-
-// ==================================================================================
-void PMSystemStokes::write_equation_systems(const std::size_t  time_step,
-                                            const std::string& output_filename,
-                                            const std::string& output_format)
-{
-  START_LOG("write_equation_systems()", "PMSystemStokes");
-
-  // Write out the FEM results: global solution
-  MeshBase & mesh           = this->get_mesh();
-  const bool fem_sol_output = true;
-
-  if (fem_sol_output)
-  {
-    std::ostringstream file_name_fem;
-    file_name_fem << output_filename + "_fem";
-
-    if (output_format == "EXODUS")
-    {
-#ifdef LIBMESH_HAVE_EXODUS_API
-
-      if (time_step == 0)
-      {
-        file_name_fem << ".e";
-        ExodusII_IO(mesh).write_equation_systems(file_name_fem.str(),
-                                                 this->get_equation_systems());
-      }
-      else
-      {
-        // file_name_fem << ".e-s." << std::setw(8) << std::setfill('0') <<
-        // std::right << time_step;
-        // ExodusII_IO(mesh).write_equation_systems(file_name_fem.str(),this->get_equation_systems());
-
-        file_name_fem << ".e";
-        ExodusII_IO exodus_IO(mesh);
-        exodus_IO.append(true);
-        exodus_IO.write_timestep(file_name_fem.str(),
-                                 this->get_equation_systems(),
-                                 time_step + 1,
-                                 time_step + 1);
-      } // end if-else
-#endif // #ifdef LIBMESH_HAVE_EXODUS_API
-    }
-    else if (output_format == "VTK")
-    {
-#ifdef LIBMESH_HAVE_VTK
-      file_name_fem << "_" << std::setw(8) << std::setfill('0') << std::right <<
-        time_step << ".vtu";
-      VTKIO(mesh).write_equation_systems(file_name_fem.str(),
-                                         this->get_equation_systems());
-#endif // #ifdef LIBMESH_HAVE_EXODUS_API
-    }
-    else
-    {
-      file_name_fem << "_" << std::setw(8) << std::setfill('0') << std::right <<
-        time_step << ".gmv.";
-      GMVIO(mesh).write_equation_systems(file_name_fem.str(),
-                                         this->get_equation_systems());
-    }
-  }
-
-  // Update the system solution by adding the local solution (from Green's
-  // function)
-  this->add_local_solution();
-
-  // Write out the FEM results: global solution
-  std::ostringstream file_name;
-  file_name << output_filename + "_total";
-
-  if (output_format == "EXODUS")
-  {
-#ifdef LIBMESH_HAVE_EXODUS_API
-
-    if (time_step == 0)
-    {
-      file_name << ".e";
-      ExodusII_IO(mesh).write_equation_systems(file_name.str(),
-                                               this->get_equation_systems());
-    }
-    else
-    {
-      // file_name << ".e-s." << std::setw(8) << std::setfill('0') << std::right
-      // << time_step;
-      // ExodusII_IO(mesh).write_equation_systems(file_name.str(),this->get_equation_systems());
-
-      file_name << ".e";
-      ExodusII_IO exodus_IO(mesh);
-      exodus_IO.append(true);
-      exodus_IO.write_timestep(file_name.str(), this->get_equation_systems(),
-                               time_step + 1, time_step + 1);
-    } // end if-else
-#endif // #ifdef LIBMESH_HAVE_EXODUS_API
-  }
-  else if (output_format == "VTK")
-  {
-#ifdef LIBMESH_HAVE_VTK
-    file_name << "_" << std::setw(8) << std::setfill('0') << std::right <<
-      time_step << ".vtu";
-    VTKIO(mesh).write_equation_systems(file_name.str(),
-                                       this->get_equation_systems());
-#endif // #ifdef LIBMESH_HAVE_EXODUS_API
-  }
-  else
-  {
-    file_name << "_" << std::setw(8) << std::setfill('0') << std::right <<
-      time_step << ".gmv";
-    GMVIO(mesh).write_equation_systems(file_name.str(),
-                                       this->get_equation_systems());
-  }
-
-  STOP_LOG("write_equation_systems()", "PMSystemStokes");
 }
 
 // ==================================================================================
@@ -1053,4 +921,91 @@ void PMSystemStokes::couple_poisson(const bool &add_local_solution_to_output)
 
   STOP_LOG("couple_poisson()", "PMSystemStokes");
 }
+
+ 
+// ==================================================================================
+void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
+                                            const Real&  real_time,
+                                            const std::string& solution_name,
+                                            const std::string& filename,
+                                            const std::string& output_format)
+{
+  START_LOG("write_equation_systems()", "PMSystemStokes");
+  
+  // When entering this funciton, Stokes system.solution only has the global part
+  // we need to add the local part and system.undisturbed_solution to the 
+  // system.solution of Stokes equation if it is required by solution_name
+  
+  // Add local part of the solution to the system.solution
+  if (solution_name == "disturbed_global")
+  {
+      // do nothing
+  }
+  else if (solution_name == "disturbed_total")
+  {
+      this->add_local_solution();
+  }
+  else if (solution_name == "undisturbed"){
+      *(this->solution) = *(this->undisturbed_solution);
+  }
+  else if (solution_name == "total")
+  {
+      this->add_local_solution();
+      this->solution->add(*this->undisturbed_solution);
+  }
+  else
+  {
+      PMToolBox::output_message(
+        "Error: solution name cannot be " + solution_name, this->comm());
+  }
+  // get a reference to the mesh object
+  MeshBase & mesh           = this->get_mesh();
+  std::ostringstream output_filename;
+  output_filename << filename;
+  
+  if (output_format == "EXODUS")
+  {
+#ifdef LIBMESH_HAVE_EXODUS_API
+      output_filename << ".e";
+      if (o_step == 0)
+      {
+        ExodusII_IO(mesh).write_equation_systems(output_filename.str(),
+          this->get_equation_systems());
+      }
+      else
+      {
+        ExodusII_IO exo(mesh);
+        exo.append(true);
+        exo.write_timestep(output_filename.str(),
+                           this->get_equation_systems(),
+                           o_step+1,
+                           real_time);
+      } // end if-else
+#endif // #ifdef LIBMESH_HAVE_EXODUS_API
+    }
+  else if (output_format == "VTK")
+  {
+#ifdef LIBMESH_HAVE_VTK
+      output_filename << "_" << std::setw(8) << std::setfill('0') << std::right <<
+        o_step << ".vtu";
+      VTKIO(mesh).write_equation_systems(output_filename.str(),
+                                         this->get_equation_systems());
+#endif // #ifdef LIBMESH_HAVE_EXODUS_API
+  }
+  else if (output_format == "GMV")
+  {
+    output_filename << "_" << std::setw(8) << std::setfill('0') << std::right <<
+      o_step << ".gmv.";
+    GMVIO(mesh).write_equation_systems(output_filename.str(),
+                                         this->get_equation_systems());
+  }
+  else
+  {
+     PMToolBox::output_message(
+       "Error: 'output_format' cannot not be " + output_format, this->comm());
+  }
+   
+  STOP_LOG("write_equation_systems()", "PMSystemStokes");
+}
+
 } // end namespace libMesh

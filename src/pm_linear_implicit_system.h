@@ -115,16 +115,6 @@ public:
 
 
   /*
-   * Write out equation systems. This requires combining the
-   * local and global solution, and update the solution vectors.
-   * output_format=="EXODUS" ; "VTK"; "GMV"
-   */
-  virtual void write_equation_systems(const std::size_t  time_step,
-                                      const std::string& output_filename,
-                                      const std::string& output_format) = 0;
-
-
-  /*
    * Attach PointMesh
    */
   void attach_point_mesh(PointMesh<3> *pm) {
@@ -206,7 +196,7 @@ public:
   PetscErrorCode write_point_csv(const std::string& filename,
                                  Vec               *petsc_vector,
                                  const bool         write_velocity) const;
-
+                                      
 protected:
 
   // particle mesh pointer
@@ -221,5 +211,7 @@ protected:
   // bool _re_init: If true, global_matrix will be rebuilt. It's only true
   // at the beginining of the simulation.
   bool _re_init;
+  
+
 };
 } // end namespace libMesh

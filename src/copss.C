@@ -1091,23 +1091,20 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   // if with_hi is true, solve the undisturbed Stokes equation and backup the solution
   if (with_hi) {
     system.solve("undisturbed");
-    v0_ptr = system.solution->clone();
   }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      write out the equation systems at Step 0 (undisturbed field)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  exodus_ptr = new ExodusII_IO(*mesh);
+  PMToolBox::output_message("start writing undisturbed solution to file", *comm_in);
   if ((std::find(output_file.begin(), output_file.end(),
                  "equation_systems") != output_file.end()) && (restart == false))
   {
-    // system.add_local_solution(); // Don't add local solution for undisturbed
-    // system!
-#ifdef LIBMESH_HAVE_EXODUS_API
-    exodus_ptr->write_equation_systems(out_system_filename, equation_systems);
-#endif // ifdef LIBMESH_HAVE_EXODUS_API
+    system.write_equation_systems(0, 0., "undisturbed", 
+      "output_equation_systems_undisturbed");
   }
+  PMToolBox::output_message("end writing undisturbed solution to file", *comm_in);
 }
 
 // ============================================================================================
@@ -1174,7 +1171,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   */
   if (i > 0) {
-    *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
+    *(system.solution) = *(system.undisturbed_solution); // re-assign the undisturbed solution
     // Update the local values to reflect the solution on neighboring processors
     system.update();
     if (update_neighbor_list_everyStep) {
@@ -1206,35 +1203,21 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
    *identical to the
    * last step before restart.
      -----------------------------------------------------------------------------------------*/
-  if (i % write_interval == 0) {
+  if (i % write_interval == 0) 
+  {
     ss << "Starting Fixman integration at step " + std::to_string(i);
     PMToolBox::output_message(ss, *comm_in);
-    if (i != restart_step) {
-      /*
-       * write equation system to output file
-       */
-      if (i != 0) {
-        if (std::find(output_file.begin(), output_file.end(),
-                      "equation_systems") != output_file.end())
-        {
-          system.add_local_solution(); // add local solution for the disturbed
-                                       // system
-          // solution
-  #ifdef LIBMESH_HAVE_EXODUS_API
-          exodus_ptr->append(true);
-          exodus_ptr->write_timestep(out_system_filename,
-                                     equation_systems,
-                                     o_step,
-                                     o_step);
-  #endif // ifdef LIBMESH_HAVE_EXODUS_API
-        } // end if (write es)
+    if (i != restart_step) 
+    {
+      if (std::find(output_file.begin(), output_file.end(), "equation_systems")
+        != output_file.end())
+      {
+        system.write_equation_systems(o_step, real_time, "total");
       }
-
       /*
        * write particle to output file
        */
       this->write_object(i);
-
       /*----------------------------------------------------------------------------------------------------
       * Write out ROUT for restart mode at step i
          ----------------------------------------------------------------------------------------------------*/
@@ -1255,8 +1238,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        */
   Real dt = 0;
-
-  if (adaptive_dt) {
+  if (adaptive_dt) 
+  {
     Real vp_max = point_mesh->maximum_bead_velocity();
     Real vp_min = point_mesh->minimum_bead_velocity();
 
@@ -1279,7 +1262,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       PMToolBox::output_message(ss, *comm_in);
     } // end if (i% write_interval)
   }
-  else {
+  else 
+  {
     if (i == 0) dt = max_dr_coeff[0] * 1.;
     else dt = max_dr_coeff.back() * 1.;
 
@@ -1293,7 +1277,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       PMToolBox::output_message(ss, *comm_in);
     } // end if (i % write_interval == 0)
   }   // end if (adaptive_dt
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      If with Brownian motion, we use midpoint scheme
      If without Brownian motion, we use normal stepping: dR = Utotal*dt
@@ -1449,7 +1432,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
          */
 
     // perf_log.push("fixman step");
-    if (cheb_converge) {
+    if (cheb_converge) 
+    {
       // Compute dw_mid = D*B^-1*dw, which can be obtained by solving the Stokes
       brownian_sys->hi_ewald(M, dw, dw_mid); // dw_mid = D * dw
 
@@ -1479,7 +1463,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
          move, so U0 needs to be re-evaluated at the new position.
          - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
            - */
-      *(system.solution) = *v0_ptr; // re-assign the undisturbed solution
+      *(system.solution) = *(system.undisturbed_solution); // re-assign the undisturbed solution
       system.update();
 
       // comment the line below if not update neighbor list at each time step
@@ -1513,7 +1497,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       VecAXPY(ROUT, dt,         U0);     // ROUT = ROUT + dt*U0_mid
       VecAXPY(ROUT, 2.0 * coef, dw_mid); // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
     }// end if cheb_converge
-    else {
+    else 
+    {
       n_chebyshev_failure += 1;
       ss << "****** Warning: After recomputing eigenvalues, Chebysheve failed to converge at step "
          << std::to_string(i) << "; relax the system for " 
@@ -1528,7 +1513,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
      // perf_log.pop("fixman step");
      // perf_log.pop("bd");
   }   // end if Brownian
-  else { // if without Brownian
+  else 
+  { // if without Brownian
     // Move the particle R_mid = R0 + (U0+U1)*dt (deterministic)
     brownian_sys->extract_particle_vector(&R0, "coordinate", "extract");
     // R_mid = R0 + dt*Utotal (U0 is actually Utotal)
@@ -1588,31 +1574,14 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
   if (i % write_interval == 0) {
     ss <<"Starting Langevin integration at step " + std::to_string(i);
     PMToolBox::output_message(ss, *comm_in);
-
     if (i != restart_step) {
-      /*
-       * write equation system to output file
-       */
-      if (i != 0) {
-        if (std::find(output_file.begin(), output_file.end(),
-                      "equation_systems") !=
-            output_file.end() and module_poisson == true)
+        if (std::find(output_file.begin(), output_file.end(), "equation_systems") 
+          != output_file.end())
         {
-          equation_systems.get_system<PMSystemPoisson>("Poisson").
-          add_local_solution();
-                  #ifdef LIBMESH_HAVE_EXODUS_API
-          exodus_ptr->append(true);
-          exodus_ptr->write_timestep(out_system_filename,
-                                     equation_systems,
-                                     o_step,
-                                     o_step);
-                  #endif // ifdef LIBMESH_HAVE_EXODUS_API
+          system.write_equation_systems(o_step, real_time, "total");
         } // end if (write es)
-      }
-
       // write particle to output file
       this->write_object(i);
-
       /*----------------------------------------------------------------------------------------------------
       * Write out ROUT for restart mode at step i
          ----------------------------------------------------------------------------------------------------*/
@@ -1764,15 +1733,9 @@ void Copss::destroy()
   VecDestroy(&R_mid);
   VecDestroy(&dw_mid);
   PetscRandomDestroy(&rand_ctx);
-
   if (with_brownian) {
     VecDestroy(&dw);
   }
-
-  if (exodus_ptr and with_hi) {
-    delete exodus_ptr;
-  }
-
   if (&viewer) {
     PetscViewerDestroy(&viewer);
   }

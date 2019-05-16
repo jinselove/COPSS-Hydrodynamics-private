@@ -247,6 +247,7 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
     "boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
   equation_systems.parameters.set<std::vector<Real> >(
     "boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
+  equation_systems.parameters.set<bool> ("with_hi") = with_hi;    
 }
 
 void CopssRigidParticleSystem::write_object(unsigned int step_id)

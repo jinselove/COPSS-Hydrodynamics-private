@@ -75,7 +75,8 @@ void PMSystemStokes::clear()
 
 // ==================================================================================
 void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
-                                   const bool& build_elem_neighbor_list)
+                                   const bool& build_elem_neighbor_list,
+                                   const std::string& option)
 {
   START_LOG("reinit_system()", "PMSystemStokes");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
@@ -102,9 +103,12 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
     _fixes[0]->check_pbc_pre_fix();
 
     // compute forces on surface nodes
-    for (std::size_t i = 0; i < _fixes.size(); i++) {
-      // _fixes[i]->print_fix();
-      _fixes[i]->compute();
+    if (option == "disturbed")
+    {
+      for (std::size_t i = 0; i < _fixes.size(); i++) {
+        // _fixes[i]->print_fix();
+        _fixes[i]->compute();
+      }
     }
 
     // sync forces on nodes to PointParticles in point mesh
@@ -116,13 +120,16 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
   }
   else
   {
-    for (std::size_t i = 0; i < _fixes.size(); i++) {
-      _fixes[i]->compute();
+    if (option == "disturbed")
+    {
+      for (std::size_t i = 0; i < _fixes.size(); i++) {
+        _fixes[i]->compute();
+      }
     }
   }
   // multi-Physics coupling
-  if (this->get_equation_systems().parameters.get<bool>("module_poisson")) {
-    this->couple_poisson(false);  
+  if (option == "disturbed" && this->get_equation_systems().parameters.get<bool>("module_poisson")) {
+    this->couple_poisson();  
   }
 
   // perf_log.pop("fix compute");
@@ -313,11 +320,6 @@ void PMSystemStokes::add_local_solution()
   this->solution->close();
   this->update();
   
-  // multi-Physics coupling
-  if (this->get_equation_systems().parameters.get<bool>("module_poisson")) {
-    this->couple_poisson(true);  
-  }
-  
   STOP_LOG("add_local_solution()", "PMSystemStokes");
 }
 
@@ -331,7 +333,7 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
   bool build_elem_neighbor_list = true;
 
   // Numerical solution: Global(FEM) + Local(Analytical)
-  this->reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
+  this->reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
   _re_init = true;
   this->solve("disturbed");
   this->add_local_solution();
@@ -904,20 +906,14 @@ void PMSystemStokes::write_fluid_velocity_data(const std::string& filename)
 }
 
 // ============================================================================
-void PMSystemStokes::couple_poisson(const bool &add_local_solution_to_output)
+void PMSystemStokes::couple_poisson()
 {
   START_LOG("couple_poisson()", "PMSystemStokes");
-  
-  if (add_local_solution_to_output) {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
-      add_local_solution();
-  }
-  else {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solve(
-      "unused");
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
-      add_electrostatic_forces();
-  }    
+
+  this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solve(
+    "unused");
+  this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
+    add_electrostatic_forces();
 
   STOP_LOG("couple_poisson()", "PMSystemStokes");
 }
@@ -927,41 +923,71 @@ void PMSystemStokes::couple_poisson(const bool &add_local_solution_to_output)
 void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
                                             const Real&  real_time,
                                             const std::string& solution_name,
-                                            const std::string& filename,
                                             const std::string& output_format)
 {
   START_LOG("write_equation_systems()", "PMSystemStokes");
   
-  // When entering this funciton, Stokes system.solution only has the global part
-  // we need to add the local part and system.undisturbed_solution to the 
-  // system.solution of Stokes equation if it is required by solution_name
-  
-  // Add local part of the solution to the system.solution
-  if (solution_name == "disturbed_global")
-  {
+  if (this->get_equation_systems().parameters.get<bool>("with_hi")) 
+  { 
+    solution_backup = this->solution->clone();
+    // When entering this funciton, Stokes system.solution only has the global part
+    // we need to add the local part and system.undisturbed_solution to the 
+    // system.solution of Stokes equation
+    if (solution_name == "disturbed_global")
+    {
       // do nothing
-  }
-  else if (solution_name == "disturbed_total")
-  {
+    }
+    else if (solution_name == "disturbed_total")
+    {
       this->add_local_solution();
-  }
-  else if (solution_name == "undisturbed"){
-      *(this->solution) = *(this->undisturbed_solution);
-  }
-  else if (solution_name == "total")
-  {
+    }
+    else if (solution_name == "total")
+    {
       this->add_local_solution();
       this->solution->add(*this->undisturbed_solution);
+    }
+    else
+    {
+      std::ostringstream ss;
+      ss << "Error: invalid solution_name: " << solution_name
+         << "; Suggested options are: " << "'disturbed_global', 'disturbed_total'"
+         << ", 'undisturbed', 'total'. Exiting ...";
+      PMToolBox::output_message(ss.str(), this->comm());
+    }
   }
-  else
+  
+  // Write out Poisson System
+  if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
   {
-      PMToolBox::output_message(
-        "Error: solution name cannot be " + solution_name, this->comm());
+    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solution_backup 
+      = this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solution->clone();
+    if (solution_name == "disturbed_global")
+    {
+      // do nothing
+    }
+    else if (solution_name == "disturbed_total")
+    {
+      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+        .add_local_solution();
+    }
+    else if (solution_name == "total")
+    {
+      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+        .add_local_solution();
+    }
+    else
+    {
+      std::ostringstream ss;
+      ss << "Error: invalid solution_name: " << solution_name
+         << "; Suggested options are: " << "'disturbed_global', 'disturbed_total'"
+         << ", 'undisturbed', 'total'. Exiting ...";
+      PMToolBox::output_message(ss.str(), this->comm());
+    }
   }
   // get a reference to the mesh object
   MeshBase & mesh           = this->get_mesh();
   std::ostringstream output_filename;
-  output_filename << filename;
+  output_filename << "output_equation_systems_" << solution_name;
   
   if (output_format == "EXODUS")
   {
@@ -1003,6 +1029,19 @@ void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
   {
      PMToolBox::output_message(
        "Error: 'output_format' cannot not be " + output_format, this->comm());
+  }
+  
+  // // resume solution
+  if (this->get_equation_systems().parameters.get<bool>("with_hi")) 
+  { 
+    *(this->solution) = *solution_backup;
+  }
+  
+  // Write out Poisson System
+  if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+  {
+    *(this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solution)
+      = *(this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solution_backup);
   }
    
   STOP_LOG("write_equation_systems()", "PMSystemStokes");

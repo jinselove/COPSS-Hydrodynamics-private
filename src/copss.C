@@ -1084,7 +1084,7 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   // if either with_hi or module_poisson is true, build_elem_neighbor_list will
   // be true
   if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-  system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
+  system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "undisturbed");
   if (print_info) {
     if (comm_in->rank() == 0) point_mesh->print_point_info();
   }
@@ -1101,8 +1101,10 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   if ((std::find(output_file.begin(), output_file.end(),
                  "equation_systems") != output_file.end()) && (restart == false))
   {
-    system.write_equation_systems(0, 0., "undisturbed", 
-      "output_equation_systems_undisturbed");
+    ExodusII_IO(*mesh).write_equation_systems("output_equation_systems_undisturbed.e",
+      equation_systems);
+    // system.write_equation_systems(0, 0., "undisturbed", 
+      // "output_equation_systems_undisturbed");
   }
   PMToolBox::output_message("end writing undisturbed solution to file", *comm_in);
 }
@@ -1183,8 +1185,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       neighbor_list_update_flag = true;
       timestep_duration         = 0;
     }
-    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
   }
+  system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
   // compute undisturbed velocity of points
   system.compute_point_velocity("undisturbed", vel0);
   // compute disturbed velocity of points
@@ -1468,7 +1470,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 
       // comment the line below if not update neighbor list at each time step
       if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-      system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
+      system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
       system.compute_point_velocity("undisturbed", vel0);
       system.solve("disturbed"); // solve the disturbed solution
       system.compute_point_velocity("disturbed", vel1);
@@ -1546,8 +1548,9 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
 
     // whether or not reinit neighbor list depends on the
     // neighbor_list_update_flag
-    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
   }
+  system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+
   Point p_velocity(0.);
 
   for (std::size_t p_id = 0; p_id < NP; p_id++) {

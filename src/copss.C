@@ -750,7 +750,8 @@ void Copss::create_domain_mesh()
          << "   maximum mesh size of fliud: hmaxf = " << hmaxf << "\n";
     }
     else {
-      ss <<"Error: 'domain_mesh_file' needs to be specified. Exiting ...";
+      PMToolBox::output_message("Error: 'domain_mesh_file' needs to be specified. Exiting ...",
+        *comm_in);
       libmesh_error();
     }
   } 

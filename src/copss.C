@@ -1086,7 +1086,9 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
   // be true
   if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
   system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "undisturbed");
-  if (print_info) {
+  if (print_info) 
+  {
+    PMToolBox::output_message("--------After reinit undisturbed system---------", *comm_in);
     if (comm_in->rank() == 0) point_mesh->print_point_info();
   }
   // if with_hi is true, solve the undisturbed Stokes equation and backup the solution
@@ -1188,6 +1190,11 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     }
   }
   system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+  if (print_info) 
+  {
+    PMToolBox::output_message("--------After reinit system at integration step " + std::to_string(i) + "---------", *comm_in);
+    if (comm_in->rank() == 0) point_mesh->print_point_info();
+  }
   // compute undisturbed velocity of points
   system.compute_point_velocity("undisturbed", vel0);
   // compute disturbed velocity of points
@@ -1551,6 +1558,11 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
     // neighbor_list_update_flag
   }
   system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+  if (print_info) 
+  {
+    PMToolBox::output_message("--------After reinit system at integration step " + std::to_string(i) + "---------", *comm_in);
+    if (comm_in->rank() == 0) point_mesh->print_point_info();
+  }
 
   Point p_velocity(0.);
 

@@ -525,7 +525,7 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 
 // ==================================================================================
 void AssembleStokes::compute_element_rhs(const Elem                   *elem,
-                                         const unsigned int            n_u_dofs,
+                                         const unsigned int&            n_u_dofs,
                                          FEBase                      & fe_v,
                                          const std::vector<std::size_t>n_list,
                                          const bool                  & pf_flag,

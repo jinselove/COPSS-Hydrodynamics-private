@@ -120,12 +120,12 @@ public:
       This calculates each element's contribution to the right-hand-side vector.
    */
   void compute_element_rhs(const Elem                   *elem,
-                           const unsigned int            n_u_dofs,
+                           const unsigned int&            n_u_dofs,
                            FEBase                      & fe_v,
                            const std::vector<std::size_t>n_list,
                            const bool                  & pf_flag,
                            const std::string           & option,
-                           DenseVector<Number>         & Fe) override;
+                           DenseVector<Number>         & Fe);
 
 
   /*! \brief select sides on the boundary for all elements

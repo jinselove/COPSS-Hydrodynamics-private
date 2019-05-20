@@ -49,8 +49,12 @@ PMSystemPoisson::PMSystemPoisson(EquationSystems  & es,
   : PMLinearImplicitSystem(es, name, number),
   _solver_poisson(es)
 {
-  if (name != "Poisson") libmesh_error();
-
+  if (name != "Poisson") 
+  {
+    PMToolBox::output_message("Error: system name in PMSystemPoisson initializer is not 'Poisson'. Exiting ..."
+      , this->comm());
+    libmesh_error();
+  }
   // Poisson equation assembly
   _assemble_poisson   = new AssemblePoisson(es, name);
   analytical_solution = _assemble_poisson->get_analytical_solution();

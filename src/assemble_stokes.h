@@ -120,12 +120,12 @@ public:
       This calculates each element's contribution to the right-hand-side vector.
    */
   void compute_element_rhs(const Elem                   *elem,
-                           const unsigned int            n_u_dofs,
+                           const unsigned int&            n_u_dofs,
                            FEBase                      & fe_v,
                            const std::vector<std::size_t>n_list,
                            const bool                  & pf_flag,
                            const std::string           & option,
-                           DenseVector<Number>         & Fe) override;
+                           DenseVector<Number>         & Fe);
 
 
   /*! \brief select sides on the boundary for all elements
@@ -180,4 +180,15 @@ private:
 
   // ! Get a reference to GGEMStokes
   GGEMStokes *ggem_stokes = nullptr;
+
+  // vector stores dof sizes for all elems
+  std::vector<unsigned int> _n_dofs;
+  
+  // dof indices
+  std::vector<std::vector<dof_id_type> > _dof_indices;
+  std::vector<unsigned int> _n_u_dofs;
+  std::vector<unsigned int> _n_p_dofs;
+  std::vector<unsigned int> _n_uvw_dofs;
+  std::vector<std::vector<dof_id_type>> _dof_indices_u;
+  std::vector<std::vector<dof_id_type>> _dof_indices_p;
 };

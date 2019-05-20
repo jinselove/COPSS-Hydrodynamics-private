@@ -212,6 +212,7 @@ public:
   // ouput file
   unsigned int write_interval; // output file write interval
   std::vector<std::string>output_file;
+  std::string solution_name;
 
   // mesh
   SerialMesh *mesh = nullptr;

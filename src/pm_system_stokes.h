@@ -73,9 +73,11 @@ public:
    * (2) update the mesh of each finite sized particle if there are;
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
+   * only if option=="disturbed", we calculate forces
    */
   void reinit_system(bool      & neighbor_list_update_flag,
-                     const bool& build_elem_neighbor_list);
+                     const bool& build_elem_neighbor_list,
+                     const std::string& option);
 
 
   /**
@@ -220,11 +222,8 @@ public:
    * This electrostatic force includes contributions from both local and global
    * solution of the Poisson system.
    *  
-   * params add_local_solution_to_output: If add local part of the potential
-   *   field to the system output. This is only set to be true when trying to
-   *   write the total solution to equation_systems in the output stage.  
    */  
-  void couple_poisson(const bool& add_local_solution_to_output); 
+  void couple_poisson(); 
   
   
    /*
@@ -233,21 +232,20 @@ public:
     * 
     * params o_step: output_step
     * params real_time: current real simulation time
-    * params solution_name: "disturbed_total", "distrubed_global", or "total"
-    *   "disturbed_total" gives disturbed_global + distrubed_local
-    *   "distrubed_local" gives global part of the disturbed solution
-    *   "total" gives the disturbed solution + undisturbed solution
     * params filename: filename for the output file
+    * params undisturbed_solution_only: when set to be true, only write undisturbed_solution
     * params output_format: format of output file, supports 'EXODUS'; "VTK", "GMV"
     */
   void write_equation_systems(const unsigned int& o_step=0, 
                               const Real& real_time=0.,
                               const std::string& solution_name = "total",
-                              const std::string& filename = "output_equation_systems",
                               const std::string& output_format = "EXODUS");
   
    // Save a pointer to undisturbed solution
    UniquePtr<NumericVector<Real>> undisturbed_solution;
+   
+   // Clone the current solution to solution_backup (used in write_equation_systems)
+   UniquePtr<NumericVector<Real>> solution_backup;
 
 private:
 
@@ -262,5 +260,6 @@ private:
 
   // Get a pointer to GGEMStokes
   GGEMStokes *ggem_stokes = nullptr;
+  
 }; // end class
 } // end namespace libMesh

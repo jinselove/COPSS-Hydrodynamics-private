@@ -164,6 +164,9 @@ public:
    * in unbounded domain.
    */
   void test_potential_profile();
+  
+  // Clone the current solution to the solution backup
+  UniquePtr<NumericVector<Real>> solution_backup;
 
 private:
 

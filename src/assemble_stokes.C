@@ -535,7 +535,6 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
     // perf_log.push("finish");
     dof_map.constrain_element_vector(Fe, _dof_indices[elem_id]);
 
-
     // Add the element matrix and rhs vector to the global system.
     // PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
     // PMToolBox::output_dense_vector(Fe);
@@ -556,7 +555,7 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 
 // ==================================================================================
 void AssembleStokes::compute_element_rhs(const Elem                   *elem,
-                                         const unsigned int            n_u_dofs,
+                                         const unsigned int&            n_u_dofs,
                                          FEBase                      & fe_v,
                                          const std::vector<std::size_t>n_list,
                                          const bool                  & pf_flag,

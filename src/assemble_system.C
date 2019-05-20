@@ -74,7 +74,6 @@ void AssembleSystem::assemble_int_force(const Elem        *elem,
   const std::vector<std::vector<Real> >& phi = fe_v.get_phi();
   const std::vector<Point>& q_xyz            = fe_v.get_xyz(); // xyz coords of
                                                                // quad pts
-  // fe_v.reinit(elem);
   const std::size_t elem_id = elem->id();
   _int_force[elem_id].resize(n_u_dofs * q_xyz.size(), 0.);     // resize this
                                                                // row

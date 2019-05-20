@@ -93,7 +93,7 @@ public:
                            const std::vector<std::size_t>n_list,
                            const bool                  & pf_flag,
                            const std::string           & option,
-                           DenseVector<Number>         & Fe) override;
+                           DenseVector<Number>         & Fe);
 
 
   /*! \brief select sides on the boundary for all elements

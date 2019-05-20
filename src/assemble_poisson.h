@@ -84,12 +84,14 @@ public:
       This calculates each element's contribution to the right-hand-side vector.
    */
   void compute_element_rhs(const Elem                   *elem,
-                           const unsigned int            n_u_dofs,
-                           FEBase                      & fe_v,
-                           const std::vector<std::size_t>n_list,
-                           const bool                  & pf_flag,
-                           const std::string           & option,
-                           DenseVector<Number>         & Fe) override;
+                          const unsigned int&            n_dofs,
+                          const std::vector<Real>& JxW,
+                          const std::vector<std::vector<Real>>& phi,
+                          const std::vector<Point> q_xyz,
+                          const std::vector<std::size_t>n_list,
+                          const bool                  & pf_flag,
+                          const std::string           & option,
+                          DenseVector<Number>         & Fe);
 
 
   /*! \brief Select sides on Dirichlet and Neumann boundaries for all elements

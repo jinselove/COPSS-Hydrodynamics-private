@@ -86,19 +86,6 @@ public:
                                  const std::string& option) = 0;
 
 
-  /*! \brief  Assemble function for calculating each element's contribution to
-   *          the right-hand-side vector. It is used in assemble_global_F()
-
-   */
-  virtual void compute_element_rhs(const Elem                   *elem,
-                                   const unsigned int            n_u_dofs,
-                                   FEBase                      & fe_v,
-                                   const std::vector<std::size_t>n_list,
-                                   const bool                  & pf_flag,
-                                   const std::string           & option,
-                                   DenseVector<Number>         & Fe) = 0;
-
-
   /*! \brief Apply Boundary Conditions by penalty method.
 
    */
@@ -164,6 +151,14 @@ protected:
   { "x_negative", "x_positive", "y_negative", "y_positive", "z_negative", 
     "z_positive" };
 
+  // Sides on the boundary for different SubEquationSystems. Boundaries applied
+  // with
+  // Dirichlet BC using penalty method are different for different systems.
+  // For example, in Poisson system, we don't use pressure inlet/outlet
+  // condition
+  // to decide whether this side has to be included in the Dirichlet BC.
+  std::vector<std::vector<unsigned int> > _boundary_sides;
+  
   // int_force matrix
   // this matrix stores the product of JxW[qp] * phi[k][qp]
   // size = num_elem * (n_u_dofs * n_quad_points)
@@ -172,23 +167,4 @@ protected:
   // vector stores q_xyz size
   // size = num_elem * q_xyz.size()
   std::vector<std::vector<Point> > _q_xyz;
-
-  // vector stores dof sizes for all elems
-  std::vector<unsigned int>_n_dofs;
-  std::vector<unsigned int>_n_u_dofs;
-  std::vector<unsigned int>_n_p_dofs;
-  std::vector<unsigned int>_n_uvw_dofs;
-
-  // dof indices
-  std::vector<std::vector<dof_id_type> >_dof_indices;
-  std::vector<std::vector<dof_id_type> >_dof_indices_u;
-  std::vector<std::vector<dof_id_type> >_dof_indices_p;
-
-  // Sides on the boundary for different SubEquationSystems. Boundaries applied
-  // with
-  // Dirichlet BC using penalty method are different for different systems.
-  // For example, in Poisson system, we don't use pressure inlet/outlet
-  // condition
-  // to decide whether this side has to be included in the Dirichlet BC.
-  std::vector<std::vector<unsigned int> >_boundary_sides;
 };

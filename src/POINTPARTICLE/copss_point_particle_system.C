@@ -255,6 +255,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
     "boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
   equation_systems.parameters.set<std::vector<Real> >(
     "boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
+  equation_systems.parameters.set<bool> ("with_hi") = with_hi;
 }
 
 void CopssPointParticleSystem::update_object()
@@ -312,7 +313,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   // validate GGEMStokes if simulation_name = ggem_validation
   if (simulation_name == "ggem_validation") {
     perf_log.push("GGEM validation");
-    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
+    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
     system.test_velocity_profile();
     perf_log.pop("GGEM validation");
     return;
@@ -324,7 +325,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     PMSystemPoisson& system_poisson =
       equation_systems.get_system<PMSystemPoisson>("Poisson");
     // Build neighbor list, will this update point_mesh in PMSystemPoisson?
-    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list);
+    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
     system_poisson.test_potential_profile();
     perf_log.pop("GGEMPoisson validation");
     return;

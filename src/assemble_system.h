@@ -151,6 +151,14 @@ protected:
   { "x_negative", "x_positive", "y_negative", "y_positive", "z_negative", 
     "z_positive" };
 
+  // Sides on the boundary for different SubEquationSystems. Boundaries applied
+  // with
+  // Dirichlet BC using penalty method are different for different systems.
+  // For example, in Poisson system, we don't use pressure inlet/outlet
+  // condition
+  // to decide whether this side has to be included in the Dirichlet BC.
+  std::vector<std::vector<unsigned int> > _boundary_sides;
+  
   // int_force matrix
   // this matrix stores the product of JxW[qp] * phi[k][qp]
   // size = num_elem * (n_u_dofs * n_quad_points)
@@ -159,18 +167,4 @@ protected:
   // vector stores q_xyz size
   // size = num_elem * q_xyz.size()
   std::vector<std::vector<Point> > _q_xyz;
-
-  // vector stores dof sizes for all elems
-  std::vector<unsigned int> _n_dofs;
-  
-  // dof indices
-  std::vector<std::vector<dof_id_type> > _dof_indices;
-
-  // Sides on the boundary for different SubEquationSystems. Boundaries applied
-  // with
-  // Dirichlet BC using penalty method are different for different systems.
-  // For example, in Poisson system, we don't use pressure inlet/outlet
-  // condition
-  // to decide whether this side has to be included in the Dirichlet BC.
-  std::vector<std::vector<unsigned int> > _boundary_sides;
 };

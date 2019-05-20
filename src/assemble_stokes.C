@@ -402,10 +402,8 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 
   // build _int_force vector at the beginning of simulation
   if (_int_force.size() == 1) {
-    // perf_log.push("compute_int_force");
-    if (_pm_system.comm().rank() == 0) {
-      printf("\nassemble_int_force() at the beginning of simulation\n\n");
-    }
+    PMToolBox::output_message("Beginning assemble_int_force() for Stokes System at the beginning of the simulation."
+      , _pm_system.comm());
     const unsigned int n_mesh_elem = _mesh.n_elem();
     _int_force.resize(n_mesh_elem);
     _q_xyz.resize(n_mesh_elem);
@@ -439,20 +437,19 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
       _n_u_dofs[elem_id] = _dof_indices_u[elem_id].size();
       _n_p_dofs[elem_id] = _dof_indices_p[elem_id].size();
 
-      //  _n_uvw_dofs[elem_id] = _n_u_dofs[elem_id]*_dim;
-      Fe.resize(_n_dofs[elem_id]);
+      // update Fe size (not necessary)
+      // Fe.resize(_n_dofs[elem_id]);
 
       // NOTE: here JxW and dphi and other element quantities are not computed
       // up to now,
       // and these will be done in the elem loop after fe->reinit()
       fe_vel->reinit(elem);
 
-      // qrule.print_info();
+      // assemble _int_force
       this->assemble_int_force(elem, _n_u_dofs[elem_id], *fe_vel);
-
-      // printf("finished assemble_int_force\n");
     }
-
+    PMToolBox::output_message("Ending assemble_int_force() for Stokes System at the beginning of the simulation."
+      , _pm_system.comm());
     // perf_log.pop("compute_int_force");
   }
 
@@ -465,41 +462,13 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 
   for (; el != end_el; ++el)
   {
-    // perf_log.push("preparation 2.1");
     // Store a pointer to the element we are currently working on.
     const Elem *elem           = *el;
     const unsigned int elem_id = elem->id();
-
-    // perf_log.pop("preparation 2.1");
-    // Get the degree of freedom indices for the current element.
-
-    // perf_log.push("preparation 2.2");
-
-    /*
-     * why do we update need dof_indices again ?
-     */
-    dof_map.dof_indices(elem, _dof_indices[elem_id]);
-
-    // dof_map.dof_indices (elem, _dof_indices_u[elem_id], u_var);
-    // dof_map.dof_indices (elem, dof_indices_p, p_var);
-
-    // perf_log.pop("preparation 2.2");
-    // perf_log.push("preparation 2.3");
-    // const unsigned int n_dofs   = dof_indices.size();
-    // const unsigned int n_u_dofs = dof_indices_u.size();
-    // const unsigned int n_p_dofs = dof_indices_p.size();
-    // const unsigned int n_uvw_dofs = n_u_dofs*_dim;
+    
+    // update Fe size
     Fe.resize(_n_dofs[elem_id]);
 
-    // Fe.resize(_n_dofs[elem_id]);
-    // perf_log.pop("preparation 2.3");
-    // perf_log.push("preparation 2.4");
-    // NOTE: here JxW and dphi and other element quantities are not computed up
-    // to now,
-    // and these will be done in the elem loop after fe->reinit()
-    // fe_vel->reinit (elem);
-    // qrule.print_info();
-    // perf_log.pop("preparation 2.4");
     // if elem_neighbor_list is pre-built, we can access it directly
     const std::vector<std::size_t>& n_list =
       _pm_system.point_mesh()->elem_neighbor_list(elem);

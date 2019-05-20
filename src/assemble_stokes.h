@@ -180,4 +180,12 @@ private:
 
   // ! Get a reference to GGEMStokes
   GGEMStokes *ggem_stokes = nullptr;
+  
+  std::vector<unsigned int> _n_u_dofs;
+  std::vector<unsigned int> _n_p_dofs;
+  std::vector<unsigned int> _n_uvw_dofs;
+  
+  std::vector<std::vector<dof_id_type>> _dof_indices_u;
+  std::vector<std::vector<dof_id_type>> _dof_indices_p;
+  
 };

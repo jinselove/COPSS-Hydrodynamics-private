@@ -175,14 +175,9 @@ protected:
 
   // vector stores dof sizes for all elems
   std::vector<unsigned int>_n_dofs;
-  std::vector<unsigned int>_n_u_dofs;
-  std::vector<unsigned int>_n_p_dofs;
-  std::vector<unsigned int>_n_uvw_dofs;
-
+  
   // dof indices
   std::vector<std::vector<dof_id_type> >_dof_indices;
-  std::vector<std::vector<dof_id_type> >_dof_indices_u;
-  std::vector<std::vector<dof_id_type> >_dof_indices_p;
 
   // Sides on the boundary for different SubEquationSystems. Boundaries applied
   // with

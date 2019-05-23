@@ -683,15 +683,18 @@ void Copss::read_restart_eigenvalue()
 // ============================================================================
 void Copss::create_domain_mesh()
 {
-  if (dim == 2) {
+  if (dim == 2) 
+  {
     ss << "Error::Copss::create_domain_mesh() only works for 3D systems.\
       2D simulation needs extra implementation. Exiting...";
     PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
   mesh = new SerialMesh(*comm_in);
-  if (generate_mesh) {
-    if (wall_type == "slit") {
+  if (generate_mesh) 
+  {
+    if (wall_type == "slit") 
+    {
       const std::vector<Real> mesh_size = PMToolBox::mesh_size(*mesh);
       const Real meshsize_x = (wall_params[1] - wall_params[0]) / Real(n_mesh[0]);
       const Real meshsize_y = (wall_params[3] - wall_params[2]) / Real(n_mesh[1]);
@@ -728,14 +731,16 @@ void Copss::create_domain_mesh()
           -copss_slitMesh_boundary_id[i], slitMesh_boundary_id[i]);              
       }
     } 
-    else {
+    else 
+    {
       ss << "Error: COPSS only supports generating domain mesh for 'slit' wall."
          << "Please load the domain mesh file for other wall types. Exiting ...";
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
   } 
-  else {
+  else 
+  {
     if (domain_mesh_file != "nothing") {
       mesh->read(domain_mesh_file);
       mesh->all_second_order();
@@ -749,12 +754,35 @@ void Copss::create_domain_mesh()
          << "   minimum mesh size of fluid: hminf = " << hminf << "\n"
          << "   maximum mesh size of fliud: hmaxf = " << hmaxf << "\n";
     }
-    else {
+    else 
+    {
       PMToolBox::output_message("Error: 'domain_mesh_file' needs to be specified. Exiting ...",
         *comm_in);
       libmesh_error();
     }
-  } 
+  }
+  // MeshBase::const_element_iterator el =
+  //   mesh->active_local_elements_begin();
+  // const MeshBase::const_element_iterator end_el =
+  //   mesh->active_local_elements_end();
+  // for (; el != end_el; ++el)
+  // {
+  //   // Store a pointer to the element we are currently working on.
+  //   const Elem *elem           = *el;
+  //   const unsigned int elem_id = elem->id();
+  //   std::cout<<"elem_id = "<<elem_id <<"\n";
+  //   for (unsigned int s = 0; s < elem->n_sides(); s++)
+  //   {
+  //     std::cout<<"side id = " << s <<", boundary_ids = ";
+  //     std::vector<boundary_id_type> boundary_ids;
+  //     mesh->get_boundary_info().boundary_ids(elem, s, boundary_ids);
+  //     for (int i = 0; i<boundary_ids.size(); i++){
+  //       std::cout<<boundary_ids[i]<<"; ";
+  //     }
+  //     std::cout<<"\n";
+  //     // If this side is on the boundary
+  //   }
+  // } // end for elem-loop
   search_radius_p = 4. / alpha;
   search_radius_e = 0.5 * hmaxf + 4. / alpha;
   // print mesh info
@@ -829,7 +857,6 @@ EquationSystems Copss::create_equation_systems()
   
   u_var = system.add_variable("u", SECOND);
   v_var = system.add_variable("v", SECOND);
-
   if (dim == 3) w_var = system.add_variable("w", SECOND);
   const unsigned int p_var = system.add_variable("p", FIRST);
 

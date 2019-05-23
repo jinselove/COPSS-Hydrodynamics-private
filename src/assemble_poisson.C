@@ -277,12 +277,16 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   // Define data structures to contain the element matrix Ke and vector Fe
   DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
+  DenseVector<Number> sigma_e;
+  DenseVector<Number> sigma_e_global;
+  DenseVector<Number> sigma_e_local;
+  
   
   // This vector will hold the degree of freedom indices for
   // the element.  These define where in the global system
   // the element degrees of freedom get mapped.
   std::vector<dof_id_type> dof_indices;
-
+ 
  // Now we will loop over all the elements in the mesh that live
   // on the local processor, and compute the element vector Fe.
   MeshBase::const_element_iterator el =
@@ -294,7 +298,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     // Store a pointer to the element we are currently working on.
     const Elem *elem           = *el;
     const unsigned int elem_id = elem->id();
-    
+    // std::cout<<"elem_id = "<<elem_id <<"\n";
     // Get the degree of freedom indices for the current element. These define
     // where in the global matrix and right-hand-side this element will contribute to.
     dof_map.dof_indices(elem, dof_indices);
@@ -310,9 +314,13 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     // computing the location of the quadrature points (q_point) and the 
     // shape functions (phi, dphi) for the current element.
     fe_phi->reinit(elem);
-
+   
     // update Fe size
     Fe.resize(n_dofs);
+    sigma_e.resize(n_dofs);
+    sigma_e_local.resize(n_dofs);
+    sigma_e_global.resize(n_dofs);
+    
 
     // if elem_neighbor_list is pre-built, we can access it directly
     const std::vector<std::size_t>& n_list =
@@ -340,11 +348,19 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
 
     // Impose Neumann BC (surface charge density) to the right hand side
-    this->apply_bc_neumann(elem, *fe_phi, *fe_face, Fe);
-
+    this->apply_bc_neumann(elem, *fe_phi, *fe_face, Fe, sigma_e, sigma_e_global, sigma_e_local);
+    // std::cout << "sigma_e:\n";
+    // PMToolBox::output_dense_vector(sigma_e);
+    // std::cout << "sigma_e_global:\n";
+    // PMToolBox::output_dense_vector(sigma_e_global);
+    // std::cout << "sigma_e_local:\n";
+    // PMToolBox::output_dense_vector(sigma_e_local);
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
     dof_map.constrain_element_vector(Fe, dof_indices);
+    
+    // PMToolBox::output_dense_vector(Fe);
+    
     // _n_dofs[elem_id] = _dof_indices[elem_id].size();
    // Add the element rhs vector to the global system.
     // PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
@@ -376,9 +392,6 @@ void AssemblePoisson::compute_element_rhs(const Elem                   *elem,
   PointMesh<3> *_point_mesh                 = _pm_system.point_mesh();
   PMPeriodicBoundary *_pm_periodic_boundary = _point_mesh->pm_periodic_boundary();
   std::vector<PointParticle *> _particles   = _point_mesh->particles();
-
-  const unsigned int elem_id      = elem->id();
-  // const std::vector<Point>& q_xyz = _q_xyz[elem_id]; // xyz coords of quad pts
 
   // 1. Add the regularized point charge, first examine if this element has
   // neighboring point charge sources
@@ -436,6 +449,8 @@ void AssemblePoisson::select_boundary_side(const Elem *elem)
   // Get a reference to the Particle-Mesh System.
   PMSystemPoisson & pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
   const std::size_t elem_id   = elem->id();
+  _boundary_sides_dirichlet_poisson[elem_id].resize(0);
+  _boundary_sides_neumann_poisson[elem_id].resize(0);
 
   // Get boundary ids for each BC
   const std::vector<unsigned int> boundary_id_dirichlet_poisson =
@@ -444,43 +459,55 @@ void AssemblePoisson::select_boundary_side(const Elem *elem)
   const std::vector<unsigned int> boundary_id_neumann_poisson =
     _eqn_sys.parameters.get<std::vector<unsigned int> >(
       "boundary_id_neumann_poisson");
+  const std::vector<Real> boundary_value_dirichlet_poisson =
+    _eqn_sys.parameters.get<std::vector<Real> >(
+      "boundary_value_dirichlet_poisson");
+  const std::vector<Real> boundary_value_neumann_poisson =
+    _eqn_sys.parameters.get<std::vector<Real> >(
+      "boundary_value_neumann_poisson");
 
   // The following loops over the sides of the element. If the element has NO
   // neighbors on a side then that side MUST live on a boundary of the domain.
   for (unsigned int s = 0; s < elem->n_sides(); s++)
   {
-    bool apply_bc_dirichlet = false, apply_bc_neumann = false;
+    // bool apply_bc_dirichlet = false, apply_bc_neumann = false;
 
     // If this side is on the boundary
     if (elem->neighbor(s) == NULL)
     {
-      // Find this side's corresponding Dirichlet BoundaryID. If found, stop
-      // looping all BoundaryIDs
-      for (unsigned int i = 0; i < boundary_id_dirichlet_poisson.size(); i++) {
+      // Check if the s-th face of this element is associated with any Dirichlet boundary id
+      // if any, stop looking
+      for (unsigned int i = 0; i < boundary_id_dirichlet_poisson.size(); i++) 
+      {
         if (_mesh.get_boundary_info().has_boundary_id(elem, s,
-                                                      boundary_id_dirichlet_poisson
-                                                      [i])) {
-          apply_bc_dirichlet = true;
+                                                      boundary_id_dirichlet_poisson[i])) 
+        {
+          // apply_bc_dirichlet = true;
+          _boundary_sides_dirichlet_poisson[elem_id].push_back(
+            std::make_tuple(s, 
+              boundary_id_dirichlet_poisson[i], 
+              boundary_value_dirichlet_poisson[i]));
           break;
         }
       }
 
-      // Find this side's corresponding Neumann BoundaryID. If found, stop
-      // looping all BoundaryIDs
-      for (unsigned int i = 0; i < boundary_id_neumann_poisson.size(); i++) {
+      // Check if the s-th face of this element is associated with any Neumann boundary id
+      // if any, stop looking
+      for (unsigned int i = 0; i < boundary_id_neumann_poisson.size(); i++) 
+      {
         if (_mesh.get_boundary_info().has_boundary_id(elem, s,
                                                       boundary_id_neumann_poisson[
                                                         i])) {
-          apply_bc_neumann = true;
+          // apply_bc_neumann = true;
+          _boundary_sides_neumann_poisson[elem_id].push_back(
+            std::make_tuple(s, 
+              boundary_id_neumann_poisson[i], 
+              boundary_value_neumann_poisson[i]));
           break;
         }
       }
+    
     }
-
-    // If BC is applied, store this side_id for this element
-    if (apply_bc_dirichlet) _boundary_sides_dirichlet_poisson[elem_id].push_back(s);
-
-    if (apply_bc_neumann) _boundary_sides_neumann_poisson[elem_id].push_back(s);
   }
 
   STOP_LOG("select_boundary_side()", "AssemblePoisson");
@@ -495,41 +522,45 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
 {
   START_LOG("apply_bc_by_penalty()", "AssemblePoisson");
 
+  const std::size_t  elem_id = elem->id();
+  
+  // If the dirichlet boundary sides of this elem is none, return
+  if (_boundary_sides_dirichlet_poisson[elem_id].size() == 0)
+  {
+    return;
+  }
+ 
   // Get a reference to the Particle-Mesh System
   PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
-  // Dirichlet boundaries
-  const std::vector<unsigned int> boundary_id_dirichlet_poisson =
-    _eqn_sys.parameters.get<std::vector<unsigned int> >(
-      "boundary_id_dirichlet_poisson");
-  const std::vector<Real> boundary_value_dirichlet_poisson =
-    _eqn_sys.parameters.get<std::vector<Real> >("boundary_value_dirichlet_poisson");
-  // return None if there are no Dirichlet BC specified
-  if (boundary_id_dirichlet_poisson.size()==0) return;
-  const Real penalty         = 1E6; // The penalty value
-  const unsigned int n_nodes = elem->n_nodes();
-  const std::size_t  elem_id = elem->id();
+  
+  // The penalty value
+  const Real penalty         = 1E6;
+
   // Loop through sides in this element that sits on system's boundary
-  for (unsigned int s = 0; s < _boundary_sides_dirichlet_poisson[elem_id].size();
-       s++)
+  for (unsigned int s = 0; s < _boundary_sides_dirichlet_poisson[elem_id].size(); s++)
   {
-    // Build the full-order side element for "potential" Dirichlet BC at the
-    // walls.
-    UniquePtr<Elem> side(elem->build_side(
-                           _boundary_sides_dirichlet_poisson[elem_id][s]));
+    // extract the tuple for this side of this element, use referece to avoid data copying
+    // get<0>(t) : side id
+    // get<1>(t) : the dirichlet boundary id associated with this side
+    // get<2>(t) : the dirichlet potential associated with this side
+    const auto &t = _boundary_sides_dirichlet_poisson[elem_id][s];
+    // Build the full-order side element for "potential" Dirichlet BC at the walls.
+    // UniquePtr<Elem> side(elem->build_side(
+                           // _boundary_sides_dirichlet_poisson[elem_id][s]));
+    UniquePtr<Elem> side(elem->build_side(std::get<0>(t)));
 
     // Total electrical potential on this side
-    Real phi_total = 0.;
+    Real phi_total = std::get<2>(t);
 
-    for (unsigned int i = 0; i < boundary_value_dirichlet_poisson.size(); i++) {
-      if (_mesh.get_boundary_info().has_boundary_id(elem,
-                                                    _boundary_sides_dirichlet_poisson
-                                                    [elem_id][s],
-                                                    boundary_id_dirichlet_poisson[
-                                                      i])) {
-        phi_total = boundary_value_dirichlet_poisson[i];
-        break;
-      }
-    }
+    // for (unsigned int i = 0; i < boundary_value_dirichlet_poisson.size(); i++) 
+    // {
+    //   if (_mesh.get_boundary_info().has_boundary_id(elem,
+    //                                                 _boundary_sides_dirichlet_poisson[elem_id][s],
+    //                                                 boundary_id_dirichlet_poisson[i])) {
+    //     phi_total = boundary_value_dirichlet_poisson[i];
+    //     break;
+    //   }
+    // }
 
     // Loop through nodes on this side element
     for (unsigned int nn = 0; nn < side->n_nodes(); nn++)
@@ -572,7 +603,7 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
                                             matrix_or_vector,
                                             0,
                                             n,
-                                            n_nodes,
+                                            elem->n_nodes(),
                                             penalty,
                                             phi_global);
         } // end if (elem->node(n) == side->node(nn))
@@ -587,21 +618,26 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
 void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
                                        FEBase             & fe_phi,
                                        FEBase             & fe_face,
-                                       DenseVector<Number>& Fe)
+                                       DenseVector<Number>& Fe,
+                                       DenseVector<Number>& sigma_e,
+                                       DenseVector<Number>& sigma_e_global,
+                                       DenseVector<Number>& sigma_e_local
+                                      )
 {
   START_LOG("apply_bc_neumann()", "AssemblePoisson");
+  
+  const std::size_t  elem_id = elem->id();
+  
+  // If the Neumann boundaries of this element is None, return None
+  if (_boundary_sides_neumann_poisson.size() == 0)
+  {
+    return;
+  }
+  
+  
   // Get a reference to the Particle-Mesh System
   PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
-  // Neumann boundaries
-  const std::vector<unsigned int> boundary_id_neumann_poisson =
-    _eqn_sys.parameters.get<std::vector<unsigned int> >(
-      "boundary_id_neumann_poisson");
-  const std::vector<Real> boundary_value_neumann_poisson =
-    _eqn_sys.parameters.get<std::vector<Real> >("boundary_value_neumann_poisson");
-  // return None if there are no neumann BC specified
-  if (boundary_id_neumann_poisson.size()==0) return;
-  const unsigned int n_nodes = elem->n_nodes();
-  const std::size_t  elem_id = elem->id();
+  
   // Integration terms for side element
   const std::vector<Real>& JxW_face               = fe_face.get_JxW();
   const std::vector<std::vector<Real> >& phi_face = fe_face.get_phi();
@@ -613,11 +649,12 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   fe_phi.get_refspace_nodes(elem->type(), nodes);
   // Evaluate the shape functions derivatives at the nodes
   fe_phi.reinit(elem, &nodes);
-  // Local electrical potential and its gradient on all nodes in this element
-  std::vector<Real> phi_local;
-  phi_local.resize(elem->n_nodes());
-  std::vector<RealGradient> dphi_local;
-  dphi_local.resize(elem->n_nodes());
+  // fe_phi.reinit(elem);
+  // Pre-calculate 'Phi_local' and 'dphi_local' on all nodes of this element
+  // so that we can directly use them later when we loop over nodes on the 
+  // boundary surfaces
+  std::vector<Real> phi_local(elem->n_nodes());
+  std::vector<RealGradient> dphi_local(elem->n_nodes());
   // Loop through nodes on this element
   for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
   {
@@ -629,70 +666,87 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   }
   // Gradient of electrical potential on all nodes in this element
   for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
-    for (unsigned int i = 0; i < phi_local.size();
-         i++) dphi_local[nn] += phi_local[i] * dphi[i][nn];
+  {
+    for (unsigned int i = 0; i < phi_local.size(); i++) 
+    {
+      dphi_local[nn] += phi_local[i] * dphi[i][nn];
+    }
+  }
+  
   // Loop through sides in this element that sits on system's boundary
-  for (unsigned int s = 0; s < _boundary_sides_neumann_poisson[elem_id].size();
-       s++)
+  // std::cout << "number of boundary faces of this elem = " << _boundary_sides_neumann_poisson[elem_id].size() <<"\n";
+  for (unsigned int s = 0; s < _boundary_sides_neumann_poisson[elem_id].size(); s++)
   {
     // Build the full-order side element for "potential" Dirichlet BC at the
     // walls.
-    UniquePtr<Elem> side(elem->build_side(
-                           _boundary_sides_neumann_poisson[elem_id][s]));
+    // std::cout << "face id = "<<_boundary_sides_neumann_poisson[elem_id][s] <<"\n";
+    
+    // get<0>(t) : side id
+    // get<1>(t) : the neumann boundary id associated with this side
+    // get<2>(t) : the neumann potential associated with this side
+    const auto &t = _boundary_sides_neumann_poisson[elem_id][s];
+    // std::cout << "-------------------side s = " << std::get<0>(t) << "---------------------------\n";
+    // std::cout << "boundary id of this side = " << std::get<1>(t) << "\n";
+    // std::cout << "sigma_total of this side = " << std::get<2>(t) <<"\n";
+    // build this side
+    UniquePtr<Elem> side(elem->build_side(std::get<0>(t)));
 
     // dphi / dn (surface charge density) on this side
-    Real sigma_total = 0.;
-
-    for (unsigned int i = 0; i < boundary_value_neumann_poisson.size(); i++) {
-      if (_mesh.get_boundary_info().has_boundary_id(elem,
-                                                    _boundary_sides_neumann_poisson
-                                                    [elem_id][s],
-                                                    boundary_id_neumann_poisson[i]))
-      {
-        sigma_total = boundary_value_neumann_poisson[i];
-        break;
-      }
-    }
+    Real sigma_total = std::get<2>(t);
 
     // Calcualte Jacobian*Weights and shape functions on this side
     fe_face.reinit(elem, s);
-
-    // Calculate (dphi / dn)_local on side nodes
-    std::vector<Real> sigma_local;
-    sigma_local.resize(side->n_nodes());
-
+    // std::cout << "face_normals size = " << face_normals.size() <<"\n";
+    // Calculate sigma_local, i.e., (dphi / dn)_local on side nodes
+    std::vector<Real> sigma_local(side->n_nodes(), 0.);
+    std::vector<Real> sigma_global(side->n_nodes(), 0.);
+    // std::cout << "sigma_local (of this face) size = " << sigma_local.size() << "\n";
+    // std::cout << "sigma_global (of this face) size = " << sigma_global.size() << "\n";
     // Loop through nodes on this side element
-    for (unsigned int nn = 0; nn < side->n_nodes(); nn++)
+    // std::cout << "local ids of nodes on the side are: ";
+    for (unsigned int sn = 0; sn < side->n_nodes(); sn++)
     {
-      // Find the node on the element matching this node on the side.
-      // That defined where in the element matrix the BC will be applied.
-      for (unsigned int n = 0; n < elem->n_nodes(); n++)
-      {
-        if (elem->node(n) == side->node(nn))
-        {
-          // Use the normal vector at a quadrature point, since
-          // normally the side element has zero curvature
-          sigma_local[nn] = dphi_local[n](0) * face_normals[0](0)
-                            + dphi_local[n](1) * face_normals[0](1)
-                            + dphi_local[n](2) * face_normals[0](2);
-        }
-      }
+      // // Find the node on the element matching this node on the side.
+      // // That defined where in the element matrix the BC will be applied.
+      // for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
+      // {
+      //   if (elem->node(nn) == side->node(sn))
+      //   {
+      //     // Use the normal vector at a quadrature point, since
+      //     // normally the side element has zero curvature
+      //     sigma_local[sn] = dphi_local[nn](0) * face_normals[0](0)
+      //                       + dphi_local[nn](1) * face_normals[0](1)
+      //                       + dphi_local[nn](2) * face_normals[0](2);
+      // 
+      //   }
+      // }
+      
+      // get the local node id of the elem using the global node id
+      const unsigned int& nn = elem->local_node(side->node_id(sn));
+      sigma_local[sn] = dphi_local[nn](0) * face_normals[0](0)
+                        + dphi_local[nn](1) * face_normals[0](1)
+                        + dphi_local[nn](2) * face_normals[0](2);
+      // Calculate (dphi / dn)_global
+      sigma_global[sn] = sigma_total - sigma_local[sn];
+      // std::cout << "local_node_id = " << nn << "; sigma_total = " << sigma_total << "; sigma_global = " << sigma_global[sn] << "; sigma_local = "<<sigma_local[sn] << "\n";
     }
-
-    // Calculate (dphi / dn)_global
-    std::vector<Real> sigma_global;
-    sigma_global.resize(side->n_nodes());
-
-    for (unsigned int nn = 0; nn < side->n_nodes();
-         nn++) sigma_global[nn] = sigma_total - sigma_local[nn];
+    // std::cout << "\n";
 
     // Integrate on this side
     // FIXME: this can be optimized by store JxW_face * phi_face for face
     // element
     // in a vector similar to that in _int_force
-    for (unsigned int qp = 0; qp < JxW_face.size(); qp++)
-      for (unsigned int i = 0; i < phi_face.size();
-           i++) Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global[i];
+    // std::cout << "phi_face.size = "<< phi_face.size() << "\n";
+    for (unsigned int i=0; i<phi_face.size(); i++)
+    {
+      for (unsigned int qp=0; qp<JxW_face.size(); qp++)
+      {
+        Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global[i];
+      }
+      // sigma_e(i) = sigma_total;
+      // sigma_e_global(i) = sigma_global[i];
+      // sigma_e_local(i) = sigma_local[i];
+    }
   } // end for s-loop
 
   STOP_LOG("apply_bc_neumann()", "AssemblePoisson");

@@ -298,7 +298,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     // Store a pointer to the element we are currently working on.
     const Elem *elem           = *el;
     const unsigned int elem_id = elem->id();
-    // std::cout<<"elem_id = "<<elem_id <<"\n";
+    // std::cout<<"-------------------elem_id = "<<elem_id <<"------------------\n";
     // Get the degree of freedom indices for the current element. These define
     // where in the global matrix and right-hand-side this element will contribute to.
     dof_map.dof_indices(elem, dof_indices);
@@ -346,9 +346,18 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
 
     // Impose the Dirichlet BC (electrical potential) via the penalty method.
     this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
+    // PMToolBox::output_dense_vector(Fe);
 
     // Impose Neumann BC (surface charge density) to the right hand side
+    // std::cout << "number of nodes of this element = " << elem->n_nodes() <<"\n";
+    // std::cout << "number of quadrature points of this element = " << q_xyz.size() <<"\n";
+    // std::cout << "size of JxW = " << JxW.size() <<"\n";
+    // std::cout << "size of phi of this element (evaludate on quadrature points) = " << phi.size() <<"(of "<< phi[0].size()<<")"<<"\n";
+    // std::cout << "size of dphi of this element (evaludate on quadrature points) = " << dphi.size() <<"(of "<< dphi[0].size()<<")"<<"\n";
+    // 
     this->apply_bc_neumann(elem, *fe_phi, *fe_face, Fe, sigma_e, sigma_e_global, sigma_e_local);
+    // PMToolBox::output_dense_vector(Fe);
+    
     // std::cout << "sigma_e:\n";
     // PMToolBox::output_dense_vector(sigma_e);
     // std::cout << "sigma_e_global:\n";
@@ -552,16 +561,6 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
     // Total electrical potential on this side
     Real phi_total = std::get<2>(t);
 
-    // for (unsigned int i = 0; i < boundary_value_dirichlet_poisson.size(); i++) 
-    // {
-    //   if (_mesh.get_boundary_info().has_boundary_id(elem,
-    //                                                 _boundary_sides_dirichlet_poisson[elem_id][s],
-    //                                                 boundary_id_dirichlet_poisson[i])) {
-    //     phi_total = boundary_value_dirichlet_poisson[i];
-    //     break;
-    //   }
-    // }
-
     // Loop through nodes on this side element
     for (unsigned int nn = 0; nn < side->n_nodes(); nn++)
     {
@@ -570,9 +569,6 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
       const Real  phi_local = pm_system.local_potential_field(elem,
                                                               ptx,
                                                               "regularized");
-
-      // const Real phi_local = pm_system.local_potential_field(ptx,
-      // "regularized");
 
       // When we run ggem_validation_poisson, Dirichelet boundary condition is
       // applied on all
@@ -593,21 +589,31 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
 
       // Find the node on the element matching this node on the side.
       // That defined where in the element matrix the BC will be applied.
-      for (unsigned int n = 0; n < elem->n_nodes(); n++)
-      {
-        if (elem->node(n) == side->node(nn))
-        {
-          // Penalize phi at the current node, var_number is 0 for 'phi'
-          this->penalize_elem_matrix_vector(Ke,
-                                            Fe,
-                                            matrix_or_vector,
-                                            0,
-                                            n,
-                                            elem->n_nodes(),
-                                            penalty,
-                                            phi_global);
-        } // end if (elem->node(n) == side->node(nn))
-      }   // enf for n-loop
+      const unsigned int& local_node_id = elem->local_node(side->node_id(nn));
+      // Penalize phi at the current node, var_number is 0 for 'phi'
+      this->penalize_elem_matrix_vector(Ke,
+                                        Fe,
+                                        matrix_or_vector,
+                                        0,
+                                        local_node_id,
+                                        elem->n_nodes(),
+                                        penalty,
+                                        phi_global);
+      // for (unsigned int n = 0; n < elem->n_nodes(); n++)
+      // {
+      //   if (elem->node(n) == side->node(nn))
+      //   {
+      //     // Penalize phi at the current node, var_number is 0 for 'phi'
+      //     this->penalize_elem_matrix_vector(Ke,
+      //                                       Fe,
+      //                                       matrix_or_vector,
+      //                                       0,
+      //                                       n,
+      //                                       elem->n_nodes(),
+      //                                       penalty,
+      //                                       phi_global);
+      //   } // end if (elem->node(n) == side->node(nn))
+      // }   // enf for n-loop
     }     // end for nn-loop
   }       // end for s-loop
 
@@ -639,114 +645,149 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
   
   // Integration terms for side element
+  const std::vector<std::vector<Real>>& phi_face = fe_face.get_phi();
+  const std::vector<std::vector<RealGradient>> dphi_face = fe_face.get_dphi();
   const std::vector<Real>& JxW_face               = fe_face.get_JxW();
-  const std::vector<std::vector<Real> >& phi_face = fe_face.get_phi();
+  const std::vector<Point>& qface_point = fe_face.get_xyz();
   const std::vector<Point>& face_normals          = fe_face.get_normals();
   // Extract the shape function derivatives to be evaluated at the nodes
-  const std::vector<std::vector<RealGradient> >& dphi = fe_phi.get_dphi();
+  // const std::vector<std::vector<RealGradient> >& dphi = fe_phi.get_dphi();
   // Extract the element node coordinates in the reference frame
-  std::vector<Point> nodes;
-  fe_phi.get_refspace_nodes(elem->type(), nodes);
+  // std::vector<Point> nodes;
+  // fe_phi.get_refspace_nodes(elem->type(), nodes);
   // Evaluate the shape functions derivatives at the nodes
-  fe_phi.reinit(elem, &nodes);
+  // fe_phi.reinit(elem, &nodes);
+
+  
   // fe_phi.reinit(elem);
   // Pre-calculate 'Phi_local' and 'dphi_local' on all nodes of this element
   // so that we can directly use them later when we loop over nodes on the 
   // boundary surfaces
-  std::vector<Real> phi_local(elem->n_nodes());
-  std::vector<RealGradient> dphi_local(elem->n_nodes());
-  // Loop through nodes on this element
-  for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
-  {
-    // Coordinate of the node
-    const Point ptx = elem->point(nn);
-    // Evaluate local electrical potential (phi) on each node
-    phi_local[nn] = pm_system.local_potential_field(elem, ptx, "regularized");
-    // phi_local[nn] = pm_system.local_potential_field(ptx, "regularized");
-  }
-  // Gradient of electrical potential on all nodes in this element
-  for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
-  {
-    for (unsigned int i = 0; i < phi_local.size(); i++) 
-    {
-      dphi_local[nn] += phi_local[i] * dphi[i][nn];
-    }
-  }
-  
+  // std::vector<Real> phi_local(elem->n_nodes());
+  // std::vector<RealGradient> dphi_local(elem->n_nodes());
+  // // Loop through nodes on this element
+  // for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
+  // {
+  //   // Coordinate of the node
+  //   const Point ptx = elem->point(nn);
+  //   // Evaluate local electrical potential (phi) on each node
+  //   phi_local[nn] = pm_system.local_potential_field(elem, ptx, "regularized");
+  //   // phi_local[nn] = pm_system.local_potential_field(ptx, "regularized");
+  // }
+  // // Gradient of electrical potential on all nodes in this element
+  // for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
+  // {
+  //   for (unsigned int i = 0; i < phi_local.size(); i++) 
+  //   {
+  //     dphi_local[nn] += phi_local[i] * dphi[i][nn];
+  //   }
+  // }
   // Loop through sides in this element that sits on system's boundary
   // std::cout << "number of boundary faces of this elem = " << _boundary_sides_neumann_poisson[elem_id].size() <<"\n";
+  
   for (unsigned int s = 0; s < _boundary_sides_neumann_poisson[elem_id].size(); s++)
   {
     // Build the full-order side element for "potential" Dirichlet BC at the
     // walls.
-    // std::cout << "face id = "<<_boundary_sides_neumann_poisson[elem_id][s] <<"\n";
     
     // get<0>(t) : side id
     // get<1>(t) : the neumann boundary id associated with this side
     // get<2>(t) : the neumann potential associated with this side
     const auto &t = _boundary_sides_neumann_poisson[elem_id][s];
-    // std::cout << "-------------------side s = " << std::get<0>(t) << "---------------------------\n";
-    // std::cout << "boundary id of this side = " << std::get<1>(t) << "\n";
-    // std::cout << "sigma_total of this side = " << std::get<2>(t) <<"\n";
-    // build this side
-    UniquePtr<Elem> side(elem->build_side(std::get<0>(t)));
+    const unsigned int& side_id = std::get<0>(t);
+    const unsigned int& boundary_id = std::get<1>(t);
+    const Real& sigma_total = std::get<2>(t);  
+    // std::cout << "side id = " << side_id << "\n";
+    // std::cout << "boundary id of this side = " << boundary_id << "\n";
+    // std::cout << "sigma_total of this side = " << sigma_total <<"\n";
 
-    // dphi / dn (surface charge density) on this side
-    Real sigma_total = std::get<2>(t);
-
-    // Calcualte Jacobian*Weights and shape functions on this side
-    fe_face.reinit(elem, s);
-    // std::cout << "face_normals size = " << face_normals.size() <<"\n";
-    // Calculate sigma_local, i.e., (dphi / dn)_local on side nodes
-    std::vector<Real> sigma_local(side->n_nodes(), 0.);
-    std::vector<Real> sigma_global(side->n_nodes(), 0.);
-    // std::cout << "sigma_local (of this face) size = " << sigma_local.size() << "\n";
-    // std::cout << "sigma_global (of this face) size = " << sigma_global.size() << "\n";
-    // Loop through nodes on this side element
-    // std::cout << "local ids of nodes on the side are: ";
-    for (unsigned int sn = 0; sn < side->n_nodes(); sn++)
+    // reinit fe_face on this side 
+    fe_face.reinit(elem, side_id);
+    // std::cout << "number of quadrature points of this side = " << qface_point.size() <<"\n";
+    // std::cout << "size of JxW of this side = " << JxW_face.size() <<"\n";
+    // std::cout << "size of phi of this side (evaludate on quadrature points) = " << phi_face.size() <<"(of "<< phi_face[0].size()<<")"<<"\n";
+    // std::cout << "size of dphi of this side (evaludate on quadrature points) = " << dphi_face.size() <<"\n";
+    Real val = 0.;
+    for (unsigned int qp=0; qp<qface_point.size(); qp++)
     {
-      // // Find the node on the element matching this node on the side.
-      // // That defined where in the element matrix the BC will be applied.
-      // for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
-      // {
-      //   if (elem->node(nn) == side->node(sn))
-      //   {
-      //     // Use the normal vector at a quadrature point, since
-      //     // normally the side element has zero curvature
-      //     sigma_local[sn] = dphi_local[nn](0) * face_normals[0](0)
-      //                       + dphi_local[nn](1) * face_normals[0](1)
-      //                       + dphi_local[nn](2) * face_normals[0](2);
-      // 
-      //   }
-      // }
-      
-      // get the local node id of the elem using the global node id
-      const unsigned int& nn = elem->local_node(side->node_id(sn));
-      sigma_local[sn] = dphi_local[nn](0) * face_normals[0](0)
-                        + dphi_local[nn](1) * face_normals[0](1)
-                        + dphi_local[nn](2) * face_normals[0](2);
-      // Calculate (dphi / dn)_global
-      sigma_global[sn] = sigma_total - sigma_local[sn];
-      // std::cout << "local_node_id = " << nn << "; sigma_total = " << sigma_total << "; sigma_global = " << sigma_global[sn] << "; sigma_local = "<<sigma_local[sn] << "\n";
+      // calculate the neumann boundary value at the quadrature point
+      val = sigma_total;
+      for (unsigned int i=0; i<phi_face.size(); i++)
+      {
+        Fe(i) += JxW_face[qp] * val * phi_face[i][qp];
+      }
     }
+
+    // // build this side
+    // // UniquePtr<Elem> side(elem->build_side(std::get<0>(t)));
+    // 
+    // // dphi / dn (surface charge density) on this side
+    // 
+    // // Calcualte Jacobian*Weights and shape functions on this side
+    // fe_face.reinit(elem, s);
+    // std::cout << "number of nodes of this side = " << side->n_nodes() <<"\n";
+    // std::cout << "number of quadrature points of this side = " << q_xyz_face.size() <<"\n";
+    // std::cout << "size of JxW of this side = " << JxW_face.size() <<"\n";
+    // std::cout << "size of phi of this side (evaludate on quadrature points) = " << phi_face.size() <<"(of "<< phi_face[0].size()<<")"<<"\n";
+    // std::cout << "size of dphi of this side (evaludate on quadrature points) = " << dphi_face.size() <<"\n";
+    // 
+    // // Calculate sigma_local, i.e., (dphi / dn)_local on side nodes
+    // std::vector<Real> sigma_local(side->n_nodes(), 0.);
+    // std::vector<Real> sigma_global(side->n_nodes(), 0.);
+    // // std::cout << "sigma_local (of this face) size = " << sigma_local.size() << "\n";
+    // // std::cout << "sigma_global (of this face) size = " << sigma_global.size() << "\n";
+    // // Loop through nodes on this side element
+    // // std::cout << "local ids of nodes on the side are: ";
+    // std::cout << "size of normals of this side = " << face_normals.size() << "\n";
+    // std::cout<< "Normals of the face:\n";
+    // for (int i=0; i<face_normals.size(); i++) 
+    // {
+    //   face_normals[i].print();
+    //   std::cout<<"\n";
+    // }
+    
+    // for (unsigned int sn = 0; sn < side->n_nodes(); sn++)
+    // {
+    //   // // Find the node on the element matching this node on the side.
+    //   // // That defined where in the element matrix the BC will be applied.
+    //   // for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
+    //   // {
+    //   //   if (elem->node(nn) == side->node(sn))
+    //   //   {
+    //   //     // Use the normal vector at a quadrature point, since
+    //   //     // normally the side element has zero curvature
+    //   //     sigma_local[sn] = dphi_local[nn](0) * face_normals[0](0)
+    //   //                       + dphi_local[nn](1) * face_normals[0](1)
+    //   //                       + dphi_local[nn](2) * face_normals[0](2);
+    //   // 
+    //   //   }
+    //   // }
+    // 
+    //   // get the local node id of the elem using the global node id
+    //   const unsigned int& nn = elem->local_node(side->node_id(sn));
+    //   sigma_local[sn] = dphi_local[nn](0) * face_normals[0](0)
+    //                     + dphi_local[nn](1) * face_normals[0](1)
+    //                     + dphi_local[nn](2) * face_normals[0](2);
+    //   // Calculate (dphi / dn)_global
+    //   sigma_global[sn] = sigma_total - sigma_local[sn];
+    //   // std::cout << "local_node_id = " << nn << "; sigma_total = " << sigma_total << "; sigma_global = " << sigma_global[sn] << "; sigma_local = "<<sigma_local[sn] << "\n";
+    // }
     // std::cout << "\n";
 
     // Integrate on this side
     // FIXME: this can be optimized by store JxW_face * phi_face for face
     // element
     // in a vector similar to that in _int_force
-    // std::cout << "phi_face.size = "<< phi_face.size() << "\n";
-    for (unsigned int i=0; i<phi_face.size(); i++)
-    {
-      for (unsigned int qp=0; qp<JxW_face.size(); qp++)
-      {
-        Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global[i];
-      }
-      // sigma_e(i) = sigma_total;
-      // sigma_e_global(i) = sigma_global[i];
-      // sigma_e_local(i) = sigma_local[i];
-    }
+    // for (unsigned int i=0; i<phi_face.size(); i++)
+    // {
+    //   for (unsigned int qp=0; qp<JxW_face.size(); qp++)
+    //   {
+    //     Fe(i) += JxW_face[qp] * phi_face[i][qp] * sigma_global[i];
+    //   }
+    //   // sigma_e(i) = sigma_total;
+    //   // sigma_e_global(i) = sigma_global[i];
+    //   // sigma_e_local(i) = sigma_local[i];
+    // }
   } // end for s-loop
 
   STOP_LOG("apply_bc_neumann()", "AssemblePoisson");

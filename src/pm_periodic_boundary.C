@@ -358,7 +358,7 @@ Point PMPeriodicBoundary::point_vector(const Point& pt0,
   // Modify the value due to periodic boundaries.
   for (std::size_t i = 0; i < _dim; ++i)
   {
-    if (_periodic_directions[i])
+    if (_periodic_directions[i] or _inlet_directions[i])
     {
       // modify the value when |dpt(i)| > xsize
       const Real xsize = this->box_length()(i);

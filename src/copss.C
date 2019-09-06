@@ -1,3 +1,4 @@
+
 // Parallel Finite Element-General Geometry Ewald-like Method.
 
 // Copyright (C) 2015-2016 Xujun Zhao, Jiyuan Li, Xikai Jiang
@@ -252,9 +253,10 @@ void Copss::read_domain_info()
   // ============== inlet pressure
   inlet_pressure.resize(input_file.vector_variable_size("inlet_pressure"));
 
-  for (unsigned int i = 0; i < inlet_pressure.size();
-       i++) inlet_pressure[i] = input_file("inlet_pressure", 0, i);
-
+  for (unsigned int i = 0; i < inlet_pressure.size(); i++) 
+  {
+    inlet_pressure[i] = input_file("inlet_pressure", 0., i);
+  }
   // ============== shear or not on each boundary pair
   shear.resize(input_file.vector_variable_size("shear"));
 

@@ -39,7 +39,7 @@ void FixPoint::check_walls()
       // check all three directions of the box
       for (std::size_t i = 0; i < dim; ++i)
       {
-        if (periodic[i]) // periodic boundary
+        if (periodic[i] or inlet[i]) // periodic boundary
         {
           if (pt0(i) <  box_min(i)) { pt0(i) += box_len(i); count[i] -= 1; }
 

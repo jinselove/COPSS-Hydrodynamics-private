@@ -88,23 +88,10 @@ void PMSystemPoisson::assemble_matrix(const std::string& system_name,
 
   // init the matrices: global stiffness and PC matrix (if required)
   this->matrix->zero();
-  const bool user_defined_pc = this->get_equation_systems().parameters.get<bool>(
-    "user_defined_pc");
-
-  if (user_defined_pc) {
-    std::cout << "--->test in PMSystemPoisson::assemble_matrix(): "
-              << "Initialize the preconditioning matrix (all zeros) \n";
-    this->get_matrix("Preconditioner").zero();
-  }
-
   // Call assemble function to assemble matrix
   _assemble_poisson->assemble_global_K(system_name, option);
-
   // close the matrices
   this->matrix->close(); // close the matrix
-
-  if (user_defined_pc) this->get_matrix("Preconditioner").close();
-
   STOP_LOG("assemble_matrix()", "PMSystemPoisson");
 }
 
@@ -119,7 +106,9 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name,
 
   // init, assemble, and close the rhs vector
   this->rhs->zero();
+  // assemble rhs vector
   _assemble_poisson->assemble_global_F(system_name, option);
+  // close rhs vector
   this->rhs->close();
 
   STOP_LOG("assemble_rhs()", "PMSystemPoisson");
@@ -129,31 +118,21 @@ void PMSystemPoisson::assemble_rhs(const std::string& system_name,
 void PMSystemPoisson::solve(const std::string& option)
 {
   START_LOG("solve()", "PMSystemPoisson");
-  // Real t1, t2;
-  // std::string msg = "---> solve Poisson";
-  // PMToolBox::output_message(msg, this->comm());
 
   // Assemble the global matrix and pc matrix at the first step, when
   // re_init=true.
   if (_re_init)
   {
-    // t1 = MPI_Wtime();
-
     // Set the solver type for the Poisson equation
     const SystemSolverType solver_type =
       this->get_equation_systems().parameters.get<SystemSolverType>(
         "solver_type_poisson");
     _solver_poisson.set_solver_type(solver_type);
-
     // Assemble the global matrix, and init the KSP solver
     this->assemble_matrix("Poisson", option);
     _solver_poisson.init_ksp_solver();
-    
     //set _re_init to false once K matrix is built
     _re_init = false;
-    // t2 = MPI_Wtime();
-    // std::cout << "For Poisson equation, time used to assemble the global
-    // matrix and reinit KSP is " <<t2-t1<<" s\n\n";
   }
   
   

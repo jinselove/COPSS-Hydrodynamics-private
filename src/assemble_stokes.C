@@ -167,8 +167,6 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
       // Store a pointer to the element we are currently working on.
       const Elem *elem = *el;
       this->select_boundary_side(elem);
-
-      // printf("finished select_boundary_side\n");
     }
   }
 

@@ -122,28 +122,6 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
   // Element vector contribution
   DenseVector<Number> Fe;
 
-  // Build _boundary_sides_dirichlet_poisson and
-  //       _boundary_sides_neumann_poisson vectors at beginning of simulation
-  // if (_boundary_sides_dirichlet_poisson.size() ==
-  //     0 and _boundary_sides_neumann_poisson.size() == 0) 
-  // {
-    // _boundary_sides_dirichlet_poisson.resize(n_mesh_elem);
-    // _boundary_sides_neumann_poisson.resize(n_mesh_elem);
-    // MeshBase::const_element_iterator el =
-    //   _mesh.active_local_elements_begin();
-    // const MeshBase::const_element_iterator end_el =
-    //   _mesh.active_local_elements_end();
-    // for (; el != end_el; ++el)
-    // for 
-    // {
-      // Store a pointer to the element we are currently working on.
-      // const Elem *elem = *el;
-      // this->select_boundary_side(elem);
-
-      // printf("finished select_boundary_side\n");
-    // }
-  // }
-
   // attach PointMesh to AnalyticalSolution (only do this once for
   // "ggem_validation")
   if ((_eqn_sys.parameters.get<std::string>("simulation_name") ==

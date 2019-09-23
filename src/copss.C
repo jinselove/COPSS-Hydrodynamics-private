@@ -466,6 +466,9 @@ void Copss::read_solver_info() {
   else if (solver_poisson == "field_split") {
     solver_type_poisson = field_split;
     user_defined_pc     = false;
+    ss << "-->Warning: user defined preconditioner is not implemented for "
+          "Poisson solver, even though the solver is set to be 'field_split'\n";
+    PMToolBox::output_message(ss, *comm_in);
   }
   else {
     solver_type_poisson = user_define;

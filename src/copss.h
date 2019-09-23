@@ -124,14 +124,16 @@ public:
   std::string particle_type;
 
   // characteristic variables
-  Real tc;                                  // characteristic time (diffusion
-                                            // time) (s)
-  Real uc;                                  // characteristic velocity (um/s)
-  Real fc;                                  // characteristic force (N)
-  Real muc;                                 // non-dimension viscosity
-  Real phi0;                                // non-dimensional electrical
-                                            // potential: e / (4 * pi * epsilon
-                                            // * epsilon_0 * a)
+  Real tc; // characteristic time (diffusion time) (s)
+  Real uc; // characteristic velocity (um/s)
+  Real fc; // characteristic force (N)
+  Real muc; // non-dimension viscosity
+  Real phi0; // characteristic electristatic potential (V)
+  Real efield0; // characteristic electric field (V/um)
+  Real charge_rho0; // characteristic volume charge density (C/um^3)
+  Real charge_sigma0; // characteristic surface charge density (C/um^2)
+
+
 
   // Geometry information
   unsigned int dim;                         // dimension of the box
@@ -184,6 +186,7 @@ public:
   std::string solver_stokes, solver_poisson;
   SystemSolverType solver_type_stokes, solver_type_poisson;
   bool module_poisson;
+  bool module_nernst_planck;
 
   // Chebyshev information
   unsigned int max_n_cheb;       // max order of Chebyshev polynomianl
@@ -371,6 +374,7 @@ protected:
    */
 
   void         read_system_info();
+  void         read_modules_info();
   void         read_physical_info();
   virtual void read_particle_info() = 0;
   void         read_domain_info();

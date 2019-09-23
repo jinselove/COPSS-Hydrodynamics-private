@@ -9,6 +9,12 @@
 simulation_name = ggem_validation_poisson
 
 #############################################
+# Physics modules (besides Stokes modules)
+#############################################
+module_poisson = true
+module_nernst_planck = false
+
+#############################################
 #			   Physical parameters         			
 #############################################
 
@@ -97,7 +103,6 @@ user_defined_pc = true
 solver_stokes = superLU_dist
 
 # Poisson solver
-module_poisson = true
 solver_poisson = superLU_dist
 
 # user defined KSP for schur complement #

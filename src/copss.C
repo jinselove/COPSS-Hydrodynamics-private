@@ -1213,6 +1213,89 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       }
     }
   }
+  else if (system.name() == "NP")
+  {
+    ss << "--------------> Get dof_map of 'NP' system";
+    PMToolBox::output_message(ss, *comm_in);
+    DofMap& dof_map = system.get_dof_map();
+    ss << "--------------> Add periodicBoundary object to 'dof_map'";
+    PMToolBox::output_message(ss, *comm_in);
+    /*** set PBC in x-direction ***/
+    if (periodicity[0])
+    {
+      PeriodicBoundary pbcx(RealVectorValue(wall_params[1] - wall_params[0],
+                                            0.,
+                                            0.));
+      pbcx.set_variable(c_var);
+      pbcx.myboundary     = slitMesh_boundary_id[0];
+      pbcx.pairedboundary = slitMesh_boundary_id[1];
+      dof_map.add_periodic_boundary(pbcx);
+      // check
+      if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
+      {
+        ss << "*********************** Error in NP PBC: ********************\n"
+           << "**** The search radius is larger than half domain length in x direction\n!"
+           << "**** search radius = " << search_radius_p
+           << ", half domain size Lx/2 =" << (wall_params[1] - wall_params[0]) / 2. << "\n"
+           << "************************************************************************\n";
+        PMToolBox::output_message(ss, *comm_in);
+        libmesh_error();
+      }
+    }
+
+    /*** set PBC in y-direction ***/
+    if (periodicity[1])
+    {
+      PeriodicBoundary pbcy(RealVectorValue(0.,
+                                            wall_params[3] - wall_params[2],
+                                            0.));
+      pbcy.set_variable(c_var);
+
+      pbcy.myboundary     = slitMesh_boundary_id[2];
+      pbcy.pairedboundary = slitMesh_boundary_id[3];
+      dof_map.add_periodic_boundary(pbcy);
+      // check
+      if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
+      {
+        ss << "*********************** Error in NP PBC: *******************\n"
+           << "**** The search radius is larger than half domain length in y direction\n!"
+           << "**** search radius = " << search_radius_p
+           << ", half domain size Ly/2 =" << (wall_params[3] - wall_params[2]) / 2. << "\n"
+           << "************************************************************************\n";
+        PMToolBox::output_message(ss, *comm_in);
+        libmesh_error();
+      }
+    }
+
+    /*** set PBC in z-direction ***/
+    if (periodicity[2])
+    {
+      PeriodicBoundary pbcz(RealVectorValue(0.,
+                                            0.,
+                                            wall_params[5] - wall_params[4]));
+      pbcz.set_variable(c_var);
+      pbcz.myboundary     = slitMesh_boundary_id[4];
+      pbcz.pairedboundary = slitMesh_boundary_id[5];
+      dof_map.add_periodic_boundary(pbcz);
+      // check
+      if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
+      {
+        ss << "*********************** Error in NP PBC: *************************\n"
+           << "**** The search radius is larger than half domain length in z direction\n!"
+           << "**** search radius = " << search_radius_p
+           << ", half domain size Lz/2 =" << (wall_params[5] - wall_params[4]) / 2. << "\n"
+           << "************************************************************************\n";
+        PMToolBox::output_message(ss, *comm_in);
+        libmesh_error();
+      }
+    }
+  }
+  else
+  {
+    ss << "Error: system " << system.name() << " not supported. Exiting...\n";
+    PMToolBox::output_message(ss, *comm_in);
+    libmesh_error();
+  }
 }
 
 // ============================================================================================

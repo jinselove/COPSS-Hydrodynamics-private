@@ -23,7 +23,7 @@
 
 // Local Includes -----------------------------------
 #include "assemble_nernst_planck.h"
-#include "solver_stokes.h"
+#include "solver_np.h"
 #include "pm_linear_implicit_system.h"
 
 namespace libMesh {
@@ -73,14 +73,14 @@ public:
    * option ==
    */
   void assemble_matrix(const std::string& system_name,
-                       const std::string& option);
+                       const std::string& option) override;
 
 
   /**
    * Assemble the system rhs.
    */
   void assemble_rhs(const std::string& system_name,
-                    const std::string& option);
+                    const std::string& option) override;
 
 
   /*
@@ -88,20 +88,35 @@ public:
    * option = ...
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve(const std::string& option,
-             const bool       & re_init);
+  void solve(const std::string& option) override;
 
-  // /*
+
+  /*
+   * Add the local solution to the global solution
+   * This function does not apply to NP system
+   */
+  void add_local_solution() override {};
+
+
+  /*
+   * Compute the L2-error in an unbounded domain
+   * This function does not apply to NP system
+   */
+  void test_l2_norm(bool& neighbor_list_update_flag) override {};
+
+
+
+    // /*
   //  * Return the NPSolver
   //  */
-  SolverStokes& np_solver() {
+  SolverNP& np_solver() {
     return _np_solver;
   }
 
 private:
 
   // // Stokes solver
-  SolverStokes _np_solver;
+  SolverNP _np_solver;
 
   // Assemble Stokes system
   AssembleNP *_assemble_np = nullptr;

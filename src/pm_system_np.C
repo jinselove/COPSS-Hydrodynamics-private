@@ -38,7 +38,6 @@
 #include "brownian_system.h"
 #include "pm_system_np.h"
 
-
 namespace libMesh {
 // ======================================================================================
 PMSystemNP::PMSystemNP(EquationSystems  & es,
@@ -92,8 +91,7 @@ void PMSystemNP::assemble_rhs(const std::string& system_name,
 }
 
 // ==================================================================================
-void PMSystemNP::solve(const std::string& option,
-                       const bool       & re_init)
+void PMSystemNP::solve(const std::string& option)
 {
   START_LOG("solve()", "PMSystemNP");
 

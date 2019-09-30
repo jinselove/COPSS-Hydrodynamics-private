@@ -399,7 +399,8 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   // perf_log.pop("preparation");
 
   // build _int_force vector at the beginning of simulation
-  if (_int_force.size() == 1) {
+  if (_int_force.size() == 1)
+  {
     // perf_log.push("compute_int_force");
     if (_pm_system.comm().rank() == 0) {
       printf("\nassemble_int_force() at the beginning of simulation\n\n");

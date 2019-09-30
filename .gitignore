@@ -1,9 +1,9 @@
 *.o
 *.depend
 *-opt
-docs/doxygen/html/
-docs/doxygen/latex/
-docs/sphinx/build/
+html/
+latex/
+build/
 examples/*/*/run.sh
 examples/*/*/zclean.sh
 examples/*/*/*.txt
@@ -16,4 +16,6 @@ examples/*/*/*.e-s.*
 examples/*/*/*.dat
 examples/*/*/*.info
 src/stable/
-
+__pycache__
+.idea
+tmp

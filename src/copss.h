@@ -125,8 +125,18 @@ public:
   Real Rb;                                             // radius of the bead
   Real drag_c;                                         // Drag coefficient
                                                        // (N*s/um)
-  Real Db;
+  Real Db; // bead diffusivity (um^2/s)
   std::string particle_type;
+  // finite-difference timestep for Nernst-Planck system (unit=tc)
+  Real dt_np;
+  // name of each ion species
+  std::vector<std::string> ion_name;
+  // concentration of each ion species (unit = M=mol/L)
+  std::vector<Real> ion_concentration;
+  // diffusivity of each ion species (unit = um^2/s)
+  std::vector<Real> ion_diffusivity;
+  // valence of each ion species (unit = 1)
+  std::vector<int> ion_valence;
 
   // characteristic variables
   Real tc;                                  // characteristic time (diffusion
@@ -137,8 +147,7 @@ public:
   Real phi0;                                // non-dimensional electrical
                                             // potential: e / (4 * pi * epsilon
                                             // * epsilon_0 * a)
-  Real c0; // characteristic concentration of ion species (M=mol/L)
-
+  Real c0 = 1.0; // characteristic concentration of ion species (M=mol/L)
   // Geometry information
   unsigned int dim;                         // dimension of the box
   std::string wall_type;                    // wall_type (slit or sphere)

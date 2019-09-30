@@ -187,8 +187,49 @@ void Copss::read_physical_info()
   }
   if (module_np)
   {
-    // characteristic ion concentration (M=mol/L)
-    c0 = input_file("ion_concentration", 1.);
+    // Nernst-Planck dt (unit=tc=6*pi*eta*Rb^3/kbT)
+    dt_np = input_file("dt_np", 0.1);
+    // name of all ion species
+    ion_name.resize(input_file.vector_variable_size("ion_name"));
+    // concentration of all ion species (unit=M=mol/L)
+    ion_concentration.resize(input_file.vector_variable_size
+    ("ion_concentration"));
+    // diffusivity of all ion species (unit=um^2/s)
+    ion_diffusivity.resize(input_file.vector_variable_size("ion_diffusivity"));
+    // valence of all ion species (1)
+    ion_valence.resize(input_file.vector_variable_size("ion_valence"));
+
+    // data validation
+    if (ion_name.size() == ion_concentration.size()
+      and ion_name.size() ==ion_diffusivity.size()
+      and ion_name.size() == ion_valence.size()
+      and ion_name.size() >= 2)
+    {
+      Real total_ion_charge = 0.;
+      for (unsigned int j = 0; j < ion_name.size(); j++)
+      {
+        ion_name[j] = input_file("ion_name", "", j);
+        ion_concentration[j] = input_file("ion_concentration", 0.0, j);
+        ion_diffusivity[j] = input_file("ion_diffusivity", 0.0, j);
+        ion_valence[j] = input_file("ion_valence", 0, j);
+        total_ion_charge += ion_valence[j] * ion_concentration[j];
+      }
+      if (total_ion_charge >= 1.e-6)
+      {
+        ss << "Error: total ion charge (valence * concentration) is not "
+              "neutral. Exiting...\n";
+        PMToolBox::output_message(ss, *comm_in);
+        libmesh_error();
+      }
+    }
+    else
+    {
+      ss << "Error: ion parameters ('ion_name', 'ion_diffusivity', "
+            "'ion_concentration', 'ion_valence') are not correctly set. "
+            "Exiting ...\n";
+      PMToolBox::output_message(ss, *comm_in);
+      libmesh_error();
+    }
   }
 
   // print out physical parameters information
@@ -213,13 +254,23 @@ void Copss::read_physical_info()
   }
   if (module_np)
   {
-    ss << "   characteristic ion concentration = " << c0 << " (M)\n";
+    ss << "   characteristic ion concentration = " << c0 << " (M)\n"
+       << "   finite-difference time step for NP system, dt_np = " << dt_np
+       << " (unit=characteristic time tc)\n"
+       << "   ------------> parameters of all ion species:\n";
+    for (int i=0; i<ion_name.size(); i++)
+    {
+      ss << "   " << ion_name[i] << " : "
+         << "concentration (M) = " << ion_concentration[i] << "; "
+         << "diffusivity (um^2/s) = " << ion_diffusivity[i] << "; "
+         << "valence (1) = " << ion_valence[i] << "\n";
+    }
   }
   PMToolBox::output_message(ss, *comm_in);
 } // end read_physical_parameter()
 
 /*
- * Read Geometry infomation
+ * Read Geometry information
  */
 void Copss::read_domain_info()
 {

@@ -262,6 +262,15 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
             = solver_type_np;
     equation_systems.parameters.set<Real>("c0")
             = c0;
+    equation_systems.parameters.set<Real>("dt_np") = dt_np;
+    equation_systems.parameters.set<std::vector<std::string>>("ion_name")
+            = ion_name;
+    equation_systems.parameters.set<std::vector<Real>>("ion_concentration")
+            = ion_concentration;
+    equation_systems.parameters.set<std::vector<Real>>("ion_diffusivity")
+            = ion_diffusivity;
+    equation_systems.parameters.set<std::vector<int>>("ion_valence")
+            = ion_valence;
     equation_systems.parameters.set<std::vector<unsigned int> >(
             "boundary_id_dirichlet_np") = boundary_id_dirichlet_poisson;
     equation_systems.parameters.set<std::vector<Real> >(

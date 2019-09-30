@@ -100,7 +100,7 @@ public:
   /*
    * Add the local solution to the global solution for electrical potential
    */
-  void add_local_solution();
+  void add_local_solution() override;
 
 
   /*

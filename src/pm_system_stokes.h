@@ -92,14 +92,14 @@ public:
    * option == "disturbed"   : disturbed velocity field   (with particles)
    */
   void assemble_matrix(const std::string& system_name,
-                       const std::string& option);
+                       const std::string& option) override;
 
 
   /**
    * Assemble the system rhs.
    */
   void assemble_rhs(const std::string& system_name,
-                    const std::string& option);
+                    const std::string& option) override;
 
 
   /*
@@ -108,20 +108,20 @@ public:
    *particles
    * option = "disturbed",   compute the disturbed field of flow with particles
    */
-  void solve(const std::string& option);
+  void solve(const std::string& option) override;
 
 
   /*
    * Add the local solution to the global solution
    */
-  void add_local_solution();
+  void add_local_solution() override;
 
 
   /*
    * Compute the L2-error in an unbounded domain
    * This function will change the system solution vector by add local solution.
    */
-  void test_l2_norm(bool& neighbor_list_update_flag);
+  void test_l2_norm(bool& neighbor_list_update_flag) override;
 
 
   /*

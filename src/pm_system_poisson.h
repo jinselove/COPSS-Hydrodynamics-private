@@ -181,5 +181,8 @@ private:
 
   // Get a pointer to GGEMPoisson
   GGEMPoisson *ggem_poisson = nullptr;
+
+  // output precision (defined in input file, default is 6)
+  int o_precision;
 };
 } // end namespace libMesh

@@ -434,7 +434,7 @@ protected:
   virtual void write_object(unsigned int step_id) = 0;
 
   // output precision
-  const int o_precision = 6;
+  int o_precision;
   
   // copss generated slit mesh boundary id
   // x-negative surface boundary_id = 4

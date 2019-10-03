@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-
+import pandas as pd
 
 box_directions = ['x', 'y', 'z']
 
@@ -11,18 +11,19 @@ vtype = np.array([ "Total", "Global", "Local", "Exact" ])
 labelplot = [ str( vt ) for vt in vtype ];
 
 for index, box_direction in enumerate(box_directions):
-    datafile = "output_potential_profile_" + box_direction + "_3P.txt"
+    datafile = "output_potential_profile_" + box_direction + "_3P.csv"
     print ("plot data in {0}".format(datafile))
-    tmpA = np.loadtxt(datafile)
-    mA = tmpA.shape[0]
-    nA = tmpA.shape[1]
+    df = pd.read_csv(datafile)
+    # tmpA = np.loadtxt(datafile)
+    mA = df.shape[0]
+    nA = df.shape[1]
     # coordinates of cross section
-    x  = tmpA[:,0];      # coordinates
+    x  = df.iloc[:,0];      # coordinates
     vx = np.zeros( (mA,4), np.float ); # total | global | local | exact
                                        #           |        |
                                        #          FEM     Green
     for i in range(0,4):
-       vx[:,i] = tmpA[:,i+1]
+       vx[:,i] = df.iloc[:,i+1]
     for i in range(0,4):
        if i<3:
            axes[index].plot(x, vx[:,i], color=colorplot[i], linewidth=2);
@@ -36,6 +37,6 @@ for index, box_direction in enumerate(box_directions):
 
 axes[0].set_title("Potential: phi")
 
-plt.show()
+#plt.show()
 plt.savefig('ggem_pointcharge_validation.eps', format='eps', dpi=100)
 

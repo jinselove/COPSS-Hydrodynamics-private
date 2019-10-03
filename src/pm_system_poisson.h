@@ -164,9 +164,14 @@ public:
    * in unbounded domain.
    */
   void test_potential_profile();
-  
-  // Clone the current solution to the solution backup
-  UniquePtr<NumericVector<Real>> solution_backup;
+
+
+  /**
+   * update system solution for output
+   */
+  void update_solution_for_output(const std::string& solution_name = "total")
+    override;
+
 
 private:
 

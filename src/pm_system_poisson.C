@@ -690,4 +690,38 @@ void PMSystemPoisson::test_potential_profile()
 
   STOP_LOG("test_potential_profile()", "PMSystemPoisson");
 }
+
+
+
+// =============================================================================
+void PMSystemPoisson::update_solution_for_output(const std::string&
+  solution_name)
+
+{
+  START_LOG("update_solution_for_output()", "PMSystemPoisson");
+
+  // clone Poisson FEM System Solution to solution_backup
+  this->solution_backup = this->solution->clone();
+  // update system solution based on the "solution_name"
+  if (solution_name == "disturbed_global")
+  {
+    // do nothing
+  }
+  else if (solution_name == "disturbed_total" or solution_name == "total")
+  {
+    this->add_local_solution();
+  }
+  else
+  {
+    std::ostringstream ss;
+    ss << "Error: invalid solution_name: " << solution_name
+       << "; Suggested options are: "
+       << "'disturbed_global', 'disturbed_total'"
+       << ", 'undisturbed', 'total'. Exiting ...";
+    PMToolBox::output_message(ss.str(), this->comm());
+  }
+
+  STOP_LOG("update_solution_for_output()", "PMSystemPoisson");
+}
+
 } // end of namespace

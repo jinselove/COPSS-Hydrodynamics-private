@@ -404,6 +404,12 @@ as follows:
 
     Whether or not to output debug information. This feature is recommended to be used by the developers only.
 
+- ``output_precision = 6``
+    The precision of output file, the default value is 6. It currently only
+    works for outputting the potential field of Poisson System when doing the GGEM test.
+    But potentially, we will use this parameter to control the precision of all
+    simulation outputs. Example, if the output of a potential 1.023456789 will
+    be written as 1.0235 if 'output_precision' is set to be 4.
 
 Force Field
 --------------

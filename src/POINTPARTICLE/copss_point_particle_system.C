@@ -243,11 +243,9 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<std::vector<unsigned int> >("shear_direction")
     = shear_direction;
   equation_systems.parameters.set<bool> ("with_hi") = with_hi;
-
   // parameters for modules
   equation_systems.parameters.set<bool>("module_poisson") = module_poisson;
   equation_systems.parameters.set<bool>("module_np") = module_np;
-
   // parameters of Poisson system
   if (module_poisson)
   {
@@ -286,6 +284,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
     equation_systems.parameters.set<std::vector<Real> >(
             "boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
   }
+  equation_systems.parameters.set<int> ("o_precision") = o_precision;
 }
 
 void CopssPointParticleSystem::update_object()

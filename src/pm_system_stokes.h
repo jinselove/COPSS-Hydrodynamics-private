@@ -226,26 +226,33 @@ public:
   void couple_poisson(); 
   
   
-   /*
+   /**
     * Write out Total solution of equation systems
     * Total solution = local + global + undisturbed (if exists)
     * 
     * params o_step: output_step
     * params real_time: current real simulation time
-    * params filename: filename for the output file
-    * params undisturbed_solution_only: when set to be true, only write undisturbed_solution
-    * params output_format: format of output file, supports 'EXODUS'; "VTK", "GMV"
+    * params solution_name: "disturbed_global": only write the global part of
+    * the disturbed solution, i.e., only solution of the FEM system;
+    * "disturbed_total": the global and local part of the disturbed solution,
+    * i.e., solution of the FEM system + solution of the GGEM part for local;
+    * "total": solution of the disturbed system and the undisturbed system.
     */
-  void write_equation_systems(const unsigned int& o_step=0, 
-                              const Real& real_time=0.,
-                              const std::string& solution_name = "total",
-                              const std::string& output_format = "EXODUS");
+  void write_equation_systems(const unsigned int& o_step,
+                              const Real& real_time,
+                              const std::string& solution_name = "total");
+
+  /**
+   * update system solution for output
+   */
+  void update_solution_for_output(const std::string& solution_name = "total")
+    override;
+
   
-   // Save a pointer to undisturbed solution
-   UniquePtr<NumericVector<Real>> undisturbed_solution;
-   
-   // Clone the current solution to solution_backup (used in write_equation_systems)
-   UniquePtr<NumericVector<Real>> solution_backup;
+   /**
+    * Save a pointer to undisturbed solution
+    */
+    UniquePtr<NumericVector<Real>> undisturbed_solution;
 
 private:
 

@@ -164,9 +164,14 @@ public:
    * in unbounded domain.
    */
   void test_potential_profile();
-  
-  // Clone the current solution to the solution backup
-  UniquePtr<NumericVector<Real>> solution_backup;
+
+
+  /**
+   * update system solution for output
+   */
+  void update_solution_for_output(const std::string& solution_name = "total")
+    override;
+
 
 private:
 
@@ -181,5 +186,8 @@ private:
 
   // Get a pointer to GGEMPoisson
   GGEMPoisson *ggem_poisson = nullptr;
+
+  // output precision (defined in input file, default is 6)
+  int o_precision;
 };
 } // end namespace libMesh

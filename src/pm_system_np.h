@@ -104,11 +104,17 @@ public:
    */
   void test_l2_norm(bool& neighbor_list_update_flag) override {};
 
+  /**
+   * update system solution for output equation systems
+   * fixme:implement this function after NP system is built
+   */
+    void update_solution_for_output(const std::string& solution_name = "total")
+    override {};
 
 
-    // /*
-  //  * Return the NPSolver
-  //  */
+  /**
+  * Return the NPSolver
+  */
   SolverNP& np_solver() {
     return _np_solver;
   }

@@ -918,21 +918,18 @@ void PMSystemStokes::couple_poisson()
   STOP_LOG("couple_poisson()", "PMSystemStokes");
 }
 
- 
-// ==================================================================================
-void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
-                                            const Real&  real_time,
-                                            const std::string& solution_name,
-                                            const std::string& output_format)
+// ===========================================================================
+void PMSystemStokes::update_solution_for_output(
+  const std::string &solution_name)
 {
-  START_LOG("write_equation_systems()", "PMSystemStokes");
-  
-  if (this->get_equation_systems().parameters.get<bool>("with_hi")) 
-  { 
-    solution_backup = this->solution->clone();
-    // When entering this funciton, Stokes system.solution only has the global part
-    // we need to add the local part and system.undisturbed_solution to the 
-    // system.solution of Stokes equation
+  START_LOG("update_solution_for_output()", "PMSystemStokes");
+
+  // update Stokes system solution if with_hi is true
+  if (this->get_equation_systems().parameters.get<bool>("with_hi"))
+  {
+    // clone Stokes FEM solution to solution_backup
+    this->solution_backup = this->solution->clone();
+    // update this->solution depends on solution_name
     if (solution_name == "disturbed_global")
     {
       // do nothing
@@ -954,43 +951,32 @@ void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
          << ", 'undisturbed', 'total'. Exiting ...";
       PMToolBox::output_message(ss.str(), this->comm());
     }
-  }
-  
-  // Write out Poisson System
+  }// end if with_hi
+
+  STOP_LOG("update_solution_for_output()", "PMSystemStokes");
+}
+
+ 
+// ===========================================================================
+void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
+                                            const Real&  real_time,
+                                            const std::string& solution_name)
+{
+  START_LOG("write_equation_systems()", "PMSystemStokes");
+
+  // update Stokes system solution
+  this->update_solution_for_output(solution_name);
+  // update Poisson system solution
   if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
   {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solution_backup 
-      = this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solution->clone();
-    if (solution_name == "disturbed_global")
-    {
-      // do nothing
-    }
-    else if (solution_name == "disturbed_total")
-    {
-      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-        .add_local_solution();
-    }
-    else if (solution_name == "total")
-    {
-      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-        .add_local_solution();
-    }
-    else
-    {
-      std::ostringstream ss;
-      ss << "Error: invalid solution_name: " << solution_name
-         << "; Suggested options are: " << "'disturbed_global', 'disturbed_total'"
-         << ", 'undisturbed', 'total'. Exiting ...";
-      PMToolBox::output_message(ss.str(), this->comm());
-    }
+    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+      .update_solution_for_output(solution_name);
   }
   // get a reference to the mesh object
-  MeshBase & mesh           = this->get_mesh();
+  MeshBase& mesh = this->get_mesh();
   std::ostringstream output_filename;
   output_filename << "output_equation_systems_" << solution_name;
-  
-  if (output_format == "EXODUS")
-  {
+  // write equation systems to Exodus file
 #ifdef LIBMESH_HAVE_EXODUS_API
       output_filename << ".e";
       if (o_step == 0)
@@ -1007,41 +993,17 @@ void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
                            o_step+1,
                            real_time);
       } // end if-else
-#endif // #ifdef LIBMESH_HAVE_EXODUS_API
-    }
-  else if (output_format == "VTK")
-  {
-#ifdef LIBMESH_HAVE_VTK
-      output_filename << "_" << std::setw(8) << std::setfill('0') << std::right <<
-        o_step << ".vtu";
-      VTKIO(mesh).write_equation_systems(output_filename.str(),
-                                         this->get_equation_systems());
-#endif // #ifdef LIBMESH_HAVE_EXODUS_API
-  }
-  else if (output_format == "GMV")
-  {
-    output_filename << "_" << std::setw(8) << std::setfill('0') << std::right <<
-      o_step << ".gmv.";
-    GMVIO(mesh).write_equation_systems(output_filename.str(),
-                                         this->get_equation_systems());
-  }
-  else
-  {
-     PMToolBox::output_message(
-       "Error: 'output_format' cannot not be " + output_format, this->comm());
-  }
-  
-  // // resume solution
+#endif
+  // resume Stokes system solution
   if (this->get_equation_systems().parameters.get<bool>("with_hi")) 
   { 
-    *(this->solution) = *solution_backup;
+    this->resume_solution_after_output();
   }
-  
-  // Write out Poisson System
+  // resume Poisson system solution
   if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
   {
-    *(this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solution)
-      = *(this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solution_backup);
+    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+      .resume_solution_after_output();
   }
    
   STOP_LOG("write_equation_systems()", "PMSystemStokes");

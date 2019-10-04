@@ -139,15 +139,16 @@ public:
   std::vector<int> ion_valence;
 
   // characteristic variables
-  Real tc;                                  // characteristic time (diffusion
-                                            // time) (s)
-  Real uc;                                  // characteristic velocity (um/s)
-  Real fc;                                  // characteristic force (N)
-  Real muc;                                 // non-dimension viscosity
-  Real phi0;                                // non-dimensional electrical
-                                            // potential: e / (4 * pi * epsilon
-                                            // * epsilon_0 * a)
+  Real tc; // characteristic time (diffusion time) (s)
+  Real uc; // characteristic velocity (um/s)
+  Real fc; // characteristic force (N)
+  Real muc; // non-dimension viscosity
+  Real phi0; // characteristic electristatic potential (V)
+  Real efield0; // characteristic electric field (V/um)
+  Real charge_rho0; // characteristic volume charge density (C/um^3)
+  Real charge_sigma0; // characteristic surface charge density (C/um^2)
   Real c0 = 1.0; // characteristic concentration of ion species (M=mol/L)
+
   // Geometry information
   unsigned int dim;                         // dimension of the box
   std::string wall_type;                    // wall_type (slit or sphere)
@@ -204,7 +205,6 @@ public:
   std::string schur_pc_type;
   std::string solver_stokes, solver_poisson, solver_np;
   SystemSolverType solver_type_stokes, solver_type_poisson, solver_type_np;
-
 
   // Chebyshev information
   unsigned int max_n_cheb;       // max order of Chebyshev polynomianl
@@ -456,7 +456,7 @@ protected:
   virtual void write_object(unsigned int step_id) = 0;
 
   // output precision
-  const int o_precision = 6;
+  int o_precision;
   
   // copss generated slit mesh boundary id
   // x-negative surface boundary_id = 4

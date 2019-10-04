@@ -145,46 +145,48 @@ void Copss::read_module_info()
   PMToolBox::output_message(ss, *comm_in);
   print_info = input_file("print_info", false);
 }
-/*
- * Read physical parameters
- */
+
+// ====================================================================
 void Copss::read_physical_info()
 {
-  T         = input_file("temperature", 297);                         // K
-  kBT       = kB * T;                                                 // (N*um)
-  viscosity = input_file("viscosity", 1.0);                           // viscosity
-                                                                      // (cP =
-                                                                      // N*s/um^2)
-  Rb        = input_file("radius", 0.10);                             // radius
-                                                                      // of the
-                                                                      // bead
-                                                                      // (um)
-  drag_c    = 6. * PI * viscosity * Rb;                               // Drag
-                                                                      // coefficient
-                                                                      // (N*s/um)
-  Db        = kBT / drag_c;                                           // diffusivity
-                                                                      // of a
-                                                                      // bead
-                                                                      // (um^2/s)
-
-  tc  = drag_c * Rb * Rb / kBT;                                       // diffusion
-                                                                      // time
-                                                                      // (s)
-  uc  = kBT / (drag_c * Rb);                                          // characteristic
-                                                                      // velocity
-                                                                      // (um/s)
-  fc  = kBT / Rb;                                                     // characteristic
-                                                                      // force
-                                                                      // (N)
-  muc = 1. / (6. * PI);                                               // non-dimensional
-                                                                      // viscosity
+  // temperature T, [T] = K
+  T = input_file("temperature", 297);
+  // characteristic energy, [kBT] = (N*um)
+  kBT = kB * T;
+  // viscosity, [viscosity] = N*s/um^2
+  viscosity = input_file("viscosity", 1.0);
+  // characteristic length, [Rb] = um
+  Rb = input_file("radius", 0.10);
+  // drag coefficient, [drag_c] = N*s/um
+  drag_c    = 6. * PI * viscosity * Rb;
+  // Characteristic diffusion coefficient, i.e., diffusion of a bead of
+  // radius Rb in infinite dilution, [Db] = um^2/s
+  Db        = kBT / drag_c;
+  // characteristic time, i.e., the time that a bead of radius Rb diffuses a
+  // bead radius away, [tc] = s
+  tc  = drag_c * Rb * Rb / kBT;
+  // characteristic velocity, [uc] = um/s
+  uc  = kBT / (drag_c * Rb);
+  // characteristic force, [fc] = N
+  fc  = kBT / Rb;
+  // non-dimensional viscosity of fluid, [muc] = 1
+  muc = 1. / (6. * PI);
+  // read parameters related to module_poisson
   if (module_poisson)
   {
     // Relative permittivity of the fluid
     epsilon = input_file("epsilon", 1.);
-    // Characteristic electrostatic potential (mV)
-    phi0    = elementary_charge / (4. * PI * epsilon * epsilon_0 * Rb);
-  }
+    // Characteristic electrostatic potential (V)
+    phi0    = elementary_charge / (4. * PI * epsilon * epsilon_0 * Rb * 1E-6);
+    // characteristic electrostatic field, [efield_c] = V/um
+    efield0 = phi0 / (Rb);
+    // characteristic volume charge density, [charge_rho0] = C/um^3
+    charge_rho0 = elementary_charge / (Rb * Rb * Rb);
+    // characteristic surface charge density, [charge_sigma0] = C/um^2
+    charge_sigma0 = elementary_charge / (Rb * Rb);
+  } // end if module_poisson
+
+  // read parameters related to
   if (module_np)
   {
     // Nernst-Planck dt (unit=tc=6*pi*eta*Rb^3/kbT)
@@ -198,7 +200,6 @@ void Copss::read_physical_info()
     ion_diffusivity.resize(input_file.vector_variable_size("ion_diffusivity"));
     // valence of all ion species (1)
     ion_valence.resize(input_file.vector_variable_size("ion_valence"));
-
     // data validation
     if (ion_name.size() == ion_concentration.size()
       and ion_name.size() ==ion_diffusivity.size()
@@ -230,9 +231,9 @@ void Copss::read_physical_info()
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
-  }
+  } // end if module_np
 
-  // print out physical parameters information
+  // print out physical parameters information related to Stokes System
   ss << "\n ##########################################################\n"
      << " #                  System Physical Parameters             \n"
      << " ##########################################################\n\n"
@@ -247,11 +248,20 @@ void Copss::read_physical_info()
      << "   characteristic time          = " << tc << " (s)\n"
      << "   characteristic velocity      = " << uc << " (um/s)\n"
      << "   characteristic force         = " << fc << " (N)\n";
+  // print out physical parameters information related to Poisson System
   if (module_poisson)
   {
     ss << "   characteristic electrostatic potential = " << phi0 <<  " (uV)\n"
-       << "   relative dielectric permittivity = " << epsilon << " (1)\n";
-  }
+       << "   relative dielectric permittivity = " << epsilon << " (1)\n"
+       << "   characteristic electrostatic potential: phi0 = " << phi0 << " V\n"
+       << "   characteristic electrostatic field: efield0 = " << efield0 <<" V/um\n"
+       << "   characteristic volume charge density: charge_rho0 = " <<
+       charge_rho0 << " C/um^3\n"
+       << "   characteristic surface charge density: charge_sigma0 = " <<
+       charge_sigma0 << " C/um^2\n";
+  } // end if module_poisson
+
+  // print out physical parameters information related to NP System
   if (module_np)
   {
     ss << "   characteristic ion concentration = " << c0 << " (M)\n"
@@ -265,13 +275,12 @@ void Copss::read_physical_info()
          << "diffusivity (um^2/s) = " << ion_diffusivity[i] << "; "
          << "valence (1) = " << ion_valence[i] << "\n";
     }
-  }
+  } // end if module_np
+  // output message
   PMToolBox::output_message(ss, *comm_in);
 } // end read_physical_parameter()
 
-/*
- * Read Geometry information
- */
+// ====================================================================
 void Copss::read_domain_info()
 {
   dim = input_file("dimension", 3);
@@ -338,13 +347,11 @@ void Copss::read_domain_info()
   }
   // ============== shear or not on each boundary pair
   shear.resize(input_file.vector_variable_size("shear"));
-
   if (shear.size() != dim) {
     ss << "Error: shear has to be defined for all boundary pairs";
     PMToolBox::output_message(ss.str(), *comm_in);
     libmesh_error();
   }
-
   for (unsigned int i = 0; i < shear.size(); i++) {
     shear[i] = input_file("shear", false, i);
 
@@ -369,82 +376,78 @@ void Copss::read_domain_info()
   for (unsigned int i = 0; i < shear_direction.size();
        i++) shear_direction[i] = input_file("shear_direction", 0, i);
 
-  // Boundary conditions for Poisson System
+  // boundary condition for Poisson Module
   if (module_poisson)
   {
+    // Read Dirichlet BC: boundary_ids and boundary_values (fixed
+    // electrostatic potential at boundaries)
     boundary_id_dirichlet_poisson.resize(input_file.vector_variable_size(
             "boundary_id_dirichlet_poisson"));
-    boundary_id_neumann_poisson.resize(input_file.vector_variable_size(
-            "boundary_id_neumann_poisson"));
     boundary_value_dirichlet_poisson.resize(input_file.vector_variable_size(
             "boundary_value_dirichlet_poisson"));
-    boundary_value_neumann_poisson.resize(input_file.vector_variable_size(
-            "boundary_value_neumann_poisson"));
-
+    // validation
     if (boundary_id_dirichlet_poisson.size() !=
         boundary_value_dirichlet_poisson.size()) {
       err << "Error: size of 'boundary_id_dirichlet_poisson' does not match with "
           << "'boundary_value_dirichlet_poisson'. Exiting ..." << "\n";
       libmesh_error();
     }
+    else{
+      for (unsigned int i = 0; i < boundary_id_dirichlet_poisson.size(); i++) {
+        boundary_id_dirichlet_poisson[i] = input_file(
+                "boundary_id_dirichlet_poisson", 0, i);
+        boundary_value_dirichlet_poisson[i] = input_file(
+                "boundary_value_dirichlet_poisson", 0.0, i);
+      }
+    } // end else
 
+    // Read Neumann BC: boundary_ids and boundary values (fixed surface
+    // charge density at boundaries)
+    boundary_id_neumann_poisson.resize(input_file.vector_variable_size(
+            "boundary_id_neumann_poisson"));
+    boundary_value_neumann_poisson.resize(input_file.vector_variable_size(
+            "boundary_value_neumann_poisson"));
+    // validation
     if (boundary_id_neumann_poisson.size() !=
         boundary_value_neumann_poisson.size()) {
       err << "Error: size of 'boundary_id_neumann_poisson' does not match with "
           << "'boundary_value_neumann_poisson'. Exiting ..." << "\n";
       libmesh_error();
     }
-
-    for (unsigned int i = 0; i < boundary_id_dirichlet_poisson.size(); i++) {
-      boundary_id_dirichlet_poisson[i] = input_file("boundary_id_dirichlet_poisson",
-                                                    0,
-                                                    i);
-    }
-
-    for (unsigned int i = 0; i < boundary_id_neumann_poisson.size(); i++) {
-      boundary_id_neumann_poisson[i] = input_file("boundary_id_neumann_poisson",
-                                                  0,
-                                                  i);
-    }
-
-    for (unsigned int i = 0; i < boundary_value_dirichlet_poisson.size(); i++) {
-      boundary_value_dirichlet_poisson[i] = input_file(
-              "boundary_value_dirichlet_poisson",
-              0.0,
-              i);
-    }
-
-    for (unsigned int i = 0; i < boundary_value_neumann_poisson.size(); i++) {
-      boundary_value_neumann_poisson[i] = input_file(
-              "boundary_value_neumann_poisson",
-              0.0,
-              i);
-    }
+    else{
+      for (unsigned int i = 0; i < boundary_id_neumann_poisson.size(); i++) {
+        boundary_id_neumann_poisson[i] = input_file(
+          "boundary_id_neumann_poisson", 0, i);
+        boundary_value_neumann_poisson[i] = input_file(
+          "boundary_value_neumann_poisson", 0.0, i);
+      }
+    } // end else
   }
 
   // Boundary condition for Nernst-Planck system
   if (module_np)
   {
-    // Dirichlet BC
+    // Dirichlet BC: boundary ids and boundary value (fixed ion concentration
+    // at boundaries)
     boundary_id_dirichlet_np.resize(input_file.vector_variable_size(
             "boundary_id_dirichlet_np"));
     boundary_value_dirichlet_np.resize(input_file.vector_variable_size(
             "boundary_value_dirichlet_np"));
-    if (boundary_id_dirichlet_poisson.size() !=
-        boundary_value_dirichlet_poisson.size())
+    if (boundary_id_dirichlet_np.size() !=
+        boundary_value_dirichlet_np.size())
     {
-      err << "Error: size of 'boundary_id_dirichlet_poisson' does not match with "
-          << "'boundary_value_dirichlet_poisson'. Exiting ..." << "\n";
+      err << "Error: size of 'boundary_id_dirichlet_np' does not match with "
+          << "'boundary_value_dirichlet_np'. Exiting ..." << "\n";
       libmesh_error();
     }
     else
     {
-      for (unsigned int i = 0; i < boundary_id_dirichlet_poisson.size(); i++)
+      for (unsigned int i = 0; i < boundary_id_dirichlet_np.size(); i++)
       {
-        boundary_id_dirichlet_np[i] = input_file("boundary_id_dirichlet_np", 0,
-                                                 i);
+        boundary_id_dirichlet_np[i] = input_file("boundary_id_dirichlet_np",
+          0, i);
         boundary_value_dirichlet_np[i] = input_file
-                ("boundary_value_dirichlet_np", 0., i);
+          ("boundary_value_dirichlet_np", 0., i);
       }
     }
     // Neumann BC
@@ -459,6 +462,7 @@ void Copss::read_domain_info()
     }
   }
 
+  // print out Geometry information
   ss << "##########################################################\n" 
      << "#                  Geometry information                  \n"
      << "##########################################################\n"
@@ -484,7 +488,7 @@ void Copss::read_domain_info()
   for (int i = 0; i < dim; i++) 
     ss << shear[i] << "(shear_rate = " << shear_rate[i] << " ), ";
   ss << "\n";
-
+  // Poisson System BC
   if (module_poisson)
   {
     ss << "-----------> Dirichlet boundary condition for Poisson (Potential)"
@@ -498,8 +502,9 @@ void Copss::read_domain_info()
       ss << "Boundary ID " << boundary_id_neumann_poisson[i]
          << " : value = " << boundary_value_neumann_poisson[i] << "\n";
     ss << "\n";
-  }
+  } // end if module_poisson
 
+  // NP system BC
   if (module_np)
   {
     ss << "-----------> Dirichlet boundary condition for Nernst-Planck "
@@ -508,13 +513,15 @@ void Copss::read_domain_info()
       ss << "Boundary ID " << boundary_id_dirichlet_np[i]
          << " : value = " << boundary_value_dirichlet_np[i] << "\n";
     ss << "\n";
-  }
+  } // end if module_np
 
+  // Domain mesh information
   ss << "##########################################################" << "\n"
      << "#                  Domain Mesh information                " << "\n"
      << "##########################################################" << "\n";
   generate_mesh = input_file("generate_mesh", true);
-  if (generate_mesh) {
+  if (generate_mesh)
+  {
     n_mesh.resize(input_file.vector_variable_size("n_mesh"));
     for (unsigned int i = 0; i < n_mesh.size(); i++) n_mesh[i] = input_file(
         "n_mesh", 1, i);
@@ -525,12 +532,12 @@ void Copss::read_domain_info()
     domain_mesh_file = input_file("domain_mesh_file", "nothing");
     ss << "------------> Load mesh file from " << domain_mesh_file.c_str() << "\n";
   } // end else
+
+  // print out information
   PMToolBox::output_message(ss, *comm_in);
 }   // end read_domain_info()
 
-/*
- * read force types
- */
+// ====================================================================
 void Copss::read_force_info() {
   // read particle-particle force types
   numForceTypes = input_file.vector_variable_size("force_field");
@@ -563,9 +570,7 @@ void Copss::read_force_info() {
   PMToolBox::output_message(ss, *comm_in);
 } // end read_force_info()
 
-/*
- * read Solvers
- */
+// ====================================================================
 void Copss::read_solver_info() {
   max_linear_iterations = input_file("max_linear_iterations", 100);
   linear_solver_rtol    = input_file("linear_solver_rtol", 1E-6);
@@ -610,7 +615,7 @@ void Copss::read_solver_info() {
     else {
       solver_type_poisson = user_define;
     }
-  }
+  } // end if module_poisson
 
   // solver info for Nernst Planck System
   if (module_np)
@@ -666,9 +671,7 @@ void Copss::read_solver_info() {
   PMToolBox::output_message(ss, *comm_in);
 } // end read_solver_info()
 
-/*
- * read Chebyshev info
- */
+// ====================================================================
 void Copss::read_chebyshev_info() {
   with_hi       = input_file("with_hi", false);
   with_brownian = input_file("with_brownian", false);
@@ -708,9 +711,7 @@ void Copss::read_chebyshev_info() {
   build_elem_neighbor_list = with_hi || module_poisson || module_np;
 } // end read_chebyshev_info()
 
-/*
- * read run time info
- */
+// ====================================================================
 void Copss::read_run_info() {
   // ############## Without Brownian ###############################
   // For polymer_chain and bead: maximum displacement (non dimensional) of one
@@ -763,10 +764,10 @@ void Copss::read_run_info() {
   for (unsigned int i = 0; i < output_file.size(); i++) {
     output_file[i] = input_file("output_file", "not defined", i);
   }
-
   // debug info
   debug_info = input_file("debug_info", false);
-
+  // output precision
+  o_precision = input_file("output_precision", 6);
   // write to screen
   ss << "\n##########################################################\n"
      << "#                 Run information                      \n"
@@ -795,6 +796,7 @@ void Copss::read_run_info() {
   for (int i = 0; i < output_file.size(); i++) {
     ss << "                              " << output_file[i] << "\n";
   }
+  ss << "-----------> output precision: " << o_precision << "\n";
   PMToolBox::output_message(ss, *comm_in);
 } // end read_run_info()
 
@@ -861,15 +863,18 @@ void Copss::read_restart_eigenvalue()
 // ============================================================================
 void Copss::create_domain_mesh()
 {
-  if (dim == 2) {
+  if (dim == 2) 
+  {
     ss << "Error::Copss::create_domain_mesh() only works for 3D systems.\
       2D simulation needs extra implementation. Exiting...";
     PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
   mesh = new SerialMesh(*comm_in);
-  if (generate_mesh) {
-    if (wall_type == "slit") {
+  if (generate_mesh) 
+  {
+    if (wall_type == "slit") 
+    {
       const std::vector<Real> mesh_size = PMToolBox::mesh_size(*mesh);
       const Real meshsize_x = (wall_params[1] - wall_params[0]) / Real(n_mesh[0]);
       const Real meshsize_y = (wall_params[3] - wall_params[2]) / Real(n_mesh[1]);
@@ -906,14 +911,16 @@ void Copss::create_domain_mesh()
           -copss_slitMesh_boundary_id[i], slitMesh_boundary_id[i]);              
       }
     } 
-    else {
+    else 
+    {
       ss << "Error: COPSS only supports generating domain mesh for 'slit' wall."
          << "Please load the domain mesh file for other wall types. Exiting ...";
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
   } 
-  else {
+  else 
+  {
     if (domain_mesh_file != "nothing") {
       mesh->read(domain_mesh_file);
       mesh->all_second_order();
@@ -927,12 +934,35 @@ void Copss::create_domain_mesh()
          << "   minimum mesh size of fluid: hminf = " << hminf << "\n"
          << "   maximum mesh size of fliud: hmaxf = " << hmaxf << "\n";
     }
-    else {
+    else 
+    {
       PMToolBox::output_message("Error: 'domain_mesh_file' needs to be specified. Exiting ...",
         *comm_in);
       libmesh_error();
     }
-  } 
+  }
+  // MeshBase::const_element_iterator el =
+  //   mesh->active_local_elements_begin();
+  // const MeshBase::const_element_iterator end_el =
+  //   mesh->active_local_elements_end();
+  // for (; el != end_el; ++el)
+  // {
+  //   // Store a pointer to the element we are currently working on.
+  //   const Elem *elem           = *el;
+  //   const unsigned int elem_id = elem->id();
+  //   std::cout<<"elem_id = "<<elem_id <<"\n";
+  //   for (unsigned int s = 0; s < elem->n_sides(); s++)
+  //   {
+  //     std::cout<<"side id = " << s <<", boundary_ids = ";
+  //     std::vector<boundary_id_type> boundary_ids;
+  //     mesh->get_boundary_info().boundary_ids(elem, s, boundary_ids);
+  //     for (int i = 0; i<boundary_ids.size(); i++){
+  //       std::cout<<boundary_ids[i]<<"; ";
+  //     }
+  //     std::cout<<"\n";
+  //     // If this side is on the boundary
+  //   }
+  // } // end for elem-loop
   search_radius_p = 4. / alpha;
   search_radius_e = 0.5 * hmaxf + 4. / alpha;
   // print mesh info
@@ -1007,7 +1037,6 @@ EquationSystems Copss::create_equation_systems()
   
   u_var = system.add_variable("u", SECOND);
   v_var = system.add_variable("v", SECOND);
-
   if (dim == 3) w_var = system.add_variable("w", SECOND);
   const unsigned int p_var = system.add_variable("p", FIRST);
 

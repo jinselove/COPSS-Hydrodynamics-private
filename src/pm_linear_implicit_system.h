@@ -102,13 +102,24 @@ public:
   virtual void solve(const std::string& option) = 0;
 
 
-  /*
+  /**
+   * update system solution for output
+   */
+  virtual void update_solution_for_output(const std::string& solution_name =
+    "total") = 0;
+
+  /**
+   * resume system solution after writing the solution to output
+   */
+  void resume_solution_after_output();
+
+  /**
    * Add the local solution to the global solution
    */
   virtual void add_local_solution() = 0;
 
 
-  /*
+  /**
    * Compute the L2-error by comparing numerical and analytical solutions
    */
   virtual void test_l2_norm(bool& neighbor_list_update_flag) = 0;
@@ -165,7 +176,7 @@ public:
     return _fixes;
   }
 
-  /*
+  /**
    * write out single particle(point particle) info, including:
    * timestep, time, particle_xyz,  particle_velocity
    */
@@ -175,7 +186,7 @@ public:
                                  const Real               time) const;
 
 
-  /*
+  /**
    * Write out particle(point) coordinates represented by a PETSc vector
    */
   void write_out_point_coordinate(Vec               *ROUT,
@@ -185,7 +196,7 @@ public:
                                   const std::string& openmode) const;
 
 
-  /*
+  /**
    * Write out particle(point) coordinates
    * The output format is Comma Separated Variable(CSV) for ParaView.
    */
@@ -196,6 +207,11 @@ public:
   PetscErrorCode write_point_csv(const std::string& filename,
                                  Vec               *petsc_vector,
                                  const bool         write_velocity) const;
+
+  /**
+   * A Clone the current solution to the solution backup
+   */
+  UniquePtr<NumericVector<Real>> solution_backup;
                                       
 protected:
 

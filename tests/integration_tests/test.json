@@ -30,9 +30,9 @@
                                                   "run.sh",
                                                   "zclean.sh",
                                                   "compare_output.py"],
-                              "validation_outputs": ["output_potential_profile_x_3P.txt",
-                                                     "output_potential_profile_y_3P.txt",
-                                                     "output_potential_profile_z_3P.txt"],
+                              "validation_outputs": ["output_potential_profile_x_3P.csv",
+                                                     "output_potential_profile_y_3P.csv",
+                                                     "output_potential_profile_z_3P.csv"],
                               "cmp_method": "cmpfile"
                               }, 
 "RigidParticle_Sphere_Sedimentation_HI":{

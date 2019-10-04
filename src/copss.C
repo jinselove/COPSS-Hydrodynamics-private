@@ -619,10 +619,10 @@ void Copss::read_run_info() {
   for (unsigned int i = 0; i < output_file.size(); i++) {
     output_file[i] = input_file("output_file", "not defined", i);
   }
-
   // debug info
   debug_info = input_file("debug_info", false);
-
+  // output precision
+  o_precision = input_file("output_precision", 6);
   // write to screen
   ss << "\n##########################################################\n"
      << "#                 Run information                      \n"
@@ -651,6 +651,7 @@ void Copss::read_run_info() {
   for (int i = 0; i < output_file.size(); i++) {
     ss << "                              " << output_file[i] << "\n";
   }
+  ss << "-----------> output precision: " << o_precision << "\n";
   PMToolBox::output_message(ss, *comm_in);
 } // end read_run_info()
 

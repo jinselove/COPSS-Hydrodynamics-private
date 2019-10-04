@@ -256,6 +256,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
   equation_systems.parameters.set<std::vector<Real> >(
     "boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
   equation_systems.parameters.set<bool> ("with_hi") = with_hi;
+  equation_systems.parameters.set<int> ("o_precision") = o_precision;
 }
 
 void CopssPointParticleSystem::update_object()

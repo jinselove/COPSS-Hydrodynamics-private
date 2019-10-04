@@ -167,3 +167,4 @@ write_interval = 1
 output_file    = 'equation_systems trajectory center_of_mass mean_square_displacement' 
 debug_info     = false
 print_info = false
+output_precision = 9

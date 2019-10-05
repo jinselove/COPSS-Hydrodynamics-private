@@ -1,63 +1,160 @@
 {
-"PointParticle_Polymer_BD_HI":{
-                                "package": "POINTPARTICLE",
-                                "required_inputs": ["point_particle_control.in",
-                                                    "point_particle_data.in",
-                                                    "run.sh",
-                                                    "zclean.sh"],
-                                "validation_outputs": ["output_polymer_0.vtk",
-                                                        "output_polymer_5.vtk",
-                                                        "out.time",
-                                                        "out.eigenvalue"],
-                                "cmp_method": "cmpfile"
-                              },
-"PointParticle_Stokes_GGEM":{
-                              "package": "POINTPARTICLE",
-                              "required_inputs": ["point_particle_control.in",
-                                                  "point_particle_data.in",
-                                                  "run.sh",
-                                                  "zclean.sh",
-                                                  "compare_output.py"],
-                              "validation_outputs": ["output_velocity_profile_x_3P.txt",
-                                                     "output_velocity_profile_y_3P.txt",
-                                                     "output_velocity_profile_z_3P.txt"],
-                              "cmp_method": "cmpdf"
-                            },
-"PointParticle_Poisson_GGEM":{
-                              "package": "POINTPARTICLE",
-                              "required_inputs": ["point_particle_control.in",
-                                                  "point_particle_data.in",
-                                                  "run.sh",
-                                                  "zclean.sh",
-                                                  "compare_output.py"],
-                              "validation_outputs": ["output_potential_profile_x_3P.csv",
-                                                     "output_potential_profile_y_3P.csv",
-                                                     "output_potential_profile_z_3P.csv"],
-                              "cmp_method": "cmpfile"
-                              }, 
-"RigidParticle_Sphere_Sedimentation_HI":{
-                                          "package": "RIGIDPARTICLE",
-                                          "required_inputs": ["rigid_particle_control.in",
-                                                              "rigid_particle_data.in",
-                                                              "surface_mesh_sphere_triMesh_0.4.e",
-                                                              "run.sh",
-                                                              "zclean.sh"],
-                                          "validation_outputs": ["output_particle_trajectory.csv",
-                                                                 "output_surface_node.csv",
-                                                                 "out.time"],
-                                          "cmp_method": "cmpfile"
-                                        },
-"RigidParticle_Sphere_Pressure_Flow":{
-                                          "package": "RIGIDPARTICLE",
-                                          "required_inputs": ["rigid_particle_control.in",
-                                                              "rigid_particle_data.in",
-                                                              "surface_mesh_sphere_triMesh_0.4.e",
-                                                              "run.sh",
-                                                              "zclean.sh"],
-                                          "validation_outputs": ["output_particle_trajectory.csv",
-                                                                 "output_surface_node.csv",
-                                                                 "out.time"],
-                                          "cmp_method": "cmpfile"
-                                        }
-
+    "PointParticle_Polymer_BD_HI":{
+        "package": "POINTPARTICLE",
+        "required_inputs": [
+            "point_particle_control.in",
+            "point_particle_data.in",
+            "run.sh",
+            "zclean.sh"
+        ],
+        "validation_outputs":[
+            {
+                "filename": "output_polymer_0.vtk",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_polymer_5.vtk",
+                "cmp_method": "cmp_file",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "out.time",
+                "cmp_method": "cmp_file",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "out.eigenvalue",
+                "cmp_method": "cmp_file",
+                "params": {},
+                "tol": 1e-6
+            }
+        ],
+      "on": true
+    },
+    "PointParticle_Stokes_GGEM": {
+        "package": "POINTPARTICLE",
+        "required_inputs": [
+            "point_particle_control.in",
+            "point_particle_data.in",
+            "run.sh",
+            "zclean.sh"
+        ],
+        "validation_outputs": [
+            {
+                "filename": "output_velocity_profile_x_3P.txt",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_velocity_profile_y_3P.txt",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_velocity_profile_z_3P.txt",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            }
+        ],
+        "on": true
+    },
+    "RigidParticle_Sphere_Sedimentation_HI": {
+        "package": "RIGIDPARTICLE",
+        "required_inputs": [
+            "rigid_particle_control.in",
+            "rigid_particle_data.in",
+            "surface_mesh_sphere_triMesh_0.4.e",
+            "run.sh",
+            "zclean.sh"
+        ],
+        "validation_outputs": [
+            {
+                "filename": "output_particle_trajectory.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_surface_node.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "out.time",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            }
+        ],
+        "on": true
+    },
+    "RigidParticle_Sphere_Pressure_Flow": {
+        "package": "RIGIDPARTICLE",
+        "required_inputs": [
+            "rigid_particle_control.in",
+            "rigid_particle_data.in",
+            "surface_mesh_sphere_triMesh_0.4.e",
+            "run.sh",
+            "zclean.sh"
+        ],
+        "validation_outputs": [
+            {
+                "filename": "output_particle_trajectory.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_surface_node.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "out.time",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            }
+        ],
+        "on": true
+    },
+    "PointParticle_Poisson_GGEM": {
+        "package": "POINTPARTICLE",
+        "required_inputs": [
+            "point_particle_control.in",
+            "point_particle_data.in",
+            "run.sh",
+            "zclean.sh"
+        ],
+        "validation_outputs": [
+            {
+                "filename": "output_potential_profile_x_3P.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_potential_profile_y_3P.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_potential_profile_z_3P.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            }
+        ],
+        "on": true
+    }
 }

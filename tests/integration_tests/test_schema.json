@@ -1,0 +1,33 @@
+{
+   "title": "One-COPSS-Integration-Test-System",
+   "type" : "object",
+   "properties" : {
+     "package" : {
+       "type": "string"
+     },
+     "required_inputs" : {
+       "type": "array"
+     },
+     "validation_outputs" : {
+       "type": "array",
+       "items": {
+         "type": "object",
+         "properties": {
+           "filename": {"type": "string"},
+           "cmp_method": {"type": "string",
+                          "pattern": "cmp_*"
+           },
+           "params": {"type": "object"},
+           "tol": {"type": "number"}
+         },
+         "required": ["filename", "cmp_method", "params", "tol"]
+       },
+       "minItems": 1,
+       "uniqueItems": true
+     },
+     "on": {
+       "type": "boolean"
+     }
+   },
+  "required": ["package", "required_inputs", "validation_outputs", "on"]
+}

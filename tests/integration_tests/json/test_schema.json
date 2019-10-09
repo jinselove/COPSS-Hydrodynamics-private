@@ -8,7 +8,7 @@
      "required_inputs" : {
        "type": "array"
      },
-     "validation_outputs" : {
+     "required_outputs" : {
        "type": "array",
        "items": {
          "type": "object",
@@ -29,5 +29,5 @@
        "type": "boolean"
      }
    },
-  "required": ["package", "required_inputs", "validation_outputs", "on"]
+  "required": ["package", "required_inputs", "required_outputs", "on"]
 }

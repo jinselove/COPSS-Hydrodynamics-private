@@ -7,10 +7,10 @@
             "run.sh",
             "zclean.sh"
         ],
-        "validation_outputs":[
+        "required_outputs":[
             {
                 "filename": "output_polymer_0.vtk",
-                "cmp_method": "cmp_df",
+                "cmp_method": "cmp_file",
                 "params": {},
                 "tol": 1e-6
             },
@@ -43,23 +43,23 @@
             "run.sh",
             "zclean.sh"
         ],
-        "validation_outputs": [
+        "required_outputs": [
             {
                 "filename": "output_velocity_profile_x_3P.txt",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"header": null, "delimiter":"  ", "engine": "python"},
                 "tol": 1e-6
             },
             {
                 "filename": "output_velocity_profile_y_3P.txt",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"header": null, "delimiter":"  ", "engine": "python"},
                 "tol": 1e-6
             },
             {
                 "filename": "output_velocity_profile_z_3P.txt",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"header": null, "delimiter":"  ", "engine": "python"},
                 "tol": 1e-6
             }
         ],
@@ -74,23 +74,23 @@
             "run.sh",
             "zclean.sh"
         ],
-        "validation_outputs": [
+        "required_outputs": [
             {
                 "filename": "output_particle_trajectory.csv",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"comment": "#", "delimiter": " ", "engine": "python"},
                 "tol": 1e-6
             },
             {
                 "filename": "output_surface_node.csv",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"comment": "#", "delimiter": " ", "engine": "python"},
                 "tol": 1e-6
             },
             {
                 "filename": "out.time",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"comment": "#", "delimiter": " ", "engine": "python"},
                 "tol": 1e-6
             }
         ],
@@ -105,23 +105,23 @@
             "run.sh",
             "zclean.sh"
         ],
-        "validation_outputs": [
+        "required_outputs": [
             {
                 "filename": "output_particle_trajectory.csv",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"comment": "#", "delimiter": " ", "engine": "python"},
                 "tol": 1e-6
             },
             {
                 "filename": "output_surface_node.csv",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"comment": "#", "delimiter": " ", "engine": "python"},
                 "tol": 1e-6
             },
             {
                 "filename": "out.time",
                 "cmp_method": "cmp_df",
-                "params": {},
+                "params": {"comment": "#", "delimiter": " ", "engine": "python"},
                 "tol": 1e-6
             }
         ],
@@ -135,7 +135,7 @@
             "run.sh",
             "zclean.sh"
         ],
-        "validation_outputs": [
+        "required_outputs": [
             {
                 "filename": "output_potential_profile_x_3P.csv",
                 "cmp_method": "cmp_df",

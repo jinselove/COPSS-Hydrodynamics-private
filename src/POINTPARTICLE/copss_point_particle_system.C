@@ -175,10 +175,10 @@ void CopssPointParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system
 }
 
 // ======================================================================================
-void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems) {
-  equation_systems.parameters.set<unsigned int>(
-                                        "linear solver maximum iterations") =
-    max_linear_iterations;
+void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
+{
+  equation_systems.parameters.set<unsigned int>("linear solver maximum iterations")
+    = max_linear_iterations;
   equation_systems.parameters.set<Real>("linear solver rtol")
     = linear_solver_rtol;
   equation_systems.parameters.set<Real>("linear solver atol")
@@ -195,10 +195,6 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
     = schur_pc_type;
   equation_systems.parameters.set<SystemSolverType>("solver_type_stokes")
     = solver_type_stokes;
-  equation_systems.parameters.set<SystemSolverType>(
-    "solver_type_poisson") = solver_type_poisson;
-  equation_systems.parameters.set<bool>("module_poisson")
-    = module_poisson;
   equation_systems.parameters.set<Real>("alpha")
     = alpha;
   equation_systems.parameters.set<Real>("kBT")
@@ -223,8 +219,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
     = Nks;
   equation_systems.parameters.set<Real>(  "Ss2")
     = Ss2;
-  equation_systems.parameters.set<Real>(  "phi0")
-    = phi0;
+
   equation_systems.parameters.set<string>("particle_type")
     = particle_type;
   equation_systems.parameters.set<string>(
@@ -247,15 +242,48 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
     = shear_rate;
   equation_systems.parameters.set<std::vector<unsigned int> >("shear_direction")
     = shear_direction;
-  equation_systems.parameters.set<std::vector<unsigned int> >(
-    "boundary_id_dirichlet_poisson") = boundary_id_dirichlet_poisson;
-  equation_systems.parameters.set<std::vector<unsigned int> >(
-    "boundary_id_neumann_poisson") = boundary_id_neumann_poisson;
-  equation_systems.parameters.set<std::vector<Real> >(
-    "boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
-  equation_systems.parameters.set<std::vector<Real> >(
-    "boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
   equation_systems.parameters.set<bool> ("with_hi") = with_hi;
+  // parameters for modules
+  equation_systems.parameters.set<bool>("module_poisson") = module_poisson;
+  equation_systems.parameters.set<bool>("module_np") = module_np;
+  // parameters of Poisson system
+  if (module_poisson)
+  {
+    equation_systems.parameters.set<SystemSolverType>("solver_type_poisson")
+            = solver_type_poisson;
+    equation_systems.parameters.set<Real>("phi0") = phi0;
+    equation_systems.parameters.set<Real>("epsilon") = epsilon;
+    equation_systems.parameters.set<std::vector<unsigned int> >(
+            "boundary_id_dirichlet_poisson") = boundary_id_dirichlet_poisson;
+    equation_systems.parameters.set<std::vector<unsigned int> >(
+            "boundary_id_neumann_poisson") = boundary_id_neumann_poisson;
+    equation_systems.parameters.set<std::vector<Real> >(
+            "boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
+    equation_systems.parameters.set<std::vector<Real> >(
+            "boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
+  }
+
+  // parameters of NP system
+  if (module_np)
+  {
+    equation_systems.parameters.set<SystemSolverType>("solver_type_np")
+      = solver_type_np;
+    equation_systems.parameters.set<Real>("c0")
+      = c0;
+    equation_systems.parameters.set<Real>("dt_np") = dt_np;
+    equation_systems.parameters.set<std::vector<std::string>>("ion_name")
+      = ion_name;
+    equation_systems.parameters.set<std::vector<Real>>("ion_concentration")
+      = ion_concentration;
+    equation_systems.parameters.set<std::vector<Real>>("ion_diffusivity")
+      = ion_diffusivity;
+    equation_systems.parameters.set<std::vector<int>>("ion_valence")
+      = ion_valence;
+    equation_systems.parameters.set<std::vector<unsigned int> >(
+            "boundary_id_dirichlet_np") = boundary_id_dirichlet_poisson;
+    equation_systems.parameters.set<std::vector<Real> >(
+            "boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
+  }
   equation_systems.parameters.set<int> ("o_precision") = o_precision;
 }
 

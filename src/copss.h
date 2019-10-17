@@ -131,12 +131,13 @@ public:
   Real dt_np;
   // name of each ion species
   std::vector<std::string> ion_name;
-  // concentration of each ion species (unit = M=mol/L)
-  std::vector<Real> ion_concentration;
   // diffusivity of each ion species (unit = um^2/s)
   std::vector<Real> ion_diffusivity;
   // valence of each ion species (unit = 1)
   std::vector<int> ion_valence;
+  // equilibrium tolerance (if ion concentration of two adjacent NP step is
+  // smaller than this value, then we consider NP system as in equilibrium)
+  Real equil_tol;
 
   // characteristic variables
   Real tc; // characteristic time (diffusion time) (s)
@@ -176,10 +177,8 @@ public:
                    boundary_value_neumann_poisson;
 
   // Boundary conditions for Nernst-Planck system
-  std::vector<unsigned int> boundary_id_dirichlet_np,
-                            boundary_id_neumann_np;
-  std::vector<Real> boundary_value_dirichlet_np,
-                    boundary_value_neumann_np;
+  std::vector<unsigned int> boundary_id_dirichlet_np;
+  std::vector<std::vector<Real> > boundary_value_dirichlet_np;
 
   // Fix
   std::vector<Fix *>fixes;

@@ -46,8 +46,15 @@ PMSystemNP::PMSystemNP(EquationSystems  & es,
   : PMLinearImplicitSystem(es, name, number),
   _np_solver(es)
 {
+  if (name != "NP")
+  {
+    PMToolBox::output_message("Error: system name in PMSystemNP initializer "
+                              "is not 'NP'. Exiting...", this->comm());
+    libmesh_error();
+  }
   // Stokes equation assembly
-  _assemble_np = (new AssembleNP(es));
+  _assemble_np = (new AssembleNP(es, "NP"));
+  analytical_solution = _assemble_np->get_analytical_solution();
 }
 
 // ==================================================================================

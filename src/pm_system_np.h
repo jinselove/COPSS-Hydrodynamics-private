@@ -94,6 +94,7 @@ public:
   /*
    * Add the local solution to the global solution
    * This function does not apply to NP system
+   * but need to re-implement it here to avoid compilation error
    */
   void add_local_solution() override {};
 
@@ -121,10 +122,14 @@ public:
 
 private:
 
-  // // Stokes solver
+  // NP solver
   SolverNP _np_solver;
 
-  // Assemble Stokes system
+  // Assemble NP system
   AssembleNP *_assemble_np = nullptr;
+
+  // Get a pointer to AnalyticalSolutionNP
+  AnalyticalSolutionNP *analytical_solution = nullptr;
+
 };
 } // end namespace libMesh

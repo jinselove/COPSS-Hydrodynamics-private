@@ -46,18 +46,23 @@
 // User defined header includes
 #include "pm_toolbox.h"
 #include "assemble_nernst_planck.h"
+#include "pm_system_np.h"
 
 // ==================================================================================
-AssembleNP::AssembleNP(EquationSystems& es)
+AssembleNP::AssembleNP(EquationSystems& es,
+                       const std::string& name)
   : AssembleSystem(es)
 {
-  // do nothing
+  libmesh_assert_equal_to(name, "NP");
+  analytical_solution = new AnalyticalSolutionNP(name);
+  // Initialize boundary sides for BC
+  _boundary_sides_dirichlet_poisson.resize(_mesh.n_elem());
 }
 
 // ==================================================================================
 AssembleNP::~AssembleNP()
 {
-  // do nothing
+  delete analytical_solution; analytical_solution = nullptr;
 }
 
 // ==================================================================================
@@ -66,16 +71,6 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
 {
   START_LOG("assemble_global_K()", "AssembleNP");
 
-  /*! It is a good idea to make sure we are assembling the proper system.*/
-  libmesh_assert_equal_to(system_name, "NP");
-
-  // -------------------------------------------------------------------------------------------
-  //  if (_pm_system.comm().rank()==0){
-  //  printf("assemble_matrix_K(): The global matrix K has been assembled
-  // ...\n");
-  // }
-  // -------------------------------------------------------------------------------------------
-  return;
 
   STOP_LOG("assemble_global_K()", "AssembleNP");
 }
@@ -86,50 +81,26 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
 {
   START_LOG("assemble_global_F()", "AssembleNP");
 
-  // PerfLog perf_log("assemble_global_F");
-  // perf_log.push("preparation");
-  // It is a good idea to make sure we are assembling the proper system.
-  libmesh_assert_equal_to(system_name, "NP");
-
   STOP_LOG("assemble_global_F()", "AssembleNP");
-
-  // ---------------------------------------------------------------------------------------------
-  // if (_pm_system.comm().rank()==0){
-  //  printf("assemble_global_F(): The global RHS vector has been assembled
-  // ...\n");
-  // }
-  // ---------------------------------------------------------------------------------------------
 }
 
 // ==================================================================================
-void AssembleNP::compute_element_rhs(const Elem                   *elem,
-                                     const unsigned int            n_u_dofs,
-                                     FEBase                      & fe_v,
+void AssembleNP::compute_element_rhs(const Elem  *elem,
+                                     const unsigned int&  n_dofs,
+                                     const std::vector<Real>& JxW,
+                                     const std::vector<std::vector<Real>>& c,
+                                     const std::vector<Point> q_xyz,
                                      const std::vector<std::size_t>n_list,
-                                     const bool                  & pf_flag,
-                                     const std::string           & option,
-                                     DenseVector<Number>         & Fe)
+                                     const bool& pf_flag,
+                                     const std::string& option,
+                                     DenseVector<Number>& Fe)
 {
   START_LOG("compute_element_rhs()", "AssembleNP"); // libMesh log
 
-  // libmesh_assert_equal_to(system_name, "NP");
 
   STOP_LOG("compute_element_rhs()", "AssembleNP");
 }
 
-// ==================================================================================
-void AssembleNP::assemble_element_KIJ(
-  const std::vector<Real>                      & JxW,
-  const std::vector<std::vector<RealGradient> >& dphi,
-  const unsigned int                             n_u_dofs,
-  const unsigned int                             i,
-  const unsigned int                             j,
-  DenseMatrix<Number>                          & Kij)
-{
-  START_LOG("assemble_element_KIJ()", "AssembleNP"); // libMesh log
-
-  STOP_LOG("assemble_element_KIJ()", "AssembleNP");  // libMesh log
-}
 
 // ==================================================================================
 void AssembleNP::select_boundary_side(const Elem *elem)

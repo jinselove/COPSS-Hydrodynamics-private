@@ -39,5 +39,8 @@ def main():
         # clean files generated in test
         COPSS.clean(test_dir)
 
+    # all tests passed
+    print("All tests succeed. Exiting ...")
+
 if __name__ == "__main__":
     main()

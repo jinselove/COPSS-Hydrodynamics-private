@@ -79,7 +79,7 @@ SolverStokes::~SolverStokes()
 }
 
 // ==================================================================================
-void SolverStokes::init_ksp_solver()
+void SolverStokes::init_ksp_solver(const std::string& system_name)
 {
   START_LOG("init_ksp_solver()", "SolverStokes");
 
@@ -96,8 +96,8 @@ void SolverStokes::init_ksp_solver()
   _max_it = static_cast<PetscInt>(max_iter);
 
   // Get a reference to the system Matrix
-  PMSystemStokes& system = _equation_systems.get_system<PMSystemStokes>(
-    "Stokes");
+  PMSystemStokes& system = _equation_systems.get_system<PMSystemStokes>
+    (system_name);
   PetscMatrix<Number> *matrix = cast_ptr<PetscMatrix<Number> *>(system.matrix);
 
   // this->petsc_view_matrix( matrix->mat() );

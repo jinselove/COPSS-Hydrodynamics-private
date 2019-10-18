@@ -86,16 +86,6 @@ public:
                                  const std::string& option) = 0;
 
 
-  /*! \brief Apply Boundary Conditions by penalty method.
-
-   */
-  virtual void apply_bc_by_penalty(const Elem          *elem,
-                                   const std::string  & matrix_or_vector,
-                                   DenseMatrix<Number>& Ke,
-                                   DenseVector<Number>& Fe,
-                                   const std::string  & option) = 0;
-
-
   /*! \brief Assemble int_force matrix for every element,
    * this includes Gaussian quadrature weights multiplied by shape functions.
    * The product is calculated once and is stored in _int_force.
@@ -109,7 +99,8 @@ public:
   /*! \brief select sides on the boundary for all elements
    *
    */
-  virtual void select_boundary_side(const Elem *elem) = 0;
+  virtual void select_boundary_side(const Elem *elem,
+                                    const std::string& system_name) = 0;
 
 
   /*! \brief Universal function to penalize element matrix or vector with a

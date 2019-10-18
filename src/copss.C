@@ -193,40 +193,28 @@ void Copss::read_physical_info()
     dt_np = input_file("dt_np", 0.1);
     // name of all ion species
     ion_name.resize(input_file.vector_variable_size("ion_name"));
-    // concentration of all ion species (unit=M=mol/L)
-    ion_concentration.resize(input_file.vector_variable_size
-    ("ion_concentration"));
     // diffusivity of all ion species (unit=um^2/s)
     ion_diffusivity.resize(input_file.vector_variable_size("ion_diffusivity"));
     // valence of all ion species (1)
     ion_valence.resize(input_file.vector_variable_size("ion_valence"));
+    // equilibrium tolerance (M)
+    equil_tol = input_file("equil_tol", 1.e-6);
     // data validation
-    if (ion_name.size() == ion_concentration.size()
-      and ion_name.size() ==ion_diffusivity.size()
+    if (ion_name.size() ==ion_diffusivity.size()
       and ion_name.size() == ion_valence.size()
       and ion_name.size() >= 2)
     {
-      Real total_ion_charge = 0.;
       for (unsigned int j = 0; j < ion_name.size(); j++)
       {
         ion_name[j] = input_file("ion_name", "", j);
-        ion_concentration[j] = input_file("ion_concentration", 0.0, j);
         ion_diffusivity[j] = input_file("ion_diffusivity", 0.0, j);
         ion_valence[j] = input_file("ion_valence", 0, j);
-        total_ion_charge += ion_valence[j] * ion_concentration[j];
-      }
-      if (total_ion_charge >= 1.e-6)
-      {
-        ss << "Error: total ion charge (valence * concentration) is not "
-              "neutral. Exiting...\n";
-        PMToolBox::output_message(ss, *comm_in);
-        libmesh_error();
       }
     }
     else
     {
       ss << "Error: ion parameters ('ion_name', 'ion_diffusivity', "
-            "'ion_concentration', 'ion_valence') are not correctly set. "
+            "'ion_valence') are not correctly set. "
             "Exiting ...\n";
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
@@ -271,10 +259,10 @@ void Copss::read_physical_info()
     for (int i=0; i<ion_name.size(); i++)
     {
       ss << "   " << ion_name[i] << " : "
-         << "concentration (M) = " << ion_concentration[i] << "; "
          << "diffusivity (um^2/s) = " << ion_diffusivity[i] << "; "
          << "valence (1) = " << ion_valence[i] << "\n";
     }
+    ss << "   equilibrium concentration tolerance (M): " << equil_tol << "\n";
   } // end if module_np
   // output message
   PMToolBox::output_message(ss, *comm_in);
@@ -295,7 +283,8 @@ void Copss::read_domain_info()
          j++) wall_params[j] = input_file(wall_type, 0.0, j);
   }
   else {
-    ss << "Error: wall_type (" << wall_type <<") is not supported !!! (in check_wall)";
+    ss << "Error: wall_type (" << wall_type <<") is not supported !!! (in "
+                                               "check_wall)";
     PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
@@ -314,7 +303,8 @@ void Copss::read_domain_info()
 
   if (periodicity[0] == true and periodicity[1] == true and periodicity[2] ==
       true) {
-    ss << "warning: The box cannot be periodic on all directions at the same time. (required by FEM)";
+    ss << "Error: The box cannot be periodic on all directions at the same "
+         "time. (required by FEM). Exiting...";
     PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
@@ -323,7 +313,7 @@ void Copss::read_domain_info()
   inlet.resize(input_file.vector_variable_size("inlet"));
 
   if (inlet.size() != dim) {
-    ss << "Error: inlet has to be defined for all dimensions",
+    ss << "Error: inlet has to be defined for all dimensions. Exiting...",
     PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
@@ -332,7 +322,7 @@ void Copss::read_domain_info()
     inlet[i] = input_file("inlet", false, i);
 
     if (inlet[i] == true and periodicity[i] == true) {
-      ss << "Error: A inlet direction has to be non-periodic";
+      ss << "Error: A inlet direction has to be non-periodic. Exiting...";
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
@@ -341,22 +331,22 @@ void Copss::read_domain_info()
   // ============== inlet pressure
   inlet_pressure.resize(input_file.vector_variable_size("inlet_pressure"));
 
-  for (unsigned int i = 0; i < inlet_pressure.size(); i++) 
+  for (unsigned int i = 0; i < inlet_pressure.size(); i++)
   {
     inlet_pressure[i] = input_file("inlet_pressure", 0., i);
   }
   // ============== shear or not on each boundary pair
   shear.resize(input_file.vector_variable_size("shear"));
   if (shear.size() != dim) {
-    ss << "Error: shear has to be defined for all boundary pairs";
-    PMToolBox::output_message(ss.str(), *comm_in);
+    ss << "Error: shear has to be defined for all boundary pairs. Exiting...";
+    PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
   for (unsigned int i = 0; i < shear.size(); i++) {
     shear[i] = input_file("shear", false, i);
 
     if (shear[i] == true and periodicity[i] == true) {
-      ss << "warning: A shear direction has to be non-periodic";
+      ss << "Error: A shear direction has to be non-periodic. Exiting...";
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
@@ -388,8 +378,9 @@ void Copss::read_domain_info()
     // validation
     if (boundary_id_dirichlet_poisson.size() !=
         boundary_value_dirichlet_poisson.size()) {
-      err << "Error: size of 'boundary_id_dirichlet_poisson' does not match with "
-          << "'boundary_value_dirichlet_poisson'. Exiting ..." << "\n";
+      ss << "Error: size of 'boundary_id_dirichlet_poisson' does not match "
+            "with boundary_value_dirichlet_poisson'. Exiting ..." << "\n";
+      PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
     else{
@@ -410,8 +401,9 @@ void Copss::read_domain_info()
     // validation
     if (boundary_id_neumann_poisson.size() !=
         boundary_value_neumann_poisson.size()) {
-      err << "Error: size of 'boundary_id_neumann_poisson' does not match with "
+      ss << "Error: size of 'boundary_id_neumann_poisson' does not match with "
           << "'boundary_value_neumann_poisson'. Exiting ..." << "\n";
+      PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
     else{
@@ -425,45 +417,86 @@ void Copss::read_domain_info()
   }
 
   // Boundary condition for Nernst-Planck system
-  if (module_np)
-  {
-    // Dirichlet BC: boundary ids and boundary value (fixed ion concentration
-    // at boundaries)
-    boundary_id_dirichlet_np.resize(input_file.vector_variable_size(
-            "boundary_id_dirichlet_np"));
-    boundary_value_dirichlet_np.resize(input_file.vector_variable_size(
-            "boundary_value_dirichlet_np"));
-    if (boundary_id_dirichlet_np.size() !=
-        boundary_value_dirichlet_np.size())
+  if (module_np) {
+    // read Dirichlet Boundary ids of NP system
+    if (input_file.have_variable("boundary_id_dirichlet_np"))
     {
-      err << "Error: size of 'boundary_id_dirichlet_np' does not match with "
-          << "'boundary_value_dirichlet_np'. Exiting ..." << "\n";
-      libmesh_error();
+      boundary_id_dirichlet_np.resize(input_file.vector_variable_size(
+        "boundary_id_dirichlet_np"));
+      for (int i = 0; i < boundary_id_dirichlet_np.size(); i++) {
+        boundary_id_dirichlet_np[i] = input_file("boundary_id_dirichlet_np",
+                                                 0, i);
+      }
     }
     else
     {
-      for (unsigned int i = 0; i < boundary_id_dirichlet_np.size(); i++)
-      {
-        boundary_id_dirichlet_np[i] = input_file("boundary_id_dirichlet_np",
-          0, i);
-        boundary_value_dirichlet_np[i] = input_file
-          ("boundary_value_dirichlet_np", 0., i);
-      }
-    }
-    // Neumann BC
-    // Fixme: Neumann BC for Nernst-Planck System are not defined yet
-    boundary_id_neumann_np.resize(input_file.vector_variable_size(
-            "boundary_id_neumann_np"));
-    if (boundary_id_neumann_np.size() > 0)
-    {
-      err << "Error: Neumann Boundary Condition for Nernst-Planck system is not"
-             " supported yet. Exiting ...\n";
+      ss << "Error: boundary_id_dirichlet_np is not given. Exiting...";
+      PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
-  }
+
+    // get Dirichlet boundary value for all ion species
+    boundary_value_dirichlet_np.resize(ion_name.size());
+    for (int ion_id=0; ion_id<ion_name.size(); ion_id++)
+    {
+      // check the boundary value is given
+      if (input_file.have_variable
+      ("boundary_value_dirichlet_np_"+ion_name[ion_id]))
+      {
+        // temporary placeholder of boundary value for this ion
+        std::vector<Real> tmp_c;
+        tmp_c.resize(input_file.vector_variable_size(
+          "boundary_value_dirichlet_np_"+ion_name[ion_id]));
+        // check the size is equal to the size of boundary_id_dirichlet_np
+        if (tmp_c.size() != boundary_id_dirichlet_np.size())
+        {
+          ss << "Error: boundary_value_dirichlet_np_" << ion_name[ion_id]
+             << " has the wrong size. Exiting...";
+          PMToolBox::output_message(ss, *comm_in);
+          libmesh_error();
+        }
+        else
+        {
+          // read boundary value to tmp_c
+          for (int i=0; i<tmp_c.size(); i++)
+          {
+            tmp_c[i] = input_file
+              ("boundary_value_dirichlet_np_"+ion_name[ion_id], 0.0, i);
+          }
+          // put tmp_c to boundary_value_dirichlet_np[ion_id]
+          boundary_value_dirichlet_np[ion_id] = tmp_c;
+        }
+      }
+      else
+      {
+        ss << "Error: boundary_value_dirichlet_np_" << ion_name[ion_id]
+           << " is not given. Exiting...";
+        PMToolBox::output_message(ss, *comm_in);
+        libmesh_error();
+      }
+    } // end for loop over ion_id
+    // validate if all Dirichlet BC is neutral
+    for (int i=0; i<boundary_id_dirichlet_np.size(); i++)
+    {
+      Real total_c = 0;
+      for (int ion_id=0; ion_id<boundary_value_dirichlet_np.size(); ion_id++)
+      {
+        total_c += boundary_value_dirichlet_np[ion_id][i] *
+          ion_valence[ion_id];
+      }
+      if (abs(total_c) > 1.e-6)
+      {
+        ss << "Error: total ion charge (concentration*valence) is not neutral"
+              " at boundary id = "<< boundary_id_dirichlet_np[i]
+              << ". Exiting...";
+        PMToolBox::output_message(ss, *comm_in);
+        libmesh_error();
+      }
+    }
+  } // end if molule_np
 
   // print out Geometry information
-  ss << "##########################################################\n" 
+  ss << "##########################################################\n"
      << "#                  Geometry information                  \n"
      << "##########################################################\n"
      << "-----------> Dimension: " << dim << "\n"
@@ -473,19 +506,19 @@ void Copss::read_domain_info()
   for (int i = 0; i < wall_params.size(); ++i)
     ss << wall_params[i] << "   ";
   ss << "\n";
-  
+
   ss << "-----------> Periodicity of the box: ";
-  for (int i = 0; i < dim; i++) 
+  for (int i = 0; i < dim; i++)
     ss << std::boolalpha << periodicity[i] << ", ";
   ss << "\n";
-  
+
   ss << "-----------> Inlet/Outlet of the box: ";
-  for (int i = 0; i < dim; i++) 
+  for (int i = 0; i < dim; i++)
     ss << inlet[i] << "(pressure = " << inlet_pressure[i] << " ), ";
   ss << "\n";
-  
+
   ss << "-----------> shear on boundary pairs: ";
-  for (int i = 0; i < dim; i++) 
+  for (int i = 0; i < dim; i++)
     ss << shear[i] << "(shear_rate = " << shear_rate[i] << " ), ";
   ss << "\n";
   // Poisson System BC
@@ -509,10 +542,17 @@ void Copss::read_domain_info()
   {
     ss << "-----------> Dirichlet boundary condition for Nernst-Planck "
           "(ion concentration):\n";
-    for (int i = 0; i < boundary_id_dirichlet_np.size(); i++)
-      ss << "Boundary ID " << boundary_id_dirichlet_np[i]
-         << " : value = " << boundary_value_dirichlet_np[i] << "\n";
-    ss << "\n";
+    for (int i=0; i<boundary_id_dirichlet_np.size(); i++)
+    {
+      // print concentration of all ion species at this boundary
+      ss << "At boundary ID " << boundary_id_dirichlet_np[i] << " : ";
+      for (int ion_id=0; ion_id<ion_name.size(); ion_id++)
+      {
+        ss << ion_name[ion_id] << "(" <<
+        boundary_value_dirichlet_np[ion_id][i] <<"[M]); ";
+      }
+      ss << "\n";
+    }
   } // end if module_np
 
   // Domain mesh information
@@ -730,8 +770,9 @@ void Copss::read_run_info() {
     }
   }
   else {
-    ss << "max_dr_coeff needs three parameters: t_milestone, max_dr_coeff "
-       << "before milestone, max_dr_coeff after milestone" << "\n";
+    ss << "Error: max_dr_coeff needs three parameters: t_milestone, "
+           "max_dr_coeff before milestone, max_dr_coeff after milestone. "
+           "Exiting...";
     PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
@@ -824,7 +865,8 @@ void Copss::read_restart_time()
     PMToolBox::output_message(ss, *comm_in); 
   } // end if
   else {
-    ss << "Error: read_restart_time can NOT read the time output: out.time";
+    ss << "Error: read_restart_time can NOT read the time output: out.time. "
+          "Exiting...";
     PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
@@ -854,7 +896,8 @@ void Copss::read_restart_eigenvalue()
     PMToolBox::output_message(ss, *comm_in);
   } // end if
   else {
-    ss << "Error: read_restart_eigenvalue() can NOT read the time output: out.eigenvalue";
+    ss << "Error: read_restart_eigenvalue() can NOT read the time output: out"
+         ".eigenvalue. Exiting...";
     PMToolBox::output_message(ss, *comm_in);
     libmesh_error();
   }
@@ -913,8 +956,9 @@ void Copss::create_domain_mesh()
     } 
     else 
     {
-      ss << "Error: COPSS only supports generating domain mesh for 'slit' wall."
-         << "Please load the domain mesh file for other wall types. Exiting ...";
+      ss << "Error: COPSS only supports generating domain mesh for 'slit' "
+             "wall. Please load the domain mesh file for other wall types. "
+             "Exiting ...";
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
@@ -991,7 +1035,8 @@ void Copss::create_periodic_boundary() {
       if (periodicity[i] or inlet[i] or shear[i]) error_flag = true;
     }
     if (error_flag) {
-      ss << "spherical domain cannot have PBC or inlet/outlet, Please check control file";
+      ss << "Error: spherical domain cannot have PBC or inlet/outlet, Please "
+             "check control file. Exiting...";
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
@@ -1073,14 +1118,25 @@ EquationSystems Copss::create_equation_systems()
   }
 
   // Nernst-Planck equation
-  if (module_np) {
-    PMSystemNP& system_np = equation_systems.add_system<PMSystemNP>("NP");
-    // fixme: is c_var a second order variable?
-    c_var = system_np.add_variable("c", SECOND);
-
-    // Attach point_mesh to PMSystemNP
-    this->attach_object_mesh(system_np);
-    this->attach_period_boundary(system_np);
+  if (module_np)
+  {
+    // add a NP system to equation systems for each ion
+    for (int ion_id=0 ; ion_id<ion_name.size(); ion_id++)
+    {
+      std::string np_sys_name = std::string("NP") + ":" + ion_name[ion_id];
+      std::string np_var_name = std::string("c") + ":" + ion_name[ion_id];
+      // Add This NP system to equation_systems and get a reference
+      PMSystemNP& system_np = equation_systems.add_system<PMSystemNP>
+        (np_sys_name);
+      // Add variable to this NP system
+      c_var = system_np.add_variable(np_var_name, SECOND);
+      // attach ion type (id and name) to this NP system
+      system_np.attach_ion_type(ion_id, ion_name[ion_id]);
+      // Attach point mesh to this NP system
+      this->attach_object_mesh(system_np);
+      // Attach periodic boundary object to this NP system
+      this->attach_period_boundary(system_np);
+    }
   }
 
   /* Initialize the data structures for the equation system. */
@@ -1155,7 +1211,8 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       // check
       if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
       {
-        ss << "*********************** Error in Stokes PBC: *************************\n"
+        ss << "*********************** Error in Stokes PBC: "
+             "*************************\n"
            << "**** The search radius is larger than half domain length in x direction\n!"
            << "**** search radius = " << search_radius_p
            << ", half domain size Lx/2 =" << (wall_params[1] - wall_params[0]) / 2. << "\n"
@@ -1181,7 +1238,8 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       // check
       if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
       {
-        ss << "*********************** Error in Stokes PBC: *************************\n"
+        ss << "*********************** Error in Stokes PBC: "
+             "*************************\n"
            << "**** The search radius is larger than half domain length in y direction\n!"
            << "**** search radius = " << search_radius_p
            << ", half domain size Ly/2 =" << (wall_params[3] - wall_params[2]) / 2. << "\n"
@@ -1207,7 +1265,8 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       // check
       if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
       {
-        ss << "*********************** Error in Stokes PBC: *************************\n"
+        ss << "*********************** Error in Stokes PBC: "
+             "*************************\n"
            << "**** The search radius is larger than half domain length in z direction\n!"
            << "**** search radius = " << search_radius_p
            << ", half domain size Lz/2 =" << (wall_params[5] - wall_params[4]) / 2. << "\n"
@@ -1236,7 +1295,8 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       // check
       if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
       {
-          ss << "*********************** Error in Poisson PBC: *************************\n"
+          ss << "*********************** Error in Poisson PBC: "
+               "*************************\n"
              << "**** The search radius is larger than half domain length in x direction\n!"
              << "**** search radius = " << search_radius_p
              << ", half domain size Lx/2 =" << (wall_params[1] - wall_params[0]) / 2. << "\n"
@@ -1260,7 +1320,8 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       // check
       if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
       {
-          ss << "*********************** Error in Poisson PBC: *************************\n"
+          ss << "*********************** Error in Poisson PBC: "
+               "*************************\n"
              << "**** The search radius is larger than half domain length in y direction\n!"
              << "**** search radius = " << search_radius_p
              << ", half domain size Ly/2 =" << (wall_params[3] - wall_params[2]) / 2. << "\n"
@@ -1283,7 +1344,8 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       // check
       if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
       {
-          ss << "*********************** Error in Poisson PBC: *************************\n"
+          ss << "*********************** Error in Poisson PBC: "
+               "*************************\n"
              << "**** The search radius is larger than half domain length in z direction\n!"
              << "**** search radius = " << search_radius_p
              << ", half domain size Lz/2 =" << (wall_params[5] - wall_params[4]) / 2. << "\n"
@@ -1360,7 +1422,8 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
       // check
       if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
       {
-        ss << "*********************** Error in NP PBC: *************************\n"
+        ss << "*********************** Error in NP PBC: "
+             "*************************\n"
            << "**** The search radius is larger than half domain length in z direction\n!"
            << "**** search radius = " << search_radius_p
            << ", half domain size Lz/2 =" << (wall_params[5] - wall_params[4]) / 2. << "\n"

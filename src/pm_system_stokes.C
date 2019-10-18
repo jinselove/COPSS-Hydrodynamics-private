@@ -39,6 +39,7 @@
 #include "brownian_system.h"
 #include "pm_system_stokes.h"
 #include "pm_system_poisson.h"
+#include "pm_system_np.h"
 
 namespace libMesh {
 // ======================================================================================
@@ -128,9 +129,25 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
     }
   }
   // multi-Physics coupling
-  if (option == "disturbed" && this->get_equation_systems().parameters.get<bool>("module_poisson")) {
-    this->couple_poisson();  
+  if (option == "disturbed")
+  {
+    // if module_poisson is true, no matter if module_np is true, we only
+    // need to couple poisson. In the case that module_np is true, we will
+    // couple NP system in Poisson system, otherwise, we do not.
+    if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+    {
+      this->couple_poisson();
+    }
+    // if module poisson is false, we will need to check if module_np is true
+    // or not
+    else
+    {
+      // if module_np is true, we only need to couple np
+      if (this->get_equation_systems().parameters.get<bool>("module_np"))
+        this->couple_np();
+    }
   }
+
 
   // perf_log.pop("fix compute");
   STOP_LOG("reinit_system()", "PMSystemStokes");
@@ -212,14 +229,14 @@ void PMSystemStokes::solve(const std::string& option)
     _solver_stokes.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver
-    this->assemble_matrix("Stokes", option);
-    _solver_stokes.init_ksp_solver();
+    this->assemble_matrix(this->name(), option);
+    _solver_stokes.init_ksp_solver(this->name());
     
     // set re_init to false once K matrix is built
     _re_init = false;
   }
   // assemble rhs 
-  this->assemble_rhs("Stokes", option);
+  this->assemble_rhs(this->name(), option);
 
   // solve the problem
   _solver_stokes.solve();
@@ -916,6 +933,16 @@ void PMSystemStokes::couple_poisson()
     add_electrostatic_forces();
 
   STOP_LOG("couple_poisson()", "PMSystemStokes");
+}
+
+// ===========================================================================
+void PMSystemStokes::couple_np()
+{
+  START_LOG("couple_np()", "PMSystemStokes");
+
+//  this->get_equation_systems().get_system<PMSystemNP>("NP").solve("unused");
+
+  STOP_LOG("couple_np()", "PMSystemStokes");
 }
 
 // ===========================================================================

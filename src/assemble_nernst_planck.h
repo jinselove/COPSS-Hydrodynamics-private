@@ -23,6 +23,7 @@
 
 // Local includes
 #include "assemble_system.h"
+#include "analytical_solution_np.h"
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
@@ -39,7 +40,8 @@ public:
 
      @param[in,out] es EquationSystem
    */
-  AssembleNP(EquationSystems& es);
+  AssembleNP(EquationSystems& es,
+             const std::string& name);
 
 
   /*! \brief Destructor
@@ -69,44 +71,58 @@ public:
                          const std::string& option) override;
 
 
-  /*! \brief Assemble the element matrix K_IJ
-
-      Reinit and compute the element matrix K_ij, which will be added into K
-      matrix after calling assemble_global_K(). Size of this submatrix is
-      n_u_dofs * n_u_dofs = n_v_dofs * n_v_dofs = n_w_dofs * n_w_dofs
-   */
-  void assemble_element_KIJ(const std::vector<Real>                      & JxW,
-                            const std::vector<std::vector<RealGradient> >& dphi,
-                            const unsigned int                             n_u_dofs,
-                            const unsigned int                             I,
-                            const unsigned int                             J,
-                            DenseMatrix<Number>                          & Kij);
-
-
   /*! \brief Assemble function for the right-hand-side in NP equation.
 
       This calculates each element's contribution to the right-hand-side vector.
    */
-  void compute_element_rhs(const Elem                   *elem,
-                           const unsigned int            n_u_dofs,
-                           FEBase                      & fe_v,
+  void compute_element_rhs(const Elem  *elem,
+                           const unsigned int&  n_dofs,
+                           const std::vector<Real>& JxW,
+                           const std::vector<std::vector<Real>>& c,
+                           const std::vector<Point> q_xyz,
                            const std::vector<std::size_t>n_list,
-                           const bool                  & pf_flag,
-                           const std::string           & option,
-                           DenseVector<Number>         & Fe);
+                           const bool& pf_flag,
+                           const std::string& option,
+                           DenseVector<Number>& Fe);
 
 
   /*! \brief select sides on the boundary for all elements
    *
    */
-  void select_boundary_side(const Elem *elem) override;
+  void select_boundary_side(const Elem *elem,
+                            const std::string& system_name) override;
 
   /*! \brief Apply BCs by penalty method.
-
+   * np_time: is the NP system time, which is used in the validation system
+   * where the boundary value is changing over time; potentially, we can also
+   * use the same idea to apply time-dependent boundary conditions
    */
   void apply_bc_by_penalty(const Elem          *elem,
                            const std::string  & matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string  & option) override;
+                           const std::string  & option,
+                           const Real np_time = 0);
+
+  /*! \brief Pointer to analytical_solution
+  */
+  AnalyticalSolutionNP* get_analytical_solution() {
+    return analytical_solution;
+  }
+
+private:
+  // Boundary sides that DirichletBCs are applied.
+  // for each tuple, the first element is the side id, the second element is the
+  // associated boundary id of this side, the third element is the corresponding
+  // Dirichlet BC values associated with this side. For NP system, each
+  // boundary value is the concentration of the ion associated with this NP
+  // system
+  std::vector<std::vector<std::tuple<unsigned int,
+                                     unsigned int,
+                                     Real
+                                     >>> _boundary_sides_dirichlet_np;
+
+  // Get a reference to AnalyticalSolutionNP
+  AnalyticalSolutionNP *analytical_solution = nullptr;
+
 };

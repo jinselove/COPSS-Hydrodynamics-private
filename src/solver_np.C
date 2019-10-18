@@ -66,10 +66,64 @@ SolverNP::~SolverNP()
 }
 
 // ==================================================================================
-void SolverNP::init_ksp_solver()
+void SolverNP::init_ksp_solver(const std::string& system_name)
 {
   START_LOG("init_ksp_solver()", "SolverNP");
 
+    // Control parameters of KSP solver
+  unsigned int max_iter = _equation_systems.parameters.get<unsigned int>(
+    "linear solver maximum iterations");
+  Real linear_sol_rtol = _equation_systems.parameters.get<Real>(
+    "linear solver rtol");
+  Real linear_sol_atol = _equation_systems.parameters.get<Real>(
+    "linear solver atol");
+  _rtol   = static_cast<PetscReal>(linear_sol_rtol);
+  _atol   = static_cast<PetscReal>(linear_sol_atol);
+  _max_it = static_cast<PetscInt>(max_iter);
+
+  // Get a reference to the system Matrix
+  PMSystemNP& system = _equation_systems.get_system<PMSystemNP>(
+    system_name);
+  PetscMatrix<Number> *matrix = cast_ptr<PetscMatrix<Number> *>(system.matrix);
+
+  // this->petsc_view_matrix( matrix->mat() );
+
+  // set up KSP in PETSc, resuse the Preconditioner
+  // PetscPrintf(this->comm().get(), "--->test in
+  // SolverPoisson::init_ksp_solver(): ");
+  // PetscPrintf(this->comm().get(), "Start to initialize the PETSc KSP
+  // solver...\n");
+  int ierr;
+  ierr = KSPCreate(this->comm().get(), &_ksp);               CHKERRABORT(
+    this->comm().get(),
+    ierr);
+  ierr = KSPSetOperators(_ksp, matrix->mat(), matrix->mat()); CHKERRABORT(
+    this->comm().get(),
+    ierr);
+  ierr = KSPSetReusePreconditioner(_ksp, PETSC_TRUE);         CHKERRABORT(
+    this->comm().get(),
+    ierr);
+  ierr = KSPSetTolerances(_ksp, _rtol, _atol, PETSC_DEFAULT, _max_it);
+  CHKERRABORT(this->comm().get(), ierr);
+  ierr = KSPSetFromOptions(_ksp);                            CHKERRABORT(
+    this->comm().get(),
+    ierr);
+
+  // ierr = KSPSetUp(_ksp); CHKERRABORT(this->comm().get(), ierr); // cause
+  // error
+
+  // start from non-zero inital guess can reduce the total iteration steps of
+  // convergence?
+  // actually NOT at all, and sometimes even worse !
+  // ierr = KSPSetInitialGuessNonzero(_ksp,PETSC_TRUE);
+  // CHKERRABORT(this->comm().get(),ierr);
+
+  // label the ksp solver is initialized
+  _is_init = true;
+
+  // PetscPrintf(this->comm().get(), "--->test in
+  // SolverPoisson::init_ksp_solver(): ");
+  // PetscPrintf(this->comm().get(), "the PETSc KSP solver is initialized \n");
 
   STOP_LOG("init_ksp_solver()", "SolverNP");
 }

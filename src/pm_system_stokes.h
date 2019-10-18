@@ -216,14 +216,25 @@ public:
    */
   void write_fluid_velocity_data(const std::string& filename);
 
-  /*
+  /**
    * Couple Stokes System (HI or FD) with Poisson System by adding electrostatic
    * force to all points (Point Particles or surface nodes on Rigid Particles.) 
    * This electrostatic force includes contributions from both local and global
    * solution of the Poisson system.
-   *  
+   *
+   * If module_np is true, this coupling will couple the Nernst-Planck system
+   * to Poisson system first by adding the contribution to the charge density
+   * from ion cloud, and then couple the total electrostatic force to Stokes
+   * system.
    */  
-  void couple_poisson(); 
+  void couple_poisson();
+
+  /**
+   * Couple Stokes System with Nernst-Planck System to create a
+   * convection-diffusion system without electrostatics, i.e, Stokes + Fick's
+   * second law
+   */
+  void couple_np();
   
   
    /**

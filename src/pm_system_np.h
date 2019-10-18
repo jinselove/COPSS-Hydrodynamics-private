@@ -109,21 +109,28 @@ public:
    * update system solution for output equation systems
    * fixme:implement this function after NP system is built
    */
-    void update_solution_for_output(const std::string& solution_name = "total")
+  void update_solution_for_output(const std::string& solution_name = "total")
     override {};
+
+
+  /**
+   * Test the concentration profile for a preset test systems
+   * this function is debug and validation purpose
+   */
+   void test_concentration_profile();
 
 
   /**
   * Return the NPSolver
   */
-  SolverNP& np_solver() {
-    return _np_solver;
+  SolverNP& solver_np() {
+    return _solver_np;
   }
 
 private:
 
   // NP solver
-  SolverNP _np_solver;
+  SolverNP _solver_np;
 
   // Assemble NP system
   AssembleNP *_assemble_np = nullptr;

@@ -1118,14 +1118,25 @@ EquationSystems Copss::create_equation_systems()
   }
 
   // Nernst-Planck equation
-  if (module_np) {
-    PMSystemNP& system_np = equation_systems.add_system<PMSystemNP>("NP");
-    // fixme: is c_var a second order variable?
-    c_var = system_np.add_variable("c", SECOND);
-
-    // Attach point_mesh to PMSystemNP
-    this->attach_object_mesh(system_np);
-    this->attach_period_boundary(system_np);
+  if (module_np)
+  {
+    // add a NP system to equation systems for each ion
+    for (int ion_id=0 ; ion_id<ion_name.size(); ion_id++)
+    {
+      std::string np_sys_name = std::string("NP") + ":" + ion_name[ion_id];
+      std::string np_var_name = std::string("c") + ":" + ion_name[ion_id];
+      // Add This NP system to equation_systems and get a reference
+      PMSystemNP& system_np = equation_systems.add_system<PMSystemNP>
+        (np_sys_name);
+      // Add variable to this NP system
+      c_var = system_np.add_variable(np_var_name, SECOND);
+      // attach ion type (id and name) to this NP system
+      system_np.attach_ion_type(ion_id, ion_name[ion_id]);
+      // Attach point mesh to this NP system
+      this->attach_object_mesh(system_np);
+      // Attach periodic boundary object to this NP system
+      this->attach_period_boundary(system_np);
+    }
   }
 
   /* Initialize the data structures for the equation system. */

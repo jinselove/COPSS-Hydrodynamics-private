@@ -88,7 +88,7 @@ public:
    * Init the KSP solver:
    * The system matrix needs to be assembled before calling this init function!
    */
-  virtual void init_ksp_solver() = 0;
+  virtual void init_ksp_solver(const std::string& system_name) = 0;
 
 
   /*

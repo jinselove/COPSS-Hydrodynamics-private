@@ -69,6 +69,11 @@ public:
 
 
   /**
+   * Init ion id for this NP system and validate if system name is correctly set
+   */
+  void attach_ion_type(const int& _ion_id, const std::string& _ion_name);
+
+  /**
    * Assemble the system matrix.
    * option ==
    */
@@ -83,7 +88,7 @@ public:
                     const std::string& option) override;
 
 
-  /*
+  /**
    * Solve the system.
    * option = ...
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
@@ -91,7 +96,14 @@ public:
   void solve(const std::string& option) override;
 
 
-  /*
+  /**
+   * Initialize parameters for this NP system
+   * This function should be called in solve() function when re_init is true
+   */
+  void init_params();
+
+
+  /**
    * Add the local solution to the global solution
    * This function does not apply to NP system
    * but need to re-implement it here to avoid compilation error
@@ -99,11 +111,12 @@ public:
   void add_local_solution() override {};
 
 
-  /*
+  /**
    * Compute the L2-error in an unbounded domain
    * This function does not apply to NP system
    */
   void test_l2_norm(bool& neighbor_list_update_flag) override {};
+
 
   /**
    * update system solution for output equation systems
@@ -127,6 +140,30 @@ public:
     return _solver_np;
   }
 
+  // time stepping for NP system
+  Real dt_np;
+
+  // ion id
+  int ion_id;
+
+  // ion name
+  std::string ion_name;
+
+  // ion diffusivity
+  Real ion_diffusivity;
+
+  // ion valence
+  int ion_valence;
+
+  // Dirichlet Boundary id for this ion
+  std::vector<unsigned int> boundary_id_dirichlet_np;
+
+  // Dirichlet Boundary value for this ion
+  std::vector<Real> boundary_value_dirichlet_np;
+
+  // equilibrium tolerance for ion concentration
+  Real equil_tol;
+
 private:
 
   // NP solver
@@ -137,6 +174,8 @@ private:
 
   // Get a pointer to AnalyticalSolutionNP
   AnalyticalSolutionNP *analytical_solution = nullptr;
+
+
 
 };
 } // end namespace libMesh

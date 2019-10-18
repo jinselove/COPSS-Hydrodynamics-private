@@ -72,7 +72,7 @@ SolverPoisson::~SolverPoisson()
 }
 
 // ==================================================================================
-void SolverPoisson::init_ksp_solver()
+void SolverPoisson::init_ksp_solver(const std::string& system_name)
 {
   START_LOG("init_ksp_solver()", "SolverPoisson");
 
@@ -89,7 +89,7 @@ void SolverPoisson::init_ksp_solver()
 
   // Get a reference to the system Matrix
   PMSystemPoisson& system = _equation_systems.get_system<PMSystemPoisson>(
-    "Poisson");
+    system_name);
   PetscMatrix<Number> *matrix = cast_ptr<PetscMatrix<Number> *>(system.matrix);
 
   // this->petsc_view_matrix( matrix->mat() );

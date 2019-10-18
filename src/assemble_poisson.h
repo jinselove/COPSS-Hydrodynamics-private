@@ -97,7 +97,8 @@ public:
   /*! \brief Select sides on Dirichlet and Neumann boundaries for all elements
    *
    */
-  void select_boundary_side(const Elem *elem) override;
+  void select_boundary_side(const Elem *elem,
+                            const std::string& system_name) override;
 
 
   /*! \brief Apply Dirichlet BC by penalty method to impose electrical potential
@@ -108,7 +109,7 @@ public:
                            const std::string  & matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string  & option) override;
+                           const std::string  & option);
 
 
   /*! \brief Apply Neumann BC to impose surface charge density on relevant

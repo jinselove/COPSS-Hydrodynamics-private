@@ -145,7 +145,7 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
     const Elem *elem = *el;
     
     // Fill _boundary_sides_neumann_poisson and _boundary_sides_dirichlet_poisson 
-    this->select_boundary_side(elem);
+    this->select_boundary_side(elem, system_name);
     
     // Get the degree of freedom indices for the current element. These define
     // where in the global matrix and right-hand-side this element will contribute to.
@@ -409,12 +409,13 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
 
 
 // ==================================================================================
-void AssemblePoisson::select_boundary_side(const Elem *elem)
+void AssemblePoisson::select_boundary_side(const Elem *elem,
+                                           const std::string& system_name)
 {
   START_LOG("select_boundary_side()", "AssemblePoisson");
 
   // Get a reference to the Particle-Mesh System.
-  PMSystemPoisson & pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
+  PMSystemPoisson & pm_system = _eqn_sys.get_system<PMSystemPoisson>(system_name);
   const std::size_t elem_id   = elem->id();
   _boundary_sides_dirichlet_poisson[elem_id].resize(0);
   _boundary_sides_neumann_poisson[elem_id].resize(0);

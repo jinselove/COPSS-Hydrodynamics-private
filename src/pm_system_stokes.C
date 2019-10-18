@@ -229,14 +229,14 @@ void PMSystemStokes::solve(const std::string& option)
     _solver_stokes.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver
-    this->assemble_matrix("Stokes", option);
-    _solver_stokes.init_ksp_solver();
+    this->assemble_matrix(this->name(), option);
+    _solver_stokes.init_ksp_solver(this->name());
     
     // set re_init to false once K matrix is built
     _re_init = false;
   }
   // assemble rhs 
-  this->assemble_rhs("Stokes", option);
+  this->assemble_rhs(this->name(), option);
 
   // solve the problem
   _solver_stokes.solve();

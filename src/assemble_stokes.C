@@ -166,7 +166,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
     {
       // Store a pointer to the element we are currently working on.
       const Elem *elem = *el;
-      this->select_boundary_side(elem);
+      this->select_boundary_side(elem, system_name);
     }
   }
 
@@ -772,7 +772,8 @@ void AssembleStokes::assemble_element_MIJ(
 }
 
 // ==================================================================================
-void AssembleStokes::select_boundary_side(const Elem *elem)
+void AssembleStokes::select_boundary_side(const Elem *elem,
+                                          const std::string& system_name)
 {
   START_LOG("select_boundary_side()", "AssembleStokes");
 
@@ -780,7 +781,7 @@ void AssembleStokes::select_boundary_side(const Elem *elem)
   // PMLinearImplicitSystem & pm_system =
   // _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
   PMLinearImplicitSystem& pm_system =
-    _eqn_sys.get_system<PMLinearImplicitSystem>("Stokes");
+    _eqn_sys.get_system<PMLinearImplicitSystem>(system_name);
   const std::vector<bool>& periodicity =
     pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::vector<bool>& inlet_direction =

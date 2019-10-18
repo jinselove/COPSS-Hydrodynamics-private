@@ -129,16 +129,15 @@ void PMSystemPoisson::solve(const std::string& option)
         "solver_type_poisson");
     _solver_poisson.set_solver_type(solver_type);
     // Assemble the global matrix, and init the KSP solver
-    this->assemble_matrix("Poisson", option);
-    _solver_poisson.init_ksp_solver();
+    this->assemble_matrix(this->name(), option);
+    _solver_poisson.init_ksp_solver(this->name());
     //set _re_init to false once K matrix is built
     _re_init = false;
   }
   
-  
   // assemble the rhs vector, and record the CPU wall time.
   // t1 = MPI_Wtime();
-  this->assemble_rhs("Poisson", option);
+  this->assemble_rhs(this->name(), option);
   // t2 = MPI_Wtime();
   // std::cout << "For Poisson equation, time used to assemble the
   // right-hand-side vector is " <<t2-t1<<" s\n";

@@ -40,7 +40,8 @@ public:
 
      @param[in,out] es EquationSystem
    */
-  AssembleNP(EquationSystems& es, const std::string& name);
+  AssembleNP(EquationSystems& es,
+             const std::string& name);
 
 
   /*! \brief Destructor
@@ -88,16 +89,20 @@ public:
   /*! \brief select sides on the boundary for all elements
    *
    */
-  void select_boundary_side(const Elem *elem) override;
+  void select_boundary_side(const Elem *elem,
+                            const std::string& system_name) override;
 
   /*! \brief Apply BCs by penalty method.
-
+   * np_time: is the NP system time, which is used in the validation system
+   * where the boundary value is changing over time; potentially, we can also
+   * use the same idea to apply time-dependent boundary conditions
    */
   void apply_bc_by_penalty(const Elem          *elem,
                            const std::string  & matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string  & option) override;
+                           const std::string  & option,
+                           const Real np_time = 0);
 
   /*! \brief Pointer to analytical_solution
   */
@@ -110,13 +115,14 @@ private:
   // for each tuple, the first element is the side id, the second element is the
   // associated boundary id of this side, the third element is the corresponding
   // Dirichlet BC values associated with this side. For NP system, each
-  // boundary value is an vector that contains the ion concentration of all
-  // ion species at this boundary.
+  // boundary value is the concentration of the ion associated with this NP
+  // system
   std::vector<std::vector<std::tuple<unsigned int,
                                      unsigned int,
-                                     std::vector<Real>
-                                     >>> _boundary_sides_dirichlet_poisson;
+                                     Real
+                                     >>> _boundary_sides_dirichlet_np;
 
   // Get a reference to AnalyticalSolutionNP
   AnalyticalSolutionNP *analytical_solution = nullptr;
+
 };

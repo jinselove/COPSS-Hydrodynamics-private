@@ -183,7 +183,7 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
                                   phi[i][qp]*phi[j][qp]
                                   // Diffusion term when using semi implicit
                                   // Euler for Diffusion
-                                  + 0.5 * np_system.dt_np * np_system
+                                  + 0.5 * np_system.system_dt * np_system
                                   .ion_diffusivity * dphi[i][qp] *
                                   dphi[j][qp]
                                );
@@ -335,7 +335,7 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
                             c_old * phi[i][qp]
                             // diffusion term when using semi-implicit Euler
                             // for diffusion
-                            - 0.5 * np_system.dt_np * np_system
+                            - 0.5 * np_system.system_dt * np_system
                               .ion_diffusivity * gradient_c_old * dphi[i][qp]
                             // Fixme: convection term contribution
 
@@ -361,24 +361,6 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
 
   STOP_LOG("assemble_global_F()", "AssembleNP");
 }
-
-// ==================================================================================
-void AssembleNP::compute_element_rhs(const Elem  *elem,
-                                     const unsigned int&  n_dofs,
-                                     const std::vector<Real>& JxW,
-                                     const std::vector<std::vector<Real>>& c,
-                                     const std::vector<Point> q_xyz,
-                                     const std::vector<std::size_t>n_list,
-                                     const bool& pf_flag,
-                                     const std::string& option,
-                                     DenseVector<Number>& Fe)
-{
-  START_LOG("compute_element_rhs()", "AssembleNP"); // libMesh log
-
-
-  STOP_LOG("compute_element_rhs()", "AssembleNP");
-}
-
 
 // ==================================================================================
 void AssembleNP::select_boundary_side(const Elem *elem,
@@ -427,6 +409,9 @@ void AssembleNP::apply_bc_by_penalty(const Elem          *elem,
 {
   START_LOG("apply_bc_by_penalty()", "AssembleNP");
 
+  // we don't need option for NP system
+  (void) option;
+
   // set penalty value to be a large number
   const Real penalty = 1.e10;
 
@@ -453,7 +438,7 @@ void AssembleNP::apply_bc_by_penalty(const Elem          *elem,
       // update boundary value for this node only for our validation system
       const Point& ptx = side->point(nn);
       if (_eqn_sys.parameters.get<std::string>("simulation_name") ==
-        "np_validation_instant_point_source")
+        "np_validation_analytic")
       {
         boundary_value = analytical_solution->exact_solution_infinite_domain
           (ptx, np_time);

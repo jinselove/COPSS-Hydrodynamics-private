@@ -71,21 +71,6 @@ public:
                          const std::string& option) override;
 
 
-  /*! \brief Assemble function for the right-hand-side in NP equation.
-
-      This calculates each element's contribution to the right-hand-side vector.
-   */
-  void compute_element_rhs(const Elem  *elem,
-                           const unsigned int&  n_dofs,
-                           const std::vector<Real>& JxW,
-                           const std::vector<std::vector<Real>>& c,
-                           const std::vector<Point> q_xyz,
-                           const std::vector<std::size_t>n_list,
-                           const bool& pf_flag,
-                           const std::string& option,
-                           DenseVector<Number>& Fe);
-
-
   /*! \brief select sides on the boundary for all elements
    *
    */

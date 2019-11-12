@@ -350,7 +350,8 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
 {
   START_LOG("compute_element_rhs()", "AssemblePoisson");
 
-  // libmesh_assert_equal_to(system_name, "Poisson");
+  // we don't need option for Poisson system
+  (void) option;
 
   PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
 
@@ -489,6 +490,9 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
                                           const std::string  & option)
 {
   START_LOG("apply_bc_by_penalty()", "AssemblePoisson");
+
+  // we don't need option for Poisson system
+  (void) option;
 
   const std::size_t  elem_id = elem->id();
   

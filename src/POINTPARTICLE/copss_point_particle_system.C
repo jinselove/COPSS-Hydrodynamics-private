@@ -278,7 +278,7 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
     equation_systems.parameters.set<std::vector<int>>("ion_valence")
       = ion_valence;
     equation_systems.parameters.set<std::vector<unsigned int> >(
-            "boundary_id_dirichlet_np") = boundary_id_dirichlet_poisson;
+            "boundary_id_dirichlet_np") = boundary_id_dirichlet_np;
     equation_systems.parameters.set<std::vector<std::vector<Real>> >(
             "boundary_value_dirichlet_np") = boundary_value_dirichlet_np;
     equation_systems.parameters.set<Real>("equil_tol") = equil_tol;

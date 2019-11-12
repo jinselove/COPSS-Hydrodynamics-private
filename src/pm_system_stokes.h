@@ -121,7 +121,7 @@ public:
    * Compute the L2-error in an unbounded domain
    * This function will change the system solution vector by add local solution.
    */
-  void test_l2_norm(bool& neighbor_list_update_flag) override;
+  void test_l2_norm(bool& neighbor_list_update_flag);
 
 
   /*
@@ -256,14 +256,21 @@ public:
   /**
    * update system solution for output
    */
-  void update_solution_for_output(const std::string& solution_name = "total")
+  void update_solution_before_output(const std::string& solution_name = "total")
     override;
+
+
+  /**
+   * override the resume function defined in PMLinearImplicitSystem
+   *
+   */
+  void resume_solution_after_output() override ;
 
   
    /**
     * Save a pointer to undisturbed solution
     */
-    UniquePtr<NumericVector<Real>> undisturbed_solution;
+   UniquePtr<NumericVector<Real>> undisturbed_solution;
 
 private:
 

@@ -940,16 +940,30 @@ void PMSystemStokes::couple_np()
 {
   START_LOG("couple_np()", "PMSystemStokes");
 
-//  this->get_equation_systems().get_system<PMSystemNP>("NP").solve("unused");
-
+  unsigned int n_sys = this->get_equation_systems().n_systems();
+  // Loop over all systems, but only couple NP systems
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
+  {
+    // get system name
+    const std::string& s_name = this->get_equation_systems().get_system(s_id)
+      .name();
+    // if system name starts with "NP:", we solve this NP system
+    if (s_name.rfind("NP:", 0)==0)
+    {
+      PMToolBox::output_message(std::string("--> Coupling NP system ") +
+                                s_name, this->comm());
+      this->get_equation_systems().get_system<PMSystemNP>(s_name).solve
+        ("unused");
+    }
+  }
   STOP_LOG("couple_np()", "PMSystemStokes");
 }
 
 // ===========================================================================
-void PMSystemStokes::update_solution_for_output(
+void PMSystemStokes::update_solution_before_output(
   const std::string &solution_name)
 {
-  START_LOG("update_solution_for_output()", "PMSystemStokes");
+  START_LOG("update_solution_before_output()", "PMSystemStokes");
 
   // update Stokes system solution if with_hi is true
   if (this->get_equation_systems().parameters.get<bool>("with_hi"))
@@ -980,10 +994,23 @@ void PMSystemStokes::update_solution_for_output(
     }
   }// end if with_hi
 
-  STOP_LOG("update_solution_for_output()", "PMSystemStokes");
+  STOP_LOG("update_solution_before_output()", "PMSystemStokes");
 }
 
- 
+// ===========================================================================
+void PMSystemStokes::resume_solution_after_output()
+{
+  // only need to resume solution when 'with_hi' is true
+  if (this->get_equation_systems().parameters.get<bool>("with_hi"))
+  {
+    *(this->solution) = *(this->solution_backup);
+  }
+  else
+  {
+    // do nothing
+  }
+}
+
 // ===========================================================================
 void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
                                             const Real&  real_time,
@@ -991,48 +1018,62 @@ void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
 {
   START_LOG("write_equation_systems()", "PMSystemStokes");
 
-  // update Stokes system solution
-  this->update_solution_for_output(solution_name);
-  // update Poisson system solution
-  if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+  // Get number of systems in equation_systems
+  unsigned int n_sys = this->get_equation_systems().n_systems();
+
+  // Update solutions for all systems
+  // the 'update_solution_before_output' function can be different for different
+  // system: For 'Stokes' or 'Poisson' system, this update function needs to
+  // update the system solution to global (solution from FEM) + local
+  // (solution from GGEM local) for output if 'solution_name' == 'total'; For
+  // 'NP:*', the FEM solution is the total solution, so there is no need to
+  // update.
+  // We will resume system solutions to FEM solutions after writing output
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
   {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-      .update_solution_for_output(solution_name);
+//    const std::string& s_name = this->get_equation_systems().get_system(s_id)
+//      .name();
+//    PMToolBox::output_message(std::string("-->Update solution for system ") +
+//                              s_name, this->comm());
+    this->get_equation_systems().get_system<PMLinearImplicitSystem>
+      (s_id).update_solution_before_output(solution_name);
   }
+
   // get a reference to the mesh object
   MeshBase& mesh = this->get_mesh();
   std::ostringstream output_filename;
   output_filename << "output_equation_systems_" << solution_name;
   // write equation systems to Exodus file
 #ifdef LIBMESH_HAVE_EXODUS_API
-      output_filename << ".e";
-      if (o_step == 0)
-      {
-        ExodusII_IO(mesh).write_equation_systems(output_filename.str(),
-          this->get_equation_systems());
-      }
-      else
-      {
-        ExodusII_IO exo(mesh);
-        exo.append(true);
-        exo.write_timestep(output_filename.str(),
-                           this->get_equation_systems(),
-                           o_step+1,
-                           real_time);
-      } // end if-else
-#endif
-  // resume Stokes system solution
-  if (this->get_equation_systems().parameters.get<bool>("with_hi")) 
-  { 
-    this->resume_solution_after_output();
-  }
-  // resume Poisson system solution
-  if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+  output_filename << ".e";
+  if (o_step == 0)
   {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-      .resume_solution_after_output();
+    ExodusII_IO(mesh).write_equation_systems(output_filename.str(),
+      this->get_equation_systems());
   }
-   
+  else
+  {
+    ExodusII_IO exo(mesh);
+    exo.append(true);
+    exo.write_timestep(output_filename.str(),
+                       this->get_equation_systems(),
+                       o_step+1,
+                       real_time);
+  } // end if-else
+#endif
+
+  // resume solutions of all systems
+  // the 'resume_solution_after_output' can be different for different systems
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
+  {
+//    const std::string& s_name = this->get_equation_systems().get_system(s_id)
+//      .name();
+//    PMToolBox::output_message(std::string("-->Resume solution for system ") +
+//                              s_name, this->comm());
+    this->get_equation_systems().get_system<PMLinearImplicitSystem>
+      (s_id).resume_solution_after_output();
+  }
+
   STOP_LOG("write_equation_systems()", "PMSystemStokes");
 }
 

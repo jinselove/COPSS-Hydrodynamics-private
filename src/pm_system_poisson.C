@@ -216,19 +216,6 @@ void PMSystemPoisson::add_local_solution()
 }
 
 // ==================================================================================
-void PMSystemPoisson::test_l2_norm(bool& neighbor_list_update_flag)
-{
-  START_LOG("test_l2_norm()", "PMSystemPoisson");
-  std::string msg = "--->test in PMSystemPoisson::test_l2_norm(): \n";
-  PMToolBox::output_message(msg, this->comm());
-
-  // FIXME: to be implemented
-
-  STOP_LOG("test_l2_norm()", "PMSystemPoisson");
-}
-
-
-// ==================================================================================
 void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
 {
   START_LOG("compute_point_potential()", "PMSystemPoisson");
@@ -669,14 +656,12 @@ void PMSystemPoisson::test_potential_profile()
   STOP_LOG("test_potential_profile()", "PMSystemPoisson");
 }
 
-
-
 // =============================================================================
-void PMSystemPoisson::update_solution_for_output(const std::string&
+void PMSystemPoisson::update_solution_before_output(const std::string&
   solution_name)
 
 {
-  START_LOG("update_solution_for_output()", "PMSystemPoisson");
+  START_LOG("update_solution_before_output()", "PMSystemPoisson");
 
   // clone Poisson FEM System Solution to solution_backup
   this->solution_backup = this->solution->clone();
@@ -699,7 +684,16 @@ void PMSystemPoisson::update_solution_for_output(const std::string&
     PMToolBox::output_message(ss.str(), this->comm());
   }
 
-  STOP_LOG("update_solution_for_output()", "PMSystemPoisson");
+  STOP_LOG("update_solution_before_output()", "PMSystemPoisson");
+}
+
+void PMSystemPoisson::resume_solution_after_output()
+{
+  START_LOG("resume_solution_after_output()", "PMSystemPoisson");
+
+  *(this->solution) = *(this->solution_backup);
+
+  STOP_LOG("resume_solution_after_output()", "PMSystemPoisson");
 }
 
 } // end of namespace

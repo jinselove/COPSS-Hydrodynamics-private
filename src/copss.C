@@ -201,8 +201,7 @@ void Copss::read_physical_info()
     equil_tol = input_file("equil_tol", 1.e-6);
     // data validation
     if (ion_name.size() ==ion_diffusivity.size()
-      and ion_name.size() == ion_valence.size()
-      and ion_name.size() >= 2)
+      and ion_name.size() == ion_valence.size())
     {
       for (unsigned int j = 0; j < ion_name.size(); j++)
       {
@@ -417,7 +416,11 @@ void Copss::read_domain_info()
   }
 
   // Boundary condition for Nernst-Planck system
-  if (module_np) {
+  if (module_np)
+  {
+    // if check charge neutrality for BC
+    check_charge_neutrality = input_file("check_charge_neutrality", true);
+
     // read Dirichlet Boundary ids of NP system
     if (input_file.have_variable("boundary_id_dirichlet_np"))
     {
@@ -475,22 +478,26 @@ void Copss::read_domain_info()
         libmesh_error();
       }
     } // end for loop over ion_id
-    // validate if all Dirichlet BC is neutral
-    for (int i=0; i<boundary_id_dirichlet_np.size(); i++)
+
+    // check charge neutrality for Boundary Values
+    if (check_charge_neutrality)
     {
-      Real total_c = 0;
-      for (int ion_id=0; ion_id<boundary_value_dirichlet_np.size(); ion_id++)
+      for (int i=0; i<boundary_id_dirichlet_np.size(); i++)
       {
-        total_c += boundary_value_dirichlet_np[ion_id][i] *
-          ion_valence[ion_id];
-      }
-      if (abs(total_c) > 1.e-6)
-      {
-        ss << "Error: total ion charge (concentration*valence) is not neutral"
-              " at boundary id = "<< boundary_id_dirichlet_np[i]
-              << ". Exiting...";
-        PMToolBox::output_message(ss, *comm_in);
-        libmesh_error();
+        Real total_c = 0;
+        for (int ion_id=0; ion_id<boundary_value_dirichlet_np.size(); ion_id++)
+        {
+          total_c += boundary_value_dirichlet_np[ion_id][i] *
+                     ion_valence[ion_id];
+        }
+        if (abs(total_c) > 1.e-6)
+        {
+          ss << "Error: total ion charge (concentration*valence) is not neutral"
+                " at boundary id = "<< boundary_id_dirichlet_np[i]
+             << ". Exiting...";
+          PMToolBox::output_message(ss, *comm_in);
+          libmesh_error();
+        }
       }
     }
   } // end if molule_np
@@ -1067,57 +1074,71 @@ EquationSystems Copss::create_equation_systems()
 {
   // Initialize equation_systems object using the 'mesh' we created before
   // equation_systems = new EquationSystems(*mesh);
-  ss << "==>(1/8) Initialize equation_systems object using the 'mesh' we created before";
+  ss << "==> Initialize equation_systems object using the 'mesh' we created "
+        "before";
   PMToolBox::output_message(ss, *comm_in);
   EquationSystems equation_systems(*mesh);
 
   // Add 'Stokes' system (of PMSystemStokes) to the 'equation_systems'
-  ss << "==>(2/8) Add 'Stokes' system (of PMSystemStokes) to the 'equation_systems'";
+  ss << "==> Add 'Stokes' system (of PMSystemStokes) to the 'equation_systems'";
   PMToolBox::output_message(ss, *comm_in);
   PMSystemStokes& system = equation_systems.add_system<PMSystemStokes>("Stokes");
   
   // Add variables to 'Stokes' system"
-  ss << "==>(3/8) Add variables to 'Stokes' system";
+  ss << "----> add variables to the system";
   PMToolBox::output_message(ss, *comm_in);
-  
   u_var = system.add_variable("u", SECOND);
   v_var = system.add_variable("v", SECOND);
   if (dim == 3) w_var = system.add_variable("w", SECOND);
   const unsigned int p_var = system.add_variable("p", FIRST);
 
-  // attach object_mesh to pm_linear_implicit_system
-  ss << "==>(4/8) Attach object_mesh to the system";
+  ss << "----> attach object_mesh to the system";
   PMToolBox::output_message(ss, *comm_in);
   this->attach_object_mesh(system);
 
-  // attach period boudary to pm_linear_implicit_system
-  ss << "==>(5/8) Add period boundary conditions to 'Stokes' system";
+  // attach period boundary to the system
+  ss << "----> add period boundary conditions to the system";
   PMToolBox::output_message(ss, *comm_in);
-  this->attach_period_boundary(system);
+  // don't include "p" in the periodic variables
+  std::vector<std::string> periodic_vars {"u", "v", "w"};
+  this->attach_period_boundary(system, periodic_vars);
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     Initialize the Preconditioning matrix for saddle point problems if
-       required.
-     Initialize the equation system and zero the preconditioning matrix
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
+  // Initialize the Preconditioning matrix for saddle point problems if
+  // required. Initialize the equation system and zero the preconditioning
+  // matrix.
   if (user_defined_pc) {
+    ss << "----> add Preconditioner when user_defined_pc is true";
+    PMToolBox::output_message(ss, *comm_in);
     system.add_matrix("Preconditioner");
   }
 
-  // Poisson equation
-  if (module_poisson) {
+  // Poisson Module
+  if (module_poisson)
+  {
+    // Add 'Poisson' system to the 'equation_systems'
+    ss << "==> Add 'Poisson' system to the 'equation_systems'";
+    PMToolBox::output_message(ss, *comm_in);
     PMSystemPoisson& system_poisson =
       equation_systems.add_system<PMSystemPoisson>("Poisson");
+
+    // Add variables to the system
+    ss << "----> add variables to the system";
+    PMToolBox::output_message(ss, *comm_in);
     phi_var = system_poisson.add_variable("phi", SECOND);
 
-    // Attach point_mesh to PMSystemPoisson
+    // attach object_mesh to the system
+    ss << "----> attach object_mesh to the system";
+    PMToolBox::output_message(ss, *comm_in);
     this->attach_object_mesh(system_poisson);
-    this->attach_period_boundary(system_poisson);
+
+    // attach period boundary to the system
+    ss << "----> add period boundary conditions to the system";
+    PMToolBox::output_message(ss, *comm_in);
+    std::vector<std::string> periodic_vars {"phi"};
+    this->attach_period_boundary(system_poisson, periodic_vars);
   }
 
-  // Nernst-Planck equation
+  // Nernst-Planck Module
   if (module_np)
   {
     // add a NP system to equation systems for each ion
@@ -1125,22 +1146,39 @@ EquationSystems Copss::create_equation_systems()
     {
       std::string np_sys_name = std::string("NP") + ":" + ion_name[ion_id];
       std::string np_var_name = std::string("c") + ":" + ion_name[ion_id];
+
       // Add This NP system to equation_systems and get a reference
+      ss << "==> Add " << np_sys_name << " system to the 'equation_systems'";
+      PMToolBox::output_message(ss, *comm_in);
       PMSystemNP& system_np = equation_systems.add_system<PMSystemNP>
         (np_sys_name);
-      // Add variable to this NP system
+
+      // Add variables to the system
+      ss << "----> add variables to the system";
+      PMToolBox::output_message(ss, *comm_in);
       c_var = system_np.add_variable(np_var_name, SECOND);
-      // attach ion type (id and name) to this NP system
-      system_np.attach_ion_type(ion_id, ion_name[ion_id]);
-      // Attach point mesh to this NP system
+
+      // attach object_mesh to the system
+      ss << "----> attach object_mesh to the system";
+      PMToolBox::output_message(ss, *comm_in);
       this->attach_object_mesh(system_np);
-      // Attach periodic boundary object to this NP system
-      this->attach_period_boundary(system_np);
+
+      // attach period boundary to the system
+      ss << "----> add period boundary conditions to the system";
+      PMToolBox::output_message(ss, *comm_in);
+      std::vector<std::string> periodic_vars {np_var_name};
+      this->attach_period_boundary(system_np, periodic_vars);
+
+      // attach ion type (id and name) to the system
+      ss << "----> attach ion type to the system";
+      PMToolBox::output_message(ss, *comm_in);
+      system_np.attach_ion_type(ion_id, ion_name[ion_id]);
     }
   }
 
   /* Initialize the data structures for the equation system. */
-  ss << "==>(6/8) Init equation_systems (libmesh function, to init all systems in equation_systems)";
+  ss << "==> Init equation_systems (libmesh function, to init all systems in "
+        "equation_systems)";
   PMToolBox::output_message(ss, *comm_in);
   equation_systems.init();
   // zero the PC matrix, which MUST be done after es.init()
@@ -1151,16 +1189,16 @@ EquationSystems Copss::create_equation_systems()
   }
 
   // set parameters for equation systems
-  ss << "==>(7/8) Set parameters of equation_systems";
+  ss << "==> Set parameters of equation_systems";
   PMToolBox::output_message(ss, *comm_in);
   this->set_parameters(equation_systems);
 
-  // initialized force field
-  ss << "==>(8/8) Attach fixes to 'stokes' system";
+  // attach fixes to Stokes system for force field calculation
+  ss << "==> attach fixes to 'stokes' system";
   PMToolBox::output_message(ss, *comm_in);
   this->attach_fixes(system);
 
-  /* Print information about the mesh and system to the screen. */
+  // Print information about the mesh and system to the screen.
   ss << "--------------> Print equation systems info" << "\n"
      << "  System has: " << mesh->n_elem() << " elements,\n"
      << "              " << mesh->n_nodes() << " nodes,\n"
@@ -1187,258 +1225,54 @@ void Copss::attach_fixes(PMLinearImplicitSystem& pm_system)
 }
 
 // ===============================================================================
-void Copss::attach_period_boundary(PMLinearImplicitSystem& system)
+void Copss::attach_period_boundary(PMLinearImplicitSystem& system,
+  std::vector<std::string>& periodic_vars)
 {
-  if (system.name() == "Stokes") {
-    ss << "--------------> Get dof_map of 'Stokes' system";
-    PMToolBox::output_message(ss, *comm_in);
-    DofMap& dof_map = system.get_dof_map();
-    ss << "--------------> Add periodicBoundary object to 'dof_map'";
-    PMToolBox::output_message(ss, *comm_in);
-    /*** set PBC in x-direction ***/
-    if (periodicity[0])
-    {
-      PeriodicBoundary pbcx(RealVectorValue(wall_params[1] - wall_params[0],
-                                            0.,
-                                            0.));
-      pbcx.set_variable(u_var);
-      pbcx.set_variable(v_var);
-      pbcx.set_variable(w_var);
-      // pbcx.set_variable(p_var); //*** NOT include p!
-      pbcx.myboundary     = slitMesh_boundary_id[0]; 
-      pbcx.pairedboundary = slitMesh_boundary_id[1];
-      dof_map.add_periodic_boundary(pbcx);
-      // check
-      if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
-      {
-        ss << "*********************** Error in Stokes PBC: "
-             "*************************\n"
-           << "**** The search radius is larger than half domain length in x direction\n!"
-           << "**** search radius = " << search_radius_p
-           << ", half domain size Lx/2 =" << (wall_params[1] - wall_params[0]) / 2. << "\n"
-           << "************************************************************************\n";
-        PMToolBox::output_message(ss, *comm_in);
-        libmesh_error();
-      }
-    }
-
-    /*** set PBC in y-direction ***/
-    if (periodicity[1])
-    {
-      PeriodicBoundary pbcy(RealVectorValue(0.,
-                                            wall_params[3] - wall_params[2],
-                                            0.));
-      pbcy.set_variable(u_var);
-      pbcy.set_variable(v_var);
-      pbcy.set_variable(w_var);
-      // pbcy.set_variable(p_var); //*** NOT include p!
-      pbcy.myboundary     = slitMesh_boundary_id[2]; 
-      pbcy.pairedboundary = slitMesh_boundary_id[3];
-      dof_map.add_periodic_boundary(pbcy);
-      // check
-      if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
-      {
-        ss << "*********************** Error in Stokes PBC: "
-             "*************************\n"
-           << "**** The search radius is larger than half domain length in y direction\n!"
-           << "**** search radius = " << search_radius_p
-           << ", half domain size Ly/2 =" << (wall_params[3] - wall_params[2]) / 2. << "\n"
-           << "************************************************************************\n";
-        PMToolBox::output_message(ss, *comm_in);
-        libmesh_error();
-      }
-    }
-
-    /*** set PBC in z-direction ***/
-    if (periodicity[2])
-    {
-      PeriodicBoundary pbcz(RealVectorValue(0.,
-                                            0.,
-                                            wall_params[5] - wall_params[4]));
-      pbcz.set_variable(u_var);
-      pbcz.set_variable(v_var);
-      pbcz.set_variable(w_var);
-      // pbcz.set_variable(p_var); //*** NOT include p!
-      pbcz.myboundary     = slitMesh_boundary_id[4];
-      pbcz.pairedboundary = slitMesh_boundary_id[5];
-      dof_map.add_periodic_boundary(pbcz);
-      // check
-      if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
-      {
-        ss << "*********************** Error in Stokes PBC: "
-             "*************************\n"
-           << "**** The search radius is larger than half domain length in z direction\n!"
-           << "**** search radius = " << search_radius_p
-           << ", half domain size Lz/2 =" << (wall_params[5] - wall_params[4]) / 2. << "\n"
-           << "************************************************************************\n";
-        PMToolBox::output_message(ss, *comm_in);
-        libmesh_error();
-      }
-    }
-  }
-  else if (system.name() == "Poisson") {
-    ss << "--------------> Get dof_map of 'Poisson' system";
-    PMToolBox::output_message(ss, *comm_in);
-    DofMap& dof_map = system.get_dof_map();
-    ss << "--------------> Add periodicBoundary object to 'dof_map'";
-    PMToolBox::output_message(ss, *comm_in);
-    /*** set PBC in x-direction ***/
-    if (periodicity[0])
-    {
-      PeriodicBoundary pbcx(RealVectorValue(wall_params[1] - wall_params[0],
-                                            0.,
-                                            0.));
-      pbcx.set_variable(phi_var);
-      pbcx.myboundary     = slitMesh_boundary_id[0];
-      pbcx.pairedboundary = slitMesh_boundary_id[1];
-      dof_map.add_periodic_boundary(pbcx);
-      // check
-      if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
-      {
-          ss << "*********************** Error in Poisson PBC: "
-               "*************************\n"
-             << "**** The search radius is larger than half domain length in x direction\n!"
-             << "**** search radius = " << search_radius_p
-             << ", half domain size Lx/2 =" << (wall_params[1] - wall_params[0]) / 2. << "\n"
-             << "************************************************************************\n";
-          PMToolBox::output_message(ss, *comm_in);
-          libmesh_error();
-      }
-    }
-    
-    /*** set PBC in y-direction ***/
-    if (periodicity[1])
-    {
-      PeriodicBoundary pbcy(RealVectorValue(0.,
-                                            wall_params[3] - wall_params[2],
-                                            0.));
-      pbcy.set_variable(phi_var);
-    
-      pbcy.myboundary     = slitMesh_boundary_id[2];
-      pbcy.pairedboundary = slitMesh_boundary_id[3];
-      dof_map.add_periodic_boundary(pbcy);
-      // check
-      if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
-      {
-          ss << "*********************** Error in Poisson PBC: "
-               "*************************\n"
-             << "**** The search radius is larger than half domain length in y direction\n!"
-             << "**** search radius = " << search_radius_p
-             << ", half domain size Ly/2 =" << (wall_params[3] - wall_params[2]) / 2. << "\n"
-             << "************************************************************************\n";
-          PMToolBox::output_message(ss, *comm_in);
-          libmesh_error();
-      }
-    }
-    
-    /*** set PBC in z-direction ***/
-    if (periodicity[2])
-    {
-      PeriodicBoundary pbcz(RealVectorValue(0.,
-                                            0.,
-                                            wall_params[5] - wall_params[4]));
-      pbcz.set_variable(phi_var);
-      pbcz.myboundary     = slitMesh_boundary_id[4];
-      pbcz.pairedboundary = slitMesh_boundary_id[5];
-      dof_map.add_periodic_boundary(pbcz);
-      // check
-      if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
-      {
-          ss << "*********************** Error in Poisson PBC: "
-               "*************************\n"
-             << "**** The search radius is larger than half domain length in z direction\n!"
-             << "**** search radius = " << search_radius_p
-             << ", half domain size Lz/2 =" << (wall_params[5] - wall_params[4]) / 2. << "\n"
-             << "************************************************************************\n";
-          PMToolBox::output_message(ss, *comm_in);
-          libmesh_error();
-      }
-    }
-  }
-  else if (system.name() == "NP")
+  ss << "--------> Get dof_map of " << system.name() << " system.";
+  PMToolBox::output_message(ss, *comm_in);
+  DofMap& dof_map = system.get_dof_map();
+  ss << "--------> Create periodicBoundary object and add to dof_map";
+  PMToolBox::output_message(ss, *comm_in);
+  // loop over each direction
+  for (int dim_i = 0; dim_i < dim; dim_i++)
   {
-    ss << "--------------> Get dof_map of 'NP' system";
-    PMToolBox::output_message(ss, *comm_in);
-    DofMap& dof_map = system.get_dof_map();
-    ss << "--------------> Add periodicBoundary object to 'dof_map'";
-    PMToolBox::output_message(ss, *comm_in);
-    /*** set PBC in x-direction ***/
-    if (periodicity[0])
+    // proceed if this direction is periodic
+    if (periodicity[dim_i])
     {
-      PeriodicBoundary pbcx(RealVectorValue(wall_params[1] - wall_params[0],
-                                            0.,
-                                            0.));
-      pbcx.set_variable(c_var);
-      pbcx.myboundary     = slitMesh_boundary_id[0];
-      pbcx.pairedboundary = slitMesh_boundary_id[1];
-      dof_map.add_periodic_boundary(pbcx);
-      // check
-      if (search_radius_p >= (wall_params[1] - wall_params[0]) / 2.)
+      // create a PeriodicBoundary object
+      PeriodicBoundary pbc(RealVectorValue(
+        (wall_params[1] - wall_params[0]) * (dim_i==0),
+        (wall_params[3] - wall_params[2]) * (dim_i==1),
+        (wall_params[5] - wall_params[4]) * (dim_i==2)));
+      // add all variables to the pbc object
+      for (unsigned int var_id=0; var_id < periodic_vars.size(); var_id++)
       {
-        ss << "*********************** Error in NP PBC: ********************\n"
-           << "**** The search radius is larger than half domain length in x direction\n!"
-           << "**** search radius = " << search_radius_p
-           << ", half domain size Lx/2 =" << (wall_params[1] - wall_params[0]) / 2. << "\n"
-           << "************************************************************************\n";
+        ss << "=======> add variable to pbc : variable name = "
+           << periodic_vars[var_id] << "; variable_id = "
+           << system.variable_number(periodic_vars[var_id]);
+        PMToolBox::output_message(ss, *comm_in);
+        pbc.set_variable(system.variable_number(periodic_vars[var_id]));
+      }
+      // set myboundary and pairedboundary
+      pbc.myboundary     = slitMesh_boundary_id[2 * dim_i];
+      pbc.pairedboundary = slitMesh_boundary_id[2 * dim_i + 1];
+      // check if the PBC is valid (particle search radius = 4/alpha <=
+      // half of the box length in this direction)
+      if (search_radius_p >= (wall_params[2 * dim_i + 1] - wall_params[2 *
+      dim_i]) / 2.)
+      {
+        ss << "Error: GGEM particle search radius is larger than half domain "
+              "length in " << dim_i << "direction! "
+              << "(search radius = 4./alpha" << search_radius_p
+              << ", half domain size Lx/2 = " << (wall_params[dim_i * 2 + 1]
+              - wall_params[dim_i * 2]) / 2. << "). Exiting ...";
         PMToolBox::output_message(ss, *comm_in);
         libmesh_error();
       }
-    }
-
-    /*** set PBC in y-direction ***/
-    if (periodicity[1])
-    {
-      PeriodicBoundary pbcy(RealVectorValue(0.,
-                                            wall_params[3] - wall_params[2],
-                                            0.));
-      pbcy.set_variable(c_var);
-
-      pbcy.myboundary     = slitMesh_boundary_id[2];
-      pbcy.pairedboundary = slitMesh_boundary_id[3];
-      dof_map.add_periodic_boundary(pbcy);
-      // check
-      if (search_radius_p >= (wall_params[3] - wall_params[2]) / 2.)
-      {
-        ss << "*********************** Error in NP PBC: *******************\n"
-           << "**** The search radius is larger than half domain length in y direction\n!"
-           << "**** search radius = " << search_radius_p
-           << ", half domain size Ly/2 =" << (wall_params[3] - wall_params[2]) / 2. << "\n"
-           << "************************************************************************\n";
-        PMToolBox::output_message(ss, *comm_in);
-        libmesh_error();
-      }
-    }
-
-    /*** set PBC in z-direction ***/
-    if (periodicity[2])
-    {
-      PeriodicBoundary pbcz(RealVectorValue(0.,
-                                            0.,
-                                            wall_params[5] - wall_params[4]));
-      pbcz.set_variable(c_var);
-      pbcz.myboundary     = slitMesh_boundary_id[4];
-      pbcz.pairedboundary = slitMesh_boundary_id[5];
-      dof_map.add_periodic_boundary(pbcz);
-      // check
-      if (search_radius_p >= (wall_params[5] - wall_params[4]) / 2.)
-      {
-        ss << "*********************** Error in NP PBC: "
-             "*************************\n"
-           << "**** The search radius is larger than half domain length in z direction\n!"
-           << "**** search radius = " << search_radius_p
-           << ", half domain size Lz/2 =" << (wall_params[5] - wall_params[4]) / 2. << "\n"
-           << "************************************************************************\n";
-        PMToolBox::output_message(ss, *comm_in);
-        libmesh_error();
-      }
-    }
-  }
-  else
-  {
-    ss << "Error: system " << system.name() << " not supported. Exiting...\n";
-    PMToolBox::output_message(ss, *comm_in);
-    libmesh_error();
-  }
+      // add pbc object to dof_map
+      dof_map.add_periodic_boundary(pbc);
+    } // end if (periodicity[dim_i])
+  } // end for loop over dim_i
 }
 
 // ============================================================================================
@@ -1574,7 +1408,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
    * write equation system at step i
    * print out information at step 0
    * do not print out information at the first step when restart since it is
-   *identical to the
+   * identical to the
    * last step before restart.
      -----------------------------------------------------------------------------------------*/
   if (i % write_interval == 0) 

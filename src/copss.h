@@ -177,6 +177,7 @@ public:
                    boundary_value_neumann_poisson;
 
   // Boundary conditions for Nernst-Planck system
+  bool check_charge_neutrality;
   std::vector<unsigned int> boundary_id_dirichlet_np;
   std::vector<std::vector<Real> > boundary_value_dirichlet_np;
 
@@ -414,7 +415,8 @@ protected:
    * Steps for create_equation_systems
    */
   virtual void attach_object_mesh(PMLinearImplicitSystem& system) = 0;
-  void         attach_period_boundary(PMLinearImplicitSystem& system);
+  void         attach_period_boundary(PMLinearImplicitSystem& system,
+    std::vector<std::string>& periodic_vars);
   virtual void set_parameters(EquationSystems& equation_systems) = 0;
 
   // force field

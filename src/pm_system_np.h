@@ -73,6 +73,17 @@ public:
    */
   void attach_ion_type(const int& _ion_id, const std::string& _ion_name);
 
+
+  /**
+   * Set up the initial condition for NP system
+   * Basically, we need to initialize the NP system solution at time 0
+   */
+   // fixme: current implementation treats boundary elements and bulk
+   //  elements the same due to a technical issue. Need to fix the issue if
+   //  thinking differently.
+  void init_cd();
+
+
   /**
    * Assemble the system matrix.
    * option ==
@@ -112,18 +123,25 @@ public:
 
 
   /**
-   * Compute the L2-error in an unbounded domain
-   * This function does not apply to NP system
+   * update system solution for output equation systems
+   * There is only 'total' solution for NP system, no need to update
    */
-  void test_l2_norm(bool& neighbor_list_update_flag) override {};
-
+  void update_solution_before_output(const std::string& solution_name = "total")
+    override
+    {
+      // we don't need solution_name input, but we have to put it in
+      // function
+      // definition since it's overriding the virtual function in parent class
+      (void) solution_name;
+    };
 
   /**
-   * update system solution for output equation systems
-   * fixme:implement this function after NP system is built
+   * override the resume_solution_after_output defined in
+   * PMLinearImplicitSystem class.
+   * We don't need to do anything in this resume function for NP system since
+   * we didn't do anything in the update_solution_before_output function
    */
-  void update_solution_for_output(const std::string& solution_name = "total")
-    override {};
+  void resume_solution_after_output() override {};
 
 
   /**
@@ -140,8 +158,34 @@ public:
     return _solver_np;
   }
 
+
+  /**
+   * Initial solution function prototype.  This gives the exact
+   * solution as a function of space and time.  In this case the
+   * initial condition will be taken as the exact solution at time 0
+   */
+
+  static Number init_solution (const Point & p,
+                              const Parameters & parameters,
+                              const std::string &,
+                              const std::string &);
+
+  /**
+   * The initial solution at time 0 on the boundaries will be set by this
+   * function
+   */
+  //fixme: implement this function to assign different initial conditions for
+  //elements on boundaries versus in bulk
+//  static Number init_solution_bc (const Point & p,
+//                                 const Parameters & parameters,
+//                                 const std::string &,
+//                                 const std::string &);
+
+  // total time
+  Real system_time;
+
   // time stepping for NP system
-  Real dt_np;
+  Real system_dt;
 
   // ion id
   int ion_id;

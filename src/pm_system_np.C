@@ -25,6 +25,7 @@
 #include <utility>
 #include <algorithm>
 #include <time.h>
+#include <math.h>
 
 // libmesh head files
 #include "libmesh/petsc_matrix.h"
@@ -70,17 +71,120 @@ void PMSystemNP::clear()
 // =================================================================
 void PMSystemNP::attach_ion_type(const int& _ion_id,
                                  const std::string& _ion_name)
-    {
-      ion_id = _ion_id;
-      ion_name = _ion_name;
-      if (this->name() != (std::string("NP")+":"+ion_name))
-      {
-        PMToolBox::output_message("Error: system name is not the same as "
-                                  "NP:'ion_name'. Exiting...", this->comm());
-        libmesh_error();
-      }
-    }
+{
+  START_LOG("attach_ion_type()", "PMSystemNP");
 
+  ion_id = _ion_id;
+  ion_name = _ion_name;
+  if (this->name() != (std::string("NP")+":"+ion_name))
+  {
+    PMToolBox::output_message("Error: system name is not the same as "
+                              "NP:'ion_name'. Exiting...", this->comm());
+    libmesh_error();
+  }
+
+  STOP_LOG("attach_ion_type()", "PMSystemNP");
+}
+
+// =============================================================
+Number PMSystemNP::init_solution(const Point & p,
+                                 const Parameters & parameters,
+                                 const std::string &,
+                                 const std::string &)
+{
+  // special initial conditions for our test system
+  if (parameters.get<std::string>("simulation_name")=="np_validation_analytic")
+  {
+    // the position of instant source at t = 0.
+    Point p0(0.);
+    // num = (p - velocity*t - p0)^2
+    Real num = 0.;
+    for (int dim_i=0; dim_i < 3; dim_i++)
+    {
+      num += pow(p(dim_i) - p0(dim_i), 2.);
+    }
+    // den = D * (4. * t + 1)
+    const Real& D = parameters.get<std::vector<Real>>("ion_diffusivity")[0];
+    const Real den = D;
+    // return exp(-num/den) / (4. * t + 1)^1.5
+    return exp(-num / den);
+  }
+  // in general the initial condition is just 0. everywhere
+  else return 0.;
+}
+
+// =============================================================
+//Number PMSystemNP::init_solution_bc (const Point & p,
+//                                     const Parameters & parameters,
+//                                     const std::string &,
+//                                     const std::string &)
+//{
+//  return 1.;
+//}
+
+// =============================================================
+void PMSystemNP::init_cd()
+{
+  START_LOG("init_cd()", "PMSystemNP");
+
+  // Initialize parameters related to NP system
+  ion_diffusivity = this->get_equation_systems().parameters
+                      .get<std::vector<Real>>("ion_diffusivity")[ion_id];
+  ion_valence = this->get_equation_systems().parameters
+                  .get<std::vector<int>>("ion_valence")[ion_id];
+  boundary_id_dirichlet_np = this->get_equation_systems().parameters
+                               .get<std::vector<unsigned int>>("boundary_id_dirichlet_np");
+  boundary_value_dirichlet_np = this->get_equation_systems().parameters
+                                  .get<std::vector<std::vector<Real>>>("boundary_value_dirichlet_np")[ion_id];
+  equil_tol = this->get_equation_systems().parameters.get<Real>("equil_tol");
+  system_dt = this->get_equation_systems().parameters.get<Real>("dt_np");
+
+  // Initialize system time
+  system_time = 0.;
+  this->get_equation_systems().parameters.set<Real>("time_np") = system_time;
+
+  // project initial conditions on All elements
+  this->project_solution(init_solution, libmesh_nullptr,
+    this->get_equation_systems().parameters);
+
+  // project Dirichlet BC on initial solutions
+  // fixme: the bounary_project_solution is not able to work in parallel
+  //  because of memory issue, need to figure out why if we need to assign
+  //  different initial conditions on boundaries versus in bulk
+//  PMToolBox::output_message("----> Set initial solution for boundary "
+//                            "elements.", this->comm());
+//  for (unsigned int i = 0; i < boundary_id_dirichlet_np.size(); i++)
+//  {
+//    PMToolBox::output_message(std::string("** for boundary id") + std::to_string
+//    (i), this->comm());
+//    // create a boundary id set for this boundary
+//    std::set <boundary_id_type> b{boundary_id_type(boundary_id_dirichlet_np[i])};
+//    // we only have one variable 'c'
+//    std::vector<unsigned int> variables{0};
+//    // project boundary value defined in init_solution_bc () to the
+//    // boundary nodes in initial solution
+//    PMToolBox::output_message(std::string("--------> On Dirichlet Boundary: ")
+//                              + std::to_string
+//                                (boundary_id_dirichlet_np[i]),
+//                              this->comm());
+//    this->boundary_project_solution(b, variables, init_solution_bc,
+//                                    libmesh_nullptr,
+//                                    this->get_equation_systems().parameters);
+//  }
+
+  // Write initial condition to 'init_cd.e'
+#ifdef LIBMESH_HAVE_EXODUS_API
+  MeshBase& mesh = this->get_mesh();
+
+  PMToolBox::output_message("----> Writing initial condition of NP system",
+    this->comm());
+
+  ExodusII_IO(mesh).write_equation_systems("init_cd.e",
+    this->get_equation_systems());
+#endif
+
+  STOP_LOG("init_cd()", "PMSystemNP");
+}
 
 // ===========================================================
 void PMSystemNP::assemble_matrix(const std::string& system_name,
@@ -101,7 +205,7 @@ void PMSystemNP::assemble_matrix(const std::string& system_name,
   STOP_LOG("assemble_matrix()", "PMSystemNP");
 }
 
-// ==================================================================================
+// =========================================================================
 void PMSystemNP::assemble_rhs(const std::string& system_name,
                               const std::string& option)
 {
@@ -129,14 +233,14 @@ void PMSystemNP::solve(const std::string& option)
   // this should only happen at the first timestep
   if (_re_init)
   {
-    // init NP system parameters
-    this->init_params();
-
     // Set the solver type for the NP equation
     const SystemSolverType solver_type =
       this->get_equation_systems().parameters.get<SystemSolverType>(
         "solver_type_np");
     _solver_np.set_solver_type(solver_type);
+
+    // Set up the initial condition for this transient system
+    this->init_cd();
 
     // Assemble the global matrix
     this->assemble_matrix(this->name(), option);
@@ -157,35 +261,6 @@ void PMSystemNP::solve(const std::string& option)
   STOP_LOG("solve()", "PMSystemNP");
 }
 
-// =========================================================================
-void PMSystemNP::init_params()
-{
-  START_LOG("init_params()", "PMSystemNP");
-
-  // time stepping for NP system
-  dt_np = this->get_equation_systems().parameters.get<Real>("dt_np");
-
-  // ion diffusivity
-  ion_diffusivity = this->get_equation_systems().parameters
-    .get<std::vector<Real>>("ion_diffusivity")[ion_id];
-
-  // ion valence
-  ion_valence = this->get_equation_systems().parameters
-    .get<std::vector<int>>("ion_valence")[ion_id];
-
-  // Dirichlet Boundary id for this ion
-  boundary_id_dirichlet_np = this->get_equation_systems().parameters
-    .get<std::vector<unsigned int>>("boundary_id_dirichlet_np");
-
-  // Dirichlet Boundary value for this ion
-  boundary_value_dirichlet_np = this->get_equation_systems().parameters
-    .get<std::vector<std::vector<Real>>>("boundary_value_dirichlet_np")[ion_id];
-
-  // equilibrium tolerance
-  equil_tol = this->get_equation_systems().parameters.get<Real>("equil_tol");
-
-  STOP_LOG("init_params()", "PMSystemNP");
-}
 // =========================================================================
 void PMSystemNP::test_concentration_profile()
 {

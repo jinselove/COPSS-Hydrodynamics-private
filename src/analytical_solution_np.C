@@ -64,8 +64,7 @@ PointMesh<3> * AnalyticalSolutionNP::get_point_mesh()
 
 // ======================================================================
 Real AnalyticalSolutionNP::exact_solution_infinite_domain(const Point& pt0,
-  const Real& t)
-const
+                                                          const Real& t) const
 {
   START_LOG("exact_solution_infinite_domain()", "AnalyticalSolutionNP");
 

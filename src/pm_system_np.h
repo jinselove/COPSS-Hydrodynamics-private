@@ -76,12 +76,18 @@ public:
 
   /**
    * Set up the initial condition for NP system
-   * Basically, we need to initialize the NP system solution at time 0
+   * By default, we need to initialize the NP system solution at time 0
+   * When input parameter relax_t_final > 0., we will relax the NP system
+   * until relax_t_final by time step np_system.system_dt with poisson system
+   * on but stokes system off. The purpose of doing such relaxation is to
+   * make sure ion cloud accommodate with charged particles so that the
+   * simulation does not takes forever in the initial stages. Rule of thumb
+   * of relax_t_final is ~2 * diffusion time of ions over the particle radius
    */
    // fixme: current implementation treats boundary elements and bulk
    //  elements the same due to a technical issue. Need to fix the issue if
    //  thinking differently.
-  void init_cd();
+  void init_cd(const Real& relax_t_final = 0.);
 
 
   /**
@@ -204,9 +210,6 @@ public:
 
   // Dirichlet Boundary value for this ion
   std::vector<Real> boundary_value_dirichlet_np;
-
-  // equilibrium tolerance for ion concentration
-  Real equil_tol;
 
 private:
 

@@ -197,16 +197,16 @@ void Copss::read_physical_info()
     ion_diffusivity.resize(input_file.vector_variable_size("ion_diffusivity"));
     // valence of all ion species (1)
     ion_valence.resize(input_file.vector_variable_size("ion_valence"));
-    // equilibrium tolerance (M)
-    equil_tol = input_file("equil_tol", 1.e-6);
-    // data validation
+    // real in data for individual ions
     if (ion_name.size() ==ion_diffusivity.size()
       and ion_name.size() == ion_valence.size())
     {
       for (unsigned int j = 0; j < ion_name.size(); j++)
       {
         ion_name[j] = input_file("ion_name", "", j);
-        ion_diffusivity[j] = input_file("ion_diffusivity", 0.0, j);
+        // get ion_diffusivity and normalize it using characteristic
+        // diffusion coefficient
+        ion_diffusivity[j] = input_file("ion_diffusivity", 0.0, j) / Db;
         ion_valence[j] = input_file("ion_valence", 0, j);
       }
     }
@@ -218,6 +218,9 @@ void Copss::read_physical_info()
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
+    // np system relaxation time for initialization (unit = tc)
+    np_system_relaxation_time = input_file("np_system_relaxation_time",
+      2. * (*std::min_element(ion_diffusivity.begin(), ion_diffusivity.end())));
   } // end if module_np
 
   // print out physical parameters information related to Stokes System
@@ -254,14 +257,18 @@ void Copss::read_physical_info()
     ss << "   characteristic ion concentration = " << c0 << " (M)\n"
        << "   finite-difference time step for NP system, dt_np = " << dt_np
        << " (unit=characteristic time tc)\n"
+       << "   relaxation time for system initialization, "
+          "np_system_relaxation_time = " << np_system_relaxation_time
+          << " (unit=characteristic time tc)\n"
        << "   ------------> parameters of all ion species:\n";
     for (int i=0; i<ion_name.size(); i++)
     {
       ss << "   " << ion_name[i] << " : "
-         << "diffusivity (um^2/s) = " << ion_diffusivity[i] << "; "
-         << "valence (1) = " << ion_valence[i] << "\n";
+         << "ion diffusivity = " << ion_diffusivity[i]
+         << "(unit = bead diffusivity Db)"
+         << "valence = " << ion_valence[i] << " (unit = 1)";
     }
-    ss << "   equilibrium concentration tolerance (M): " << equil_tol << "\n";
+
   } // end if module_np
   // output message
   PMToolBox::output_message(ss, *comm_in);

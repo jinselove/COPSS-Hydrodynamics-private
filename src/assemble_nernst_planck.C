@@ -314,34 +314,53 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
       Number c_old = 0.;
       Gradient gradient_c_old;
 
-      // compute the old solution & its gradient at this qp point
-      for (unsigned int l=0; l<phi.size(); l++)
+      if(option=="diffusion")
       {
-        // get old solution at this qp point
-        // notice that we are not using Libmesh::TransientSystem, thus the
-        // current_solution of our system is actually solution from previous
-        // time step
-        c_old += phi[l][qp] * np_system.current_solution(dof_indices[l]);
-        // get solution gradient at this qp_point
-        gradient_c_old.add_scaled(dphi[l][qp], np_system.current_solution
-          (dof_indices[l]));
+        // compute the old solution & its gradient at this qp point
+        for (unsigned int l=0; l<phi.size(); l++)
+        {
+          // get old solution at this qp point
+          // notice that we are not using Libmesh::TransientSystem, thus the
+          // current_solution of our system is actually solution from previous
+          // time step
+          c_old += phi[l][qp] * np_system.current_solution(dof_indices[l]);
+          // get solution gradient at this qp_point
+          gradient_c_old.add_scaled(dphi[l][qp], np_system.current_solution
+            (dof_indices[l]));
+        }
+
+        // Now compute the element rhs
+        for (unsigned int i=0; i<phi.size(); i++)
+        {
+          Fe(i) += JxW[qp] * (
+            // Mass term
+            c_old * phi[i][qp]
+            // diffusion term when using semi-implicit Euler
+            // for diffusion
+            - 0.5 * np_system.system_dt * np_system
+              .ion_diffusivity * gradient_c_old * dphi[i][qp]
+          );
+        }
+      }
+      else if(option=="diffusion&convection")
+      {
+
+      }
+      else if(option=="diffusion&electrostatics")
+      {
+
+      }
+      else if(option=="diffusion&electrostatics&convection")
+      {
+
+      }
+      else
+      {
+        std::cout << "Error: unsupported option to assembel global F for NP "
+                     "system. Exiting..." << std::endl;
+        libmesh_error();
       }
 
-      // Now compute the element rhs
-      for (unsigned int i=0; i<phi.size(); i++)
-      {
-        Fe(i) += JxW[qp] * (
-                            // Mass term
-                            c_old * phi[i][qp]
-                            // diffusion term when using semi-implicit Euler
-                            // for diffusion
-                            - 0.5 * np_system.system_dt * np_system
-                              .ion_diffusivity * gradient_c_old * dphi[i][qp]
-                            // Fixme: convection term contribution
-
-                            // Fixme: electrostatics term contribution
-                           );
-      }
 
       // apply bc by penalty
       this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);

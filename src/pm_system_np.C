@@ -38,6 +38,7 @@
 #include "pm_toolbox.h"
 #include "brownian_system.h"
 #include "pm_system_np.h"
+#include "pm_system_poisson.h"
 
 namespace libMesh {
 // ======================================================================================
@@ -50,6 +51,7 @@ PMSystemNP::PMSystemNP(EquationSystems  & es,
   // NP equation assembly
   _assemble_np = (new AssembleNP(es, "NP"));
   analytical_solution = _assemble_np->get_analytical_solution();
+  system_time = 0.;
 }
 
 // ==================================================================================
@@ -123,27 +125,15 @@ Number PMSystemNP::init_solution(const Point & p,
 //}
 
 // =============================================================
-void PMSystemNP::init_cd()
+void PMSystemNP::init_cd(const Real& relax_t_final)
 {
   START_LOG("init_cd()", "PMSystemNP");
 
-  // Initialize parameters related to NP system
-  ion_diffusivity = this->get_equation_systems().parameters
-                      .get<std::vector<Real>>("ion_diffusivity")[ion_id];
-  ion_valence = this->get_equation_systems().parameters
-                  .get<std::vector<int>>("ion_valence")[ion_id];
-  boundary_id_dirichlet_np = this->get_equation_systems().parameters
-                               .get<std::vector<unsigned int>>("boundary_id_dirichlet_np");
-  boundary_value_dirichlet_np = this->get_equation_systems().parameters
-                                  .get<std::vector<std::vector<Real>>>("boundary_value_dirichlet_np")[ion_id];
-  equil_tol = this->get_equation_systems().parameters.get<Real>("equil_tol");
+  // get time interval for NP system
   system_dt = this->get_equation_systems().parameters.get<Real>("dt_np");
 
-  // Initialize system time
-  system_time = 0.;
-  this->get_equation_systems().parameters.set<Real>("time_np") = system_time;
-
-  // project initial conditions on All elements
+  // project initial conditions on both bulk and boundary elements. By
+  // default, the initial ion concentration is set to be 0 across the domain
   this->project_solution(init_solution, libmesh_nullptr,
     this->get_equation_systems().parameters);
 
@@ -172,16 +162,37 @@ void PMSystemNP::init_cd()
 //                                    this->get_equation_systems().parameters);
 //  }
 
-  // Write initial condition to 'init_cd.e'
-#ifdef LIBMESH_HAVE_EXODUS_API
-  MeshBase& mesh = this->get_mesh();
+  // relax NP system with Poisson System on
+  while(system_time < relax_t_final)
+  {
+    // solve the NP system with the coupling of diffusion & electrostatics, i
+    // .e., turn the fluid off, if "module_poisson" is true
+    if(this->get_equation_systems().parameters.get<bool>("module_poisson"))
+    {
+      // need to solve the poisson system first before solving NP system
+      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+        .solve("unused");
+      // solve the coupled NP system
+      this->solve("diffusion&electrostatics");
+    }
+    // solve the NP system alone, i.e., diffusion only if "module_poisson" if
+    // false
+    else
+    {
+      this->solve("diffusion");
+    }
+    system_time += system_dt;
+  }
 
-  PMToolBox::output_message("----> Writing initial condition of NP system",
-    this->comm());
+  // write relaxed initial condition to output
+  #ifdef LIBMESH_HAVE_EXODUS_API
+    MeshBase& mesh = this->get_mesh();
+    ExodusII_IO(mesh).write_equation_systems("initial_condition.e",
+      this->get_equation_systems());
+  #endif
 
-  ExodusII_IO(mesh).write_equation_systems("init_cd.e",
-    this->get_equation_systems());
-#endif
+  // resume system time to 0. after relaxation
+  system_time = 0.;
 
   STOP_LOG("init_cd()", "PMSystemNP");
 }
@@ -239,9 +250,6 @@ void PMSystemNP::solve(const std::string& option)
         "solver_type_np");
     _solver_np.set_solver_type(solver_type);
 
-    // Set up the initial condition for this transient system
-    this->init_cd();
-
     // Assemble the global matrix
     this->assemble_matrix(this->name(), option);
 
@@ -252,7 +260,6 @@ void PMSystemNP::solve(const std::string& option)
     _re_init = false;
   }
 
-  // assemble RHS at every NP step
   this->assemble_rhs(this->name(), option);
 
   // solve the problem

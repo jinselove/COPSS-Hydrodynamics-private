@@ -135,9 +135,10 @@ public:
   std::vector<Real> ion_diffusivity;
   // valence of each ion species (unit = 1)
   std::vector<int> ion_valence;
-  // equilibrium tolerance (if ion concentration of two adjacent NP step is
-  // smaller than this value, then we consider NP system as in equilibrium)
-  Real equil_tol;
+  // NP system relaxation time for initialization. By default, this
+  // relaxation time is 2 * Rb^2/max(ion_diffusivity), i.e., the time it takes
+  // for ions to diffuse 2 particle radius. 
+  Real np_system_relaxation_time;
 
   // characteristic variables
   Real tc; // characteristic time (diffusion time) (s)

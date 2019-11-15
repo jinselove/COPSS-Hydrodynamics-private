@@ -131,23 +131,14 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
   // multi-Physics coupling
   if (option == "disturbed")
   {
-    // if module_poisson is true, no matter if module_np is true, we only
-    // need to couple poisson. In the case that module_np is true, we will
-    // couple NP system in Poisson system, otherwise, we do not.
-    if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
-    {
-      this->couple_poisson();
-    }
-    // if module poisson is false, we will need to check if module_np is true
-    // or not
-    else
-    {
-      // if module_np is true, we only need to couple np
-      if (this->get_equation_systems().parameters.get<bool>("module_np"))
-        this->couple_np();
-    }
-  }
+    // ---> couple NP systems at time t
+    if (this->get_equation_systems().parameters.get<bool>("module_np"))
+      this->couple_np();
 
+    // --> couple Poisson system at time t
+    if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+      this->couple_poisson();
+  }
 
   // perf_log.pop("fix compute");
   STOP_LOG("reinit_system()", "PMSystemStokes");
@@ -940,22 +931,47 @@ void PMSystemStokes::couple_np()
 {
   START_LOG("couple_np()", "PMSystemStokes");
 
+  const bool& module_poisson = this->get_equation_systems()
+    .parameters.get<bool>("module_poisson");
+  const bool& with_hi = this->get_equation_systems()
+    .parameters.get<bool>("with_hi");
   unsigned int n_sys = this->get_equation_systems().n_systems();
-  // Loop over all systems, but only couple NP systems
   for (unsigned int s_id=0; s_id<n_sys; s_id++)
   {
-    // get system name
     const std::string& s_name = this->get_equation_systems().get_system(s_id)
       .name();
-    // if system name starts with "NP:", we solve this NP system
     if (s_name.rfind("NP:", 0)==0)
     {
-      PMToolBox::output_message(std::string("--> Coupling NP system ") +
-                                s_name, this->comm());
-      this->get_equation_systems().get_system<PMSystemNP>(s_name).solve
-        ("unused");
+      PMSystemNP& np_system = this->get_equation_systems()
+        .get_system<PMSystemNP>(s_name);
+      std::string option;
+      if (np_system.system_time>0.)
+      {
+        // --> couple this NP system at system_time > 0.
+        if (!module_poisson and with_hi) {
+          option = "diffusion&convection";
+        }
+        else if (module_poisson and !with_hi){
+          option = "diffusion&electrostatics";
+        }
+        else if (module_poisson and with_hi){
+          option = "diffusion&electrostatics&convection";
+        }
+        else {
+          option = "diffusion";
+        }
+        // solve this np_system with option
+        np_system.solve(option);
+      }
+      else
+      {
+        // --> initialize this NP system at system_time = 0.
+        np_system.init_cd(this->get_equation_systems().parameters.get<Real>
+          ("np_system_relaxation_time"));
+      }
     }
   }
+
   STOP_LOG("couple_np()", "PMSystemStokes");
 }
 

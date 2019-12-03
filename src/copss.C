@@ -189,8 +189,6 @@ void Copss::read_physical_info()
   // read parameters related to
   if (module_np)
   {
-    // Nernst-Planck dt (unit=tc=6*pi*eta*Rb^3/kbT)
-    dt_np = input_file("dt_np", 0.1);
     // name of all ion species
     ion_name.resize(input_file.vector_variable_size("ion_name"));
     // diffusivity of all ion species (unit=um^2/s)
@@ -220,7 +218,7 @@ void Copss::read_physical_info()
     }
     // np system relaxation time for initialization (unit = tc)
     np_system_relaxation_time = input_file("np_system_relaxation_time",
-      2. * (*std::min_element(ion_diffusivity.begin(), ion_diffusivity.end())));
+      2. / (*std::min_element(ion_diffusivity.begin(), ion_diffusivity.end())));
   } // end if module_np
 
   // print out physical parameters information related to Stokes System
@@ -244,6 +242,7 @@ void Copss::read_physical_info()
     ss << "   characteristic electrostatic potential = " << phi0 <<  " (uV)\n"
        << "   relative dielectric permittivity = " << epsilon << " (1)\n"
        << "   characteristic electrostatic potential: phi0 = " << phi0 << " V\n"
+       << "   characteristic electrostatic potential: phi0 = " << phi0 << " V\n"
        << "   characteristic electrostatic field: efield0 = " << efield0 <<" V/um\n"
        << "   characteristic volume charge density: charge_rho0 = " <<
        charge_rho0 << " C/um^3\n"
@@ -255,17 +254,16 @@ void Copss::read_physical_info()
   if (module_np)
   {
     ss << "   characteristic ion concentration = " << c0 << " (M)\n"
-       << "   finite-difference time step for NP system, dt_np = " << dt_np
-       << " (unit=characteristic time tc)\n"
        << "   relaxation time for system initialization, "
           "np_system_relaxation_time = " << np_system_relaxation_time
-          << " (unit=characteristic time tc)\n"
+          << " (unit=characteristic time tc ~= O(R_ion/R_bead) ~= O"
+             "(D_bead/D_ion))\n"
        << "   ------------> parameters of all ion species:\n";
     for (int i=0; i<ion_name.size(); i++)
     {
       ss << "   " << ion_name[i] << " : "
          << "ion diffusivity = " << ion_diffusivity[i]
-         << "(unit = bead diffusivity Db)"
+         << "(unit = bead diffusivity Db ~= O(R_bead/R_ion)), "
          << "valence = " << ion_valence[i] << " (unit = 1)";
     }
 
@@ -1148,6 +1146,14 @@ EquationSystems Copss::create_equation_systems()
   // Nernst-Planck Module
   if (module_np)
   {
+    // fixme: remove the following if condition after final implementation
+    if(with_brownian & with_hi){
+      PMToolBox::output_message("Error: cannot support module_np with both "
+                                "Brownian and HI on for now because of the "
+                                "half-point scheme in Fixman's integration. "
+                                "", *comm_in);
+      libmesh_error();
+    }
     // add a NP system to equation systems for each ion
     for (int ion_id=0 ; ion_id<ion_name.size(); ion_id++)
     {
@@ -1246,6 +1252,8 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system,
     // proceed if this direction is periodic
     if (periodicity[dim_i])
     {
+      ss << "---------------> direction: " << dim_i;
+      PMToolBox::output_message(ss, *comm_in);
       // create a PeriodicBoundary object
       PeriodicBoundary pbc(RealVectorValue(
         (wall_params[1] - wall_params[0]) * (dim_i==0),
@@ -1254,10 +1262,6 @@ void Copss::attach_period_boundary(PMLinearImplicitSystem& system,
       // add all variables to the pbc object
       for (unsigned int var_id=0; var_id < periodic_vars.size(); var_id++)
       {
-        ss << "=======> add variable to pbc : variable name = "
-           << periodic_vars[var_id] << "; variable_id = "
-           << system.variable_number(periodic_vars[var_id]);
-        PMToolBox::output_message(ss, *comm_in);
         pbc.set_variable(system.variable_number(periodic_vars[var_id]));
       }
       // set myboundary and pairedboundary
@@ -1371,15 +1375,36 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
   comm_in->barrier();
 }
 
-// ==============================================================================================
+// ===================================================================
+const Real Copss::get_min_dt(EquationSystems &es)
+{
+  // Initialize min_dt as a large FLOAT number
+  Real min_dt = std::numeric_limits<double>::max();
+  // Loop over all sub systems and find the minimum dt
+  unsigned int n_sys = es.n_systems();
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
+  {
+    // get a reference to sub system name
+    const std::string &s_name = es.get_system(s_id).name();
+    // get a reference to the sub system
+    PMLinearImplicitSystem &sys = es.get_system<PMLinearImplicitSystem>(s_name);
+    // get dt from this system
+    const Real &dt = sys.get_dt();
+    min_dt = (dt < min_dt) ? dt : min_dt;
+    ss << "system: " << s_name << "--> dt: " << dt;
+    PMToolBox::output_message(ss, *comm_in);
+  }
+  return min_dt;
+}
+
+// =========================================================================
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
   // PerfLog perf_log("integration");
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  */
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   if (i > 0) {
     *(system.solution) = *(system.undisturbed_solution); // re-assign the undisturbed solution
     // Update the local values to reflect the solution on neighboring processors
@@ -1448,55 +1473,13 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     o_step++;
   } // end if (i % write_interval == 0 )
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Adaptive time step.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       */
-  Real dt = 0;
-  if (adaptive_dt) 
-  {
-    Real vp_max = point_mesh->maximum_bead_velocity();
-    Real vp_min = point_mesh->minimum_bead_velocity();
+  // get time step dt
+  const Real& dt = this->get_min_dt(equation_systems);
+  ss << "min{dt} of all systems: " << dt;
+  PMToolBox::output_message(ss, *comm_in);
+  equation_systems.parameters.set<Real>("dt") = dt;
 
-    if (real_time <
-        max_dr_coeff[0]) dt =
-        (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);
-    else dt =
-        (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);
-
-    if (i % write_interval == 0) {
-      ss << "       ################################################################\n"
-         << "       # Max velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_max << "\n"
-         << "       # Min velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_min << "\n"
-         << "       # minimum mesh size = " << hmin << "\n"
-         << "       # The adaptive time increment at step " << i <<" is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
-         << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)\n"
-         << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i)\n"
-         << "       # Chebyshev failure steps = " << n_chebyshev_failure << "\n"
-         << "       #################################################################\n";
-      PMToolBox::output_message(ss, *comm_in);
-    } // end if (i% write_interval)
-  }
-  else 
-  {
-    if (i == 0) dt = max_dr_coeff[0] * 1.;
-    else dt = max_dr_coeff.back() * 1.;
-
-    if (i % write_interval == 0) {
-      ss << "       ##########################################################\n"
-         << "       # The fixed time increment at step " << i << " is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
-         << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0\n"
-         << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0\n"
-         << "       # Chebyshev failure steps = " << n_chebyshev_failure << "\n"
-         << "       ##########################################################\n";
-      PMToolBox::output_message(ss, *comm_in);
-    } // end if (i % write_interval == 0)
-  }   // end if (adaptive_dt
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     If with Brownian motion, we use midpoint scheme
-     If without Brownian motion, we use normal stepping: dR = Utotal*dt
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       */
+  // use MidPoint scheme if Brownian is on
   if (with_brownian)
   {
     /*-------------------------------------------
@@ -1526,8 +1509,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
        Generate random vector dw whose mean = 0, variance = sqrt(2*dt)
        petsc_random_vector generates a uniform distribution [0 1] whose
        mean = 0.5 and variance = 1/12, so we need a shift and scale operation.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-         */
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     Real mean_dw = 0.0, variance_dw = 0.0;
 
     // A more precise way is to construct a random vector with gaussian
@@ -1537,10 +1519,9 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     brownian_sys->_vector_mean_variance(dw, mean_dw, variance_dw);
     VecScale(dw, std::sqrt(2.0));
 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - --
        Print out the mean and variance or view the generated vector.
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-         */
+       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     //      PetscPrintf(PETSC_COMM_WORLD,
     //                 "Generated random_vector: mean = %f, variance = %f\n",
@@ -1712,6 +1693,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       VecAXPY(ROUT, dt,         U0);     // ROUT = ROUT + dt*U0_mid
       VecAXPY(ROUT, 2.0 * coef, dw_mid); // ROUT = ROUT + sqrt(2)*D_mid*B^-1*dw
     }// end if cheb_converge
+    // Use dR = Utotal*dt if Brownian is off
     else 
     {
       n_chebyshev_failure += 1;
@@ -1740,7 +1722,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     // Update ROUT (position vector excluding pbc) at the i-th step
     VecAXPY(ROUT, dt, U0); // ROUT = ROUT + dt*U0_mid
   } // end else (without_brownian)
-  real_time         += dt;
+  real_time += dt;
+  equation_systems.parameters.set<Real>("real_time") = real_time;
   timestep_duration += 1;
 }
 
@@ -1818,45 +1801,12 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
     o_step++;
   } // end if (i % write_interval == 0 )
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Adaptive time step.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       */
-  Real dt = 0;
+  // get time step dt
+  const Real& dt = this->get_min_dt(equation_systems);
+  ss << "min{dt} of all systems: " << dt;
+  PMToolBox::output_message(ss, *comm_in);
+  equation_systems.parameters.set<Real>("dt") = dt;
 
-  if (adaptive_dt) {
-    Real vp_max = point_mesh->maximum_bead_velocity();
-    Real vp_min = point_mesh->minimum_bead_velocity();
-
-    if (real_time <
-        max_dr_coeff[0]) dt =
-        (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);
-    else dt =
-        (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);
-
-    if (i % write_interval == 0) {
-      ss << "       ###########################################################\n"
-         << "       # Max velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_max << "\n"
-         << "       # Min velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_min << "\n"
-         << "       # minimum mesh size = " << hmin << "\n"
-         << "       # The adaptive time increment at step " << i <<" is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
-         << "       # adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)\n"
-         << "       ###########################################################\n";
-      PMToolBox::output_message(ss, *comm_in);
-    } // end if (i% write_interval)
-  }
-  else {
-    if (real_time < max_dr_coeff[0]) dt = max_dr_coeff[1] * 1.;
-    else dt = max_dr_coeff[2] * 1.;
-
-    if (i % write_interval == 0) {
-      ss << "       ###########################################################\n"
-         << "       # The fixed time increment at step " << i << " is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
-         << "       # fixed_time_step = max_dr_coeff * bead_radius / 1.0\n" 
-         << "       ###########################################################\n";
-      PMToolBox::output_message(ss, *comm_in);
-    } // end if (i % write_interval == 0)
-  }   // end if (adaptive_dt)
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      If with Brownian motion, we use midpoint scheme
@@ -1944,6 +1894,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
     VecAXPY(ROUT, dt, U0); // ROUT = ROUT + dt*U0_mid
   } // end else (without_brownian)
   real_time         += dt;
+  equation_systems.parameters.set<Real>("real_time") = real_time;
   timestep_duration += 1;
 }
 

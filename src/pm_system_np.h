@@ -67,6 +67,12 @@ public:
    */
   void clear();
 
+  /**
+   * override get_dt function in parent class since this system needs more
+   * conditions on dt to make the system stable
+   */
+  Real get_dt();
+
 
   /**
    * Init ion id for this NP system and validate if system name is correctly set
@@ -78,7 +84,7 @@ public:
    * Set up the initial condition for NP system
    * By default, we need to initialize the NP system solution at time 0
    * When input parameter relax_t_final > 0., we will relax the NP system
-   * until relax_t_final by time step np_system.system_dt with poisson system
+   * until relax_t_final by time step np_dt with poisson system
    * on but stokes system off. The purpose of doing such relaxation is to
    * make sure ion cloud accommodate with charged particles so that the
    * simulation does not takes forever in the initial stages. Rule of thumb
@@ -187,14 +193,11 @@ public:
 //                                 const std::string &,
 //                                 const std::string &);
 
-  // total time
-  Real system_time;
-
-  // time stepping for NP system
-  Real system_dt;
-
   // ion id
   int ion_id;
+
+  // np system dt
+  Real np_dt;
 
   // ion name
   std::string ion_name;
@@ -210,6 +213,9 @@ public:
 
   // Dirichlet Boundary value for this ion
   std::vector<Real> boundary_value_dirichlet_np;
+
+  // reinitialize initial condition
+  bool set_init_cd;
 
 private:
 

@@ -81,6 +81,10 @@ public:
    */
   virtual void clear() = 0;
 
+  /**
+   * get the time interval to guarantee numerical stability for a system
+   */
+  virtual Real get_dt() {return std::numeric_limits<double>::max();};
 
   /**
    * Assemble the system matrix.

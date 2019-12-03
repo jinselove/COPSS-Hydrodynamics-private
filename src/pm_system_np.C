@@ -51,7 +51,7 @@ PMSystemNP::PMSystemNP(EquationSystems  & es,
   // NP equation assembly
   _assemble_np = (new AssembleNP(es, "NP"));
   analytical_solution = _assemble_np->get_analytical_solution();
-  system_time = 0.;
+  set_init_cd = true;
 }
 
 // ==================================================================================
@@ -86,6 +86,22 @@ void PMSystemNP::attach_ion_type(const int& _ion_id,
   }
 
   STOP_LOG("attach_ion_type()", "PMSystemNP");
+}
+
+// ==================================================================
+Real PMSystemNP::get_dt()
+{
+  START_LOG("get_dt()", "PMSystemNP");
+  // Nernst-Planck dt (unit=tc=6*pi*eta*Rb^3/kbT)
+  // fixme: we need to calculate dt_np automatically to ensure numerical
+  // stability
+  Real dt = 0.1;
+  PMToolBox::output_message("Warning:: need to implement get_dt for NP "
+                            "system, currently dt is set to be 0.1 constant",
+                            this->comm());
+
+  STOP_LOG("get_dt()", "PMSystemNP");
+  return dt;
 }
 
 // =============================================================
@@ -129,13 +145,25 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
 {
   START_LOG("init_cd()", "PMSystemNP");
 
-  // get time interval for NP system
-  system_dt = this->get_equation_systems().parameters.get<Real>("dt_np");
+  // get dt for NP system
+  np_dt = this->get_dt();
 
   // project initial conditions on both bulk and boundary elements. By
   // default, the initial ion concentration is set to be 0 across the domain
+  PMToolBox::output_message("==> Initialize ion concentration for NP system",
+    this->comm());
+  PMToolBox::output_message("----> 1. init uniform concentration",
+    this->comm());
   this->project_solution(init_solution, libmesh_nullptr,
     this->get_equation_systems().parameters);
+
+  // write initial condition to output
+  MeshBase& mesh = this->get_mesh();
+  const std::string init_cd_name = "init_cd.e";
+#ifdef LIBMESH_HAVE_EXODUS_API
+  ExodusII_IO(mesh).write_equation_systems(init_cd_name,
+    this->get_equation_systems());
+#endif
 
   // project Dirichlet BC on initial solutions
   // fixme: the bounary_project_solution is not able to work in parallel
@@ -163,7 +191,11 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
 //  }
 
   // relax NP system with Poisson System on
-  while(system_time < relax_t_final)
+  PMToolBox::output_message("----> 2. relax ion concentration",
+                            this->comm());
+  unsigned int relax_step_id = 0;
+  Real relax_time = 0.;
+  while(relax_time < relax_t_final)
   {
     // solve the NP system with the coupling of diffusion & electrostatics, i
     // .e., turn the fluid off, if "module_poisson" is true
@@ -181,18 +213,23 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
     {
       this->solve("diffusion");
     }
-    system_time += system_dt;
+    relax_time += np_dt;
+    relax_step_id += 1;
+    PMToolBox::output_message(std::string("relax system time : ") +
+      std::to_string(relax_time), this->comm());
+    // write the solution during relaxation
+#ifdef LIBMESH_HAVE_EXODUS_API
+    ExodusII_IO exo(mesh);
+    exo.append(true);
+    exo.write_timestep(init_cd_name,
+                       this->get_equation_systems(),
+                       relax_step_id,
+                       relax_time);
+#endif
   }
 
-  // write relaxed initial condition to output
-  #ifdef LIBMESH_HAVE_EXODUS_API
-    MeshBase& mesh = this->get_mesh();
-    ExodusII_IO(mesh).write_equation_systems("initial_condition.e",
-      this->get_equation_systems());
-  #endif
-
-  // resume system time to 0. after relaxation
-  system_time = 0.;
+  // avoid setting initial condition again
+  set_init_cd = false;
 
   STOP_LOG("init_cd()", "PMSystemNP");
 }

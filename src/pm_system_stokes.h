@@ -63,7 +63,13 @@ public:
    */
   sys_type& system() {
     return *this;
-  }
+  };
+
+  /**
+   * override get_dt function in parent class since this system needs more
+   * conditions on dt to make the system stable
+   */
+  Real get_dt();
 
   /*
    * Re-init particle mesh, including:

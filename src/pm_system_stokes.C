@@ -74,6 +74,65 @@ void PMSystemStokes::clear()
   // AssembleStokes
 }
 
+Real PMSystemStokes::get_dt()
+{
+  START_LOG("get_dt()", "PMSystemStokes");
+
+  // get a reference to equation systems
+  EquationSystems& es = this->get_equation_systems();
+  // get other necessary parameters
+  const std::vector<Real>& max_dr_coeff = es.parameters.get<std::vector<Real>>
+    ("max_dr_coeff");
+  const bool& adaptive_dt = es.parameters.get<bool>("adaptive_dt");
+  const Real& real_time = es.parameters.get<Real>("real_time");
+
+  // calculate dt
+  // --> initialize dt as a large FLOAT number
+  Real dt = std::numeric_limits<double>::max();
+  // --> if adaptive_dt is true, update dt based on current system status
+  if (adaptive_dt)
+  {
+    Real vp_max = _point_mesh->maximum_bead_velocity();
+    Real vp_min = _point_mesh->minimum_bead_velocity();
+    if (real_time < max_dr_coeff[0])
+      dt = (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);
+    else
+      dt = (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);
+//    if (i % write_interval == 0) {
+//      ss << "       ################################################################\n"
+//         << "       # Max velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_max << "\n"
+//         << "       # Min velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_min << "\n"
+//         << "       # minimum mesh size = " << hmin << "\n"
+//         << "       # The adaptive time increment at step " << i <<" is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
+//         << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)\n"
+//         << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i)\n"
+//         << "       # Chebyshev failure steps = " << n_chebyshev_failure << "\n"
+//         << "       #################################################################\n";
+//      PMToolBox::output_message(ss, *comm_in);
+//    } // end if (i% write_interval)
+  }
+  // --> if adaptive is false, use max_dr_coeff as dt
+  else
+  {
+    dt = (real_time < max_dr_coeff[0]) ? max_dr_coeff[1] : max_dr_coeff[2];
+//    if (i % write_interval == 0) {
+//      ss << "       ##########################################################\n"
+//         << "       # The fixed time increment at step " << i << " is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
+//         << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0\n"
+//         << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0\n"
+//         << "       # Chebyshev failure steps = " << n_chebyshev_failure << "\n"
+//         << "       ##########################################################\n";
+//      PMToolBox::output_message(ss, *comm_in);
+//    } // end if (i % write_interval == 0)
+  }   // end if (adaptive_dt)
+
+
+  STOP_LOG("get_dt()", "PMSystemStokes");
+
+  // return
+  return dt;
+}
+
 // ==================================================================================
 void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
                                    const bool& build_elem_neighbor_list,
@@ -945,9 +1004,15 @@ void PMSystemStokes::couple_np()
       PMSystemNP& np_system = this->get_equation_systems()
         .get_system<PMSystemNP>(s_name);
       std::string option;
-      if (np_system.system_time>0.)
+      if (np_system.set_init_cd)
       {
-        // --> couple this NP system at system_time > 0.
+        // --> initialize this NP system
+        np_system.init_cd(this->get_equation_systems().parameters.get<Real>
+          ("np_system_relaxation_time"));
+      }
+      else
+      {
+        // --> couple this NP system
         if (!module_poisson and with_hi) {
           option = "diffusion&convection";
         }
@@ -960,14 +1025,21 @@ void PMSystemStokes::couple_np()
         else {
           option = "diffusion";
         }
+        // check if dt is the same as np_dt
+        if (abs(this->get_equation_systems().parameters.get<Real>("dt")
+          -np_system.np_dt) > 1.e-6)
+        {
+          PMToolBox::output_message("Error: simulation time step is "
+                                    "different from np_system time step (when "
+                                    "module_np is on, simulation time step "
+                                    "should be determined by the "
+                                    "time step of NP system. Need to "
+                                    "implement additional function to take "
+                                    "care of this extreme case)", this->comm());
+          libmesh_error();
+        }
         // solve this np_system with option
         np_system.solve(option);
-      }
-      else
-      {
-        // --> initialize this NP system at system_time = 0.
-        np_system.init_cd(this->get_equation_systems().parameters.get<Real>
-          ("np_system_relaxation_time"));
       }
     }
   }

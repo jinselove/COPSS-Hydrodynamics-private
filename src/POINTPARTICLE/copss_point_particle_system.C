@@ -177,6 +177,8 @@ void CopssPointParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system
 // ======================================================================================
 void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
 {
+  equation_systems.parameters.set<Real>("real_time") = real_time;
+  equation_systems.parameters.set<bool>("adaptive_dt") = adaptive_dt;
   equation_systems.parameters.set<unsigned int>("linear solver maximum iterations")
     = max_linear_iterations;
   equation_systems.parameters.set<Real>("linear solver rtol")
@@ -270,7 +272,6 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
       = solver_type_np;
     equation_systems.parameters.set<Real>("c0")
       = c0;
-    equation_systems.parameters.set<Real>("dt_np") = dt_np;
     equation_systems.parameters.set<std::vector<std::string>>("ion_name")
       = ion_name;
     equation_systems.parameters.set<std::vector<Real>>("ion_diffusivity")
@@ -429,6 +430,8 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     for (int i = 0; i < max_dr_coeff.size();
          i++) max_dr_coeff[i] *= Ss2 / Rb / Rb;
   }
+  // attach max_dr_coeff to equation systems for future use
+  equation_systems.parameters.set<std::vector<Real> >("max_dr_coeff") = max_dr_coeff;
 
   // start integration
   perf_log.push("integration");

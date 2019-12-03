@@ -402,9 +402,9 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   if (_int_force.size() == 1)
   {
     // perf_log.push("compute_int_force");
-    if (_pm_system.comm().rank() == 0) {
-      printf("\nassemble_int_force() at the beginning of simulation\n\n");
-    }
+    PMToolBox::output_message("------> computing helper quantities to ease "
+                              "numerical integrations later (only do this once)",
+                              _pm_system.comm());
     const unsigned int n_mesh_elem = _mesh.n_elem();
     _int_force.resize(n_mesh_elem);
     _q_xyz.resize(n_mesh_elem);

@@ -183,7 +183,7 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
                                   phi[i][qp]*phi[j][qp]
                                   // Diffusion term when using semi implicit
                                   // Euler for Diffusion
-                                  + 0.5 * np_system.system_dt * np_system
+                                  + 0.5 * np_system.np_dt * np_system
                                   .ion_diffusivity * dphi[i][qp] *
                                   dphi[j][qp]
                                );
@@ -337,7 +337,7 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
             c_old * phi[i][qp]
             // diffusion term when using semi-implicit Euler
             // for diffusion
-            - 0.5 * np_system.system_dt * np_system
+            - 0.5 * np_system.np_dt * np_system
               .ion_diffusivity * gradient_c_old * dphi[i][qp]
           );
         }

@@ -127,8 +127,6 @@ public:
                                                        // (N*s/um)
   Real Db; // bead diffusivity (um^2/s)
   std::string particle_type;
-  // finite-difference timestep for Nernst-Planck system (unit=tc)
-  Real dt_np;
   // name of each ion species
   std::vector<std::string> ion_name;
   // diffusivity of each ion species (unit = um^2/s)
@@ -438,6 +436,12 @@ protected:
    * Create brownian system
    */
   void create_brownian_system(EquationSystems& equation_systems);
+
+
+  /*!
+   * Get minimum dt from all systems
+   */
+  const Real get_min_dt(EquationSystems& es);
 
   /*!
    * Integrate particle motions using Fixman's midpoint scheme

@@ -59,6 +59,7 @@ PMSystemPoisson::PMSystemPoisson(EquationSystems  & es,
   _assemble_poisson   = new AssemblePoisson(es, name);
   analytical_solution = _assemble_poisson->get_analytical_solution();
   ggem_poisson        = _assemble_poisson->get_ggem_poisson();
+  o_precision = 6;
 }
 
 // ==================================================================================
@@ -143,7 +144,7 @@ void PMSystemPoisson::solve(const std::string& option)
   // right-hand-side vector is " <<t2-t1<<" s\n";
 
   // solve the problem
-  _solver_poisson.solve();
+  _solver_poisson.solve(this->name());
   
 
   STOP_LOG("solve()", "PMSystemPoisson");

@@ -62,12 +62,6 @@ public:
 
 
   /*
-   * solve the equation system Ax = b
-   */
-  void solve();
-
-
-  /*
    * Build IS for u/p for PC field split
    *    -called by: solve()
    */
@@ -98,18 +92,6 @@ public:
                                  Mat *pmat);
 
 private:
-
-  // solver relative tolerance
-  PetscReal _rtol;
-
-  // solver absolute tolerance
-  PetscReal _atol;
-
-  // (iterative) solver maximum iteration
-  PetscInt _max_it;
-
-  // KSP sover
-  KSP _ksp;
 
   // IS pointers for velocity and pressure, respectively
   IS _is_v;

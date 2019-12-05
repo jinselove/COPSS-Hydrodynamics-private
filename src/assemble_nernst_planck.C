@@ -71,6 +71,8 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
 {
   START_LOG("assemble_global_K()", "AssembleNP");
 
+  (void) option;
+
   // Get a Reference to the LinearImplicitSystem we are solving
   PMSystemNP& np_system = _eqn_sys.get_system<PMSystemNP> (system_name);
 
@@ -83,25 +85,33 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
   // store the object as a UniquePtr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
   UniquePtr<FEBase> fe (FEBase::build(_dim, fe_type));
+  UniquePtr<FEBase> fe_face (FEBase::build(_dim, fe_type));
 
   // A Gauss quadrature rule for numerical integration.
   // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (_dim, fe_type.default_quadrature_order());
+  QGauss qface (_dim-1, fe_type.default_quadrature_order());
 
   // Tell the finite element object to use our quadrature rule.
   fe->attach_quadrature_rule (&qrule);
+  fe_face->attach_quadrature_rule(&qface);
 
   // Here we define some references to cell-specific data that
   // will be used to assemble the linear system.  We will start
   // with the element Jacobian * quadrature weight at each integration point.
   const std::vector<Real> & JxW      = fe->get_JxW();
+  const std::vector<Real> & JxW_face = fe_face->get_JxW();
 
   // The element shape functions evaluated at the quadrature points.
   const std::vector<std::vector<Real> > & phi = fe->get_phi();
+  const std::vector<std::vector<Real> > & psi = fe_face->get_phi();
 
   // The element shape function gradients evaluated at the quadrature
   // points.
   const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+
+  // The XY locations of the quadrature points used for face integration
+  const std::vector<Point> & qface_points = fe_face->get_xyz();
 
   // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
@@ -116,7 +126,7 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
   DenseMatrix<Number> Ke;
   // we will not update Fe in assemble_matrix() function, but we need it when
   // we call apply_bc_by_penalty() method to modify Ke for BC
-  DenseVector<Number> Fe;
+//  DenseVector<Number> Fe;
 
   // This vector will hold the degree of freedom indices for
   // the element.  These define where in the global system
@@ -139,7 +149,7 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
     const Elem * elem = *el;
 
     // Fill _boundary_sides_dirichlet_np
-    this->select_boundary_side(elem, system_name);
+//    this->select_boundary_side(elem, system_name);
 
     // Get the degree of freedom indices for the
     // current element.  These define where in the global
@@ -161,7 +171,7 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
     // triangle, now we are on a quadrilateral).
     Ke.resize (dof_indices.size(),
                dof_indices.size());
-    Fe.resize (dof_indices.size());
+//    Fe.resize (dof_indices.size());
 
     // Now we will build the element matrix.
     // Constructing the RHS requires the solution and its
@@ -183,7 +193,7 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
                                   phi[i][qp]*phi[j][qp]
                                   // Diffusion term when using semi implicit
                                   // Euler for Diffusion
-                                  + 0.5 * np_system.np_dt * np_system
+                                  + 0.5 * np_system.dt * np_system
                                   .ion_diffusivity * dphi[i][qp] *
                                   dphi[j][qp]
                                );
@@ -191,16 +201,33 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
       } // end loop over rows of Ke
     } // end loop for qp
 
-    // apply BCs by penalty method
-    this->apply_bc_by_penalty(elem, "matrix", Ke, Fe, option);
+    // apply bc by penalty on K matrix
+    {
+      // The penalty value.
+      const Real penalty = 1.e10;
 
+      // The following loops over the sides of the element.
+      // If the element has no neighbor on a side then that
+      // side MUST live on a boundary of the domain.
+      for (unsigned int s=0; s<elem->n_sides(); s++)
+        if (elem->neighbor_ptr(s) == libmesh_nullptr)
+        {
+          fe_face->reinit(elem, s);
+
+          for (unsigned int qp=0; qp<qface.n_points(); qp++)
+          {
+            // Matrix contribution
+            for (unsigned int i=0; i<psi.size(); i++)
+              for (unsigned int j=0; j<psi.size(); j++)
+                Ke(i,j) += penalty*JxW_face[qp]*psi[i][qp]*psi[j][qp];
+          }
+        }
+    }
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
     dof_map.constrain_element_matrix(Ke, dof_indices);
 
     // Add the element matrix to the global system.
-    // GeomTools::zero_filter_dense_matrix(Ke, 1e-10);
-    // PMToolBox::output_dense_matrix(Ke);
     np_system.matrix->add_matrix(Ke, dof_indices);
   } // end for loop over local elements
 
@@ -225,25 +252,33 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
   // store the object as a UniquePtr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
   UniquePtr<FEBase> fe (FEBase::build(_dim, fe_type));
+  UniquePtr<FEBase> fe_face (FEBase::build(_dim, fe_type));
 
   // A Gauss quadrature rule for numerical integration.
   // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (_dim, fe_type.default_quadrature_order());
+  QGauss qface (_dim-1, fe_type.default_quadrature_order());
 
   // Tell the finite element object to use our quadrature rule.
   fe->attach_quadrature_rule (&qrule);
+  fe_face->attach_quadrature_rule (&qface);
 
   // Here we define some references to cell-specific data that
   // will be used to assemble the linear system.  We will start
   // with the element Jacobian * quadrature weight at each integration point.
   const std::vector<Real> & JxW      = fe->get_JxW();
+  const std::vector<Real> & JxW_face = fe_face->get_JxW();
 
   // The element shape functions evaluated at the quadrature points.
   const std::vector<std::vector<Real> > & phi = fe->get_phi();
+  const std::vector<std::vector<Real> > & psi = fe_face->get_phi();
 
   // The element shape function gradients evaluated at the quadrature
   // points.
   const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+
+  // The XY locations of the quadrature points used for face integration
+  const std::vector<Point> & qface_points = fe_face->get_xyz();
 
   // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
@@ -251,11 +286,6 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
   // in future examples.
   const DofMap & dof_map = np_system.get_dof_map();
 
-  // Define data structures to contain the element matrix
-  // and right-hand-side vector contribution.  Following
-  // basic finite element terminology we will denote these
-  // "Ke" and "Fe".
-  DenseMatrix<Number> Ke;
   // we will not update Fe in assemble_matrix() function, but we need it when
   // we call apply_bc_by_penalty() method to modify Ke for BC
   DenseVector<Number> Fe;
@@ -270,6 +300,7 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
   // matrix contribution.  Since the mesh
   // will be refined we want to only consider the ACTIVE elements,
   // hence we use a variant of the active_elem_iterator.
+
   MeshBase::const_element_iterator el = _mesh.active_local_elements_begin();
   const MeshBase::const_element_iterator end_el = _mesh
     .active_local_elements_end();
@@ -298,8 +329,6 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
     // the last element.  Note that this will be the case if the
     // element type is different (i.e. the last element was a
     // triangle, now we are on a quadrilateral).
-    Ke.resize (dof_indices.size(),
-               dof_indices.size());
     Fe.resize (dof_indices.size());
 
     // Now we will build the element matrix and right-hand-side.
@@ -314,45 +343,51 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
       Number c_old = 0.;
       Gradient gradient_c_old;
 
-      if(option=="diffusion")
+      if (option == "diffusion")
       {
         // compute the old solution & its gradient at this qp point
-        for (unsigned int l=0; l<phi.size(); l++)
+        for (unsigned int l = 0; l < phi.size(); l++)
         {
           // get old solution at this qp point
           // notice that we are not using Libmesh::TransientSystem, thus the
           // current_solution of our system is actually solution from previous
           // time step
-          c_old += phi[l][qp] * np_system.current_solution(dof_indices[l]);
+          c_old += phi[l][qp] * (*np_system.current_local_solution)(dof_indices[l]);
+//          c_old += phi[l][qp] * 1.;
+
           // get solution gradient at this qp_point
-          gradient_c_old.add_scaled(dphi[l][qp], np_system.current_solution
-            (dof_indices[l]));
+          gradient_c_old.add_scaled(dphi[l][qp], (*np_system.current_local_solution)(dof_indices[l]));
+//          gradient_c_old.add_scaled(dphi[l][qp], 1.);
         }
 
         // Now compute the element rhs
-        for (unsigned int i=0; i<phi.size(); i++)
+        for (unsigned int i = 0; i < phi.size(); i++)
         {
+//          std::cout << "JxW[qp]="<<JxW[qp]<<"; c_old="<<c_old
+//            <<"; phi[i][qp]="<< phi[i][qp] << "; np_system.dt" << np_system.dt
+//            <<"; np_system.ion_diffusivity="<<np_system.ion_diffusivity
+//            <<"; gradient_c_old="<<gradient_c_old
+//            <<"; dphi[i][qp]="<<dphi[i][qp]<<std::endl;
           Fe(i) += JxW[qp] * (
             // Mass term
             c_old * phi[i][qp]
-            // diffusion term when using semi-implicit Euler
-            // for diffusion
-            - 0.5 * np_system.np_dt * np_system
-              .ion_diffusivity * gradient_c_old * dphi[i][qp]
-          );
-        }
+            // diffusion term when using semi-implicit Euler for diffusion
+            - 0.5 * np_system.dt * np_system.ion_diffusivity * gradient_c_old
+            * dphi[i][qp]);
+//          std::cout<<"Fe(i)="<<Fe(i)<<std::endl;
+        } // end loop i < phi.size()
       }
-      else if(option=="diffusion&convection")
+      else if (option == "diffusion&convection")
       {
-
+        // fixme
       }
-      else if(option=="diffusion&electrostatics")
+      else if (option == "diffusion&electrostatics")
       {
-
+        // fixme
       }
-      else if(option=="diffusion&electrostatics&convection")
+      else if (option == "diffusion&electrostatics&convection")
       {
-
+        // fixme
       }
       else
       {
@@ -360,22 +395,54 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
                      "system. Exiting..." << std::endl;
         libmesh_error();
       }
+    } // end loop qp<q_rule.n_points()
 
+    // apply bc by penalty
+    {
+      // The penalty value.
+      const Real penalty = 1.e10;
 
-      // apply bc by penalty
-      this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
+      // The following loops over the sides of the element.
+      // If the element has no neighbor on a side then that
+      // side MUST live on a boundary of the domain.
+      for (unsigned int s=0; s<elem->n_sides(); s++)
+      {
+        if (elem->neighbor_ptr(s) == libmesh_nullptr)
+        {
+          fe_face->reinit(elem, s);
 
-      // If this assembly program were to be used on an adaptive mesh,
-      // we would have to apply any hanging node constraint equations.
-      // perf_log.push("finish");
-      dof_map.constrain_element_vector(Fe, dof_indices);
+          for (unsigned int qp=0; qp<qface.n_points(); qp++)
+          {
+            const Real value =
+              analytical_solution->exact_solution_infinite_domain
+                (qface_points[qp],
+                 _eqn_sys.parameters.get<Real>("real_time"),
+                 _eqn_sys.parameters.get<std::vector<Real>>("ion_diffusivity")[0]);
 
-      // Add the element matrix and rhs vector to the global system.
-      // PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
-      // PMToolBox::output_dense_vector(Fe);
-      np_system.rhs->add_vector(Fe, dof_indices);
-    } // end loop over local elements
-  }
+            // RHS contribution
+            for (unsigned int i=0; i<psi.size(); i++)
+              Fe(i) += penalty*JxW_face[qp]*value*psi[i][qp];
+          } // end loop qp<qface.n_points()
+        } // end if elem->neighbor_ptr(s) == libmesh_nullptr
+      } // end loop s<elem->n_sides()
+    }// end apply penalty
+//      this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
+
+    // If this assembly program were to be used on an adaptive mesh,
+    // we would have to apply any hanging node constraint equations.
+    // perf_log.push("finish");
+    dof_map.constrain_element_vector(Fe, dof_indices);
+
+    // Add the element matrix and rhs vector to the global system.
+    // PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
+    // PMToolBox::output_dense_vector(Fe);
+//    std::cout<<"----> elem id="<<elem->id()<<std::endl;
+//    for (int ii=0; ii<dof_indices.size(); ii++)
+//    {
+//      std::cout<<"dof = " << dof_indices[ii] << "; Fe = "<< Fe(ii) <<std::endl;
+//    }
+    np_system.rhs->add_vector(Fe, dof_indices);
+  } // end loop over local elements
 
 
   STOP_LOG("assemble_global_F()", "AssembleNP");
@@ -393,11 +460,13 @@ void AssembleNP::select_boundary_side(const Elem *elem,
 
   // The following loops over the sides of the element. If the element has NO
   // neighbors on a side then that side MUST live on a boundary of the domain.
+//  std::cout<<"elem_id="<<elem_id<<"; n_sides="<<elem->n_sides()<<std::endl;
   for (unsigned int s = 0; s < elem->n_sides(); s++)
   {
     // If this side is on the boundary
     if (elem->neighbor(s) == NULL)
     {
+//      std::cout << "--> s="<<s<<"; has no neighbor"<<std::endl;
       // Check if the s-th face of this element is associated with any Dirichlet boundary id
       // if any, stop looking
       for (unsigned int i = 0; i < pm_system.boundary_id_dirichlet_np.size(); i++)
@@ -423,8 +492,7 @@ void AssembleNP::apply_bc_by_penalty(const Elem          *elem,
                                      const std::string  & matrix_or_vector,
                                      DenseMatrix<Number>& Ke,
                                      DenseVector<Number>& Fe,
-                                     const std::string  & option,
-                                     const Real np_time)
+                                     const std::string  & option)
 {
   START_LOG("apply_bc_by_penalty()", "AssembleNP");
 
@@ -460,13 +528,18 @@ void AssembleNP::apply_bc_by_penalty(const Elem          *elem,
         "np_validation_analytic")
       {
         boundary_value = analytical_solution->exact_solution_infinite_domain
-          (ptx, np_time);
+          (ptx, _eqn_sys.parameters.get<Real>("real_time"), _eqn_sys.parameters
+          .get<std::vector<Real>>("ion_diffusivity")[0]);
       }
 
       // Find the node on the element matching this node on the side.
       // That defined where in the element matrix the BC will be applied.
       const unsigned int& local_node_id = elem->local_node(side->node_id(nn));
       // Penalize phi at the current node, var_number is 0 for 'phi'
+      std::cout<<"elem_id="<<elem_id
+        <<"; id of sides on dirichlet boundaries=" << std::get<0>(t)
+        <<"; dirichlet boundary id associated with this side="<<std::get<1>(t)
+        <<"; boundary_value="<<boundary_value << std::endl;
       this->penalize_elem_matrix_vector(Ke,
                                         Fe,
                                         matrix_or_vector,

@@ -225,7 +225,7 @@ void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
   const MeshBase  & mesh   = this->get_mesh();
   const std::size_t NP     =  _point_mesh->num_particles();
   const std::size_t dim    = mesh.mesh_dimension();
-  const dof_id_type n_elem = mesh.n_elem();
+  const dof_id_type& n_elem = mesh.n_elem();
 
   std::vector<Real> _pv_send_list;                               // point
                                                                  // potential
@@ -339,7 +339,7 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
   const MeshBase  & mesh   = this->get_mesh();
   const std::size_t NP     =  _point_mesh->num_particles();
   const std::size_t dim    = mesh.mesh_dimension();
-  const dof_id_type n_elem = mesh.n_elem();
+  const dof_id_type& n_elem = mesh.n_elem();
 
   // std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
   std::vector<Real> _pv_send_list;                               // point

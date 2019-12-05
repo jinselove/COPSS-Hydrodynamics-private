@@ -66,9 +66,9 @@ class Validator:
             try:
                 jsonschema.validate(test, self.test_schema)
                 print("Succeed!")
-            except:
+            except SystemError as err:
                 print("Fail!")
-                print("Please double check this test in test.json")
+                print("Please double check this test in test.json. Error is: {0}".format(err))
                 sys.exit(-1)
 
     def validate_copss(self):

@@ -1311,7 +1311,7 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
        - */
   PMToolBox::output_message("start writing undisturbed solution to file", *comm_in);
   if ((std::find(output_file.begin(), output_file.end(),
-                 "equation_systems") != output_file.end()) && (restart == false))
+                 "equation_systems") != output_file.end()) && !restart)
   {
     ExodusII_IO(*mesh).write_equation_systems("output_equation_systems_undisturbed.e",
       equation_systems);
@@ -1376,24 +1376,32 @@ void Copss::create_brownian_system(EquationSystems& equation_systems)
 }
 
 // ===================================================================
-const Real Copss::get_min_dt(EquationSystems &es)
+const Real Copss::get_min_dt(EquationSystems &es,
+                             std::vector<std::string> sys_names)
 {
   // Initialize min_dt as a large FLOAT number
   Real min_dt = std::numeric_limits<double>::max();
-  // Loop over all sub systems and find the minimum dt
-  unsigned int n_sys = es.n_systems();
-  for (unsigned int s_id=0; s_id<n_sys; s_id++)
+  // If sys_names is not given, get all system names from es
+  if (sys_names.size()==0)
   {
-    // get a reference to sub system name
-    const std::string &s_name = es.get_system(s_id).name();
+    unsigned int n_sys = es.n_systems();
+    sys_names.resize(n_sys);
+    for (unsigned int s_id=0; s_id<n_sys; s_id++)
+      sys_names[s_id] = es.get_system(s_id).name();
+  }
+  // loop over all systems in sys_names and find the minimum dt
+  for (unsigned int s_id=0; s_id<sys_names.size(); s_id++)
+  {
     // get a reference to the sub system
-    PMLinearImplicitSystem &sys = es.get_system<PMLinearImplicitSystem>(s_name);
+    PMLinearImplicitSystem &sys = es.get_system<PMLinearImplicitSystem>
+      (sys_names[s_id]);
     // get dt from this system
     const Real &dt = sys.get_dt();
     min_dt = (dt < min_dt) ? dt : min_dt;
-    ss << "system: " << s_name << "--> dt: " << dt;
+    ss << "dt(" << sys_names[s_id] << "): " << dt;
     PMToolBox::output_message(ss, *comm_in);
   }
+  // return minimum dt
   return min_dt;
 }
 

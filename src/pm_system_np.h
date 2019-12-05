@@ -84,7 +84,7 @@ public:
    * Set up the initial condition for NP system
    * By default, we need to initialize the NP system solution at time 0
    * When input parameter relax_t_final > 0., we will relax the NP system
-   * until relax_t_final by time step np_dt with poisson system
+   * until relax_t_final by time step dt with poisson system
    * on but stokes system off. The purpose of doing such relaxation is to
    * make sure ion cloud accommodate with charged particles so that the
    * simulation does not takes forever in the initial stages. Rule of thumb
@@ -157,8 +157,14 @@ public:
 
 
   /**
+   * write out solution to csv file
+   */
+   void write_out_solution();
+
+  /**
    * Test the concentration profile for a preset test systems
    * this function is debug and validation purpose
+   * Currently test the NP system solution at time 0
    */
    void test_concentration_profile();
 
@@ -197,7 +203,7 @@ public:
   int ion_id;
 
   // np system dt
-  Real np_dt;
+  Real dt;
 
   // ion name
   std::string ion_name;
@@ -228,7 +234,7 @@ private:
   // Get a pointer to AnalyticalSolutionNP
   AnalyticalSolutionNP *analytical_solution = nullptr;
 
-
-
+  // output precision (defined in input file, default is 6)
+  int o_precision;
 };
 } // end namespace libMesh

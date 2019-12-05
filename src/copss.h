@@ -441,7 +441,8 @@ protected:
   /*!
    * Get minimum dt from all systems
    */
-  const Real get_min_dt(EquationSystems& es);
+  const Real get_min_dt(EquationSystems& es,
+    std::vector<std::string> sys_names = std::vector<std::string>());
 
   /*!
    * Integrate particle motions using Fixman's midpoint scheme

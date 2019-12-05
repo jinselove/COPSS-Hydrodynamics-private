@@ -289,7 +289,7 @@ void PMSystemStokes::solve(const std::string& option)
   this->assemble_rhs(this->name(), option);
 
   // solve the problem
-  _solver_stokes.solve();
+  _solver_stokes.solve(this->name());
   
   // update undisturbed solution when option="undisturbed"
   if (option == "undisturbed")
@@ -476,7 +476,7 @@ void PMSystemStokes::compute_point_velocity(const std::string& option,
   const MeshBase  & mesh   = this->get_mesh();
   const std::size_t NP     =  _point_mesh->num_particles();
   const std::size_t dim    = mesh.mesh_dimension();
-  const dof_id_type n_elem = mesh.n_elem();
+  const dof_id_type& n_elem = mesh.n_elem();
 
   // std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
   std::vector<Real> _pv_send_list;                            // point velocity
@@ -1012,22 +1012,13 @@ void PMSystemStokes::couple_np()
       }
       else
       {
-        // --> couple this NP system
-        if (!module_poisson and with_hi) {
-          option = "diffusion&convection";
-        }
-        else if (module_poisson and !with_hi){
-          option = "diffusion&electrostatics";
-        }
-        else if (module_poisson and with_hi){
-          option = "diffusion&electrostatics&convection";
-        }
-        else {
-          option = "diffusion";
-        }
-        // check if dt is the same as np_dt
+        // generate option for NP system
+        option = std::string("diffusion")
+          + ((module_poisson) ? ("electrostatics") : (""))
+          + ((with_hi) ? ("convection") : (""));
+        // check if dt has changed
         if (abs(this->get_equation_systems().parameters.get<Real>("dt")
-          -np_system.np_dt) > 1.e-6)
+          -np_system.dt) > 1.e-6)
         {
           PMToolBox::output_message("Error: simulation time step is "
                                     "different from np_system time step (when "

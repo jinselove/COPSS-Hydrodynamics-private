@@ -74,7 +74,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
   /*! It is a good idea to make sure we are assembling the proper system.
    */
   libmesh_assert_equal_to(system_name, "Stokes");
-  const unsigned int n_mesh_elem = _mesh.n_elem();
+  const dof_id_type& n_mesh_elem = _mesh.n_elem();
   PMSystemStokes   & _pm_system  =
     _eqn_sys.get_system<PMSystemStokes>(system_name);
 
@@ -405,7 +405,7 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
     PMToolBox::output_message("------> computing helper quantities to ease "
                               "numerical integrations later (only do this once)",
                               _pm_system.comm());
-    const unsigned int n_mesh_elem = _mesh.n_elem();
+    const dof_id_type& n_mesh_elem = _mesh.n_elem();
     _int_force.resize(n_mesh_elem);
     _q_xyz.resize(n_mesh_elem);
     _n_dofs.resize(n_mesh_elem);

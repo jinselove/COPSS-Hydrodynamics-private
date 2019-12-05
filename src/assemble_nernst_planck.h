@@ -86,8 +86,7 @@ public:
                            const std::string  & matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string  & option,
-                           const Real np_time = 0);
+                           const std::string  & option);
 
   /*! \brief Pointer to analytical_solution
   */

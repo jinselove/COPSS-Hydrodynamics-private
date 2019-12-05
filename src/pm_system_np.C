@@ -52,6 +52,7 @@ PMSystemNP::PMSystemNP(EquationSystems  & es,
   _assemble_np = (new AssembleNP(es, "NP"));
   analytical_solution = _assemble_np->get_analytical_solution();
   set_init_cd = true;
+  o_precision = 6;
 }
 
 // ==================================================================================
@@ -95,13 +96,29 @@ Real PMSystemNP::get_dt()
   // Nernst-Planck dt (unit=tc=6*pi*eta*Rb^3/kbT)
   // fixme: we need to calculate dt_np automatically to ensure numerical
   // stability
-  Real dt = 0.1;
+  Real dt = 0.01;
   PMToolBox::output_message("Warning:: need to implement get_dt for NP "
                             "system, currently dt is set to be 0.1 constant",
                             this->comm());
 
   STOP_LOG("get_dt()", "PMSystemNP");
   return dt;
+}
+
+// ===============================================================
+void PMSystemNP::init_params()
+{
+  // initialize some parameters of this NP system
+  Parameters& params = this->get_equation_systems().parameters;
+  ion_diffusivity = (params.get<std::vector<Real>>("ion_diffusivity"))[ion_id];
+  ion_valence = (params.get<std::vector<int>>("ion_valence"))[ion_id];
+  boundary_id_dirichlet_np = params.get<std::vector<unsigned int>>
+    ("boundary_id_dirichlet_np");
+  boundary_value_dirichlet_np = (params.get<std::vector<std::vector<Real>>>
+    ("boundary_value_dirichlet_np"))[ion_id];
+  // get dt from equation system instead from get_dt() function of this
+  // system because we need to collect the minimum dt of all systems
+  dt = params.get<Real>("dt");
 }
 
 // =============================================================
@@ -117,7 +134,7 @@ Number PMSystemNP::init_solution(const Point & p,
     Point p0(0.);
     // num = (p - velocity*t - p0)^2
     Real num = 0.;
-    for (int dim_i=0; dim_i < 3; dim_i++)
+    for (int dim_i=0; dim_i<3; dim_i++)
     {
       num += pow(p(dim_i) - p0(dim_i), 2.);
     }
@@ -132,21 +149,12 @@ Number PMSystemNP::init_solution(const Point & p,
 }
 
 // =============================================================
-//Number PMSystemNP::init_solution_bc (const Point & p,
-//                                     const Parameters & parameters,
-//                                     const std::string &,
-//                                     const std::string &)
-//{
-//  return 1.;
-//}
-
-// =============================================================
 void PMSystemNP::init_cd(const Real& relax_t_final)
 {
   START_LOG("init_cd()", "PMSystemNP");
 
-  // get dt for NP system
-  np_dt = this->get_dt();
+  // initialize system parameters
+  this->init_params();
 
   // project initial conditions on both bulk and boundary elements. By
   // default, the initial ion concentration is set to be 0 across the domain
@@ -156,10 +164,14 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
     this->comm());
   this->project_solution(init_solution, libmesh_nullptr,
     this->get_equation_systems().parameters);
+  PMToolBox::output_message(std::string("**** ion concentration at time 0: ")
+    , this->comm());
+  PMToolBox::output_message(std::string("max concentration = ") +
+    std::to_string(this->solution->max()), this->comm());
 
   // write initial condition to output
   MeshBase& mesh = this->get_mesh();
-  const std::string init_cd_name = "init_cd.e";
+  const std::string init_cd_name = std::string("init_cd_") + ion_name + ".e";
 #ifdef LIBMESH_HAVE_EXODUS_API
   ExodusII_IO(mesh).write_equation_systems(init_cd_name,
     this->get_equation_systems());
@@ -190,13 +202,22 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
 //                                    this->get_equation_systems().parameters);
 //  }
 
-  // relax NP system with Poisson System on
+  // relax NP system with Stokes system off
   PMToolBox::output_message("----> 2. relax ion concentration",
                             this->comm());
+  PMToolBox::output_message(std::string("relax dt = ") + std::to_string
+    (dt), this->comm());
+  // initialize relax step id and relax time
   unsigned int relax_step_id = 0;
   Real relax_time = 0.;
   while(relax_time < relax_t_final)
   {
+//    this->solution->print_matlab(std::string("ion_concentration_step_")
+//    +std::to_string(relax_step_id)+".mat");
+    // update real_time since boundary condition is condition at next step
+    relax_time += dt;
+    this->get_equation_systems().parameters.set<Real>("real_time") = relax_time;
+
     // solve the NP system with the coupling of diffusion & electrostatics, i
     // .e., turn the fluid off, if "module_poisson" is true
     if(this->get_equation_systems().parameters.get<bool>("module_poisson"))
@@ -211,12 +232,20 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
     // false
     else
     {
+//      PMToolBox::output_message("start solving np system...", this->comm());
       this->solve("diffusion");
     }
-    relax_time += np_dt;
+    PMToolBox::output_message(
+      std::string("**** ion concentration at real time:")
+      + std::to_string(this->get_equation_systems().parameters.get<Real>
+        ("real_time")), this->comm());
+    PMToolBox::output_message(std::string("max concentration = ")
+      + std::to_string(this->solution->max()), this->comm());
+    this->rhs->print_matlab(std::string("rhs_step_")+std::to_string
+    (relax_step_id)+".mat");
+    this->matrix->print_matlab(std::string("matrix_step_")+std::to_string
+    (relax_step_id)+".mat");
     relax_step_id += 1;
-    PMToolBox::output_message(std::string("relax system time : ") +
-      std::to_string(relax_time), this->comm());
     // write the solution during relaxation
 #ifdef LIBMESH_HAVE_EXODUS_API
     ExodusII_IO exo(mesh);
@@ -227,7 +256,10 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
                        relax_time);
 #endif
   }
-
+  // reset real_time to zero after relax
+  PMToolBox::output_message("----> relaxation done. Reset real_time to 0.",
+    this->comm());
+  this->get_equation_systems().parameters.set<Real>("real_time") = 0.;
   // avoid setting initial condition again
   set_init_cd = false;
 
@@ -288,30 +320,199 @@ void PMSystemNP::solve(const std::string& option)
     _solver_np.set_solver_type(solver_type);
 
     // Assemble the global matrix
+//    PMToolBox::output_message("start assemble matrix", this->comm());
     this->assemble_matrix(this->name(), option);
 
     // init the KSP solver
+//    PMToolBox::output_message("start init ksp solver", this->comm());
     _solver_np.init_ksp_solver(this->name());
 
     //set _re_init to false once K matrix is built
     _re_init = false;
   }
-
+//  PMToolBox::output_message("start assemble rhs", this->comm());
   this->assemble_rhs(this->name(), option);
 
   // solve the problem
-  _solver_np.solve();
+//  PMToolBox::output_message("start solve Ax=b", this->comm());
+  _solver_np.solve(this->name());
 
   STOP_LOG("solve()", "PMSystemNP");
 }
 
 // =========================================================================
+void PMSystemNP::write_out_solution()
+{
+  // get system dimension
+  MeshBase& mesh = this->get_mesh();
+  const std::size_t dim = mesh.mesh_dimension();
+  // get current time
+  const Real& real_time = this->get_equation_systems().parameters.get<Real>
+    ("real_time");
+  // Output electrical potential profiles along xyz directions, global + local
+  // solutions
+  const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
+  const Point& box_len = _point_mesh->pm_periodic_boundary()->box_length();
+  // nn: number of spacial points to check
+  const unsigned int ns = 200;
+  // define output file format parameters
+  std::ofstream outfile;
+  o_precision = this->get_equation_systems().parameters.get<int>
+    ("o_precision");
+  // define output filename for x, y, z directions
+  std::vector<std::string> filenames;
+  filenames.push_back("x");
+  filenames.push_back("y");
+  if (dim==3) filenames.push_back("z");
+  // loop over all [dim_i] directions and write the output
+  for (int dim_i=0; dim_i<dim; dim_i++)
+  {
+    std::ostringstream oss;
+    oss << "output_concentration_profile_" << filenames[dim_i] << ".csv";
+    // check if file already exists
+    std::ifstream infile(oss.str());
+
+    // open file for appending if real_time > 0. and file exists
+    if (real_time>0. and infile.good())
+    {
+      outfile.open(oss.str(), std::ios_base::app);
+    }
+    else
+    {
+      outfile.open(oss.str(), std::ios_base::out);
+      if (this->comm().rank()==0){
+        std::cout << "create output file " << filenames[dim_i]
+          << " at real_time: " << real_time << std::endl;
+        outfile << "real_time,"
+                << filenames[dim_i] << ","
+                << "c,"
+                << "c_exact\n";
+      }
+    }
+
+    // set output format
+    outfile.setf(std::ios::fixed);
+    outfile.precision(o_precision);
+    // write out solution at this step
+    const Real ds = box_len(dim_i) / Real(ns);
+    // create helper vector
+    std::vector<int> helper_vec(dim, 0);
+    helper_vec[dim_i] = 1;
+    // loop over all [ns] space points along this direction, the coordinate of
+    // other two directions are set to be zero
+    for (std::size_t i = 0; i < ns + 1; ++i)
+    {
+      // create the i-th spacial point
+      Point pt((box_min(0) + Real(i) * ds) * helper_vec[0],
+               (box_min(1) + Real(i) * ds) * helper_vec[1],
+               (box_min(2) + Real(i) * ds) * helper_vec[2]);
+      // global potential from FEM
+      const unsigned int c_var = 0; // c_var = 0
+      // get global phi from FEM solution, this is slow, but we tolerate it
+      // only for test
+      Real c = this->point_value(c_var, pt);
+      // get exact solution for an unbounded domain from analytical solution
+      const Real c_exact = analytical_solution->exact_solution_infinite_domain(
+        pt, real_time, ion_diffusivity);
+      // write the result to output file
+      if (this->comm().rank() == 0)
+        outfile << real_time << ","
+                << pt(dim_i) << ","
+                << c << ","
+                << c_exact << "\n";
+    } // end for i-loop
+    outfile.close();
+  } // end loop dim_i
+}
+
+// =========================================================================
 void PMSystemNP::test_concentration_profile()
 {
-  START_LOG("test_concentration_profile()", "PMSystemPoisson");
+  START_LOG("test_concentration_profile()", "PMSystemNP");
 
-  // fixme:
+  // initialize system parameters
+  this->init_params();
 
-  STOP_LOG("test_concentration_profile()", "PMSystemPoisson");
+  // we only test the NP system for n_step at a constant dt
+  const unsigned int n_step = 10;
+  dt = 0.01;
+
+  PMToolBox::output_message("====>2. Test concentration profile for NP system:",
+    this->comm());
+
+  // Make sure system time is 0. now
+  if (this->get_equation_systems().parameters.get<Real>("real_time")>0.)
+  {
+    PMToolBox::output_message("Error: current real time is not zero before "
+                              "testing concentration profile. Exiting...",
+                              this->comm());
+    libmesh_error();
+  }
+  // solve NP system to get concentration at t = 0. + dt
+  _re_init = true;
+
+
+  PMToolBox::output_message("----> 1. init system solution as analytic "
+                            "concentration at time 0 (a gaussian distribution)",
+                            this->comm());
+  this->project_solution(init_solution, libmesh_nullptr,
+                         this->get_equation_systems().parameters);
+  PMToolBox::output_message(std::string("**** ion concentration at time 0: ")
+    , this->comm());
+  PMToolBox::output_message(std::string("max concentration = ") +
+                            std::to_string(this->solution->max()), this->comm());
+
+  // write initial condition to output
+
+  this->write_out_solution();
+
+  MeshBase& mesh = this->get_mesh();
+  const std::string init_cd_name = "np_validation_analytic.e";
+#ifdef LIBMESH_HAVE_EXODUS_API
+      ExodusII_IO(mesh).write_equation_systems(init_cd_name,
+    this->get_equation_systems());
+#endif
+
+  PMToolBox::output_message("----> 2. integrate np system with diffusion only",
+                            this->comm());
+  PMToolBox::output_message(std::string("dt = ") + std::to_string
+    (dt), this->comm());
+  // initialize step id and relax time
+  unsigned int step_id = 0;
+  Real real_time = 0.;
+  while(step_id < n_step)
+  {
+    // update real_time since boundary condition is condition at next step
+    real_time += dt;
+    this->get_equation_systems().parameters.set<Real>("real_time") = real_time;
+
+    // solve the diffusion system
+    this->solve("diffusion");
+
+    // write solution to output
+    step_id += 1;
+    this->write_out_solution();
+
+    // screen print out
+    PMToolBox::output_message(
+      std::string("**** ion concentration at real time:")
+      + std::to_string(this->get_equation_systems().parameters.get<Real>
+        ("real_time")), this->comm());
+    PMToolBox::output_message(std::string("max concentration = ")
+                              + std::to_string(this->solution->max()), this->comm());
+    // write the solution during relaxation
+#ifdef LIBMESH_HAVE_EXODUS_API
+    ExodusII_IO exo(mesh);
+exo.append(true);
+exo.write_timestep(init_cd_name,
+                   this->get_equation_systems(),
+                   step_id,
+                   real_time);
+#endif
+  }
+  // reset real_time to zero after relax
+  PMToolBox::output_message("----> test done.", this->comm());
+
+  STOP_LOG("test_concentration_profile()", "PMSystemNP");
 }
 } // end of namespace

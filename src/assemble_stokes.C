@@ -340,9 +340,8 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
   // printf("assemble_matrix_K(): The global matrix K has been assembled
   // ...\n");
   // }
-  return;
-
   STOP_LOG("assemble_global_K()", "AssembleStokes");
+  return;
 }
 
 // ==================================================================================
@@ -543,13 +542,6 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   } // end for elem-loop
 
   STOP_LOG("assemble_global_F()", "AssembleStokes");
-
-  // ---------------------------------------------------------------------------------------------
-  // if (_pm_system.comm().rank()==0){
-  //  printf("assemble_global_F(): The global RHS vector has been assembled
-  // ...\n");
-  // }
-  // ---------------------------------------------------------------------------------------------
 }
 
 // ==================================================================================

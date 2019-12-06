@@ -298,6 +298,13 @@ public:
   }
 
   /**
+ * Clear the KD-Tree if need
+ * Note, different from the construct_kd_tree, this is a public function.
+ */
+  virtual void clear_kd_tree();
+
+
+  /**
    * Return the information of element neighbor list
    * around the search radius _search_radius_e
    * Mapping between elem id and element neighbor list of particles
@@ -332,12 +339,6 @@ public:
     return _local_elem_neighbor_list[elem_id];
   }
 
-  /**
-   * Clear the KD-Tree if need
-   * Note, different from the construct_kd_tree, this is a public function.
-   */
-  virtual void clear_kd_tree();
-
 
   /**
    * Build the neighbor list of a particle within the search_radius_p using
@@ -350,11 +351,10 @@ public:
    * IndicesDists output pair<particle_id, distance>
    * Note we need the particle distance to compute their interaction forces.
    */
-  virtual void build_particle_neighbor_list(
+  void build_particle_neighbor_list(
     const Point                  & query_pt,
     const bool                     is_sorted,
-    std::vector<std::pair<std::size_t,
-                          Real> >& IndicesDists);
+    std::vector<std::pair<std::size_t,Real> >& IndicesDists);
 
 
   /**
@@ -365,7 +365,7 @@ public:
    * In fact, the particle neighbor list has been built in "reinit()", so this
    *is NOT USED!
    */
-  virtual void build_particle_neighbor_list();
+  void build_particle_neighbor_list();
 
 
   /*** NOT ACTUALLY USED NOW, written only for the purpose of comparing with
@@ -374,12 +374,12 @@ public:
    * Build the neighbor list for all the particles directly! (N^2 complexity)
    * NOTE that the particle list constructed from this function is not sorted!
    ***/
-  virtual void build_particle_neighbor_list_naively();
+  void build_particle_neighbor_list_naively();
 
   /**
    * reinit neighbor distance for all particles
    */
-  virtual void reinit_neighbor_vector();
+  void reinit_neighbor_vector();
 
   /**
    * Build the neighbor list of partilces for a given elem
@@ -390,7 +390,7 @@ public:
    * because this list is only used to evaluate element-wise load vector due to
    * the neighboring particles.
    */
-  virtual void build_elem_neighbor_list(const Elem               *elem,
+  void build_elem_neighbor_list(const Elem               *elem,
                                         const bool                is_sorted,
                                         std::vector<std::size_t>& n_list);
 
@@ -401,7 +401,7 @@ public:
    * this will generate the _elem_neighbor_list and  _elem_neighbor_list_vector
    * NOTE this takes advantage of KD Tree
    */
-  virtual void build_elem_neighbor_list();
+  void build_elem_neighbor_list();
 
 
   /*
@@ -507,6 +507,55 @@ public:
    */
   const void write_initial_surface_node_pos() const;
 
+
+  /**
+   * Get the ids of all neighbor element of an element
+   */
+  const std::vector<dof_id_type> get_elem_elem_neighbor_list(const
+                                                             dof_id_type& elem_id)
+  {
+    return _elem_elem_neighbor_list[elem_id];
+  };
+
+  /**
+   * Build element element neighbor list
+   */
+  void build_elem_elem_neighbor_list();
+
+
+  /**
+   * Get the ids of all points within an element
+   */
+  const std::vector<dof_id_type> get_elem_point_containing_list(const
+                                                                dof_id_type& elem_id)
+  {
+    return _elem_point_containing_list[elem_id];
+  }
+
+
+  /**
+   * Get the ids of all neighbor points of an element
+   */
+  const std::vector<dof_id_type> get_elem_point_neighbor_list(const
+                                                              dof_id_type& elem_id)
+  {
+    return _elem_point_neighbor_list[elem_id];
+  }
+
+  /**
+   * Build element particle neighbor list.
+   */
+  void build_elem_point_neighbor_list();
+
+protected:
+
+  /**
+   * Build element particle containing list. This function will be called
+   * within build_elem_point_neighbor_list().
+   */
+  void build_elem_point_containing_list();
+
+
 private:
 
   // Mesh base (for simulaiton domain)
@@ -546,6 +595,25 @@ private:
   // but we do this here only for test purpose. For local build
   std::map<const std::size_t, std::vector<std::size_t> >_elem_neighbor_list;
   std::map<const std::size_t, std::vector<std::size_t> >_local_elem_neighbor_list;
+
+  // elem-elem neighbor list: mapping between the id of one element to the
+  // ids of all its neighbor element. Notice that this mapping does change
+  // with time. This mapping is global, i.e., all processors have the same
+  // information about _elem_elem_neighbor_list
+  std::map<const dof_id_type, std::vector<dof_id_type>>_elem_elem_neighbor_list;
+
+  // mapping between the id of one element to the ids of all the point
+  // particles within this element. Notice that this mapping changes with
+  // time. This mapping is global, i.e., all processors have the same
+  // information about _elem_point_containing_list
+  std::map<const dof_id_type, std::vector<dof_id_type>>_elem_point_containing_list;
+
+  // mapping between the id of one element to the ids of its neighbor
+  // particles. We find this mapping by first finding the neighbor elements
+  // of this element and then look for particles located with each of the
+  // neighbor elements. This mapping is global, i.e., all processors have the same
+  // information about _elem_point_neighbor_list
+  std::map<const dof_id_type, std::vector<dof_id_type>>_elem_point_neighbor_list;
 
   // Pointer to the Periodic boundary condition
   PMPeriodicBoundary *_periodic_boundary = nullptr;

@@ -99,7 +99,10 @@ private:
   // we store penalty value of boundary surface nodes in a vector. This
   // vector does not get reinitialized unless _reinit_node_penalty is True.
   // If boundary value changes with time, then we need to reinitialize this
-  // vector at every step
+  // vector at every step; Notice that each node modifies part of this vector
+  // and the information never gets communicated, however, since we will only
+  // access to the local information, we don't need to sync the whole vector
+  // over multiple cpus
   std::vector<std::vector<Real>> _node_penalty;
 
   // initialize reinit_node_penalty as true. It will be reset to false if

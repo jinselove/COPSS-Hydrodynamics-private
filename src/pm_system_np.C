@@ -235,26 +235,29 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
 //      PMToolBox::output_message("start solving np system...", this->comm());
       this->solve("diffusion");
     }
-    PMToolBox::output_message(
-      std::string("**** ion concentration at real time:")
-      + std::to_string(this->get_equation_systems().parameters.get<Real>
-        ("real_time")), this->comm());
-    PMToolBox::output_message(std::string("max concentration = ")
-      + std::to_string(this->solution->max()), this->comm());
-//    this->rhs->print_matlab(std::string("rhs_step_")+std::to_string
+    // write the solution during relaxation
+//    if (relax_step_id%10==0)
+//    {
+      PMToolBox::output_message(
+        std::string("**** ion concentration at real time:")
+        + std::to_string(this->get_equation_systems().parameters.get<Real>
+          ("real_time")), this->comm());
+      PMToolBox::output_message(std::string("max concentration = ")
+                                + std::to_string(this->solution->max()), this->comm());
+      //    this->rhs->print_matlab(std::string("rhs_step_")+std::to_string
 //    (relax_step_id)+".mat");
 //    this->matrix->print_matlab(std::string("matrix_step_")+std::to_string
 //    (relax_step_id)+".mat");
+      #ifdef LIBMESH_HAVE_EXODUS_API
+            ExodusII_IO exo(mesh);
+            exo.append(true);
+            exo.write_timestep(init_cd_name,
+                               this->get_equation_systems(),
+                               relax_step_id+1,
+                               relax_time);
+      #endif
+//    }
     relax_step_id += 1;
-    // write the solution during relaxation
-#ifdef LIBMESH_HAVE_EXODUS_API
-    ExodusII_IO exo(mesh);
-    exo.append(true);
-    exo.write_timestep(init_cd_name,
-                       this->get_equation_systems(),
-                       relax_step_id,
-                       relax_time);
-#endif
   }
   // reset real_time to zero after relax
   PMToolBox::output_message("----> relaxation done. Reset real_time to 0.",

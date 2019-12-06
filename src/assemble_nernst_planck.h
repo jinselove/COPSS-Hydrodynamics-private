@@ -77,17 +77,6 @@ public:
   void select_boundary_side(const Elem *elem,
                             const std::string& system_name) override;
 
-  /*! \brief Apply BCs by penalty method.
-   * np_time: is the NP system time, which is used in the validation system
-   * where the boundary value is changing over time; potentially, we can also
-   * use the same idea to apply time-dependent boundary conditions
-   */
-  void apply_bc_by_penalty(const Elem          *elem,
-                           const std::string  & matrix_or_vector,
-                           DenseMatrix<Number>& Ke,
-                           DenseVector<Number>& Fe,
-                           const std::string  & option);
-
   /*! \brief Pointer to analytical_solution
   */
   AnalyticalSolutionNP* get_analytical_solution() {
@@ -101,8 +90,8 @@ private:
   // Dirichlet BC values associated with this side. For NP system, each
   // boundary value is the concentration of the ion associated with this NP
   // system
-  std::vector<std::vector<std::tuple<unsigned int,
-                                     unsigned int,
+  std::vector<std::vector<std::tuple<dof_id_type,
+                                     dof_id_type,
                                      Real
                                      >>> _boundary_sides_dirichlet_np;
 

@@ -1731,7 +1731,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
     VecAXPY(ROUT, dt, U0); // ROUT = ROUT + dt*U0_mid
   } // end else (without_brownian)
   real_time += dt;
-  equation_systems.parameters.set<Real>("real_time") = real_time;
   timestep_duration += 1;
 }
 
@@ -1902,7 +1901,6 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
     VecAXPY(ROUT, dt, U0); // ROUT = ROUT + dt*U0_mid
   } // end else (without_brownian)
   real_time         += dt;
-  equation_systems.parameters.set<Real>("real_time") = real_time;
   timestep_duration += 1;
 }
 

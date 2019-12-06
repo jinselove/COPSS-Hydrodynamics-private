@@ -239,8 +239,55 @@ public:
    * Couple Stokes System with Nernst-Planck System to create a
    * convection-diffusion system without electrostatics, i.e, Stokes + Fick's
    * second law
+   * This function will first initialize all NP system and relax them with
+   * Poisson on but Fluid off for some time. Once all NP systems are relaxed,
+   * this function will just solve all NP systems for one step to get c(t+dt)
+   *
+   * PseudoCode:
+         void couple_np()
+         {
+            if first np sys is relax (i.e., all system are relaxed):
+              for each np_sys:
+              {
+                 real_time += dt;
+                 solve this np_sys with poisson&stokes --> gives c(t=t+dt)
+              }
+
+            else:
+            {
+                if first np sys is initialized (i.e., all system are initialized):
+                {
+
+                    real_time += dt
+
+                    for each np_sys
+                    {
+                        np_sys.solve("diffusion"+(module_poisson) ? ("electrostatics")
+                        : ("")) --> gives c(t+dt)
+
+                        if real_time > relax_t_final:
+                        {
+                            set relax = true;
+                            set real_time = 0.;
+                        }
+                    }
+
+                    poisson.solve(with ion concentration); --> gives phi(t+dt)
+                }
+
+                else:
+                    for each np_sys
+                    {
+                        initialize this np_sys, i.e, set concentration to be 0 and then
+                        is_initialized = true
+                    }
+
+                this->couple_np();
+            }
+          }
    */
-  void couple_np();
+  void couple_np(unsigned int relax_step_id=0,
+                 const unsigned int output_interval=10);
   
   
    /**

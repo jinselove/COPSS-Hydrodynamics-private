@@ -80,20 +80,15 @@ public:
   void attach_ion_type(const int& _ion_id, const std::string& _ion_name);
 
 
-  /**
+  /*
    * Set up the initial condition for NP system
-   * By default, we need to initialize the NP system solution at time 0
-   * When input parameter relax_t_final > 0., we will relax the NP system
-   * until relax_t_final by time step dt with poisson system
-   * on but stokes system off. The purpose of doing such relaxation is to
-   * make sure ion cloud accommodate with charged particles so that the
-   * simulation does not takes forever in the initial stages. Rule of thumb
-   * of relax_t_final is ~2 * diffusion time of ions over the particle radius
+   * For general systems, we initialize the NP system solution to be 0
+   * everywhere
+   * fixme: potentially we can reinitialize the solution to be a finite
+   * number specified in the input file
    */
-   // fixme: current implementation treats boundary elements and bulk
-   //  elements the same due to a technical issue. Need to fix the issue if
-   //  thinking differently.
-  void init_cd(const Real& relax_t_final = 0.);
+
+  void init_cd();
 
 
   /**
@@ -220,8 +215,11 @@ public:
   // Dirichlet Boundary value for this ion
   std::vector<Real> boundary_value_dirichlet_np;
 
-  // reinitialize initial condition
-  bool set_init_cd;
+  // if initial condition is set
+  bool init_cd_set;
+
+  // if NP system is relaxed without fluid
+  bool relaxed;
 
 private:
 

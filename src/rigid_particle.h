@@ -499,7 +499,7 @@ private:
   std::size_t _num_mesh_node;
 
   // number of surface element
-  std::size_t _num_mesh_elem;
+  dof_id_type _num_mesh_elem;
 
   // mesh size
   std::vector<Real>_mesh_size;

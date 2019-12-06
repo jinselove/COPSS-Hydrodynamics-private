@@ -43,7 +43,7 @@ EXTERN_C_FOR_PETSC_END
 # include "libmesh/petsc_linear_solver.h"
 
 // local header
-# include "pm_system_stokes.h"
+# include "pm_linear_implicit_system.h"
 
 using namespace libMesh;
 
@@ -143,6 +143,73 @@ void Solver::petsc_view_matrix(Mat matix) const
   ierr = PetscViewerDestroy(&mat_viewer);                    CHKERRABORT(
     this->comm().get(),
     ierr);
+}
+
+// =======================================================================================
+void Solver::solve(const std::string& sys_name)
+{
+  START_LOG("solve()", "Solver");
+
+  int ierr;
+  PetscInt  its         = 0;
+  PetscReal final_resid = 0.;
+
+//   Real t1, t2;
+//   t1 = MPI_Wtime();
+//   PetscPrintf(this->comm().get(),
+//     "----> Solving the system: ");
+//   std::cout<<sys_name<<std::endl;
+//
+//   PetscPrintf(this->comm().get(), "--------> Start the KSP solve... \n");
+
+  // Get a reference to the Particle-Mesh linear implicit system object,
+  // and the assembled matrix and the rhs vector, solution
+  PMLinearImplicitSystem& system = _equation_systems
+    .get_system<PMLinearImplicitSystem>(sys_name);
+  PetscVector<Number>   *rhs      = cast_ptr<PetscVector<Number> *>(system.rhs);
+  NumericVector<Number>& sol_in   = *(system.solution);
+  PetscVector<Number>   *solution = cast_ptr<PetscVector<Number> *>(&sol_in);
+
+  // Look at the matrix for debug purpose
+//   PetscMatrix<Number>* matrix     = cast_ptr<PetscMatrix<Number>*>(
+//   system.matrix );
+//   this->petsc_view_matrix( matrix->mat() );
+//   this->petsc_view_vector( rhs->vec() );
+
+  // KSP solve
+  ierr = KSPSolve(_ksp, rhs->vec(), solution->vec()); CHKERRABORT(
+    this->comm().get(),
+    ierr);
+  ierr = KSPGetIterationNumber(_ksp, &its);          CHKERRABORT(
+    this->comm().get(),
+    ierr);
+  ierr = KSPGetResidualNorm(_ksp, &final_resid);     CHKERRABORT(
+    this->comm().get(),
+    ierr);
+
+  // output the convergence infomation
+  if (std::abs(final_resid) > _atol) {
+    PetscPrintf(this->comm().get(),
+                "   Linear solver does NOT converged after %d iteration,",
+                its);
+  }
+//  else {
+//    PetscPrintf(this->comm().get(),
+//      "Linear solver converged after %d iteration,",its);
+//    PetscPrintf(this->comm().get(),
+//      " and the residual norm is%E.\n\n",final_resid);
+//  }
+
+  // Update the system after the solve
+  system.update();
+
+//  t2 = MPI_Wtime();
+  this->comm().barrier();
+
+//  PetscPrintf(this->comm().get(),
+//    "   Time used to solve the linear equation Ax=b is %f\n",t2-t1);
+
+  STOP_LOG("solve()", "Solver");
 }
 
 #endif // ifdef LIBMESH_HAVE_PETSC

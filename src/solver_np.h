@@ -57,24 +57,4 @@ public:
    * The system matrix needs to be assembled before calling this init function!
    */
   void init_ksp_solver(const std::string& system_name);
-
-
-  /*
-   * solve the equation system Ax = b
-   */
-  void solve();
-
-private:
-
-  // solver relative tolerance
-  PetscReal _rtol;
-
-  // solver absolute tolerance
-  PetscReal _atol;
-
-  // (iterative) solver maximum iteration
-  PetscInt _max_it;
-
-  // KSP sover
-  KSP _ksp;
 };

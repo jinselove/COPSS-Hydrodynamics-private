@@ -128,13 +128,4 @@ void SolverNP::init_ksp_solver(const std::string& system_name)
   STOP_LOG("init_ksp_solver()", "SolverNP");
 }
 
-// =======================================================================================
-void SolverNP::solve()
-{
-  START_LOG("solve()", "SolverNP");
-
-
-  STOP_LOG("solve()", "SolverNP");
-}
-
 #endif // ifdef LIBMESH_HAVE_PETSC

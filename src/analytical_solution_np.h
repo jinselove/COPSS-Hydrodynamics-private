@@ -74,9 +74,11 @@ public:
 
 
     /*! \brief Exact solution at a point in the domain at time t
-
+     *
      */
-    Real exact_solution_infinite_domain(const Point& pt0, const Real& t) const;
+    Real exact_solution_infinite_domain(const Point& pt,
+                                        const Real& t,
+                                        const Real& D_ion) const;
 
 
     /*! \brief Attach point mesh to the class

@@ -59,6 +59,7 @@ PMSystemPoisson::PMSystemPoisson(EquationSystems  & es,
   _assemble_poisson   = new AssemblePoisson(es, name);
   analytical_solution = _assemble_poisson->get_analytical_solution();
   ggem_poisson        = _assemble_poisson->get_ggem_poisson();
+  o_precision = 6;
 }
 
 // ==================================================================================
@@ -143,7 +144,7 @@ void PMSystemPoisson::solve(const std::string& option)
   // right-hand-side vector is " <<t2-t1<<" s\n";
 
   // solve the problem
-  _solver_poisson.solve();
+  _solver_poisson.solve(this->name());
   
 
   STOP_LOG("solve()", "PMSystemPoisson");
@@ -216,19 +217,6 @@ void PMSystemPoisson::add_local_solution()
 }
 
 // ==================================================================================
-void PMSystemPoisson::test_l2_norm(bool& neighbor_list_update_flag)
-{
-  START_LOG("test_l2_norm()", "PMSystemPoisson");
-  std::string msg = "--->test in PMSystemPoisson::test_l2_norm(): \n";
-  PMToolBox::output_message(msg, this->comm());
-
-  // FIXME: to be implemented
-
-  STOP_LOG("test_l2_norm()", "PMSystemPoisson");
-}
-
-
-// ==================================================================================
 void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
 {
   START_LOG("compute_point_potential()", "PMSystemPoisson");
@@ -237,7 +225,7 @@ void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
   const MeshBase  & mesh   = this->get_mesh();
   const std::size_t NP     =  _point_mesh->num_particles();
   const std::size_t dim    = mesh.mesh_dimension();
-  const dof_id_type n_elem = mesh.n_elem();
+  const dof_id_type& n_elem = mesh.n_elem();
 
   std::vector<Real> _pv_send_list;                               // point
                                                                  // potential
@@ -351,7 +339,7 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
   const MeshBase  & mesh   = this->get_mesh();
   const std::size_t NP     =  _point_mesh->num_particles();
   const std::size_t dim    = mesh.mesh_dimension();
-  const dof_id_type n_elem = mesh.n_elem();
+  const dof_id_type& n_elem = mesh.n_elem();
 
   // std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
   std::vector<Real> _pv_send_list;                               // point
@@ -669,14 +657,12 @@ void PMSystemPoisson::test_potential_profile()
   STOP_LOG("test_potential_profile()", "PMSystemPoisson");
 }
 
-
-
 // =============================================================================
-void PMSystemPoisson::update_solution_for_output(const std::string&
+void PMSystemPoisson::update_solution_before_output(const std::string&
   solution_name)
 
 {
-  START_LOG("update_solution_for_output()", "PMSystemPoisson");
+  START_LOG("update_solution_before_output()", "PMSystemPoisson");
 
   // clone Poisson FEM System Solution to solution_backup
   this->solution_backup = this->solution->clone();
@@ -699,7 +685,16 @@ void PMSystemPoisson::update_solution_for_output(const std::string&
     PMToolBox::output_message(ss.str(), this->comm());
   }
 
-  STOP_LOG("update_solution_for_output()", "PMSystemPoisson");
+  STOP_LOG("update_solution_before_output()", "PMSystemPoisson");
+}
+
+void PMSystemPoisson::resume_solution_after_output()
+{
+  START_LOG("resume_solution_after_output()", "PMSystemPoisson");
+
+  *(this->solution) = *(this->solution_backup);
+
+  STOP_LOG("resume_solution_after_output()", "PMSystemPoisson");
 }
 
 } // end of namespace

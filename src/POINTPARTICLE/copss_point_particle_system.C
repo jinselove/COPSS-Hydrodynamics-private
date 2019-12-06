@@ -177,6 +177,8 @@ void CopssPointParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system
 // ======================================================================================
 void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
 {
+  equation_systems.parameters.set<Real>("real_time") = real_time;
+  equation_systems.parameters.set<bool>("adaptive_dt") = adaptive_dt;
   equation_systems.parameters.set<unsigned int>("linear solver maximum iterations")
     = max_linear_iterations;
   equation_systems.parameters.set<Real>("linear solver rtol")
@@ -270,18 +272,35 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
       = solver_type_np;
     equation_systems.parameters.set<Real>("c0")
       = c0;
-    equation_systems.parameters.set<Real>("dt_np") = dt_np;
     equation_systems.parameters.set<std::vector<std::string>>("ion_name")
       = ion_name;
     equation_systems.parameters.set<std::vector<Real>>("ion_diffusivity")
       = ion_diffusivity;
     equation_systems.parameters.set<std::vector<int>>("ion_valence")
       = ion_valence;
+    equation_systems.parameters.set<Real>("np_system_relaxation_time") =
+      np_system_relaxation_time;
+    // calculate minimum dt required by all NP systems
+    // this dt will be updated during integration process if dt required by
+    // other systems are even smaller
+    unsigned int n_sys = equation_systems.n_systems();
+    std::vector<std::string> np_sys_names;
+    for (unsigned int s_id=0; s_id<n_sys; s_id++)
+    {
+      const std::string& s_name = equation_systems.get_system(s_id).name();
+      if (s_name.rfind("NP:", 0)==0)
+      {
+        np_sys_names.push_back(s_name);
+      }
+    }
+    equation_systems.parameters.set<Real>("dt") =
+      this->get_min_dt(equation_systems, np_sys_names);
+    PMToolBox::output_message(std::string("dt required by NP systems = ")
+    +std::to_string(equation_systems.parameters.set<Real>("dt")), *comm_in);
     equation_systems.parameters.set<std::vector<unsigned int> >(
-            "boundary_id_dirichlet_np") = boundary_id_dirichlet_poisson;
+            "boundary_id_dirichlet_np") = boundary_id_dirichlet_np;
     equation_systems.parameters.set<std::vector<std::vector<Real>> >(
             "boundary_value_dirichlet_np") = boundary_value_dirichlet_np;
-    equation_systems.parameters.set<Real>("equil_tol") = equil_tol;
   }
   equation_systems.parameters.set<int> ("o_precision") = o_precision;
 }
@@ -338,8 +357,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
 
-  // validate GGEMStokes if simulation_name = ggem_validation
-  if (simulation_name == "ggem_validation") {
+  // validate Stokes against analytic solution
+  if (simulation_name == "ggem_validation")
+  {
     perf_log.push("GGEM validation");
     system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
     system.test_velocity_profile();
@@ -347,8 +367,9 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     return;
   }
 
-  // validate GGEMPoisson if simulation_name = ggem_validation_poisson
-  if (simulation_name == "ggem_validation_poisson") {
+  // validate Poisson against analytic solution
+  if (simulation_name=="ggem_validation_poisson")
+  {
     perf_log.push("GGEMPoisson validation");
     PMSystemPoisson& system_poisson =
       equation_systems.get_system<PMSystemPoisson>("Poisson");
@@ -358,6 +379,28 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     perf_log.pop("GGEMPoisson validation");
     return;
   }
+
+  // validate NP system (diffusion only) with analytic solution
+  if (simulation_name=="np_validation_analytic")
+  {
+    perf_log.push("NP (diffusion only) validation");
+
+    // test concentration profile of all NP systems
+    unsigned int n_sys = equation_systems.n_systems();
+    for (unsigned int s_id=0; s_id<n_sys; s_id++)
+    {
+      const std::string& s_name = equation_systems.get_system(s_id).name();
+      if (s_name.rfind("NP:", 0)==0)
+      {
+        PMSystemNP& np_system = equation_systems.get_system<PMSystemNP>(s_name);
+        np_system.test_concentration_profile();
+      }
+    }
+
+    perf_log.pop("NP (diffusion only) validation");
+    return;
+  }
+
 
   ss << "============================4. Start moving particles ====================";
   PMToolBox::output_message(ss, *comm_in);
@@ -371,7 +414,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   hmin  = hminf;
   hmax  = hmaxf;
 
-  if (with_brownian == false and with_hi == true) {
+  if (!with_brownian and with_hi) {
     for (int i = 1; i < max_dr_coeff.size(); i++) max_dr_coeff[i] *= hmin;  // only
                                                                             // magnify
                                                                             // max_dr_coeff[1]
@@ -424,10 +467,12 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   vel0.resize(n_vec);
   vel1.resize(n_vec);
 
-  if (adaptive_dt == true and point_particle_model == "polymer_chain") {
+  if (adaptive_dt and point_particle_model == "polymer_chain") {
     for (int i = 0; i < max_dr_coeff.size();
          i++) max_dr_coeff[i] *= Ss2 / Rb / Rb;
   }
+  // attach max_dr_coeff to equation systems for future use
+  equation_systems.parameters.set<std::vector<Real> >("max_dr_coeff") = max_dr_coeff;
 
   // start integration
   perf_log.push("integration");

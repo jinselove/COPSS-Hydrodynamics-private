@@ -156,5 +156,35 @@
             }
         ],
         "on": true
+    },
+    "NernstPlanck_Validation_Analytic": {
+        "package": "POINTPARTICLE",
+        "required_inputs": [
+            "point_particle_control.in",
+            "point_particle_data.in",
+            "run.sh",
+            "zclean.sh"
+        ],
+        "required_outputs": [
+            {
+                "filename": "output_concentration_profile_x.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_concentration_profile_y.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            },
+            {
+                "filename": "output_concentration_profile_z.csv",
+                "cmp_method": "cmp_df",
+                "params": {},
+                "tol": 1e-6
+            }
+        ],
+        "on": true
     }
 }

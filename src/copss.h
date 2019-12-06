@@ -127,17 +127,16 @@ public:
                                                        // (N*s/um)
   Real Db; // bead diffusivity (um^2/s)
   std::string particle_type;
-  // finite-difference timestep for Nernst-Planck system (unit=tc)
-  Real dt_np;
   // name of each ion species
   std::vector<std::string> ion_name;
   // diffusivity of each ion species (unit = um^2/s)
   std::vector<Real> ion_diffusivity;
   // valence of each ion species (unit = 1)
   std::vector<int> ion_valence;
-  // equilibrium tolerance (if ion concentration of two adjacent NP step is
-  // smaller than this value, then we consider NP system as in equilibrium)
-  Real equil_tol;
+  // NP system relaxation time for initialization. By default, this
+  // relaxation time is 2 * Rb^2/max(ion_diffusivity), i.e., the time it takes
+  // for ions to diffuse 2 particle radius. 
+  Real np_system_relaxation_time;
 
   // characteristic variables
   Real tc; // characteristic time (diffusion time) (s)
@@ -177,6 +176,7 @@ public:
                    boundary_value_neumann_poisson;
 
   // Boundary conditions for Nernst-Planck system
+  bool check_charge_neutrality;
   std::vector<unsigned int> boundary_id_dirichlet_np;
   std::vector<std::vector<Real> > boundary_value_dirichlet_np;
 
@@ -414,7 +414,8 @@ protected:
    * Steps for create_equation_systems
    */
   virtual void attach_object_mesh(PMLinearImplicitSystem& system) = 0;
-  void         attach_period_boundary(PMLinearImplicitSystem& system);
+  void         attach_period_boundary(PMLinearImplicitSystem& system,
+    std::vector<std::string>& periodic_vars);
   virtual void set_parameters(EquationSystems& equation_systems) = 0;
 
   // force field
@@ -435,6 +436,13 @@ protected:
    * Create brownian system
    */
   void create_brownian_system(EquationSystems& equation_systems);
+
+
+  /*!
+   * Get minimum dt from all systems
+   */
+  const Real get_min_dt(EquationSystems& es,
+    std::vector<std::string> sys_names = std::vector<std::string>());
 
   /*!
    * Integrate particle motions using Fixman's midpoint scheme

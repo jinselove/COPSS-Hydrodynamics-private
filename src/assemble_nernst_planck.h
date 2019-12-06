@@ -71,38 +71,11 @@ public:
                          const std::string& option) override;
 
 
-  /*! \brief Assemble function for the right-hand-side in NP equation.
-
-      This calculates each element's contribution to the right-hand-side vector.
-   */
-  void compute_element_rhs(const Elem  *elem,
-                           const unsigned int&  n_dofs,
-                           const std::vector<Real>& JxW,
-                           const std::vector<std::vector<Real>>& c,
-                           const std::vector<Point> q_xyz,
-                           const std::vector<std::size_t>n_list,
-                           const bool& pf_flag,
-                           const std::string& option,
-                           DenseVector<Number>& Fe);
-
-
   /*! \brief select sides on the boundary for all elements
    *
    */
   void select_boundary_side(const Elem *elem,
                             const std::string& system_name) override;
-
-  /*! \brief Apply BCs by penalty method.
-   * np_time: is the NP system time, which is used in the validation system
-   * where the boundary value is changing over time; potentially, we can also
-   * use the same idea to apply time-dependent boundary conditions
-   */
-  void apply_bc_by_penalty(const Elem          *elem,
-                           const std::string  & matrix_or_vector,
-                           DenseMatrix<Number>& Ke,
-                           DenseVector<Number>& Fe,
-                           const std::string  & option,
-                           const Real np_time = 0);
 
   /*! \brief Pointer to analytical_solution
   */
@@ -117,12 +90,26 @@ private:
   // Dirichlet BC values associated with this side. For NP system, each
   // boundary value is the concentration of the ion associated with this NP
   // system
-  std::vector<std::vector<std::tuple<unsigned int,
-                                     unsigned int,
+  std::vector<std::vector<std::tuple<dof_id_type,
+                                     dof_id_type,
                                      Real
                                      >>> _boundary_sides_dirichlet_np;
 
+  // For regular NP simulations, Dirichlet Boundary value is constant. Thus
+  // we store penalty value of boundary surface nodes in a vector. This
+  // vector does not get reinitialized unless _reinit_node_penalty is True.
+  // If boundary value changes with time, then we need to reinitialize this
+  // vector at every step
+  std::vector<std::vector<Real>> _node_penalty;
+
+  // initialize reinit_node_penalty as true. It will be reset to false if
+  // necessary
+  bool _reinit_node_penalty = true;
+
   // Get a reference to AnalyticalSolutionNP
   AnalyticalSolutionNP *analytical_solution = nullptr;
+
+  // A big number for penalty
+  const Real penalty = 1.e10;
 
 };

@@ -57,18 +57,23 @@ PointMesh<3> * AnalyticalSolutionNP::get_point_mesh()
 {
   START_LOG("get_point_mesh()", "AnalyticalSolutionNP");
 
-  return _point_mesh;
 
   STOP_LOG("get_point_mesh()", "AnalyticalSolutionNP");
+  return _point_mesh;
 }
 
 // ======================================================================
-Real AnalyticalSolutionNP::exact_solution_infinite_domain(const Point& pt0,
-  const Real& t)
-const
+Real AnalyticalSolutionNP::exact_solution_infinite_domain(const Point& pt,
+                                                          const Real& t,
+                                                          const Real& D_ion)
+                                                          const
 {
   START_LOG("exact_solution_infinite_domain()", "AnalyticalSolutionNP");
 
+  const Point pt0(0.); // source point
+  const Real num = (pt-pt0).norm_sq();
+  const Real den = D_ion * (4. * t + 1.);
+
   STOP_LOG("exact_solution_infinite_domain()", "AnalyticalSolutionNP");
-  return 0;
+  return exp(-num/den) / pow(4. * t + 1., 1.5);
 }

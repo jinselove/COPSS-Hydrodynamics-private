@@ -81,6 +81,10 @@ public:
    */
   virtual void clear() = 0;
 
+  /**
+   * get the time interval to guarantee numerical stability for a system
+   */
+  virtual Real get_dt() {return std::numeric_limits<double>::max();};
 
   /**
    * Assemble the system matrix.
@@ -105,13 +109,13 @@ public:
   /**
    * update system solution for output
    */
-  virtual void update_solution_for_output(const std::string& solution_name =
+  virtual void update_solution_before_output(const std::string& solution_name =
     "total") = 0;
 
   /**
    * resume system solution after writing the solution to output
    */
-  void resume_solution_after_output();
+  virtual void resume_solution_after_output() = 0;
 
   /**
    * Add the local solution to the global solution
@@ -122,7 +126,7 @@ public:
   /**
    * Compute the L2-error by comparing numerical and analytical solutions
    */
-  virtual void test_l2_norm(bool& neighbor_list_update_flag) = 0;
+  void test_l2_norm(bool& neighbor_list_update_flag);
 
 
   /*

@@ -67,11 +67,29 @@ public:
    */
   void clear();
 
+  /**
+   * override get_dt function in parent class since this system needs more
+   * conditions on dt to make the system stable
+   */
+  Real get_dt();
+
 
   /**
    * Init ion id for this NP system and validate if system name is correctly set
    */
   void attach_ion_type(const int& _ion_id, const std::string& _ion_name);
+
+
+  /*
+   * Set up the initial condition for NP system
+   * For general systems, we initialize the NP system solution to be 0
+   * everywhere
+   * fixme: potentially we can reinitialize the solution to be a finite
+   * number specified in the input file
+   */
+
+  void init_cd();
+
 
   /**
    * Assemble the system matrix.
@@ -112,23 +130,36 @@ public:
 
 
   /**
-   * Compute the L2-error in an unbounded domain
-   * This function does not apply to NP system
+   * update system solution for output equation systems
+   * There is only 'total' solution for NP system, no need to update
    */
-  void test_l2_norm(bool& neighbor_list_update_flag) override {};
+  void update_solution_before_output(const std::string& solution_name = "total")
+    override
+    {
+      // we don't need solution_name input, but we have to put it in
+      // function
+      // definition since it's overriding the virtual function in parent class
+      (void) solution_name;
+    };
+
+  /**
+   * override the resume_solution_after_output defined in
+   * PMLinearImplicitSystem class.
+   * We don't need to do anything in this resume function for NP system since
+   * we didn't do anything in the update_solution_before_output function
+   */
+  void resume_solution_after_output() override {};
 
 
   /**
-   * update system solution for output equation systems
-   * fixme:implement this function after NP system is built
+   * write out solution to csv file
    */
-  void update_solution_for_output(const std::string& solution_name = "total")
-    override {};
-
+   void write_out_solution();
 
   /**
    * Test the concentration profile for a preset test systems
    * this function is debug and validation purpose
+   * Currently test the NP system solution for first 10 steps at dt = 0.01
    */
    void test_concentration_profile();
 
@@ -140,11 +171,34 @@ public:
     return _solver_np;
   }
 
-  // time stepping for NP system
-  Real dt_np;
+
+  /**
+   * Initial solution function prototype.  This gives the exact
+   * solution as a function of space and time.  In this case the
+   * initial condition will be taken as the exact solution at time 0
+   */
+
+  static Number init_solution (const Point & p,
+                              const Parameters & parameters,
+                              const std::string &,
+                              const std::string &);
+
+  /**
+   * The initial solution at time 0 on the boundaries will be set by this
+   * function
+   */
+  //fixme: implement this function to assign different initial conditions for
+  //elements on boundaries versus in bulk
+//  static Number init_solution_bc (const Point & p,
+//                                 const Parameters & parameters,
+//                                 const std::string &,
+//                                 const std::string &);
 
   // ion id
   int ion_id;
+
+  // np system dt
+  Real dt;
 
   // ion name
   std::string ion_name;
@@ -161,8 +215,11 @@ public:
   // Dirichlet Boundary value for this ion
   std::vector<Real> boundary_value_dirichlet_np;
 
-  // equilibrium tolerance for ion concentration
-  Real equil_tol;
+  // if initial condition is set
+  bool init_cd_set;
+
+  // if NP system is relaxed without fluid
+  bool relaxed;
 
 private:
 
@@ -175,7 +232,7 @@ private:
   // Get a pointer to AnalyticalSolutionNP
   AnalyticalSolutionNP *analytical_solution = nullptr;
 
-
-
+  // output precision (defined in input file, default is 6)
+  int o_precision;
 };
 } // end namespace libMesh

@@ -169,7 +169,10 @@ void CopssRigidParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system
 }
 
 // ======================================================================================
-void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems) {
+void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
+{
+  equation_systems.parameters.set<Real>("real_time") = real_time;
+  equation_systems.parameters.set<bool>("adaptive_dt") = adaptive_dt;
   equation_systems.parameters.set<unsigned int>("linear solver maximum iterations")
     = max_linear_iterations;
   equation_systems.parameters.set<Real>("linear solver rtol")
@@ -259,18 +262,18 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
             = solver_type_np;
     equation_systems.parameters.set<Real>("c0")
             = c0;
-    equation_systems.parameters.set<Real>("dt_np") = dt_np;
     equation_systems.parameters.set<std::vector<std::string>>("ion_name")
             = ion_name;
     equation_systems.parameters.set<std::vector<Real>>("ion_diffusivity")
             = ion_diffusivity;
     equation_systems.parameters.set<std::vector<int>>("ion_valence")
             = ion_valence;
+    equation_systems.parameters.set<Real>("np_system_relaxation_time") =
+      np_system_relaxation_time;
     equation_systems.parameters.set<std::vector<unsigned int> >(
             "boundary_id_dirichlet_np") = boundary_id_dirichlet_poisson;
     equation_systems.parameters.set<std::vector<std::vector<Real>> >(
       "boundary_value_dirichlet_np") = boundary_value_dirichlet_np;
-    equation_systems.parameters.set<Real>("equil_tol") = equil_tol;
   }
   equation_systems.parameters.set<int> ("o_precision") = o_precision;
 }
@@ -322,6 +325,8 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems) {
                                                                             // and
                                                                             // max_dr_coeff[2]
   }
+  // attach max_dr_coeff to equation systems for future use
+  equation_systems.parameters.set<std::vector<Real> >("max_dr_coeff") = max_dr_coeff;
 
   if (update_neighbor_list_everyStep) {
     ss << "====> neighbor_list is updated at every time step (including half step of fixman if available)";

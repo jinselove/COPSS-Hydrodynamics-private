@@ -51,7 +51,8 @@ PMSystemNP::PMSystemNP(EquationSystems  & es,
   // NP equation assembly
   _assemble_np = (new AssembleNP(es, "NP"));
   analytical_solution = _assemble_np->get_analytical_solution();
-  set_init_cd = true;
+  init_cd_set = false;
+  relaxed = false;
   o_precision = 6;
 }
 
@@ -148,123 +149,21 @@ Number PMSystemNP::init_solution(const Point & p,
   else return 0.;
 }
 
+
+
 // =============================================================
-void PMSystemNP::init_cd(const Real& relax_t_final)
+void PMSystemNP::init_cd()
 {
   START_LOG("init_cd()", "PMSystemNP");
 
   // initialize system parameters
   this->init_params();
 
-  // project initial conditions on both bulk and boundary elements. By
-  // default, the initial ion concentration is set to be 0 across the domain
-  PMToolBox::output_message("==> Initialize ion concentration for NP system",
-    this->comm());
-  PMToolBox::output_message("----> 1. init uniform concentration",
-    this->comm());
+  // set initial ion concentration
   this->project_solution(init_solution, libmesh_nullptr,
     this->get_equation_systems().parameters);
-  PMToolBox::output_message(std::string("**** ion concentration at time 0: ")
-    , this->comm());
-  PMToolBox::output_message(std::string("max concentration = ") +
-    std::to_string(this->solution->max()), this->comm());
 
-  // write initial condition to output
-  MeshBase& mesh = this->get_mesh();
-  const std::string init_cd_name = std::string("init_cd_") + ion_name + ".e";
-#ifdef LIBMESH_HAVE_EXODUS_API
-  ExodusII_IO(mesh).write_equation_systems(init_cd_name,
-    this->get_equation_systems());
-#endif
-
-  // project Dirichlet BC on initial solutions
-  // fixme: the bounary_project_solution is not able to work in parallel
-  //  because of memory issue, need to figure out why if we need to assign
-  //  different initial conditions on boundaries versus in bulk
-//  PMToolBox::output_message("----> Set initial solution for boundary "
-//                            "elements.", this->comm());
-//  for (unsigned int i = 0; i < boundary_id_dirichlet_np.size(); i++)
-//  {
-//    PMToolBox::output_message(std::string("** for boundary id") + std::to_string
-//    (i), this->comm());
-//    // create a boundary id set for this boundary
-//    std::set <boundary_id_type> b{boundary_id_type(boundary_id_dirichlet_np[i])};
-//    // we only have one variable 'c'
-//    std::vector<unsigned int> variables{0};
-//    // project boundary value defined in init_solution_bc () to the
-//    // boundary nodes in initial solution
-//    PMToolBox::output_message(std::string("--------> On Dirichlet Boundary: ")
-//                              + std::to_string
-//                                (boundary_id_dirichlet_np[i]),
-//                              this->comm());
-//    this->boundary_project_solution(b, variables, init_solution_bc,
-//                                    libmesh_nullptr,
-//                                    this->get_equation_systems().parameters);
-//  }
-
-  // relax NP system with Stokes system off
-  PMToolBox::output_message("----> 2. relax ion concentration",
-                            this->comm());
-  PMToolBox::output_message(std::string("relax dt = ") + std::to_string
-    (dt), this->comm());
-  // initialize relax step id and relax time
-  unsigned int relax_step_id = 0;
-  Real relax_time = 0.;
-  while(relax_time < relax_t_final)
-  {
-//    this->solution->print_matlab(std::string("ion_concentration_step_")
-//    +std::to_string(relax_step_id)+".mat");
-    // update real_time since boundary condition is condition at next step
-    relax_time += dt;
-    this->get_equation_systems().parameters.set<Real>("real_time") = relax_time;
-
-    // solve the NP system with the coupling of diffusion & electrostatics, i
-    // .e., turn the fluid off, if "module_poisson" is true
-    if(this->get_equation_systems().parameters.get<bool>("module_poisson"))
-    {
-      // need to solve the poisson system first before solving NP system
-      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-        .solve("unused");
-      // solve the coupled NP system
-      this->solve("diffusion&electrostatics");
-    }
-    // solve the NP system alone, i.e., diffusion only if "module_poisson" if
-    // false
-    else
-    {
-//      PMToolBox::output_message("start solving np system...", this->comm());
-      this->solve("diffusion");
-    }
-    // write the solution during relaxation
-//    if (relax_step_id%10==0)
-//    {
-      PMToolBox::output_message(
-        std::string("**** ion concentration at real time:")
-        + std::to_string(this->get_equation_systems().parameters.get<Real>
-          ("real_time")), this->comm());
-      PMToolBox::output_message(std::string("max concentration = ")
-                                + std::to_string(this->solution->max()), this->comm());
-      //    this->rhs->print_matlab(std::string("rhs_step_")+std::to_string
-//    (relax_step_id)+".mat");
-//    this->matrix->print_matlab(std::string("matrix_step_")+std::to_string
-//    (relax_step_id)+".mat");
-      #ifdef LIBMESH_HAVE_EXODUS_API
-            ExodusII_IO exo(mesh);
-            exo.append(true);
-            exo.write_timestep(init_cd_name,
-                               this->get_equation_systems(),
-                               relax_step_id+1,
-                               relax_time);
-      #endif
-//    }
-    relax_step_id += 1;
-  }
-  // reset real_time to zero after relax
-  PMToolBox::output_message("----> relaxation done. Reset real_time to 0.",
-    this->comm());
-  this->get_equation_systems().parameters.set<Real>("real_time") = 0.;
-  // avoid setting initial condition again
-  set_init_cd = false;
+  init_cd_set = true;
 
   STOP_LOG("init_cd()", "PMSystemNP");
 }

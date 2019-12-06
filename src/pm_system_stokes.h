@@ -239,8 +239,12 @@ public:
    * Couple Stokes System with Nernst-Planck System to create a
    * convection-diffusion system without electrostatics, i.e, Stokes + Fick's
    * second law
+   * This function will first initialize all NP system and relax them with
+   * Poisson on but Fluid off for some time. Once all NP systems are relaxed,
+   * this function will just solve all NP systems for one step to get c(t+dt)
    */
-  void couple_np();
+  void couple_np(unsigned int relax_step_id=0,
+                 const unsigned int output_interval=10);
   
   
    /**

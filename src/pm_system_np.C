@@ -241,10 +241,10 @@ void PMSystemNP::init_cd(const Real& relax_t_final)
         ("real_time")), this->comm());
     PMToolBox::output_message(std::string("max concentration = ")
       + std::to_string(this->solution->max()), this->comm());
-    this->rhs->print_matlab(std::string("rhs_step_")+std::to_string
-    (relax_step_id)+".mat");
-    this->matrix->print_matlab(std::string("matrix_step_")+std::to_string
-    (relax_step_id)+".mat");
+//    this->rhs->print_matlab(std::string("rhs_step_")+std::to_string
+//    (relax_step_id)+".mat");
+//    this->matrix->print_matlab(std::string("matrix_step_")+std::to_string
+//    (relax_step_id)+".mat");
     relax_step_id += 1;
     // write the solution during relaxation
 #ifdef LIBMESH_HAVE_EXODUS_API
@@ -488,6 +488,13 @@ void PMSystemNP::test_concentration_profile()
 
     // solve the diffusion system
     this->solve("diffusion");
+
+//    this->rhs->print_matlab(std::string("rhs_step_")+std::to_string(step_id)
+//    +".mat");
+//    this->matrix->print_matlab(std::string("matrix_step_")+std::to_string
+//    (step_id)+".mat");
+//    this->solution->print_matlab(std::string("sol_step_")+std::to_string
+//    (step_id+1)+".mat");
 
     // write solution to output
     step_id += 1;

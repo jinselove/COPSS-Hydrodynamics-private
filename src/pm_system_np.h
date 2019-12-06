@@ -164,7 +164,7 @@ public:
   /**
    * Test the concentration profile for a preset test systems
    * this function is debug and validation purpose
-   * Currently test the NP system solution at time 0
+   * Currently test the NP system solution for first 10 steps at dt = 0.01
    */
    void test_concentration_profile();
 

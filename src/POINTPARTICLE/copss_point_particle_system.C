@@ -384,7 +384,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   if (simulation_name=="np_validation_analytic")
   {
     perf_log.push("NP (diffusion only) validation");
-    
+
     // test concentration profile of all NP systems
     unsigned int n_sys = equation_systems.n_systems();
     for (unsigned int s_id=0; s_id<n_sys; s_id++)

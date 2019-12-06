@@ -106,7 +106,21 @@ private:
                                      Real
                                      >>> _boundary_sides_dirichlet_np;
 
+  // For regular NP simulations, Dirichlet Boundary value is constant. Thus
+  // we store penalty value of boundary surface nodes in a vector. This
+  // vector does not get reinitialized unless _reinit_node_penalty is True.
+  // If boundary value changes with time, then we need to reinitialize this
+  // vector at every step
+  std::vector<std::vector<Real>> _node_penalty;
+
+  // initialize reinit_node_penalty as true. It will be reset to false if
+  // necessary
+  bool _reinit_node_penalty = true;
+
   // Get a reference to AnalyticalSolutionNP
   AnalyticalSolutionNP *analytical_solution = nullptr;
+
+  // A big number for penalty
+  const Real penalty = 1.e10;
 
 };

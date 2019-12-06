@@ -174,6 +174,9 @@ PointMesh<KDDim>::~PointMesh()
   _particles.clear();
   _elem_neighbor_list.clear();
   _local_elem_neighbor_list.clear();
+//  _elem_elem_neighbor_list.clear();
+//  _elem_point_containing_list.clear();
+//  _elem_point_neighbor_list.clear();
 }
 
 // ======================================================================
@@ -874,6 +877,9 @@ void PointMesh<KDDim>::build_elem_elem_neighbor_list()
   parallel_object_only();
   START_LOG("reinit()", "PointMesh<KDDim>");
 
+  std::ostringstream oss;
+  oss << "\n>>>>>>>>>>> Building elem-elem neighbor list";
+  PMToolBox::output_message(oss, this->comm());
   // get some reference for convenience
   const dof_id_type& n_elem = _mesh.n_elem();
 
@@ -1000,21 +1006,102 @@ void PointMesh<KDDim>::build_elem_elem_neighbor_list()
   }
 
   // print out debug information to screen
-  std::ostringstream oss;
-  oss << "-----------build elem-elem neighbor list------------\n";
-  for (dof_id_type elem_id=0; elem_id<n_elem; elem_id++)
-  {
-    oss << "elem id " << elem_id << " neighbor list: ";
-    const std::vector<dof_id_type>& elem_nb_list =
-      this->get_elem_elem_neighbor_list(elem_id);
-    for (dof_id_type i=0; i<elem_nb_list.size(); i++)
-      oss << elem_nb_list[i] << ", ";
-    oss << "\n";
-  }
+  oss << "Done!!!";
   PMToolBox::output_message(oss, this->comm());
+  //  for (dof_id_type elem_id=0; elem_id<n_elem; elem_id++)
+//  {
+//    oss << "elem id " << elem_id << " neighbor list: ";
+//    const std::vector<dof_id_type>& elem_nb_list =
+//      this->get_elem_elem_neighbor_list(elem_id);
+//    for (dof_id_type i=0; i<elem_nb_list.size(); i++)
+//      oss << elem_nb_list[i] << ", ";
+//    oss << "\n";
+//  }
+//  PMToolBox::output_message(oss, this->comm());
 
   STOP_LOG("build_elem_elem_neighbor_list()", "PointMesh<KDDim>");
 }
+
+// =====================================================================
+template<unsigned int KDDim>
+void PointMesh<KDDim>::build_elem_point_containing_list()
+{
+  START_LOG("build_elem_point_containing_list()", "PointMesh<KDDim>");
+
+  std::ostringstream oss;
+  oss << "\n>>>>>>>>>>> Building elem-point containing list";
+  PMToolBox::output_message(oss, this->comm());
+
+  // clear the mapping
+  _elem_point_containing_list.clear();
+
+//  std::cout<<"_particles.size() = "<<_particles.size()<<std::endl;
+  for (std::size_t p_id=0; p_id<_particles.size(); p_id++)
+  {
+    bool use_locator = false;
+
+    // if current element has not been assigned, we use locator
+    if (_particles[p_id]->elem_id()==-1)
+      use_locator = true;
+    // if the current element doesn't contain this point anymore, we use locator
+    else if (!_mesh.elem(_particles[p_id]->elem_id())->contains_point
+      (_particles[p_id]->point()))
+      use_locator = true;
+
+    // use locator. If found, reset point elem id
+    if (use_locator)
+    {
+      const Elem* elem = _mesh.point_locator().operator()
+        (_particles[p_id]->point());
+      if (elem== nullptr)
+      {
+        std::ostringstream oss;
+        oss << "Error: cannot find the element that current particle is "
+               "within : "
+            <<"particle id = " << p_id <<", "
+            <<"particle location = (" << _particles[p_id]->point()(0) << ", "
+            << _particles[p_id]->point()(1) << ", "
+            << _particles[p_id]->point()(2) << "). Exiting ...";
+        PMToolBox::output_message(oss, this->comm());
+        libmesh_error();
+      }
+      else
+        _particles[p_id]->set_elem_id(elem->id());
+    }
+
+    // get the new elem_id
+    const dof_id_type& elem_id = _particles[p_id]->elem_id();
+
+    // insert a new pair if this elem_id has not been mapped to any particles
+    // yet
+    if (_elem_point_containing_list.count(elem_id)==0)
+    {
+      _elem_point_containing_list.insert
+      (std::make_pair(elem_id, std::vector<dof_id_type>()));
+    }
+
+    // update mapping
+    _elem_point_containing_list[elem_id].push_back(p_id);
+  }
+
+  oss << "Done!!!";
+  PMToolBox::output_message(oss, this->comm());
+//  for (dof_id_type elem_id=0; elem_id<_mesh.n_elem(); elem_id++) {
+//
+//        if (_elem_point_containing_list.count(elem_id)){
+//    oss << "Elem id " << elem_id << " contains points: ";
+//    const std::vector <dof_id_type> &contained_points =
+//      this->get_elem_point_containing_list(elem_id);
+//    for (dof_id_type i = 0; i < contained_points.size(); i++)
+//      oss << contained_points[i] << ", ";
+//    oss << "\n";
+//  }
+//  }
+//  PMToolBox::output_message(oss, this->comm());
+
+  STOP_LOG("build_elem_point_containing_list()", "PointMesh<KDDim>");
+}
+
 
 // ======================================================================
 template<unsigned int KDDim>
@@ -1031,6 +1118,8 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
   // diffusion
   // steps instead of every time step, we need to reinit particle neighbor list
   if (neighbor_list_update_flag) {
+//    this->build_elem_elem_neighbor_list();
+//    this->build_elem_point_containing_list();
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       - -
        if the KD tree is already built, we need to re-construct the KD tree in

@@ -529,7 +529,10 @@ public:
   const std::vector<dof_id_type> get_elem_point_containing_list(const
                                                                 dof_id_type& elem_id)
   {
-    return _elem_point_containing_list[elem_id];
+    if (_elem_point_containing_list.count(elem_id))
+      return _elem_point_containing_list[elem_id];
+    else
+      return std::vector<dof_id_type>();
   }
 
 
@@ -614,6 +617,9 @@ private:
   // neighbor elements. This mapping is global, i.e., all processors have the same
   // information about _elem_point_neighbor_list
   std::map<const dof_id_type, std::vector<dof_id_type>>_elem_point_neighbor_list;
+
+  // mapping between the id of particle to its neighbor elements
+  std::map<const dof_id_type,std::vector<dof_id_type>>_point_elem_neighbor_list;
 
   // Pointer to the Periodic boundary condition
   PMPeriodicBoundary *_periodic_boundary = nullptr;

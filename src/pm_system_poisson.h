@@ -91,16 +91,9 @@ public:
 
 
   /*
-   * Compute the L2-error in an unbounded domain
-   * This function will change the system solution vector by add local solution.
-   */
-  void test_l2_norm(bool& neighbor_list_update_flag) override;
-
-
-  /*
    * Add the local solution to the global solution for electrical potential
    */
-  void add_local_solution();
+  void add_local_solution() override;
 
 
   /*
@@ -169,8 +162,13 @@ public:
   /**
    * update system solution for output
    */
-  void update_solution_for_output(const std::string& solution_name = "total")
+  void update_solution_before_output(const std::string& solution_name = "total")
     override;
+
+  /**
+   * resume solution after writing output
+   */
+  void resume_solution_after_output() override;
 
 
 private:

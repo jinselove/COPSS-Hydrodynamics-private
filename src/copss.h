@@ -55,6 +55,7 @@
 #include "point_mesh.h"
 #include "pm_system_stokes.h"
 #include "pm_system_poisson.h"
+#include "pm_system_np.h"
 #include "brownian_system.h"
 #include "pm_periodic_boundary.h"
 #include "chebyshev.h"
@@ -99,6 +100,10 @@ public:
   std::string simulation_name;
   bool print_info;
 
+  // modules
+  bool module_poisson;
+  bool module_np;
+
   // physical parameters
   const Real kB                = 1.380662E-17;         // 1.380662E-23(J/K) =
                                                        // 1.3806623E-23(N*m/K) =
@@ -120,18 +125,29 @@ public:
   Real Rb;                                             // radius of the bead
   Real drag_c;                                         // Drag coefficient
                                                        // (N*s/um)
-  Real Db;
+  Real Db; // bead diffusivity (um^2/s)
   std::string particle_type;
+  // name of each ion species
+  std::vector<std::string> ion_name;
+  // diffusivity of each ion species (unit = um^2/s)
+  std::vector<Real> ion_diffusivity;
+  // valence of each ion species (unit = 1)
+  std::vector<int> ion_valence;
+  // NP system relaxation time for initialization. By default, this
+  // relaxation time is 2 * Rb^2/max(ion_diffusivity), i.e., the time it takes
+  // for ions to diffuse 2 particle radius. 
+  Real np_system_relaxation_time;
 
   // characteristic variables
-  Real tc;                                  // characteristic time (diffusion
-                                            // time) (s)
-  Real uc;                                  // characteristic velocity (um/s)
-  Real fc;                                  // characteristic force (N)
-  Real muc;                                 // non-dimension viscosity
-  Real phi0;                                // non-dimensional electrical
-                                            // potential: e / (4 * pi * epsilon
-                                            // * epsilon_0 * a)
+  Real tc; // characteristic time (diffusion time) (s)
+  Real uc; // characteristic velocity (um/s)
+  Real fc; // characteristic force (N)
+  Real muc; // non-dimension viscosity
+  Real phi0; // characteristic electristatic potential (V)
+  Real efield0; // characteristic electric field (V/um)
+  Real charge_rho0; // characteristic volume charge density (C/um^3)
+  Real charge_sigma0; // characteristic surface charge density (C/um^2)
+  Real c0 = 1.0; // characteristic concentration of ion species (M=mol/L)
 
   // Geometry information
   unsigned int dim;                         // dimension of the box
@@ -159,6 +175,11 @@ public:
   std::vector<Real>boundary_value_dirichlet_poisson,
                    boundary_value_neumann_poisson;
 
+  // Boundary conditions for Nernst-Planck system
+  bool check_charge_neutrality;
+  std::vector<unsigned int> boundary_id_dirichlet_np;
+  std::vector<std::vector<Real> > boundary_value_dirichlet_np;
+
   // Fix
   std::vector<Fix *>fixes;
   FixFactory *fix_factory = nullptr;
@@ -176,14 +197,13 @@ public:
   int max_linear_iterations;
   Real linear_solver_rtol;
   Real linear_solver_atol;
-  bool user_defined_pc;
+  bool user_defined_pc, user_defined_pc_poisson, user_defined_pc_np;
   bool schur_user_ksp;
   Real schur_user_ksp_rtol;
   Real schur_user_ksp_atol;
   std::string schur_pc_type;
-  std::string solver_stokes, solver_poisson;
-  SystemSolverType solver_type_stokes, solver_type_poisson;
-  bool module_poisson;
+  std::string solver_stokes, solver_poisson, solver_np;
+  SystemSolverType solver_type_stokes, solver_type_poisson, solver_type_np;
 
   // Chebyshev information
   unsigned int max_n_cheb;       // max order of Chebyshev polynomianl
@@ -228,7 +248,7 @@ public:
   // std::unique_ptr<PMPeriodicBoundary> pm_periodic_boundary;
 
   // equation system
-  unsigned int u_var, v_var, w_var, p_var, phi_var;
+  unsigned int u_var, v_var, w_var, p_var, phi_var, c_var;
 
   // integrate
   // paramters for dynamic process;
@@ -371,6 +391,7 @@ protected:
    */
 
   void         read_system_info();
+  void         read_module_info();
   void         read_physical_info();
   virtual void read_particle_info() = 0;
   void         read_domain_info();
@@ -393,7 +414,8 @@ protected:
    * Steps for create_equation_systems
    */
   virtual void attach_object_mesh(PMLinearImplicitSystem& system) = 0;
-  void         attach_period_boundary(PMLinearImplicitSystem& system);
+  void         attach_period_boundary(PMLinearImplicitSystem& system,
+    std::vector<std::string>& periodic_vars);
   virtual void set_parameters(EquationSystems& equation_systems) = 0;
 
   // force field
@@ -414,6 +436,13 @@ protected:
    * Create brownian system
    */
   void create_brownian_system(EquationSystems& equation_systems);
+
+
+  /*!
+   * Get minimum dt from all systems
+   */
+  const Real get_min_dt(EquationSystems& es,
+    std::vector<std::string> sys_names = std::vector<std::string>());
 
   /*!
    * Integrate particle motions using Fixman's midpoint scheme

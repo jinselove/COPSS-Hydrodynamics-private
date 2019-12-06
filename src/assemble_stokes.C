@@ -74,7 +74,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
   /*! It is a good idea to make sure we are assembling the proper system.
    */
   libmesh_assert_equal_to(system_name, "Stokes");
-  const unsigned int n_mesh_elem = _mesh.n_elem();
+  const dof_id_type& n_mesh_elem = _mesh.n_elem();
   PMSystemStokes   & _pm_system  =
     _eqn_sys.get_system<PMSystemStokes>(system_name);
 
@@ -166,9 +166,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
     {
       // Store a pointer to the element we are currently working on.
       const Elem *elem = *el;
-      this->select_boundary_side(elem);
-
-      // printf("finished select_boundary_side\n");
+      this->select_boundary_side(elem, system_name);
     }
   }
 
@@ -401,12 +399,13 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   // perf_log.pop("preparation");
 
   // build _int_force vector at the beginning of simulation
-  if (_int_force.size() == 1) {
+  if (_int_force.size() == 1)
+  {
     // perf_log.push("compute_int_force");
-    if (_pm_system.comm().rank() == 0) {
-      printf("\nassemble_int_force() at the beginning of simulation\n\n");
-    }
-    const unsigned int n_mesh_elem = _mesh.n_elem();
+    PMToolBox::output_message("------> computing helper quantities to ease "
+                              "numerical integrations later (only do this once)",
+                              _pm_system.comm());
+    const dof_id_type& n_mesh_elem = _mesh.n_elem();
     _int_force.resize(n_mesh_elem);
     _q_xyz.resize(n_mesh_elem);
     _n_dofs.resize(n_mesh_elem);
@@ -773,7 +772,8 @@ void AssembleStokes::assemble_element_MIJ(
 }
 
 // ==================================================================================
-void AssembleStokes::select_boundary_side(const Elem *elem)
+void AssembleStokes::select_boundary_side(const Elem *elem,
+                                          const std::string& system_name)
 {
   START_LOG("select_boundary_side()", "AssembleStokes");
 
@@ -781,7 +781,7 @@ void AssembleStokes::select_boundary_side(const Elem *elem)
   // PMLinearImplicitSystem & pm_system =
   // _eqn_sys.get_system<PMLinearImplicitSystem> ("Stokes");
   PMLinearImplicitSystem& pm_system =
-    _eqn_sys.get_system<PMLinearImplicitSystem>("Stokes");
+    _eqn_sys.get_system<PMLinearImplicitSystem>(system_name);
   const std::vector<bool>& periodicity =
     pm_system.point_mesh()->pm_periodic_boundary()->periodic_direction();
   const std::vector<bool>& inlet_direction =

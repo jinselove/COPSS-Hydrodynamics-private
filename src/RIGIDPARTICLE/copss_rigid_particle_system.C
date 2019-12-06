@@ -169,10 +169,12 @@ void CopssRigidParticleSystem::attach_object_mesh(PMLinearImplicitSystem& system
 }
 
 // ======================================================================================
-void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems) {
-  equation_systems.parameters.set<unsigned int>(
-                                        "linear solver maximum iterations") =
-    max_linear_iterations;
+void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
+{
+  equation_systems.parameters.set<Real>("real_time") = real_time;
+  equation_systems.parameters.set<bool>("adaptive_dt") = adaptive_dt;
+  equation_systems.parameters.set<unsigned int>("linear solver maximum iterations")
+    = max_linear_iterations;
   equation_systems.parameters.set<Real>("linear solver rtol")
     = linear_solver_rtol;
   equation_systems.parameters.set<Real>("linear solver atol")
@@ -189,10 +191,6 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
     = schur_pc_type;
   equation_systems.parameters.set<SystemSolverType>("solver_type_stokes")
     = solver_type_stokes;
-  equation_systems.parameters.set<SystemSolverType>(
-    "solver_type_poisson") = solver_type_poisson;
-  equation_systems.parameters.set<bool>("module_poisson")
-    = module_poisson;
   equation_systems.parameters.set<Real>("alpha")
     = alpha;
   equation_systems.parameters.set<Real>("kBT")
@@ -203,23 +201,21 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
     "minimum fluid mesh size") = hminf;
   equation_systems.parameters.set<Real>(
     "minimum solid mesh size") = hmins;
-  equation_systems.parameters.set<Real>(                "minimum mesh size")
+  equation_systems.parameters.set<Real>("minimum mesh size")
     = hmin;
-  equation_systems.parameters.set<Real>(                "viscosity_0")
+  equation_systems.parameters.set<Real>("viscosity_0")
     = muc;
-  equation_systems.parameters.set<Real>(                "br0")
+  equation_systems.parameters.set<Real>("br0")
     = 1.0;
-  equation_systems.parameters.set<Real>(                "bead radius")
+  equation_systems.parameters.set<Real>("bead radius")
     = Rb;
-  equation_systems.parameters.set<Real>(                "drag")
+  equation_systems.parameters.set<Real>("drag")
     = drag_c;
-  equation_systems.parameters.set<Real>(                "tc")
+  equation_systems.parameters.set<Real>("tc")
     = tc;
-  equation_systems.parameters.set<Real>(                "phi0")
-    = phi0;
-  equation_systems.parameters.set<string>(              "particle_type")
+  equation_systems.parameters.set<string>("particle_type")
     = particle_type;
-  equation_systems.parameters.set<string>(              "particle_mesh_type")
+  equation_systems.parameters.set<string>("particle_mesh_type")
     = particle_mesh_type;
   equation_systems.parameters.set<std::vector<string> >("force_types")
     = forceTypes;
@@ -227,27 +223,58 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   for (int i = 0; i < numForceTypes;
        i++) equation_systems.parameters.set<std::vector<Real> >(forces[i].first) =
       forces[i].second;
-  equation_systems.parameters.set<string>(                    "simulation_name")
+  equation_systems.parameters.set<string>("simulation_name")
     = simulation_name;
-  equation_systems.parameters.set<string>(                    "wall_type")
+  equation_systems.parameters.set<string>("wall_type")
     = wall_type;
-  equation_systems.parameters.set<std::vector<Real> >(        wall_type)
+  equation_systems.parameters.set<std::vector<Real> >(wall_type)
     = wall_params;
-  equation_systems.parameters.set<std::vector<bool> >(        "shear")
+  equation_systems.parameters.set<std::vector<bool> >("shear")
     = shear;
-  equation_systems.parameters.set<std::vector<Real> >(        "shear_rate")
+  equation_systems.parameters.set<std::vector<Real> >("shear_rate")
     = shear_rate;
   equation_systems.parameters.set<std::vector<unsigned int> >("shear_direction")
     = shear_direction;
-  equation_systems.parameters.set<std::vector<unsigned int> >(
-    "boundary_id_dirichlet_poisson") = boundary_id_dirichlet_poisson;
-  equation_systems.parameters.set<std::vector<unsigned int> >(
-    "boundary_id_neumann_poisson") = boundary_id_neumann_poisson;
-  equation_systems.parameters.set<std::vector<Real> >(
-    "boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
-  equation_systems.parameters.set<std::vector<Real> >(
-    "boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
   equation_systems.parameters.set<bool> ("with_hi") = with_hi;
+  // parameters for modules
+  equation_systems.parameters.set<bool>("module_poisson") = module_poisson;
+  equation_systems.parameters.set<bool>("module_np") = module_np;
+  // parameters of Poisson system
+  if (module_poisson)
+  {
+    equation_systems.parameters.set<SystemSolverType>("solver_type_poisson")
+            = solver_type_poisson;
+    equation_systems.parameters.set<Real>("phi0") = phi0;
+    equation_systems.parameters.set<Real>("epsilon") = epsilon;
+    equation_systems.parameters.set<std::vector<unsigned int> >(
+            "boundary_id_dirichlet_poisson") = boundary_id_dirichlet_poisson;
+    equation_systems.parameters.set<std::vector<unsigned int> >(
+            "boundary_id_neumann_poisson") = boundary_id_neumann_poisson;
+    equation_systems.parameters.set<std::vector<Real> >(
+            "boundary_value_dirichlet_poisson") = boundary_value_dirichlet_poisson;
+    equation_systems.parameters.set<std::vector<Real> >(
+            "boundary_value_neumann_poisson") = boundary_value_neumann_poisson;
+  }
+  // parameters of NP system
+  if (module_np)
+  {
+    equation_systems.parameters.set<SystemSolverType>("solver_type_np")
+            = solver_type_np;
+    equation_systems.parameters.set<Real>("c0")
+            = c0;
+    equation_systems.parameters.set<std::vector<std::string>>("ion_name")
+            = ion_name;
+    equation_systems.parameters.set<std::vector<Real>>("ion_diffusivity")
+            = ion_diffusivity;
+    equation_systems.parameters.set<std::vector<int>>("ion_valence")
+            = ion_valence;
+    equation_systems.parameters.set<Real>("np_system_relaxation_time") =
+      np_system_relaxation_time;
+    equation_systems.parameters.set<std::vector<unsigned int> >(
+            "boundary_id_dirichlet_np") = boundary_id_dirichlet_poisson;
+    equation_systems.parameters.set<std::vector<std::vector<Real>> >(
+      "boundary_value_dirichlet_np") = boundary_value_dirichlet_np;
+  }
   equation_systems.parameters.set<int> ("o_precision") = o_precision;
 }
 
@@ -298,6 +325,8 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems) {
                                                                             // and
                                                                             // max_dr_coeff[2]
   }
+  // attach max_dr_coeff to equation systems for future use
+  equation_systems.parameters.set<std::vector<Real> >("max_dr_coeff") = max_dr_coeff;
 
   if (update_neighbor_list_everyStep) {
     ss << "====> neighbor_list is updated at every time step (including half step of fixman if available)";

@@ -88,13 +88,13 @@ public:
    * Init the KSP solver:
    * The system matrix needs to be assembled before calling this init function!
    */
-  virtual void init_ksp_solver() = 0;
+  virtual void init_ksp_solver(const std::string& system_name) = 0;
 
 
   /*
    * Solve the equation system Ax = b
    */
-  virtual void solve() = 0;
+  virtual void solve(const std::string& sys_name);
 
 
   /*
@@ -128,6 +128,18 @@ protected:
   // Label if the system is initialized.
   // If not, the destructor cannot destroy PETSc objects.
   bool _is_init;
+
+    // solver relative tolerance
+  PetscReal _rtol;
+
+  // solver absolute tolerance
+  PetscReal _atol;
+
+  // (iterative) solver maximum iteration
+  PetscInt _max_it;
+
+  // KSP sover
+  KSP _ksp;
 };
 
 #endif // #ifdef LIBMESH_HAVE_PETSC

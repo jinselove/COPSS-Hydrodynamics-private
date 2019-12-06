@@ -131,7 +131,8 @@ public:
   /*! \brief select sides on the boundary for all elements
    *
    */
-  void select_boundary_side(const Elem *elem) override;
+  void select_boundary_side(const Elem *elem,
+                            const std::string& system_name) override;
 
 
   /*! \brief Apply BCs by penalty method.
@@ -141,7 +142,7 @@ public:
                            const std::string  & matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string  & option) override;
+                           const std::string  & option);
 
 
   /*! \brief Define the pressure jump at the inlet and outlet of the channel

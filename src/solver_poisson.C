@@ -72,7 +72,7 @@ SolverPoisson::~SolverPoisson()
 }
 
 // ==================================================================================
-void SolverPoisson::init_ksp_solver()
+void SolverPoisson::init_ksp_solver(const std::string& system_name)
 {
   START_LOG("init_ksp_solver()", "SolverPoisson");
 
@@ -89,7 +89,7 @@ void SolverPoisson::init_ksp_solver()
 
   // Get a reference to the system Matrix
   PMSystemPoisson& system = _equation_systems.get_system<PMSystemPoisson>(
-    "Poisson");
+    system_name);
   PetscMatrix<Number> *matrix = cast_ptr<PetscMatrix<Number> *>(system.matrix);
 
   // this->petsc_view_matrix( matrix->mat() );
@@ -131,73 +131,6 @@ void SolverPoisson::init_ksp_solver()
   // SolverPoisson::init_ksp_solver(): ");
   // PetscPrintf(this->comm().get(), "the PETSc KSP solver is initialized \n");
   STOP_LOG("init_ksp_solver()", "SolverPoisson");
-}
-
-// =======================================================================================
-void SolverPoisson::solve()
-{
-  START_LOG("solve()", "SolverPoisson");
-
-  int ierr;
-  PetscInt  its         = 0;
-  PetscReal final_resid = 0.;
-
-  // Real t1, t2;
-  // t1 = MPI_Wtime();
-  // PetscPrintf(this->comm().get(), "--->test in SolverPoisson::solve(): ");
-  // PetscPrintf(this->comm().get(), "Start the KSP solve... \n");
-
-  // Get a reference to the Particle-Mesh linear implicit system object,
-  // and the assembled matrix and the rhs vector, solution
-  PMSystemPoisson& system = _equation_systems.get_system<PMSystemPoisson>(
-    "Poisson");
-  PetscVector<Number>   *rhs      = cast_ptr<PetscVector<Number> *>(system.rhs);
-  NumericVector<Number>& sol_in   = *(system.solution);
-  PetscVector<Number>   *solution = cast_ptr<PetscVector<Number> *>(&sol_in);
-
-  // Look at the matrix for debug purpose
-  // PetscMatrix<Number>* matrix     = cast_ptr<PetscMatrix<Number>*>(
-  // system.matrix );
-  // this->petsc_view_matrix( matrix->mat() );
-  // this->petsc_view_vector( rhs->vec() );
-
-  // KSP solve
-  ierr = KSPSolve(_ksp, rhs->vec(), solution->vec()); CHKERRABORT(
-    this->comm().get(),
-    ierr);
-  ierr = KSPGetIterationNumber(_ksp, &its);          CHKERRABORT(
-    this->comm().get(),
-    ierr);
-  ierr = KSPGetResidualNorm(_ksp, &final_resid);     CHKERRABORT(
-    this->comm().get(),
-    ierr);
-
-  // output the convergence infomation
-  if (std::abs(final_resid) > _atol) {
-    PetscPrintf(this->comm().get(),
-                "   Linear solver does NOT converged after %d iteration,",
-                its);
-  }
-
-  // else {
-  // PetscPrintf(this->comm().get(), "   Linear solver converged after %d
-  // iteration,",its);
-  // PetscPrintf(this->comm().get(), " and the residual norm is
-  // %E.\n\n",final_resid);
-  // }
-
-  // Update the system after the solve
-  system.update();
-
-  // t2 = MPI_Wtime();
-  this->comm().barrier();
-
-  // PetscPrintf(this->comm().get(),"   Time used to solve the linear equation
-  // Ax=b is %f\n",t2-t1);
-  // std::cout << "\nTime used to solve the linear equation Ax=b is " <<t2-t1<<"
-  // s\n\n";
-
-  STOP_LOG("solve()", "SolverPoisson");
 }
 
 #endif // ifdef LIBMESH_HAVE_PETSC

@@ -23,6 +23,7 @@
 
 // Local includes
 #include "assemble_system.h"
+#include "analytical_solution_np.h"
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
@@ -39,7 +40,8 @@ public:
 
      @param[in,out] es EquationSystem
    */
-  AssembleNP(EquationSystems& es);
+  AssembleNP(EquationSystems& es,
+             const std::string& name);
 
 
   /*! \brief Destructor
@@ -69,44 +71,45 @@ public:
                          const std::string& option) override;
 
 
-  /*! \brief Assemble the element matrix K_IJ
-
-      Reinit and compute the element matrix K_ij, which will be added into K
-      matrix after calling assemble_global_K(). Size of this submatrix is
-      n_u_dofs * n_u_dofs = n_v_dofs * n_v_dofs = n_w_dofs * n_w_dofs
-   */
-  void assemble_element_KIJ(const std::vector<Real>                      & JxW,
-                            const std::vector<std::vector<RealGradient> >& dphi,
-                            const unsigned int                             n_u_dofs,
-                            const unsigned int                             I,
-                            const unsigned int                             J,
-                            DenseMatrix<Number>                          & Kij);
-
-
-  /*! \brief Assemble function for the right-hand-side in NP equation.
-
-      This calculates each element's contribution to the right-hand-side vector.
-   */
-  void compute_element_rhs(const Elem                   *elem,
-                           const unsigned int            n_u_dofs,
-                           FEBase                      & fe_v,
-                           const std::vector<std::size_t>n_list,
-                           const bool                  & pf_flag,
-                           const std::string           & option,
-                           DenseVector<Number>         & Fe);
-
-
   /*! \brief select sides on the boundary for all elements
    *
    */
-  void select_boundary_side(const Elem *elem) override;
+  void select_boundary_side(const Elem *elem,
+                            const std::string& system_name) override;
 
-  /*! \brief Apply BCs by penalty method.
+  /*! \brief Pointer to analytical_solution
+  */
+  AnalyticalSolutionNP* get_analytical_solution() {
+    return analytical_solution;
+  }
 
-   */
-  void apply_bc_by_penalty(const Elem          *elem,
-                           const std::string  & matrix_or_vector,
-                           DenseMatrix<Number>& Ke,
-                           DenseVector<Number>& Fe,
-                           const std::string  & option) override;
+private:
+  // Boundary sides that DirichletBCs are applied.
+  // for each tuple, the first element is the side id, the second element is the
+  // associated boundary id of this side, the third element is the corresponding
+  // Dirichlet BC values associated with this side. For NP system, each
+  // boundary value is the concentration of the ion associated with this NP
+  // system
+  std::vector<std::vector<std::tuple<dof_id_type,
+                                     dof_id_type,
+                                     Real
+                                     >>> _boundary_sides_dirichlet_np;
+
+  // For regular NP simulations, Dirichlet Boundary value is constant. Thus
+  // we store penalty value of boundary surface nodes in a vector. This
+  // vector does not get reinitialized unless _reinit_node_penalty is True.
+  // If boundary value changes with time, then we need to reinitialize this
+  // vector at every step
+  std::vector<std::vector<Real>> _node_penalty;
+
+  // initialize reinit_node_penalty as true. It will be reset to false if
+  // necessary
+  bool _reinit_node_penalty = true;
+
+  // Get a reference to AnalyticalSolutionNP
+  AnalyticalSolutionNP *analytical_solution = nullptr;
+
+  // A big number for penalty
+  const Real penalty = 1.e10;
+
 };

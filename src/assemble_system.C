@@ -122,8 +122,7 @@ void AssembleSystem::penalize_elem_matrix_vector(DenseMatrix<Number>& Ke,
   else if (matrix_or_vector == "both")
   {
     Ke(var_number * n_nodes_elem + n, var_number * n_nodes_elem + n) += penalty;
-    Fe(var_number * n_nodes_elem + n)                                += penalty *
-                                                                        value;
+    Fe(var_number * n_nodes_elem + n) += penalty * value;
   }
   else
   {

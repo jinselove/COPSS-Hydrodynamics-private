@@ -330,16 +330,4 @@ const
   STOP_LOG("write_point_csv()", "PMLinearImplicitSystem");
   PetscFunctionReturn(0);
 }
-
-// =========================================================================
-void PMLinearImplicitSystem::resume_solution_after_output()
-{
-  START_LOG("resume_solution_after_output", "PMLinearImplicitSystem");
-
-  // resume Poisson system solution
-  // fixme: make sure this assignment is correct
-  *(this->solution) = *(this->solution_backup);
-
-  STOP_LOG("resume_solution_after_output", "PMLinearImplicitSystem");
-}
 } // end namespace libMesh

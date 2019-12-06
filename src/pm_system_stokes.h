@@ -63,7 +63,13 @@ public:
    */
   sys_type& system() {
     return *this;
-  }
+  };
+
+  /**
+   * override get_dt function in parent class since this system needs more
+   * conditions on dt to make the system stable
+   */
+  Real get_dt();
 
   /*
    * Re-init particle mesh, including:
@@ -92,14 +98,14 @@ public:
    * option == "disturbed"   : disturbed velocity field   (with particles)
    */
   void assemble_matrix(const std::string& system_name,
-                       const std::string& option);
+                       const std::string& option) override;
 
 
   /**
    * Assemble the system rhs.
    */
   void assemble_rhs(const std::string& system_name,
-                    const std::string& option);
+                    const std::string& option) override;
 
 
   /*
@@ -108,13 +114,13 @@ public:
    *particles
    * option = "disturbed",   compute the disturbed field of flow with particles
    */
-  void solve(const std::string& option);
+  void solve(const std::string& option) override;
 
 
   /*
    * Add the local solution to the global solution
    */
-  void add_local_solution();
+  void add_local_solution() override;
 
 
   /*
@@ -216,14 +222,72 @@ public:
    */
   void write_fluid_velocity_data(const std::string& filename);
 
-  /*
+  /**
    * Couple Stokes System (HI or FD) with Poisson System by adding electrostatic
    * force to all points (Point Particles or surface nodes on Rigid Particles.) 
    * This electrostatic force includes contributions from both local and global
    * solution of the Poisson system.
-   *  
+   *
+   * If module_np is true, this coupling will couple the Nernst-Planck system
+   * to Poisson system first by adding the contribution to the charge density
+   * from ion cloud, and then couple the total electrostatic force to Stokes
+   * system.
    */  
-  void couple_poisson(); 
+  void couple_poisson();
+
+  /**
+   * Couple Stokes System with Nernst-Planck System to create a
+   * convection-diffusion system without electrostatics, i.e, Stokes + Fick's
+   * second law
+   * This function will first initialize all NP system and relax them with
+   * Poisson on but Fluid off for some time. Once all NP systems are relaxed,
+   * this function will just solve all NP systems for one step to get c(t+dt)
+   *
+   * PseudoCode:
+         void couple_np()
+         {
+            if first np sys is relax (i.e., all system are relaxed):
+              for each np_sys:
+              {
+                 real_time += dt;
+                 solve this np_sys with poisson&stokes --> gives c(t=t+dt)
+              }
+
+            else:
+            {
+                if first np sys is initialized (i.e., all system are initialized):
+                {
+
+                    real_time += dt
+
+                    for each np_sys
+                    {
+                        np_sys.solve("diffusion"+(module_poisson) ? ("electrostatics")
+                        : ("")) --> gives c(t+dt)
+
+                        if real_time > relax_t_final:
+                        {
+                            set relax = true;
+                            set real_time = 0.;
+                        }
+                    }
+
+                    poisson.solve(with ion concentration); --> gives phi(t+dt)
+                }
+
+                else:
+                    for each np_sys
+                    {
+                        initialize this np_sys, i.e, set concentration to be 0 and then
+                        is_initialized = true
+                    }
+
+                this->couple_np();
+            }
+          }
+   */
+  void couple_np(unsigned int relax_step_id=0,
+                 const unsigned int output_interval=10);
   
   
    /**
@@ -245,14 +309,21 @@ public:
   /**
    * update system solution for output
    */
-  void update_solution_for_output(const std::string& solution_name = "total")
+  void update_solution_before_output(const std::string& solution_name = "total")
     override;
+
+
+  /**
+   * override the resume function defined in PMLinearImplicitSystem
+   *
+   */
+  void resume_solution_after_output() override ;
 
   
    /**
     * Save a pointer to undisturbed solution
     */
-    UniquePtr<NumericVector<Real>> undisturbed_solution;
+   UniquePtr<NumericVector<Real>> undisturbed_solution;
 
 private:
 

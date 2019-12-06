@@ -97,7 +97,8 @@ public:
   /*! \brief Select sides on Dirichlet and Neumann boundaries for all elements
    *
    */
-  void select_boundary_side(const Elem *elem) override;
+  void select_boundary_side(const Elem *elem,
+                            const std::string& system_name) override;
 
 
   /*! \brief Apply Dirichlet BC by penalty method to impose electrical potential
@@ -108,7 +109,7 @@ public:
                            const std::string  & matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string  & option) override;
+                           const std::string  & option);
 
 
   /*! \brief Apply Neumann BC to impose surface charge density on relevant
@@ -118,7 +119,11 @@ public:
   void apply_bc_neumann(const Elem          *elem,
                         FEBase             & fe_phi,
                         FEBase             & fe_face,
-                        DenseVector<Number>& Fe);
+                        DenseVector<Number>& Fe,
+                        DenseVector<Number>& sigma_e,
+                        DenseVector<Number>& sigma_e_global,
+                        DenseVector<Number>& sigma_e_local
+                      );
 
 
   /*! \brief Initialize ggem_poisson for local field calcualtions
@@ -143,12 +148,21 @@ public:
 private:
 
   // Boundary sides that Dirichlet and Neumann BCs are applied.
-  std::vector<std::vector<unsigned int> >_boundary_sides_dirichlet_poisson,
-                                         _boundary_sides_neumann_poisson;
+  // for each tuple, the first element is the side id, the second element is the 
+  // associated boundary id of this side, the third element is the corresponding
+  // Dirichlet(Neumann) BC values associated with this side
+  std::vector<std::vector<std::tuple<unsigned int, unsigned int, Real>>> _boundary_sides_dirichlet_poisson; 
+  
+  std::vector<std::vector<std::tuple<unsigned int, unsigned int, Real>>> _boundary_sides_neumann_poisson;
+                                         
 
   // Get a reference to GGEMPoisson
   GGEMPoisson *ggem_poisson = nullptr;
 
   // Get a reference to AnalyticalSolutionPoisson
   AnalyticalSolutionPoisson *analytical_solution = nullptr;
+
+  // surface charge density (total)
+  
+  
 };

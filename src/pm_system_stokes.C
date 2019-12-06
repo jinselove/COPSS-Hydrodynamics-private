@@ -39,6 +39,7 @@
 #include "brownian_system.h"
 #include "pm_system_stokes.h"
 #include "pm_system_poisson.h"
+#include "pm_system_np.h"
 
 namespace libMesh {
 // ======================================================================================
@@ -71,6 +72,65 @@ void PMSystemStokes::clear()
 
   // analytical_solution and ggem_stokes pointer will be destroyed in
   // AssembleStokes
+}
+
+Real PMSystemStokes::get_dt()
+{
+  START_LOG("get_dt()", "PMSystemStokes");
+
+  // get a reference to equation systems
+  EquationSystems& es = this->get_equation_systems();
+  // get other necessary parameters
+  const std::vector<Real>& max_dr_coeff = es.parameters.get<std::vector<Real>>
+    ("max_dr_coeff");
+  const bool& adaptive_dt = es.parameters.get<bool>("adaptive_dt");
+  const Real& real_time = es.parameters.get<Real>("real_time");
+
+  // calculate dt
+  // --> initialize dt as a large FLOAT number
+  Real dt = std::numeric_limits<double>::max();
+  // --> if adaptive_dt is true, update dt based on current system status
+  if (adaptive_dt)
+  {
+    Real vp_max = _point_mesh->maximum_bead_velocity();
+    Real vp_min = _point_mesh->minimum_bead_velocity();
+    if (real_time < max_dr_coeff[0])
+      dt = (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);
+    else
+      dt = (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);
+//    if (i % write_interval == 0) {
+//      ss << "       ################################################################\n"
+//         << "       # Max velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_max << "\n"
+//         << "       # Min velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_min << "\n"
+//         << "       # minimum mesh size = " << hmin << "\n"
+//         << "       # The adaptive time increment at step " << i <<" is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
+//         << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)\n"
+//         << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i)\n"
+//         << "       # Chebyshev failure steps = " << n_chebyshev_failure << "\n"
+//         << "       #################################################################\n";
+//      PMToolBox::output_message(ss, *comm_in);
+//    } // end if (i% write_interval)
+  }
+  // --> if adaptive is false, use max_dr_coeff as dt
+  else
+  {
+    dt = (real_time < max_dr_coeff[0]) ? max_dr_coeff[1] : max_dr_coeff[2];
+//    if (i % write_interval == 0) {
+//      ss << "       ##########################################################\n"
+//         << "       # The fixed time increment at step " << i << " is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
+//         << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0\n"
+//         << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0\n"
+//         << "       # Chebyshev failure steps = " << n_chebyshev_failure << "\n"
+//         << "       ##########################################################\n";
+//      PMToolBox::output_message(ss, *comm_in);
+//    } // end if (i % write_interval == 0)
+  }   // end if (adaptive_dt)
+
+
+  STOP_LOG("get_dt()", "PMSystemStokes");
+
+  // return
+  return dt;
 }
 
 // ==================================================================================
@@ -128,8 +188,15 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
     }
   }
   // multi-Physics coupling
-  if (option == "disturbed" && this->get_equation_systems().parameters.get<bool>("module_poisson")) {
-    this->couple_poisson();  
+  if (option == "disturbed")
+  {
+    // ---> couple NP systems at time t
+    if (this->get_equation_systems().parameters.get<bool>("module_np"))
+      this->couple_np();
+
+    // --> couple Poisson system at time t
+    if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+      this->couple_poisson();
   }
 
   // perf_log.pop("fix compute");
@@ -212,17 +279,17 @@ void PMSystemStokes::solve(const std::string& option)
     _solver_stokes.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver
-    this->assemble_matrix("Stokes", option);
-    _solver_stokes.init_ksp_solver();
+    this->assemble_matrix(this->name(), option);
+    _solver_stokes.init_ksp_solver(this->name());
     
     // set re_init to false once K matrix is built
     _re_init = false;
   }
   // assemble rhs 
-  this->assemble_rhs("Stokes", option);
+  this->assemble_rhs(this->name(), option);
 
   // solve the problem
-  _solver_stokes.solve();
+  _solver_stokes.solve(this->name());
   
   // update undisturbed solution when option="undisturbed"
   if (option == "undisturbed")
@@ -409,7 +476,7 @@ void PMSystemStokes::compute_point_velocity(const std::string& option,
   const MeshBase  & mesh   = this->get_mesh();
   const std::size_t NP     =  _point_mesh->num_particles();
   const std::size_t dim    = mesh.mesh_dimension();
-  const dof_id_type n_elem = mesh.n_elem();
+  const dof_id_type& n_elem = mesh.n_elem();
 
   // std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
   std::vector<Real> _pv_send_list;                            // point velocity
@@ -919,10 +986,190 @@ void PMSystemStokes::couple_poisson()
 }
 
 // ===========================================================================
-void PMSystemStokes::update_solution_for_output(
+//void PMSystemStokes::couple_np()
+//{
+//  START_LOG("couple_np()", "PMSystemStokes");
+//
+//  const bool& module_poisson = this->get_equation_systems()
+//    .parameters.get<bool>("module_poisson");
+//  const bool& with_hi = this->get_equation_systems()
+//    .parameters.get<bool>("with_hi");
+//  unsigned int n_sys = this->get_equation_systems().n_systems();
+//  for (unsigned int s_id=0; s_id<n_sys; s_id++)
+//  {
+//    const std::string& s_name = this->get_equation_systems().get_system(s_id)
+//      .name();
+//    if (s_name.rfind("NP:", 0)==0)
+//    {
+//      PMSystemNP& np_system = this->get_equation_systems()
+//        .get_system<PMSystemNP>(s_name);
+//      std::string option;
+//      if (np_system.set_init_cd)
+//      {
+//        // --> initialize this NP system
+//        np_system.init_cd(this->get_equation_systems().parameters.get<Real>
+//          ("np_system_relaxation_time"));
+//      }
+//      else
+//      {
+//        // generate option for NP system
+//        option = std::string("diffusion")
+//          + ((module_poisson) ? ("electrostatics") : (""))
+//          + ((with_hi) ? ("convection") : (""));
+//        // check if dt has changed
+//        if (abs(this->get_equation_systems().parameters.get<Real>("dt")
+//          -np_system.dt) > 1.e-6)
+//        {
+//          PMToolBox::output_message("Error: simulation time step is "
+//                                    "different from np_system time step (when "
+//                                    "module_np is on, simulation time step "
+//                                    "should be determined by the "
+//                                    "time step of NP system. Need to "
+//                                    "implement additional function to take "
+//                                    "care of this extreme case)", this->comm());
+//          libmesh_error();
+//        }
+//        // solve this np_system with option
+//        np_system.solve(option);
+//      }
+//    }
+//  }
+//
+//  STOP_LOG("couple_np()", "PMSystemStokes");
+//}
+
+//===========================================================================
+void PMSystemStokes::couple_np(unsigned int relax_step_id,
+                               const unsigned int output_interval)
+{
+  Parameters& params = this->get_equation_systems().parameters;
+  const bool& module_poisson = params.get<bool>("module_poisson");
+  const bool& with_hi = params.get<bool>("with_hi");
+  const Real& dt = params.get<Real>("dt");
+  const Real& relax_t_final = params.get<Real>("np_system_relaxation_time");
+
+  // store all np system names to a vector
+  std::vector<std::string> np_sys_names;
+  unsigned int n_sys = this->get_equation_systems().n_systems();
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
+  {
+    const std::string& s_name = this->get_equation_systems().get_system(s_id)
+      .name();
+    if (s_name.rfind("NP:", 0)==0) {
+      np_sys_names.push_back(s_name);
+    }
+  }
+
+  // check if np systems are relaxed (we only need to check the first one
+  // since all np systems have the same relaxed status). If np systems are
+  // already relaxed, we just need to solve them for one step with poisson
+  // and stokes ------> this will give us c(t+dt)
+  if (this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[0])
+    .relaxed)
+  {
+    // update real_time since we are solve concentration for t = t+dt
+    params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
+
+    // set solve options
+    const std::string option = std::string("diffusion")
+      + ((module_poisson) ? ("electrostatics") : (""))
+      + ((with_hi) ? ("convection") : (""));
+
+    // solve all NP system for t = t+dt
+    for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
+      this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
+        .solve(option);
+
+    // output info to screen
+    std::ostringstream oss;
+    oss <<"----> All NP system are relaxed. Solved all NP systems for c(t=t+dt="
+        <<params.get<Real>("real_time")<<"):\n";
+    for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
+      oss <<"* system '" << np_sys_names[s_id] <<"' max_solution = "
+      <<this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
+        .solution->max()<<"\n";
+    PMToolBox::output_message(oss, this->comm());
+  }
+  // if NP system are not relaxed, we relax them; this will be done recursively
+  else
+  {
+    // if NP system are not initialized, we initialized them, otherwise we
+    // relax them for one step. Notice that all
+    // NP systems have the same init_cd_set status
+    if (! this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[0])
+      .init_cd_set)
+    {
+      PMToolBox::output_message("----> Initializing all NP systems",
+        this->comm());
+      for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
+        this->get_equation_systems().get_system<PMSystemNP>
+          (np_sys_names[s_id]).init_cd();
+#ifdef LIBMESH_HAVE_EXODUS_API
+      ExodusII_IO(this->get_mesh()).write_equation_systems("init_cd.e",
+        this->get_equation_systems());
+#endif
+    }
+    else
+    {
+      std::ostringstream oss;
+      // update real_time since we are solving concentration for t = t+dt
+      params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
+      if (relax_step_id%output_interval==0)
+        oss <<"----> relaxing all NP systems for one step without fluid to get c"
+            <<"(t=t+dt="<<params.get<Real>("real_time") <<"):\n";
+      // solve all NP systems for one step with Electrostatics on but Fluid
+      // off --> this gives us c(t+dt)
+      const std::string option = std::string("diffusion")
+        + ((module_poisson) ? ("electrostatics") : (""));
+      for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
+      {
+        // solve this NP system for one step
+        this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
+          .solve(option);
+        if (relax_step_id%output_interval==0)
+        oss <<"* system '" << np_sys_names[s_id] <<"' max_solution = "
+            <<this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
+              .solution->max()<<"\n";
+        // set system relaxed status if real_time > relax_t_final
+        if (params.get<Real>("real_time") > relax_t_final)
+        {
+          this->get_equation_systems().get_system<PMSystemNP>
+            (np_sys_names[s_id]).relaxed = true;
+        }
+      }
+
+      // update poisson system to get phi(t+dt)
+      if (module_poisson) this->get_equation_systems().get_system<PMSystemPoisson>
+        ("Poisson").solve("unused");
+      if(relax_step_id%output_interval==0)
+      {
+        #ifdef LIBMESH_HAVE_EXODUS_API
+        PMToolBox::output_message("* append equation systems to init_cd.e",
+          this->comm());
+          ExodusII_IO exo(this->get_mesh());
+          exo.append(true);
+          exo.write_timestep("init_cd.e", this->get_equation_systems(),
+            relax_step_id+1, params.get<Real>("real_time"));
+        #endif
+        PMToolBox::output_message(oss, this->comm());
+      }
+
+      // set real time to 0. if relax time > relax_t_final
+      if (params.get<Real>("real_time") > relax_t_final)
+        params.set<Real>("real_time") = 0.;
+    }
+
+    // recursively call couple_np. Recursion will stop once all systems are
+    // relaxed
+    this->couple_np(relax_step_id+1, output_interval);
+  }
+}
+
+// ===========================================================================
+void PMSystemStokes::update_solution_before_output(
   const std::string &solution_name)
 {
-  START_LOG("update_solution_for_output()", "PMSystemStokes");
+  START_LOG("update_solution_before_output()", "PMSystemStokes");
 
   // update Stokes system solution if with_hi is true
   if (this->get_equation_systems().parameters.get<bool>("with_hi"))
@@ -953,10 +1200,23 @@ void PMSystemStokes::update_solution_for_output(
     }
   }// end if with_hi
 
-  STOP_LOG("update_solution_for_output()", "PMSystemStokes");
+  STOP_LOG("update_solution_before_output()", "PMSystemStokes");
 }
 
- 
+// ===========================================================================
+void PMSystemStokes::resume_solution_after_output()
+{
+  // only need to resume solution when 'with_hi' is true
+  if (this->get_equation_systems().parameters.get<bool>("with_hi"))
+  {
+    *(this->solution) = *(this->solution_backup);
+  }
+  else
+  {
+    // do nothing
+  }
+}
+
 // ===========================================================================
 void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
                                             const Real&  real_time,
@@ -964,48 +1224,62 @@ void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
 {
   START_LOG("write_equation_systems()", "PMSystemStokes");
 
-  // update Stokes system solution
-  this->update_solution_for_output(solution_name);
-  // update Poisson system solution
-  if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+  // Get number of systems in equation_systems
+  unsigned int n_sys = this->get_equation_systems().n_systems();
+
+  // Update solutions for all systems
+  // the 'update_solution_before_output' function can be different for different
+  // system: For 'Stokes' or 'Poisson' system, this update function needs to
+  // update the system solution to global (solution from FEM) + local
+  // (solution from GGEM local) for output if 'solution_name' == 'total'; For
+  // 'NP:*', the FEM solution is the total solution, so there is no need to
+  // update.
+  // We will resume system solutions to FEM solutions after writing output
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
   {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-      .update_solution_for_output(solution_name);
+//    const std::string& s_name = this->get_equation_systems().get_system(s_id)
+//      .name();
+//    PMToolBox::output_message(std::string("-->Update solution for system ") +
+//                              s_name, this->comm());
+    this->get_equation_systems().get_system<PMLinearImplicitSystem>
+      (s_id).update_solution_before_output(solution_name);
   }
+
   // get a reference to the mesh object
   MeshBase& mesh = this->get_mesh();
   std::ostringstream output_filename;
   output_filename << "output_equation_systems_" << solution_name;
   // write equation systems to Exodus file
 #ifdef LIBMESH_HAVE_EXODUS_API
-      output_filename << ".e";
-      if (o_step == 0)
-      {
-        ExodusII_IO(mesh).write_equation_systems(output_filename.str(),
-          this->get_equation_systems());
-      }
-      else
-      {
-        ExodusII_IO exo(mesh);
-        exo.append(true);
-        exo.write_timestep(output_filename.str(),
-                           this->get_equation_systems(),
-                           o_step+1,
-                           real_time);
-      } // end if-else
-#endif
-  // resume Stokes system solution
-  if (this->get_equation_systems().parameters.get<bool>("with_hi")) 
-  { 
-    this->resume_solution_after_output();
-  }
-  // resume Poisson system solution
-  if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+  output_filename << ".e";
+  if (o_step == 0)
   {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-      .resume_solution_after_output();
+    ExodusII_IO(mesh).write_equation_systems(output_filename.str(),
+      this->get_equation_systems());
   }
-   
+  else
+  {
+    ExodusII_IO exo(mesh);
+    exo.append(true);
+    exo.write_timestep(output_filename.str(),
+                       this->get_equation_systems(),
+                       o_step+1,
+                       real_time);
+  } // end if-else
+#endif
+
+  // resume solutions of all systems
+  // the 'resume_solution_after_output' can be different for different systems
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
+  {
+//    const std::string& s_name = this->get_equation_systems().get_system(s_id)
+//      .name();
+//    PMToolBox::output_message(std::string("-->Resume solution for system ") +
+//                              s_name, this->comm());
+    this->get_equation_systems().get_system<PMLinearImplicitSystem>
+      (s_id).resume_solution_after_output();
+  }
+
   STOP_LOG("write_equation_systems()", "PMSystemStokes");
 }
 

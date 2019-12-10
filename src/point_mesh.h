@@ -550,6 +550,22 @@ public:
    */
   void build_elem_point_neighbor_list();
 
+  /*
+   * Get the ids of all neighbor points of a point
+   */
+  const std::vector<dof_id_type> get_point_point_neighbor_list(const
+    dof_id_type& point_id)
+  {
+    return _point_point_neighbor_list[point_id];
+  }
+
+  /**
+   * Build particle-particle neighbor list
+   * This is done by first locate the element that this point is within and
+   * then find all neighbor points of this element
+   */
+   void build_point_point_neighbor_list();
+
 protected:
 
   /**
@@ -614,12 +630,17 @@ private:
   // mapping between the id of one element to the ids of its neighbor
   // particles. We find this mapping by first finding the neighbor elements
   // of this element and then look for particles located with each of the
-  // neighbor elements. This mapping is global, i.e., all processors have the same
-  // information about _elem_point_neighbor_list
+  // neighbor elements and itself. This mapping is global, i.e., all processors
+  // have the same information about _elem_point_neighbor_list. Notice that
+  // the neighbor points include points within the element.
   std::map<const dof_id_type, std::vector<dof_id_type>>_elem_point_neighbor_list;
 
-  // mapping between the id of particle to its neighbor elements
-  std::map<const dof_id_type,std::vector<dof_id_type>>_point_elem_neighbor_list;
+  // mapping between the id of particle to its neighbor points. We find this
+  // mapping by first finding the element that contains this point and then
+  // look for the neighbor points of this element from
+  // _elem_point_neighbor_list. This mapping is global and excludes particle
+  // itself from the neighbor list.
+  std::map<const dof_id_type,std::vector<dof_id_type>>_point_point_neighbor_list;
 
   // Pointer to the Periodic boundary condition
   PMPeriodicBoundary *_periodic_boundary = nullptr;

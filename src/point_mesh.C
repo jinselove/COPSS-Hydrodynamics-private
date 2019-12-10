@@ -875,7 +875,7 @@ void PointMesh<KDDim>::build_elem_elem_neighbor_list()
   // let's be sure we properly initialize on every processor at once: this
   // function is only executed in debug mode
   parallel_object_only();
-  START_LOG("reinit()", "PointMesh<KDDim>");
+  START_LOG("build_elem_elem_neighbor_list()", "PointMesh<KDDim>");
 
   std::ostringstream oss;
   oss << "\n>>>>>>>>>>> Building elem-elem neighbor list";
@@ -1008,16 +1008,16 @@ void PointMesh<KDDim>::build_elem_elem_neighbor_list()
   // print out debug information to screen
   oss << "Done!!!";
   PMToolBox::output_message(oss, this->comm());
-  //  for (dof_id_type elem_id=0; elem_id<n_elem; elem_id++)
-//  {
-//    oss << "elem id " << elem_id << " neighbor list: ";
-//    const std::vector<dof_id_type>& elem_nb_list =
-//      this->get_elem_elem_neighbor_list(elem_id);
-//    for (dof_id_type i=0; i<elem_nb_list.size(); i++)
-//      oss << elem_nb_list[i] << ", ";
-//    oss << "\n";
-//  }
-//  PMToolBox::output_message(oss, this->comm());
+  for (dof_id_type elem_id=0; elem_id<n_elem; elem_id++)
+  {
+    oss << "elem id " << elem_id << " neighbor element list: ";
+    const std::vector<dof_id_type>& elem_nb_list =
+      this->get_elem_elem_neighbor_list(elem_id);
+    for (dof_id_type i=0; i<elem_nb_list.size(); i++)
+      oss << elem_nb_list[i] << ", ";
+    oss << "\n";
+  }
+  PMToolBox::output_message(oss, this->comm());
 
   STOP_LOG("build_elem_elem_neighbor_list()", "PointMesh<KDDim>");
 }
@@ -1086,22 +1086,218 @@ void PointMesh<KDDim>::build_elem_point_containing_list()
 
   oss << "Done!!!";
   PMToolBox::output_message(oss, this->comm());
-//  for (dof_id_type elem_id=0; elem_id<_mesh.n_elem(); elem_id++) {
-//
-//        if (_elem_point_containing_list.count(elem_id)){
-//    oss << "Elem id " << elem_id << " contains points: ";
-//    const std::vector <dof_id_type> &contained_points =
-//      this->get_elem_point_containing_list(elem_id);
-//    for (dof_id_type i = 0; i < contained_points.size(); i++)
-//      oss << contained_points[i] << ", ";
-//    oss << "\n";
-//  }
-//  }
-//  PMToolBox::output_message(oss, this->comm());
+  for (dof_id_type elem_id=0; elem_id<_mesh.n_elem(); elem_id++) {
+//    if (_elem_point_containing_list.count(elem_id)){
+      oss << "Elem id " << elem_id << " contains points: ";
+      const std::vector <dof_id_type> &contained_points =
+        this->get_elem_point_containing_list(elem_id);
+      for (dof_id_type i = 0; i < contained_points.size(); i++)
+        oss << contained_points[i] << ", ";
+      oss << "\n";
+//    }
+  }
+  PMToolBox::output_message(oss, this->comm());
 
   STOP_LOG("build_elem_point_containing_list()", "PointMesh<KDDim>");
 }
 
+// =====================================================================
+template<unsigned int KDDim>
+void PointMesh<KDDim>::build_elem_point_neighbor_list()
+{
+  // let's be sure we properly initialize on every processor at once: this
+  // function is only executed in debug mode
+  parallel_object_only();
+  START_LOG("build_elem_point_neighbor_list", "PointMesh<KDDim>");
+
+  std::ostringstream oss;
+  oss << "\n>>>>>>>>>>> Building elem-point neighbor list (using information "
+         "in elem-elem neighbor list and elem-point containing list)";
+  PMToolBox::output_message(oss, this->comm());
+  // get some reference for convenience
+  const dof_id_type& n_elem = _mesh.n_elem();
+
+  //Initialize the global container
+  _elem_point_neighbor_list.clear();
+
+  // create a helper map to store local mapping, we need this local mapping
+  // to fill _elem_elem_neighbor_list globally.
+  std::map<dof_id_type, std::vector<dof_id_type>>
+    _local_elem_point_neighbor_list;
+
+  // loop over each element in parallel to build _elem_elem_neighbor_list
+  MeshBase::const_element_iterator el = _mesh.active_local_elements_begin();
+  const MeshBase::const_element_iterator end_el = _mesh
+    .active_local_elements_end();
+
+  for(; el!=end_el; ++el)
+  {
+    // store a pointer to the current element
+    const Elem *elem = *el;
+
+    // get some references for convenience
+    const std::size_t& elem_id = elem->id();
+
+    // get the reference to all neighbor elements of this element
+    const std::vector<dof_id_type>& elem_nb_list =
+      this->get_elem_elem_neighbor_list(elem_id);
+
+    // create a list to store all neighbor particles of this element
+    std::vector<dof_id_type> nb_point_list;
+
+    // start collecting all neighbor particles of this element
+    // -> 0. first include points within this element itself
+    const std::vector<dof_id_type>& containing_points =
+      this->get_elem_point_containing_list(elem_id);
+    for(dof_id_type j=0; j<containing_points.size(); j++)
+      nb_point_list.push_back(containing_points[j]);
+    // -> 1. loop over all neighbor elements of this element
+    for (dof_id_type i=0; i<elem_nb_list.size(); i++)
+    {
+      const dof_id_type& nb_elem_id = elem_nb_list[i];
+      // get a reference to the points within this neighbor element
+      const std::vector<dof_id_type>& containing_points =
+        this->get_elem_point_containing_list(nb_elem_id);
+      // -> 2. loop over all points contained in this neighbor element
+      for (dof_id_type j=0; j<containing_points.size(); j++)
+        nb_point_list.push_back(containing_points[j]);
+    };
+
+    // insert the mapping of elem_id and nb_list to
+    // _local_elem_elem_neighbor_list
+    _local_elem_point_neighbor_list.insert(std::make_pair(elem_id,
+      nb_point_list));
+  } // end loop elem in parallel
+
+  // Until now, each processor has a different version of
+  // _local_elem_point_neighbor_list that stores the mapping of local elements
+  // to their neighbor points. For example, if element 0 is on processor 0
+  // and element 1 is processor 1, then the mapping of element 0 is stored on
+  // _local_elem_point_neighbor_list on processor 0 and the mapping of element
+  // 1 is store in _local_elem_point_neighbor_list on processor 1. The problem
+  // is that if we want to get access to the mapping of element 0 on
+  // processor 1, we will not able to find it. Thus we need a global mapping
+
+  // if in serial, _local_elem_point_neighbor_list is the same as
+  // _elem_point_neighbor_list
+  if (this->comm().size()<2)
+  {
+    _elem_point_neighbor_list.insert(_local_elem_point_neighbor_list.begin(),
+                                    _local_elem_point_neighbor_list.end());
+  }
+
+  // start creating global mapping
+
+  // 1. create buffer vectors to help creating global mapping
+  const dof_id_type len0 = _local_elem_point_neighbor_list.size();
+  // a vector that stores all element ids, size = len0
+  std::vector<dof_id_type> buffer_elem_id_list(len0);
+  // a vector that stores all neighbor element ids of all elements
+  std::vector<dof_id_type> buffer_point_nb_list;
+  // a vector that stores all neighbor list length of all elements, size = len0
+  std::vector<dof_id_type> buffer_point_nb_len(len0);
+
+  dof_id_type k=0;
+  std::map<const dof_id_type, std::vector<dof_id_type>>::const_iterator p;
+
+  for(p=_local_elem_point_neighbor_list.begin();
+      p!=_local_elem_point_neighbor_list.end(); ++p)
+  {
+    buffer_point_nb_len[k] = p->second.size();
+    buffer_elem_id_list[k] = p->first;
+    k++;
+    // append neighbor list of current element to the end of buffer_elem_nb
+    buffer_point_nb_list.insert(buffer_point_nb_list.end(), p->second.begin(),
+                               p->second.end());
+  }
+
+  // (2) all gather the local data. Check this link to understand how
+  // allgather works: https://libmesh.github.io/doxygen/classlibMesh_1_1Parallel_1_1Communicator.html#a10632832fb05b53d1e7e0882c21fd6f3
+  this->comm().allgather(buffer_elem_id_list);
+  this->comm().allgather(buffer_point_nb_len);
+  this->comm().allgather(buffer_point_nb_list);
+
+  // (3) unpacked the gathered buffer to _elem_elem_neighbor_list
+  k = 0;
+  for(dof_id_type i=0; i<buffer_elem_id_list.size(); ++i)
+  {
+    const dof_id_type& elem_id = buffer_elem_id_list[i];
+    const dof_id_type& point_nb_len = buffer_point_nb_len[i];
+    std::vector<dof_id_type> point_nb_list(point_nb_len);
+
+    for(dof_id_type j=0; j<point_nb_len; ++j)
+    {
+      point_nb_list[j] = buffer_point_nb_list[k];
+      k++;
+    }
+
+    _elem_point_neighbor_list.insert(std::make_pair(elem_id, point_nb_list));
+  }
+
+  // print out debug information to screen
+  oss << "Done!!!";
+  PMToolBox::output_message(oss, this->comm());
+  for (dof_id_type elem_id=0; elem_id<n_elem; elem_id++)
+  {
+    oss << "elem id " << elem_id << ", neighbor point list: ";
+    const std::vector<dof_id_type>& point_nb_list =
+      this->get_elem_point_neighbor_list(elem_id);
+    for (dof_id_type i=0; i<point_nb_list.size(); i++)
+      oss << point_nb_list[i] << ", ";
+    oss << "\n";
+  }
+  PMToolBox::output_message(oss, this->comm());
+
+
+  STOP_LOG("build_elem_point_neighbor_list", "PointMesh<KDDim>");
+}
+
+// =====================================================================
+template<unsigned int KDDim>
+void PointMesh<KDDim>::build_point_point_neighbor_list()
+{
+  START_LOG("build_point_point_neighbor_list()", "PointMesh<KDDim>");
+
+  std::ostringstream oss;
+  oss << "\n>>>>>>>>>>> Building point-point neighbor list (first get the "
+         "element id of this point and then find all neighbor points of the "
+         "element)";
+  PMToolBox::output_message(oss, this->comm());
+
+  // clear the mapping
+  _point_point_neighbor_list.clear();
+
+  for (std::size_t p_id=0; p_id<_particles.size(); p_id++)
+  {
+    // get the elem_id of this point
+    const dof_id_type& elem_id = _particles[p_id]->elem_id();
+
+    // get a copy of all the neighbor points of this element
+    std::vector<dof_id_type> point_nb_list =
+      this->get_elem_point_neighbor_list(elem_id);
+    // erase the point itself from the neighbor list
+    point_nb_list.erase(std::remove(point_nb_list.begin(), point_nb_list.end
+    (), p_id), point_nb_list.end());
+
+    // insert the mapping
+    _point_point_neighbor_list.insert(std::make_pair(p_id, point_nb_list));
+  }
+
+  oss << "Done!!!";
+  PMToolBox::output_message(oss, this->comm());
+  for (dof_id_type p_id=0; p_id<_particles.size(); p_id++) {
+    oss << "Point id " << p_id <<" (elem_id = " << _particles[p_id]->elem_id()
+    <<"), neighbor points: ";
+    const std::vector <dof_id_type> &neighbor_points =
+      this->get_point_point_neighbor_list(p_id);
+    for (dof_id_type i = 0; i<neighbor_points.size(); i++)
+      oss << neighbor_points[i] << ", ";
+    oss << "\n";
+  }
+  PMToolBox::output_message(oss, this->comm());
+
+  STOP_LOG("build_point_point_neighbor_list()", "PointMesh<KDDim>");
+}
 
 // ======================================================================
 template<unsigned int KDDim>
@@ -1118,8 +1314,26 @@ void PointMesh<KDDim>::reinit(bool      & neighbor_list_update_flag,
   // diffusion
   // steps instead of every time step, we need to reinit particle neighbor list
   if (neighbor_list_update_flag) {
-//    this->build_elem_elem_neighbor_list();
+    // --> 1. build elem-elem neighbor list. Notice that this neighbor list
+    // should and should only be built once since element locations don't
+    // change during the simulation
+//    if(_elem_elem_neighbor_list.size()==0)
+//      this->build_elem_elem_neighbor_list();
+    // --> 2. build elem-point containing list. This will update the points
+    // contained in each element, which is necessary to build other types of
+    // neighbor list later. Notice that this function will also update the
+    // element id of each point.
 //    this->build_elem_point_containing_list();
+    // --> 3. build elem-point neighbor list. This will update the neighbor
+    // points of each element, which is necessary to build other types of
+    // neighbor list later. Notice that this function will utilize the
+    // information in elem_elem_neighbor_list and elem_point_containing_list.
+//    this->build_elem_point_neighbor_list();
+    // --> 4. build point_point neighbor list. This will update the neighbor
+    // points of each point. Notice that this function will utilize the elem
+    // id updated in step 2 and elem_point_neighbor_list.
+//    this->build_point_point_neighbor_list();
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       - -
        if the KD tree is already built, we need to re-construct the KD tree in

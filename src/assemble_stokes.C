@@ -499,8 +499,8 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
     // qrule.print_info();
     // perf_log.pop("preparation 2.4");
     // if elem_neighbor_list is pre-built, we can access it directly
-    const std::vector<std::size_t>& n_list =
-      _pm_system.point_mesh()->elem_neighbor_list(elem);
+    const std::vector<dof_id_type>& n_list =
+      _pm_system.point_mesh()->get_elem_point_neighbor_list(elem->id());
 
     // Now compute Fe caused by the regularized point force and boundary
     // traction.
@@ -548,7 +548,7 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 void AssembleStokes::compute_element_rhs(const Elem                   *elem,
                                          const unsigned int&            n_u_dofs,
                                          FEBase                      & fe_v,
-                                         const std::vector<std::size_t>n_list,
+                                         const std::vector<dof_id_type>& n_list,
                                          const bool                  & pf_flag,
                                          const std::string           & option,
                                          DenseVector<Number>         & Fe)

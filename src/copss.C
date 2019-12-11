@@ -758,9 +758,6 @@ void Copss::read_chebyshev_info() {
     }
   }
   PMToolBox::output_message(ss, *comm_in);
-  // build elem-particle neighbor list if either with_hi or module_poisson or
-  // module_np is true
-  build_elem_neighbor_list = with_hi || module_poisson || module_np;
 } // end read_chebyshev_info()
 
 // ====================================================================
@@ -1291,10 +1288,8 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
 {
   // get stokes system from equation systems
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
-  // if either with_hi or module_poisson is true, build_elem_neighbor_list will
-  // be true
   if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-  system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "undisturbed");
+  system.reinit_system(neighbor_list_update_flag, "undisturbed");
   if (print_info) 
   {
     PMToolBox::output_message("--------After reinit undisturbed system---------", *comm_in);
@@ -1427,7 +1422,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       timestep_duration         = 0;
     }
   }
-  system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+  system.reinit_system(neighbor_list_update_flag, "disturbed");
   if (print_info) 
   {
     PMToolBox::output_message("--------After reinit system at integration step " + std::to_string(i) + "---------", *comm_in);
@@ -1672,7 +1667,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 
       // comment the line below if not update neighbor list at each time step
       if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-      system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+      system.reinit_system(neighbor_list_update_flag, "disturbed");
       system.compute_point_velocity("undisturbed", vel0);
       system.solve("disturbed"); // solve the disturbed solution
       system.compute_point_velocity("disturbed", vel1);
@@ -1752,7 +1747,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
     // whether or not reinit neighbor list depends on the
     // neighbor_list_update_flag
   }
-  system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+  system.reinit_system(neighbor_list_update_flag, "disturbed");
   if (print_info) 
   {
     PMToolBox::output_message("--------After reinit system at integration step " + std::to_string(i) + "---------", *comm_in);

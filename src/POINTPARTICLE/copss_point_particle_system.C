@@ -156,7 +156,7 @@ void CopssPointParticleSystem::create_object_mesh() {
 
   // reinit point mesh (including particles and neighbor list)
   // PMToolBox::output_message("before reinit point_mesh", *comm_in);
-  point_mesh->reinit(neighbor_list_update_flag, true);
+  point_mesh->reinit(neighbor_list_update_flag);
   // PMToolBox::output_message("after reinit point_mesh", *comm_in);
   ss << "-------------> Reinit point mesh object, finished! \n"
      << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - \n"
@@ -361,7 +361,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   if (simulation_name == "ggem_validation")
   {
     perf_log.push("GGEM validation");
-    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+    system.reinit_system(neighbor_list_update_flag, "disturbed");
     system.test_velocity_profile();
     perf_log.pop("GGEM validation");
     return;
@@ -374,7 +374,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     PMSystemPoisson& system_poisson =
       equation_systems.get_system<PMSystemPoisson>("Poisson");
     // Build neighbor list, will this update point_mesh in PMSystemPoisson?
-    system.reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+    system.reinit_system(neighbor_list_update_flag, "disturbed");
     system_poisson.test_potential_profile();
     perf_log.pop("GGEMPoisson validation");
     return;

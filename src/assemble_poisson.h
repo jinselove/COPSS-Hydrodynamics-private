@@ -87,8 +87,8 @@ public:
                           const unsigned int&            n_dofs,
                           const std::vector<Real>& JxW,
                           const std::vector<std::vector<Real>>& phi,
-                          const std::vector<Point> q_xyz,
-                          const std::vector<std::size_t>n_list,
+                          const std::vector<Point>& q_xyz,
+                          const std::vector<dof_id_type>& n_list,
                           const bool                  & pf_flag,
                           const std::string           & option,
                           DenseVector<Number>         & Fe);

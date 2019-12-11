@@ -24,6 +24,7 @@
 #include "libmesh/elem.h"
 
 #include "point_particle.h"
+#include "pm_toolbox.h"
 
 
 namespace libMesh {
@@ -159,74 +160,37 @@ void PointParticle::set_orientation(const std::vector<Real>& rot_vec)
 }
 
 // ======================================================================
-void PointParticle::print_info(const bool& print_neighbor_list) const
+void PointParticle::print_info(const Parallel::Communicator& comm_in) const
 {
-  /* --------------------------------------------------------------------------
-   * Scheme 1: using printf. Then every process will print out info on its own.
-   * --------------------------------------------------------------------------*/
-  printf("point particle[%d]: \n", _id);
-  printf("      center = (%.6e, %.6e, %.6e)\n",
-         _center(0),
-         _center(1),
-         _center(2));
-  printf("      PBC counter = (%d, %d, %d)\n",
-         _counter[0],
-         _counter[1],
-         _counter[2]);
-  printf("      force  = (%.6e, %.6e, %.6e)\n",
-         _force(0),
-         _force(1),
-         _force(2));
-  printf("      velocity = (%.6e, %.6e, %.6e)\n",
-         _velocity(0),
-         _velocity(1),
-         _velocity(2));
-  printf("      orientation = (%.6e, %.6e, %.6e)\n",
-         _orientation[0],
-         _orientation[1],
-         _orientation[2]);
-  printf("      constant_force = (%.6e, %.6e, %.6e)\n",
-         _constant_force(0),
-         _constant_force(1),
-         _constant_force(2));
-  printf("      charge = %.6e\n", _charge);
-
-
-  // output elem id and process id
-  printf("      parent_id   = %d\n",   _parent_id);
-  printf("      point_type  = %d\n",   _point_type);
-  printf("      elem_id     = %d  \n", _elem_id);
-  printf("      proc_id     = %d\n",   _processor_id);
-
-  // output orientation vector
-  printf("      orientation = (");
-
-  for (std::size_t i = 0; i < _orientation.size(); ++i)
-  {
-    printf("%f", _orientation[i]);
-
-    if (i != _orientation.size() - 1) printf(", ");
-  }
-  printf(")\n");
+  std::ostringstream oss;
+  oss << "--------> point particle[" << _id << "]\n";
+  oss << "     center = (" << _center(0) << "," << _center(1) << "," <<
+  _center(2) <<")\n";
+  oss << "     PBC Counter = (" << _counter[0] << "," << _counter[1] << "," <<
+      _counter[2] <<")\n";
+  oss << "     force = (" << _force(0) << "," << _force(1) << "," <<
+      _force(2) <<")\n";
+  oss << "     velocity = (" << _velocity(0) << "," << _velocity(1) << "," <<
+      _velocity(2) <<")\n";
+  oss << "     orientation = (" << _orientation[0] << "," << _orientation[1] <<
+  "," << _orientation[2] <<"\n";
+  oss << "     constant force = (" << _constant_force(0) << "," << _constant_force(1) <<
+  "," << _constant_force(2) <<")\n";
+  oss << "     charge = " << _charge;
+  oss << "     parent_id = " << _parent_id;
+  oss << "     point_type = " << _point_type;
+  oss << "     elem_id = " << _elem_id;
 
   // output the neighbor list
-  if (print_neighbor_list)
+  if (_neighbor_list.size() > 0)
   {
-    if (_neighbor_list.size() > 0)
-    {
-      printf("      its neighbor list includes(%lu): ", _neighbor_list.size());
-
-      for (std::size_t i = 0; i < _neighbor_list.size(); ++i)
-        //        printf("      ---point %lu,   distance = %f\n",
-        //               _neighbor_list[i].first, _neighbor_list[i].second);
-        // this neighbor distance is not updated at every time step, thus,
-        // please do not print it
-        printf(" %lu; ",
-               _neighbor_list[i].first);
-      printf("\n");
-    }
-    else printf("      there are no neighbors around this point particle!\n");
+    oss << "      its neighbor points include: ";
+    for (dof_id_type i = 0; i < _neighbor_list.size(); ++i)
+      oss << _neighbor_list[i] <<", ";
+    oss <<"\n";
   }
-  printf("\n");
+  else oss << "      there are no neighbors around this point particle!\n";
+
+  PMToolBox::output_message(oss, comm_in);
 } // the end of print_info()
 }   // end of namespace

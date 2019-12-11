@@ -135,7 +135,6 @@ Real PMSystemStokes::get_dt()
 
 // ==================================================================================
 void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
-                                   const bool& build_elem_neighbor_list,
                                    const std::string& option)
 {
   START_LOG("reinit_system()", "PMSystemStokes");
@@ -145,7 +144,7 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
   // (2) build the element-point neighbor list according to search radius;
   // (3) evaluate forces
   // perf_log.push("reinit point_mesh");
-  _point_mesh->reinit(neighbor_list_update_flag, build_elem_neighbor_list);
+  _point_mesh->reinit(neighbor_list_update_flag);
 
   // perf_log.pop("reinit point_mesh");
   // perf_log.push("fix compute");
@@ -397,10 +396,9 @@ void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
   std::ostringstream ss;
   ss << "--->test in PMSystemStokes::test_l2_norm(): \n";
   PMToolBox::output_message(ss, this->comm());
-  bool build_elem_neighbor_list = true;
 
   // Numerical solution: Global(FEM) + Local(Analytical)
-  this->reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
+  this->reinit_system(neighbor_list_update_flag, "disturbed");
   _re_init = true;
   this->solve("disturbed");
   this->add_local_solution();

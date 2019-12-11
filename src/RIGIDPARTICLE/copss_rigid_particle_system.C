@@ -134,12 +134,13 @@ void CopssRigidParticleSystem::create_object_mesh() {
   PMToolBox::output_message("==>(4/4) Create point_mesh object", *comm_in);
 
   // Create object mesh
-  point_mesh = new PointMesh<3>(*particle_mesh, search_radius_p, search_radius_e);
+  point_mesh = new PointMesh<3>(*particle_mesh, search_radius_p,
+    search_radius_e);
 
   // No need to add periodic boundary, which is already included in
   // particle_mesh
   // Reinit point_mesh
-  point_mesh->reinit(neighbor_list_update_flag, build_elem_neighbor_list);
+  point_mesh->reinit(neighbor_list_update_flag);
 
   // finish point_mesh, print information
   ss << "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n"

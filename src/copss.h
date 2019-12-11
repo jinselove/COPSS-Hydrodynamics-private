@@ -215,7 +215,6 @@ public:
                                  // by default
   // Run time info
   bool with_hi;
-  bool build_elem_neighbor_list; // build element-particle neighbor list
   bool with_brownian;            // if consider brownian motion
   std::size_t random_seed;
   bool adaptive_dt;              // if use adaptive time step (essential for

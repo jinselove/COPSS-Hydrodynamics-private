@@ -448,7 +448,8 @@ const
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
   const bool is_sorted                    = false;
-  std::vector<std::size_t> elem_neighbors = point_mesh->elem_neighbor_list(elem);
+  const std::vector<dof_id_type>& elem_neighbors =
+    point_mesh->get_elem_point_neighbor_list(elem->id());
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
@@ -516,8 +517,8 @@ Point GGEMStokes::local_velocity_bead(PointMesh<3>      *point_mesh,
        - */
   const Point& ptx            = point_mesh->particles()[pid0]->point();
   const PointType point_type0 = point_mesh->particles()[pid0]->point_type();
-  std::vector<std::pair<std::size_t, Real> > IndicesDists;
-  IndicesDists = point_mesh->particles()[pid0]->neighbor_list();
+  const std::vector<dof_id_type> neighbor_list =
+    point_mesh->particles()[pid0]->neighbor_list();
   const std::vector<Point>& neighbor_vector =
     point_mesh->particles()[pid0]->neighbor_vector();
 
@@ -533,11 +534,11 @@ Point GGEMStokes::local_velocity_bead(PointMesh<3>      *point_mesh,
 
   // const Real ksi = this->regularization_parameter(hmin, ibm_beta, br0,
   // point_type0);
-  for (std::size_t v = 0; v < IndicesDists.size(); ++v)
+  for (std::size_t v = 0; v < neighbor_list.size(); ++v)
   {
     // 0. particle id and position, vector x = ptx - pt0
     const Point x           = neighbor_vector[v];
-    const unsigned int p_id = IndicesDists[v].first;
+    const unsigned int p_id = neighbor_list[v];
 
     // 1. compute the Green function (Oseen Tensor) of particle-v
     if (force_type == "regularized") GT = this->green_tensor_local_regularized(x);

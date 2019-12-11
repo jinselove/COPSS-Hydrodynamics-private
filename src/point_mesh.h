@@ -235,29 +235,6 @@ public:
   ~PointMesh();
 
 
-  /*
-   * Read points coordinate data from file
-   */
-
-  // void read_points_data(const std::string& filename);
-
-
-  /**
-   * Generate random point data within the bounding box
-   * and write the data to a local file "random_points_data.txt"
-   */
-
-  // void generate_random_points(const std::size_t N,
-  //                             const Real bbox_XA, const Real bbox_XB,
-  //                             const Real bbox_YA, const Real bbox_YB,
-  //                             const Real bbox_ZA, const Real bbox_ZB);
-
-
-  // void generate_random_points(const std::size_t N,
-  //                             const Point& bbox_min,
-  //                             const Point& bbox_max);
-
-
   /**
    * Return the information of particles
    */
@@ -309,35 +286,35 @@ public:
    * around the search radius _search_radius_e
    * Mapping between elem id and element neighbor list of particles
    */
-  const std::map<const std::size_t,
-                 std::vector<std::size_t> >& elem_neighbor_list() const
-  {
-    return _elem_neighbor_list;
-  }
+//  const std::map<const dof_id_type,
+//                 std::vector<dof_id_type> >& elem_neighbor_list() const
+//  {
+//    return _elem_point_neighbor_list;
+//  }
 
   /**
    * Return the particle neighbor list around a given element
    * around the search radius _search_radius_e
    */
-  const std::vector<std::size_t>elem_neighbor_list(const Elem *elem)
-  {
-    const std::size_t elem_id = elem->id();
-
-    return _elem_neighbor_list[elem_id];
-
-    // return _elem_neighbor_list.at(elem_id); // not work well
-  }
+//  const std::vector<std::size_t>elem_neighbor_list(const Elem *elem)
+//  {
+//    const std::size_t elem_id = elem->id();
+//
+//    return _elem_neighbor_list[elem_id];
+//
+//    // return _elem_neighbor_list.at(elem_id); // not work well
+//  }
 
   /**
    * Return the particle neighbor list around a given LOCAL element
    * around the search radius _search_radius_e
    */
-  const std::vector<std::size_t>local_elem_neighbor_list(const Elem *elem)
-  {
-    const std::size_t elem_id = elem->id();
-
-    return _local_elem_neighbor_list[elem_id];
-  }
+//  const std::vector<std::size_t>local_elem_neighbor_list(const Elem *elem)
+//  {
+//    const std::size_t elem_id = elem->id();
+//
+//    return _local_elem_neighbor_list[elem_id];
+//  }
 
 
   /**
@@ -365,7 +342,7 @@ public:
    * In fact, the particle neighbor list has been built in "reinit()", so this
    *is NOT USED!
    */
-  void build_particle_neighbor_list();
+//  void build_particle_neighbor_list();
 
 
   /*** NOT ACTUALLY USED NOW, written only for the purpose of comparing with
@@ -374,7 +351,7 @@ public:
    * Build the neighbor list for all the particles directly! (N^2 complexity)
    * NOTE that the particle list constructed from this function is not sorted!
    ***/
-  void build_particle_neighbor_list_naively();
+//  void build_particle_neighbor_list_naively();
 
   /**
    * reinit neighbor distance for all particles
@@ -390,9 +367,9 @@ public:
    * because this list is only used to evaluate element-wise load vector due to
    * the neighboring particles.
    */
-  void build_elem_neighbor_list(const Elem               *elem,
-                                        const bool                is_sorted,
-                                        std::vector<std::size_t>& n_list);
+//  void build_elem_neighbor_list(const Elem               *elem,
+//                                        const bool                is_sorted,
+//                                        std::vector<std::size_t>& n_list);
 
 
   /** FIXME: Should we build this locally and globally(by allgather)???
@@ -401,19 +378,13 @@ public:
    * this will generate the _elem_neighbor_list and  _elem_neighbor_list_vector
    * NOTE this takes advantage of KD Tree
    */
-  void build_elem_neighbor_list();
+//  void build_elem_neighbor_list();
 
 
-  /*
-   * Reinit the point-mesh system. This includes:
-   * (1) build the point-point neighbor list according to search radius;
-   * (2) build the element-point neighbor list according to search radius
-         (only if build_elem_neighbor_list is true);
-   * (3) set the elem_id and proc_id for points
-   * ---- force recalculation is not reinitialized here, but in ForceField:
+  /**
+   * Reinit the point-mesh system.
    */
-  void reinit(bool      & neighbor_list_update_flag,
-              const bool& build_elem_neighbor_list);
+  void reinit(bool& neighbor_list_update_flag);
 
 
   /*
@@ -522,6 +493,15 @@ public:
    */
   void build_elem_elem_neighbor_list();
 
+  /**
+   * Set element element neighbor list
+   */
+  void set_elem_elem_neighbor_list(const std::map<const dof_id_type,
+    std::vector<dof_id_type>>& elem_elem_neighbor_list)
+  {
+    _elem_elem_neighbor_list = elem_elem_neighbor_list;
+  };
+
 
   /**
    * Get the ids of all points within an element
@@ -549,15 +529,6 @@ public:
    * Build element particle neighbor list.
    */
   void build_elem_point_neighbor_list();
-
-  /*
-   * Get the ids of all neighbor points of a point
-   */
-  const std::vector<dof_id_type> get_point_point_neighbor_list(const
-    dof_id_type& point_id)
-  {
-    return _point_point_neighbor_list[point_id];
-  }
 
   /**
    * Build particle-particle neighbor list
@@ -612,8 +583,8 @@ private:
   // Element neighbor list: mapping between Elem and particle id's around it
   // This is NOT necessary to be on all the processors in implementation,
   // but we do this here only for test purpose. For local build
-  std::map<const std::size_t, std::vector<std::size_t> >_elem_neighbor_list;
-  std::map<const std::size_t, std::vector<std::size_t> >_local_elem_neighbor_list;
+//  std::map<const std::size_t, std::vector<std::size_t> >_elem_neighbor_list;
+//  std::map<const std::size_t, std::vector<std::size_t> >_local_elem_neighbor_list;
 
   // elem-elem neighbor list: mapping between the id of one element to the
   // ids of all its neighbor element. Notice that this mapping does change

@@ -58,6 +58,7 @@ RigidParticle::RigidParticle(const dof_id_type           & particle_id,
   _center0(pt),
   _radius(0.),
   _mag(mag),
+  _elem_id(-1),
   _rot(rot),
   _charge(charge), _epsilon_in(epsilon_in),
   _body_sedimentation_force_density(sedimentation_body_force_density),
@@ -1065,44 +1066,42 @@ void RigidParticle::print_info() const
   /* --------------------------------------------------------------------------
    * Scheme 1: using printf. Then every process will print out info on its own.
    * --------------------------------------------------------------------------*/
+  std::ostringstream oss;
   const std::vector<Real> hs = this->mesh_size();
-  std::cout << "------>" << _particle_id << "-th particle: " << std::endl
-            << "                  particle_type = " << _particle_type << std::endl
-            << "                  particle shape = " << _particle_shape <<
-    std::endl
-            << "                  charge = " << _charge << std::endl
-            << "                  dielectric constant = " << _epsilon_in <<
-    std::endl
-            << "                  center0 = " << _center0(0) << "," <<
-    _center0(1) << "," << _center0(2) << std::endl
-            << "                  centroid0 = (" << _centroid0(0) << "," <<
-    _centroid0(1) << "," << _centroid0(2) << ")" << std::endl
-            << "                  magnitude = " << _mag(0) << "," << _mag(1) <<
-    "," << _mag(2) << std::endl
-            << "                  rotation = " << _rot(0) << "," << _rot(1) <<
-    "," << _rot(2) << std::endl
-            << "                  area0   = " << _area0 << std::endl
-            << "                  volume0 = " << _volume0 << std::endl
-            << "                  hmin = " << hs[0] << ", hmax = " << hs[1] <<
-    std::endl
-            << "                  number of elements = " <<
-    this->num_mesh_elem() << std::endl
-            << "                  number of nodes = " << this->num_mesh_nodes() <<
-    std::endl;
+  oss << "------>" << _particle_id << "-th particle: \n"
+      << "                  particle_type = " << _particle_type << "\n"
+      << "                  particle shape = " << _particle_shape << "\n"
+      << "                  charge = " << _charge << "\n"
+      << "                  dielectric constant = " << _epsilon_in << "\n"
+      << "                  center0 = " << _center0(0) << "," <<
+    _center0(1) << "," << _center0(2) << "\n"
+      << "                  centroid0 = (" << _centroid0(0) << "," <<
+  _centroid0(1) << "," << _centroid0(2) << ")" << "\n"
+      << "                  magnitude = " << _mag(0) << "," << _mag(1) <<
+  "," << _mag(2) << "\n"
+      << "                  rotation = " << _rot(0) << "," << _rot(1) <<
+  "," << _rot(2) << "\n"
+      << "                  area0   = " << _area0 << "\n"
+      << "                  volume0 = " << _volume0 << "\n"
+      << "                  hmin = " << hs[0] << ", hmax = " << hs[1] <<
+"\n"
+      << "                  number of elements = " <<
+this->num_mesh_elem() << "\n"
+      << "                  number of nodes = " << this->num_mesh_nodes() <<
+"\n";
 
-  // // output the neighbor list
-  // if (print_neighbor_list)
-  // {
-  //   if( _neighbor_list.size()>0 )
-  //   {
-  //     printf("              the neighbor list includes: \n");
-  //     for (std::size_t i=0; i<_neighbor_list.size(); ++i )
-  //       printf("              ---particle %lu,   distance = %f\n",
-  //              _neighbor_list[i].first, _neighbor_list[i].second);
-  //   }
-  //   else
-  //     printf("              there are no neighbors around this particle!\n");
-  // }
-  // printf("\n");
+   // output the neighbor list
+   if( _neighbor_list.size()>0 )
+   {
+     oss << "              neighbor RigidParticle includes: \n";
+     for (std::size_t i=0; i<_neighbor_list.size(); ++i )
+       oss << _neighbor_list[i] << ", ";
+     oss << "\n";
+   }
+   else
+     oss << "              there are no neighbor RigidParticles around this "
+            "particle!\n";
+
+   PMToolBox::output_message(oss, this->comm());
 } // the end of print_info()
 } // end of namespace

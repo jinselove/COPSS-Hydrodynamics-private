@@ -75,14 +75,12 @@ public:
    * Re-init particle mesh, including:
    * (1) reinit() reinit point particles
    *              build_particle_neighbor_list()
-   *              build_elem_neighbor_list()
    * (2) update the mesh of each finite sized particle if there are;
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    * only if option=="disturbed", we calculate forces
    */
-  void reinit_system(bool      & neighbor_list_update_flag,
-                     const bool& build_elem_neighbor_list,
+  void reinit_system(bool& neighbor_list_update_flag,
                      const std::string& option);
 
 

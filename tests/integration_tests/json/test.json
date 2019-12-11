@@ -12,28 +12,28 @@
                 "filename": "output_polymer_0.vtk",
                 "cmp_method": "cmp_file",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_polymer_5.vtk",
                 "cmp_method": "cmp_file",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "out.time",
                 "cmp_method": "cmp_file",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "out.eigenvalue",
                 "cmp_method": "cmp_file",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             }
         ],
-      "on": true
+      "on": false
     },
     "PointParticle_Stokes_GGEM": {
         "package": "POINTPARTICLE",
@@ -48,19 +48,19 @@
                 "filename": "output_velocity_profile_x_3P.txt",
                 "cmp_method": "cmp_df",
                 "params": {"header": null, "delimiter":"  ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_velocity_profile_y_3P.txt",
                 "cmp_method": "cmp_df",
                 "params": {"header": null, "delimiter":"  ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_velocity_profile_z_3P.txt",
                 "cmp_method": "cmp_df",
                 "params": {"header": null, "delimiter":"  ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             }
         ],
         "on": true
@@ -79,19 +79,19 @@
                 "filename": "output_particle_trajectory.csv",
                 "cmp_method": "cmp_df",
                 "params": {"comment": "#", "delimiter": " ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_surface_node.csv",
                 "cmp_method": "cmp_df",
                 "params": {"comment": "#", "delimiter": " ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "out.time",
                 "cmp_method": "cmp_df",
                 "params": {"comment": "#", "delimiter": " ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             }
         ],
         "on": true
@@ -110,19 +110,19 @@
                 "filename": "output_particle_trajectory.csv",
                 "cmp_method": "cmp_df",
                 "params": {"comment": "#", "delimiter": " ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_surface_node.csv",
                 "cmp_method": "cmp_df",
                 "params": {"comment": "#", "delimiter": " ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "out.time",
                 "cmp_method": "cmp_df",
                 "params": {"comment": "#", "delimiter": " ", "engine": "python"},
-                "tol": 1e-6
+                "tol": 1e-5
             }
         ],
         "on": true
@@ -140,19 +140,19 @@
                 "filename": "output_potential_profile_x_3P.csv",
                 "cmp_method": "cmp_df",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_potential_profile_y_3P.csv",
                 "cmp_method": "cmp_df",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_potential_profile_z_3P.csv",
                 "cmp_method": "cmp_df",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             }
         ],
         "on": true
@@ -170,19 +170,19 @@
                 "filename": "output_concentration_profile_x.csv",
                 "cmp_method": "cmp_df",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_concentration_profile_y.csv",
                 "cmp_method": "cmp_df",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             },
             {
                 "filename": "output_concentration_profile_z.csv",
                 "cmp_method": "cmp_df",
                 "params": {},
-                "tol": 1e-6
+                "tol": 1e-5
             }
         ],
         "on": true

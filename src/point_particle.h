@@ -186,8 +186,7 @@ public:
    * Set the neighbor list of the particle
    * This is used by the member function in the class "ParticleMesh"
    */
-  void set_neighbor_list(const std::vector<std::pair<std::size_t,
-                                                     Real> >& nei_list)
+  void set_neighbor_list(const std::vector<dof_id_type>& nei_list)
   {
     if (nei_list.size() > 0) {
       _neighbor_list = nei_list;
@@ -198,7 +197,7 @@ public:
    * Return the neighbor list of the particle.
    * NOTE, this includes the particle ids and distance values to this particle.
    */
-  std::vector<std::pair<std::size_t, Real> >neighbor_list() const
+  const std::vector<dof_id_type> neighbor_list()
   {
     return _neighbor_list;
   }
@@ -214,7 +213,7 @@ public:
   /**
    * neighbor distance
    */
-  const std::vector<Point>neighbor_vector() const {
+  const std::vector<Point>neighbor_vector() {
     return _neighbor_vector;
   }
 
@@ -271,7 +270,7 @@ public:
     return _orientation;
   }
 
-  void        set_orientation(const std::vector<Real>& rot_vec);
+  void set_orientation(const std::vector<Real>& rot_vec);
 
   /*
    * Return the charge of the particle
@@ -299,7 +298,7 @@ public:
   /*
    * Print information of this particle
    */
-  void print_info(const bool& print_neighbor_list = true) const;
+  void print_info(const Parallel::Communicator& comm_in) const;
 
 private:
 
@@ -351,13 +350,11 @@ private:
   dof_id_type _elem_id; // unsigned int _elem_id (uint32 by default!);
 
 
-  // neighbor particles around the present particle: particle id and distance
-  // value.
-  std::vector<std::pair<std::size_t, Real> >_neighbor_list;
+  // neighbor particles around the present particle: particle id
+  std::vector<dof_id_type>_neighbor_list;
 
   // neighbor distance
   std::vector<Point>_neighbor_vector;
-
 
   // Define the orientation of this point(bending, torque)
   // Use the definition of quaternions to describe the orientation

@@ -293,8 +293,8 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     
 
     // if elem_neighbor_list is pre-built, we can access it directly
-    const std::vector<std::size_t>& n_list =
-      _pm_system.point_mesh()->elem_neighbor_list(elem);
+    const std::vector<dof_id_type>& n_list =
+      _pm_system.point_mesh()->get_elem_point_neighbor_list(elem->id());
 
     // if this elem has no neighboring particle we turn the pc_flag to 'false'
     bool pc_flag = true;                      // a flag for the point charge
@@ -342,8 +342,8 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
                                           const unsigned int& n_dofs,
                                           const std::vector<Real>& JxW,
                                           const std::vector<std::vector<Real>>& phi,
-                                          const std::vector<Point> q_xyz,
-                                          const std::vector<std::size_t> n_list,
+                                          const std::vector<Point>& q_xyz,
+                                          const std::vector<dof_id_type>&n_list,
                                           const bool& pc_flag,
                                           const std::string& option,
                                           DenseVector<Number>& Fe)

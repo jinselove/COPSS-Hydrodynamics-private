@@ -1300,10 +1300,8 @@ void Copss::solve_undisturbed_system(EquationSystems& equation_systems)
     system.solve("undisturbed");
   }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
      write out the equation systems at Step 0 (undisturbed field)
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   PMToolBox::output_message("start writing undisturbed solution to file", *comm_in);
   if ((std::find(output_file.begin(), output_file.end(),
                  "equation_systems") != output_file.end()) && !restart)

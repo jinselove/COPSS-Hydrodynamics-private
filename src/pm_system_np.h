@@ -130,6 +130,12 @@ public:
 
 
   /**
+   * evaluate and get the total solution
+   */
+//   UniquePtr<NumericVector<Real>> eval_get_total_solution() override {};
+  void eval_total_solution() override {};
+
+  /**
    * update system solution for output equation systems
    * There is only 'total' solution for NP system, no need to update
    */

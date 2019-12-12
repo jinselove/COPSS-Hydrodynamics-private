@@ -664,8 +664,8 @@ void PMSystemPoisson::update_solution_before_output(const std::string&
 {
   START_LOG("update_solution_before_output()", "PMSystemPoisson");
 
-  // clone Poisson FEM System Solution to solution_backup
-  this->solution_backup = this->solution->clone();
+  // clone Poisson FEM System Solution to _global_solution
+  this->_global_solution = this->solution->clone();
   // update system solution based on the "solution_name"
   if (solution_name == "disturbed_global")
   {
@@ -692,7 +692,8 @@ void PMSystemPoisson::resume_solution_after_output()
 {
   START_LOG("resume_solution_after_output()", "PMSystemPoisson");
 
-  *(this->solution) = *(this->solution_backup);
+  // resume system solution to global solution
+  *(this->solution) = *(this->_global_solution);
 
   STOP_LOG("resume_solution_after_output()", "PMSystemPoisson");
 }

@@ -95,6 +95,15 @@ public:
    */
   void add_local_solution() override;
 
+  /**
+   * Evaluate and get total solution
+   * Total solution = global_solution + local_solution
+   */
+//  UniquePtr<NumericVector<Real>> eval_get_total_solution() override
+  void eval_total_solution() override
+  {
+    // fixme: implement this function
+  };
 
   /*
    * Compute electrical potential at all beads' locations

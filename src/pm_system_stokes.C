@@ -338,24 +338,8 @@ void PMSystemStokes::add_local_solution()
     const std::vector<Real> Ulocal = this->local_velocity_fluid(pt,
       "regularized", elem_id);
 
-    // Get the global solution
-    std::vector<Real> Uglobal;
-    this->solution->get(dof_indices, Uglobal);
-
     // add local solution to system solution
     this->solution->add_vector(Ulocal, dof_indices);
-    std::vector<Real> Utotal;
-    this->solution->get(dof_indices, Utotal);
-
-    // compute the local velocity of fluid at the current node
-    const std::vector<Real> Uexact =
-      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-//    std::cout<<"node_id = " << node->id()
-//             <<"; dof_indices = " <<
-//             dof_indices[0] << ", "<<dof_indices[1]<<", "<<dof_indices[2]<<"; "
-//             <<" Ulocal = "<<Ulocal[0] <<", "<<Ulocal[1]<<", "<<Ulocal[2]<<"; "
-//             <<" Uglobal = "<<Uglobal[0]<<", "<<Uglobal[1]<<", "<<Uglobal[2]<<"; "
-//             <<" Uexact = "<<Uexact[0]<<", "<<Uexact[1]<<", "<<Uexact[2]<<"\n";
   } // end loop over local nodes
 
   this->solution->close();
@@ -363,6 +347,80 @@ void PMSystemStokes::add_local_solution()
 
 //  PMToolBox::output_message(">>>> Adding local solution Done!!!", this->comm());
   STOP_LOG("add_local_solution()", "PMSystemStokes");
+}
+
+// =======================================================================
+//UniquePtr<NumericVector<Real>> PMSystemStokes::eval_get_total_solution()
+void PMSystemStokes::eval_total_solution()
+{
+  START_LOG("eval_total_solution()", "PMSystemStokes");
+
+  PMToolBox::output_message(">>>>> Evaluating total Stokes solution",
+                            this->comm());
+
+  // Make sure current solution are closed
+  if (!this->solution->closed())
+    this->solution->close();
+
+  // clone current solution (which should be global) to _total_solution --->
+  // gives total_solution = global_disturbed_solution
+  PMToolBox::output_message("> Setting total solution to be current global "
+                            "disturbed solution", this->comm());
+  this->_total_solution = this->solution->clone();
+
+  // add undisturbed solution to total --> gives total_solution =
+  // global_disturbed_solution + undisturbed_solution
+  if (this->undisturbed_solution != nullptr) {
+    PMToolBox::output_message("> Adding undisturbed solution to total "
+                              "solution", this->comm());
+    this->_total_solution->add(*this->undisturbed_solution);
+  }
+
+  // Make sure _total_solution is closed now
+  if (!this->_total_solution->closed())
+    this->_total_solution->close();
+
+  // Add local_disturbed_solution for each nodes
+  PMToolBox::output_message("> Adding local disturbed solution to total "
+                            "solution", this->comm());
+  // Get the parameters and Initialize the quantities
+  MeshBase& mesh = this->get_mesh();
+  const unsigned int& dim = mesh.mesh_dimension();
+
+  // loop over local nodes and update local solution vector according to the
+  // dof_indices of each node
+  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
+  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
+
+  for (; nd != end_nd; ++nd) {
+    // Store a pointer to the current node, and extract a point
+    Node *node = *nd;
+    Point pt;
+    for (unsigned int i = 0; i < dim; ++i) pt(i) = (*node)(i);
+
+    // get the element id of this node from stored mapping
+    const dof_id_type &elem_id = _point_mesh->get_node_elem_id(node->id());
+
+    // get the global dof numbers of this node for u, v, w three directions
+    std::vector<dof_id_type> dof_indices(dim);
+    for (unsigned int i = 0; i < dim; ++i) { // var = 0, 1, 2 = i
+      dof_indices[i] = node->dof_number(this->number(), i, 0);
+    }
+
+    // get the local velocity on this node calling GGEM
+    const std::vector<Real> Ulocal =
+      this->local_velocity_fluid(pt,"regularized", elem_id);
+
+    // add local solution to system solution
+    this->_total_solution->add_vector(Ulocal, dof_indices);
+  } // end loop over local nodes
+
+  PMToolBox::output_message(">>>>> Evaluating total Stokes solution, "
+                            "Done!!!", this->comm());
+  STOP_LOG("eval_total_solution()", "PMSystemStokes");
+
+  // return the pointer to _total_solution
+//  return _total_solution;
 }
 
 // ==================================================================================
@@ -753,8 +811,8 @@ void PMSystemStokes::test_l2_norm()
   _re_init = true;
   this->solve("disturbed");
 
-  // add local solution to global solution
-  this->add_local_solution();
+  // evaluate the total solution
+  this->eval_total_solution();
 
   // Theoretical solution(only velocity)
   const unsigned int dim = 3;
@@ -762,8 +820,6 @@ void PMSystemStokes::test_l2_norm()
   const unsigned int n_nodes = mesh.n_nodes();
   Real val0_norm = 0., val1_norm = 0.;
   Real val2_norm = 0., val3_norm = 0.;
-
-  // AnalyticalSolution analytical_solution(*this);
 
   // Loop over each node and compute the nodal velocity value
   MeshBase::node_iterator nd           = mesh.local_nodes_begin();
@@ -784,9 +840,9 @@ void PMSystemStokes::test_l2_norm()
       dof_nums[i] = node->dof_number(this->number(), i, 0);
     }
 
-    // Get the numerical solution
-    std::vector<Real> Unum;
-    this->solution->get(dof_nums, Unum);
+    // Get the numerical total solution
+    std::vector<Real> Utotal;
+    this->_total_solution->get(dof_nums, Utotal);
 
     // compute the local velocity of fluid at the current node
     const std::vector<Real> Uexact =
@@ -794,10 +850,9 @@ void PMSystemStokes::test_l2_norm()
 
     // compute the errors
     for (unsigned int i = 0; i < dim; ++i) {
-      Real tmpt = std::abs(Unum[i] - Uexact[i]);
+      Real tmpt = std::abs(Utotal[i] - Uexact[i]);
       val0_norm += tmpt;
       val1_norm += std::abs(Uexact[i]);
-
       val2_norm += tmpt * tmpt;
       val3_norm += Uexact[i] * Uexact[i];
     }
@@ -816,14 +871,14 @@ void PMSystemStokes::test_l2_norm()
   PMToolBox::output_message(ss, this->comm());
 
   // write equation system to output file
-  std::ostringstream output_filename;
-  output_filename << "total_solution.e";
-#ifdef LIBMESH_HAVE_EXODUS_API
-  PMToolBox::output_message("writing total solution to total_solution.e",
-    this->comm());
-  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
-                                                   this->get_equation_systems());
-#endif // #ifdef LIBMESH_HAVE_EXODUS_API
+//  std::ostringstream output_filename;
+//  output_filename << "total_solution.e";
+//#ifdef LIBMESH_HAVE_EXODUS_API
+//  PMToolBox::output_message("writing total solution to total_solution.e",
+//    this->comm());
+//  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+//                                                   this->get_equation_systems());
+//#endif // #ifdef LIBMESH_HAVE_EXODUS_API
   STOP_LOG("test_l2_norm()", "PMSystemStokes");
 }
 
@@ -1080,8 +1135,8 @@ void PMSystemStokes::update_solution_before_output(
   // update Stokes system solution if with_hi is true
   if (this->get_equation_systems().parameters.get<bool>("with_hi"))
   {
-    // clone Stokes FEM solution to solution_backup
-    this->solution_backup = this->solution->clone();
+    // clone Stokes FEM solution to _global_solution
+    this->_global_solution = this->solution->clone();
     // update this->solution depends on solution_name
     if (solution_name == "disturbed_global")
     {
@@ -1112,10 +1167,10 @@ void PMSystemStokes::update_solution_before_output(
 // ===========================================================================
 void PMSystemStokes::resume_solution_after_output()
 {
-  // only need to resume solution when 'with_hi' is true
+  // only need to resume solution to global solution when 'with_hi' is true
   if (this->get_equation_systems().parameters.get<bool>("with_hi"))
   {
-    *(this->solution) = *(this->solution_backup);
+    *(this->solution) = *(this->_global_solution);
   }
   else
   {

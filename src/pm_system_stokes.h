@@ -124,6 +124,15 @@ public:
   void add_local_solution() override;
 
 
+  /**
+   * Evaluate and get total solution
+   * Total solution = undisturbed_solution (if existed) +
+   * global_disturbed_solution +
+   * local_disturbed_solution
+   */
+//  UniquePtr<NumericVector<Real>> eval_get_total_solution() override;
+    void eval_total_solution() override;
+
   /*
    * Return the SolverStokes
    */
@@ -323,7 +332,7 @@ public:
    /**
     * Save a pointer to undisturbed solution
     */
-   UniquePtr<NumericVector<Real>> undisturbed_solution;
+   UniquePtr<NumericVector<Number>> undisturbed_solution;
 
 private:
 

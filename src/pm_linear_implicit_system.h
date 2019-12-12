@@ -122,6 +122,12 @@ public:
    */
   virtual void add_local_solution() = 0;
 
+  /**
+   * evaluate and get total solution of the system
+   */
+//  virtual UniquePtr<NumericVector<Real>> eval_get_total_solution() = 0;
+  virtual void eval_total_solution() = 0;
+
 
   /**
    * Compute the L2-error by comparing numerical and analytical solutions
@@ -212,10 +218,6 @@ public:
                                  Vec               *petsc_vector,
                                  const bool         write_velocity) const;
 
-  /**
-   * A Clone the current solution to the solution backup
-   */
-  UniquePtr<NumericVector<Real>> solution_backup;
                                       
 protected:
 
@@ -231,7 +233,12 @@ protected:
   // bool _re_init: If true, global_matrix will be rebuilt. It's only true
   // at the beginining of the simulation.
   bool _re_init;
-  
+
+  // A Pointer to the total solution
+  UniquePtr<NumericVector<Number>> _total_solution;
+
+  // A Pointer to the global_solution
+  UniquePtr<NumericVector<Number>> _global_solution;
 
 };
 } // end namespace libMesh

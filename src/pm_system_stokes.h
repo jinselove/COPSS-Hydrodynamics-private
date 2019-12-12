@@ -117,15 +117,11 @@ public:
 
   /*
    * Add the local solution to the global solution
+   * This is currently only used for calculating total solution to write the
+   * equation systems output. The solution will be reset to global solution
+   * after writing output.
    */
   void add_local_solution() override;
-
-
-  /*
-   * Compute the L2-error in an unbounded domain
-   * This function will change the system solution vector by add local solution.
-   */
-  void test_l2_norm(bool& neighbor_list_update_flag);
 
 
   /*
@@ -169,7 +165,8 @@ public:
    * force_type: "regularized" or "smooth"
    */
   std::vector<Real>local_velocity_fluid(const Point      & p,
-                                        const std::string& force_type) const;
+                                        const std::string& force_type,
+                                        const dof_id_type p_elem_id=-1) const;
 
 
   /**
@@ -202,11 +199,16 @@ public:
    */
   void test_velocity_profile();
 
-
-  /*
-   * Return the exact solution of Stokes eqn for any given
-   * point \pt0 in an unbounded domain.
+  /**
+   * Test function. Test solutions on all nodes
    */
+  void test_l2_norm();
+
+
+    /*
+     * Return the exact solution of Stokes eqn for any given
+     * point \pt0 in an unbounded domain.
+     */
 
   // const std::vector<Real> exact_solution(const Point& pt0) const;
 

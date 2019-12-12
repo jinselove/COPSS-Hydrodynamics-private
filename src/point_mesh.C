@@ -259,6 +259,11 @@ void PointMesh<KDDim>::reinit(bool& neighbor_list_update_flag)
     // change during the simulation
     if(_elem_elem_neighbor_list.size()==0)
       this->build_elem_elem_neighbor_list();
+    // --> 1.2 build node-elem mapping. Notice that this mapping
+    // should and should only be built once since element locations don't
+    // change during the simulation
+    if(_node_elem_mapping.size()==0)
+      this->build_node_elem_mapping();
     // --> 2. build elem-point containing list. This will update the points
     // contained in each element, which is necessary to build other types of
     // neighbor list later. Notice that this function will also update the
@@ -436,6 +441,132 @@ void PointMesh<KDDim>::build_elem_elem_neighbor_list()
 
   STOP_LOG("build_elem_elem_neighbor_list()", "PointMesh<KDDim>");
 }
+
+// =====================================================================
+template<unsigned int KDDim>
+void PointMesh<KDDim>::build_node_elem_mapping()
+{
+  // let's be sure we properly initialize on every processor at once: this
+  // function is only executed in debug mode
+  parallel_object_only();
+  START_LOG("build_elem_elem_neighbor_list()", "PointMesh<KDDim>");
+
+  std::ostringstream oss;
+//  oss << "\n>>>>>>>>>>> Building node-elem mapping";
+//  PMToolBox::output_message(oss, this->comm());
+
+  //Initialize the global container
+  _node_elem_mapping.clear();
+
+  // create a helper map to store local mapping, we need this local mapping
+  // to fill _elem_elem_neighbor_list globally.
+  std::map<dof_id_type, dof_id_type> _local_node_elem_mapping;
+
+  // loop over each node in parallel to build _node_elem_neighbor_list
+  MeshBase::node_iterator nd           = _mesh.local_nodes_begin();
+  const MeshBase::node_iterator end_nd = _mesh.local_nodes_end();
+
+  for (; nd != end_nd; ++nd)
+  {
+    // Store a pointer to the current node, and extract a point
+    Node *node = *nd;
+    Point pt;
+    for (unsigned int i = 0; i < KDDim; ++i) pt(i) = (*node)(i);
+    // locate the element that contains this node point using point locator
+    // despite that a node might be shared by multiple elements, point
+    // locator should give us one of them
+    const Elem* elem = _mesh.point_locator().operator()(pt);
+    if (elem==nullptr)
+    {
+      std::ostringstream oss;
+      oss << "Error: cannot find the element that current particle is "
+             "within : "
+          <<"particle location = (" << pt(0) << ", "
+          << pt(1) << ", "
+          << pt(2) << "). Exiting ...";
+      PMToolBox::output_message(oss, this->comm());
+      libmesh_error();
+    }
+    // Add the pair to the local mapping
+    _local_node_elem_mapping.insert(std::make_pair(node->id(), elem->id()));
+  }
+
+  // Until now, each processor has a different version of
+  // _local_node_elem_mapping that stores the mapping of local nodes
+  // to their elements. For example, if node 0 is on processor 0
+  // and node 1 is processor 1, then the mapping of node 0 is stored on
+  // _local_node_elem_mapping on processor 0 and the mapping of node
+  // 1 is store in _local_node_elem_mapping on processor 1. The problem
+  // is that if we want to get access to the mapping of node 0 on
+  // processor 1, we will not able to find it. Thus we need a global mapping
+
+  // if in serial, _local_node_elem_mapping is the same as
+  // _elem_elem_neighbor_list
+  if (this->comm().size()<2)
+  {
+    _node_elem_mapping.insert(_local_node_elem_mapping.begin(),
+      _local_node_elem_mapping.end());
+  }
+
+  // start creating global mapping
+
+  // 1. create buffer vectors to help creating global mapping
+  const dof_id_type len0 = _local_node_elem_mapping.size();
+  // a vector that stores all node ids, size = len0
+  std::vector<dof_id_type> buffer_node_id_list(len0);
+  // a vector that stores all element ids of all nodes; notice that each node
+  // only has one element mapping
+  std::vector<dof_id_type> buffer_elem_id_list(len0);
+
+  dof_id_type k=0;
+  std::map<const dof_id_type, dof_id_type>::const_iterator p;
+  for(p=_local_node_elem_mapping.begin();
+      p!=_local_node_elem_mapping.end(); ++p)
+  {
+    buffer_node_id_list[k] = p->first;
+    buffer_elem_id_list[k] = p->second;
+    k++;
+  }
+
+  // (2) all gather the local data. Check this link to understand how
+  // allgather works: https://libmesh.github.io/doxygen/classlibMesh_1_1Parallel_1_1Communicator.html#a10632832fb05b53d1e7e0882c21fd6f3
+  this->comm().allgather(buffer_node_id_list);
+  this->comm().allgather(buffer_elem_id_list);
+
+  // (3) unpacked the gathered buffer to _elem_elem_neighbor_list
+  for(dof_id_type i=0; i<buffer_node_id_list.size(); ++i)
+  {
+    const dof_id_type& node_id = buffer_node_id_list[i];
+    const dof_id_type& elem_id = buffer_elem_id_list[i];
+    _node_elem_mapping.insert(std::make_pair(node_id, elem_id));
+  }
+
+  // print out debug information to screen
+//  oss << "Done!!!";
+//  PMToolBox::output_message(oss, this->comm());
+//  oss << "----> output global id of elements that each node falls in:\n";
+//  for (dof_id_type node_id=0; node_id<_mesh.n_nodes(); node_id++)
+//  {
+//    oss << "node id " << node_id << " belongs to elem id: "
+//                                    ""<<this->get_node_elem_id(node_id);
+//    oss << "\n";
+//  }
+//  PMToolBox::output_message(oss, this->comm());
+//
+//  oss << "----> output global id of nodes of each element:\n";
+//  for (dof_id_type elem_id=0; elem_id<_mesh.n_elem(); elem_id++)
+//  {
+//    oss << "elem id " << elem_id << " has nodes: ";
+//    const Elem* elem = _mesh.elem(elem_id);
+//    for (dof_id_type node_id=0; node_id<elem->n_nodes(); node_id++)
+//      oss << elem->node(node_id)<<", ";
+//    oss << "\n";
+//  }
+//  PMToolBox::output_message(oss, this->comm());
+
+  STOP_LOG("build_node_elem_mapping()", "PointMesh<KDDim>");
+}
+
 
 // =====================================================================
 template<unsigned int KDDim>
@@ -745,9 +876,8 @@ void PointMesh<KDDim>::build_particle_neighbor_list(const Point& tgt,
   _kd_tree->radiusSearch(&query_pt[0], r_l2, IndicesDists, params);
 
   // the distance is L2 form, which is the distance square, so we take sqrt()
-  for (std::size_t j = 0; j < IndicesDists.size(); ++j) {
-  IndicesDists[j].second = std::sqrt(IndicesDists[j].second);
-  }
+  for (std::size_t j = 0; j < IndicesDists.size(); ++j)
+    IndicesDists[j].second = std::sqrt(IndicesDists[j].second);
 
   /* ------------------------------------------------------------------------
   * if the periodic boundary condition is applied, we must find the neighbor

@@ -504,6 +504,21 @@ public:
 
 
   /**
+   * Build node to element mapping
+   */
+   void build_node_elem_mapping();
+
+   /**
+    * Get element global id of a node
+    * notice that the input node id is global
+    */
+   const dof_id_type get_node_elem_id(const dof_id_type& node_id)
+   {
+     return _node_elem_mapping[node_id];
+   }
+
+
+  /**
    * Get the ids of all points within an element
    */
   const std::vector<dof_id_type> get_elem_point_containing_list(const
@@ -591,6 +606,13 @@ private:
   // with time. This mapping is global, i.e., all processors have the same
   // information about _elem_elem_neighbor_list
   std::map<const dof_id_type, std::vector<dof_id_type>>_elem_elem_neighbor_list;
+
+  // mapping between node id and the element id it belongs to. Notice that we
+  // only take one of the element if a node is shared by multiple elements.
+  // This mapping will only be created once; Notice that both node_id and
+  // element id in the mapping are global; All processors have the same
+  // information about this mapping
+  std::map<const dof_id_type, dof_id_type> _node_elem_mapping;
 
   // mapping between the id of one element to the ids of all the point
   // particles within this element. Notice that this mapping changes with

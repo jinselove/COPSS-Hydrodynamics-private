@@ -171,9 +171,9 @@ public:
    * Eqn (33) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
    */
   std::vector<Real>local_velocity_fluid(PointMesh<3>      *point_mesh,
-                                        const Point      & ptx, /* a pt in space
-                                                                   */
-                                        const std::string& force_type) const;
+                                        const Point      & ptx, /* a pt in space*/
+                                        const std::string& force_type,
+                                        const dof_id_type ptx_elem_id=-1) const;
 
 
   /* Compute the local vel-solution of the fluid at a given point ptx
@@ -194,8 +194,7 @@ public:
    */
   std::vector<Real>local_velocity_fluid(PointMesh<3>      *point_mesh,
                                         const Elem        *elem,
-                                        const Point      & ptx, /* a pt in space
-                                                                   */
+                                        const Point      & ptx,
                                         const std::string& force_type) const;
 
 

@@ -21,10 +21,12 @@ for index, box_direction in enumerate(box_directions):
     vx = np.zeros( (mA,4), np.float ); # total | global | local | exact
     vy = np.zeros( (mA,4), np.float ); #           |        |
     vz = np.zeros( (mA,4), np.float ); #          FEM      Green
+    
     for i in range(0,4):
        vx[:,i] = tmpA[:,i*3+1]
        vy[:,i] = tmpA[:,i*3+2]
        vz[:,i] = tmpA[:,i*3+3]
+
     for i in range(0, 4):
        if i<3:
            axes[index, 0].plot(x, vx[:,i], color=colorplot[i], linewidth=2);
@@ -41,6 +43,7 @@ for index, box_direction in enumerate(box_directions):
            axes[index, 1].plot(x, vy[:,i], label=labelplot[i], color=colorplot[i], linewidth=2, ls='--');        
            
     axes[index, 1].set_xlabel(box_direction, fontsize=25)
+    axes[index, 1].set_ylim([-0.05, 0.05])
 
     for i in range(0, 4):
        if i<3:
@@ -49,6 +52,8 @@ for index, box_direction in enumerate(box_directions):
            axes[index, 2].plot(x, vz[:,i], label=labelplot[i], color=colorplot[i], linewidth=2, ls='--');        
            
     axes[index, 2].set_xlabel(box_direction, fontsize=25)
+    axes[index, 2].set_ylim([-0.05, 0.05])
+
 axes[0, 0].set_title("velocity in x-direction: u")
 axes[0, 1].set_title("velocity in y-direction: v")
 axes[0, 2].set_title("velocity in z-direction: w")

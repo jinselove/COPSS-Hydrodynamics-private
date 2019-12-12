@@ -363,6 +363,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     perf_log.push("GGEM validation");
     system.reinit_system(neighbor_list_update_flag, "disturbed");
     system.test_velocity_profile();
+    system.test_l2_norm();
     perf_log.pop("GGEM validation");
     return;
   }

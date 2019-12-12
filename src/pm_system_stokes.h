@@ -166,7 +166,7 @@ public:
    */
   std::vector<Real>local_velocity_fluid(const Point      & p,
                                         const std::string& force_type,
-                                        const dof_id_type p_elem_id=-1) const;
+                                        dof_id_type p_elem_id=-1) const;
 
 
   /**
@@ -338,6 +338,9 @@ private:
 
   // Get a pointer to GGEMStokes
   GGEMStokes *ggem_stokes = nullptr;
+
+  // output precision (defined in input file, default is 6)
+  int o_precision;
   
 }; // end class
 } // end namespace libMesh

@@ -368,18 +368,21 @@ const
   std::vector<dof_id_type> point_nb_list;
   // ---> if the elem_id (id of the element that contains ptx) of the point is
   // given, we can get the point neighbor list from elem_point_neighbor_list
-  if (ptx_elem_id != -1)
+  if (ptx_elem_id == -1)
   {
-    point_nb_list = point_mesh->get_elem_point_neighbor_list(ptx_elem_id);
-  }
-  else
-  {
+    std::cout<<"Warning: ("<<ptx(0)<<","<<ptx(1)<<","<<ptx(2)<<"), elem_id = "
+      <<ptx_elem_id
+      << "is invalid. Build point neighbor list using KDtree instead";
     //build the particle neighbor list around the given point \p ptx
     const bool is_sorted = false;
     std::vector<std::pair<std::size_t, Real> > IndicesDists;
     point_mesh->build_particle_neighbor_list(ptx, is_sorted, IndicesDists);
     for (std::size_t v=0; v<IndicesDists.size(); v++)
       point_nb_list.push_back(IndicesDists[v].first);
+  }
+  else
+  {
+    point_nb_list = point_mesh->get_elem_point_neighbor_list(ptx_elem_id);
   }
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

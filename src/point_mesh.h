@@ -560,6 +560,13 @@ protected:
    */
   void build_elem_point_containing_list();
 
+  /**
+   * get mesh
+   */
+   const MeshBase& get_mesh() const
+   {
+     return _mesh;
+   }
 
 private:
 

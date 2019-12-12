@@ -308,7 +308,7 @@ void PMSystemStokes::add_local_solution()
   // Check if the system solution vector is closed or not
   if ((this->solution->closed()) == false) this->solution->close();
 
-  PMToolBox::output_message(">>>> Start adding local solution to system "
+  PMToolBox::output_message(">>>> Adding local solution to system "
                             "solution", this->comm());
   // Get the parameters and Initialize the quantities
   MeshBase& mesh = this->get_mesh();
@@ -350,18 +350,18 @@ void PMSystemStokes::add_local_solution()
     // compute the local velocity of fluid at the current node
     const std::vector<Real> Uexact =
       analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-    std::cout<<"node_id = " << node->id()
-             <<"; dof_indices = " <<
-             dof_indices[0] << ", "<<dof_indices[1]<<", "<<dof_indices[2]<<"; "
-             <<" Ulocal = "<<Ulocal[0] <<", "<<Ulocal[1]<<", "<<Ulocal[2]<<"; "
-             <<" Uglobal = "<<Uglobal[0]<<", "<<Uglobal[1]<<", "<<Uglobal[2]<<"; "
-             <<" Uexact = "<<Uexact[0]<<", "<<Uexact[1]<<", "<<Uexact[2]<<"\n";
+//    std::cout<<"node_id = " << node->id()
+//             <<"; dof_indices = " <<
+//             dof_indices[0] << ", "<<dof_indices[1]<<", "<<dof_indices[2]<<"; "
+//             <<" Ulocal = "<<Ulocal[0] <<", "<<Ulocal[1]<<", "<<Ulocal[2]<<"; "
+//             <<" Uglobal = "<<Uglobal[0]<<", "<<Uglobal[1]<<", "<<Uglobal[2]<<"; "
+//             <<" Uexact = "<<Uexact[0]<<", "<<Uexact[1]<<", "<<Uexact[2]<<"\n";
   } // end loop over local nodes
 
   this->solution->close();
   this->update();
 
-  PMToolBox::output_message(">>>> Adding local solution Done!!!", this->comm());
+//  PMToolBox::output_message(">>>> Adding local solution Done!!!", this->comm());
   STOP_LOG("add_local_solution()", "PMSystemStokes");
 }
 
@@ -554,10 +554,21 @@ std::vector<Real>PMSystemStokes::point_velocity(
 // ==================================================================================
 std::vector<Number>PMSystemStokes::local_velocity_fluid(const Point      & p,
                                                   const std::string&force_type,
-                                                  const dof_id_type p_elem_id)
+                                                  dof_id_type p_elem_id)
 const
 {
   START_LOG("local_velocity_fluid()", "PMSystemStokes");
+  // if p_elem_id is not given, i.e, equals to the default value -1, we first
+  // need to update this value
+  if (p_elem_id==-1)
+  {
+    const MeshBase& mesh = this->get_mesh();
+    p_elem_id = mesh.point_locator().operator()(p)->id();
+//    std::ostringstream oss;
+//    oss << "Locate pt ("<<p(0)<<","<<p(1)<<","<<p(2)
+//      <<") in elem_id = "<<p_elem_id;
+//    PMToolBox::output_message(oss, this->comm());
+  }
 
   std::vector<Real> Ulocal = ggem_stokes->local_velocity_fluid(_point_mesh,
                                                                p,
@@ -611,332 +622,139 @@ Point PMSystemStokes::global_self_exclusion(const std::size_t p_id) const
   return self_v;
 }
 
-// ==================================================================================
+// =========================================================================
 void PMSystemStokes::test_velocity_profile()
 {
   START_LOG("test_velocity_profile()", "PMSystemStokes");
-  bool neighbor_list_update_flag = true;
-  std::ostringstream ss;
-  // solve the disturbed velocity field: global solution(FEM solution)
-  // In this test, we assume that undisturbed velocity is zero!
-  ss <<"========>2. Test in PMSystemStokes:: test_velocity_profile()";
-  PMToolBox::output_message(ss, this->comm());
-  // build both particle-particle and particle-elem neighbor list
-  _re_init = true;
-  this->solve("disturbed");
-  // add local solution to system solution
-  this->add_local_solution();
+  PMToolBox::output_message("========>2. Test in PMSystemStokes::"
+                            "test_velocity_profile(): \n", this->comm());
 
-  // output the velocity profiles along xyz directions, global + local
-  // solutions.
+  // we need to update neighbor list in test function
+  bool neighbor_list_update_flag = true;
+
+  // Solve the disturbed velocity field: global solution by FEM
+  _re_init = true; // assemble global matrix and init ksp_solver
+  this->solve("disturbed");
+
+  // get system dimension
+  MeshBase& mesh = this->get_mesh();
+  const std::size_t dim = mesh.mesh_dimension();
+  // Output electrical potential profiles along xyz directions, global + local
+  // solutions
   const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
   const Point& box_len = _point_mesh->pm_periodic_boundary()->box_length();
-  const Real   xn = 200, yn = 80, zn = 80;
-  const Real   dx = box_len(0) / xn, dy = box_len(1) / yn, dz = box_len(2) / zn;
+  // nn: number of spacial points to check
+  const unsigned int ns = 200;
+  // NP: number of point particles (beads) in the system
   const unsigned int NP = _point_mesh->num_particles();
 
-  // get the reference to mesh
-  MeshBase& mesh = this->get_mesh();
-
+  // define output file format parameters
   std::ofstream outfile;
-  int o_width = 12, o_precision = 9;
-//
-  // 1. write out the velocity profile along x-direction.
-  std::ostringstream filenamex;
-  filenamex << "output_velocity_profile_x_" << NP << "P.txt";
-  outfile.open(filenamex.str(), std::ios_base::out);
+  o_precision = this->get_equation_systems().parameters.get<int>
+    ("o_precision");
+  // define output filename for x, y, z directions
+  std::vector<std::string> filenames;
+  filenames.push_back("x");
+  filenames.push_back("y");
+  if (dim==3) filenames.push_back("z");
 
-  for (std::size_t i = 0; i < xn + 1; ++i)
+  // loop over all [dim_i] directions and write the output
+  for (int dim_i=0; dim_i<dim; dim_i++)
   {
-    Point pt(box_min(0) + Real(i) * dx, 0., 0.);
-    std::vector<Real>  Uglobal(3), Ulocal(3), Utotal(3);
-    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-    // this is slow, but only for test.
-    Utotal[0] = this->point_value(u_var, pt);
-    Utotal[1] = this->point_value(v_var, pt);
-    Utotal[2] = this->point_value(w_var, pt);
-
-    // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact =
-      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-
-    // write the velocity, x vx vy vz
-    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-    outfile.precision(o_precision);   outfile.width(o_width);
-
+    // create output file
+    std::ostringstream oss;
+    oss << "output_velocity_profile_" << filenames[dim_i] << "_" << NP <<
+        "P.csv";
+    // open output file
+    PMToolBox::output_message("writing output to " + oss.str() + "\n",
+                              this->comm());
+    outfile.open(oss.str(), std::ios_base::out);
+    // set output file format (fixed + precision)
+    outfile.setf(std::ios::fixed);
+    outfile.precision(o_precision);
+    // write column header
     if (this->comm().rank() == 0)
-      outfile << pt(0) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-        Utotal[2]
-              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " << Ulocal[2]
-              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-        "\n";
-  } // end for i-loop
-  outfile.close();
+      outfile << filenames[dim_i]<<","
+              << "u_total,v_total,w_total,"
+              << "u_global,v_global,w_global,"
+              << "u_local,v_local,w_local,"
+              << "u_exact,v_exact,w_exact\n";
+    // separation between spacial points in this direction
+    const Real ds = box_len(dim_i) / Real(ns);
+    // create helper vector
+    std::vector<int> helper_vec(dim, 0);
+    helper_vec[dim_i] = 1;
+    // loop over all [ns] space points along this direction, the coordinate of
+    // other two directions are set to be zero
+    for (std::size_t i = 0; i < ns + 1; ++i)
+    {
+      // create the i-th spacial point
+      Point pt((box_min(0) + Real(i) * ds) * helper_vec[0],
+               (box_min(1) + Real(i) * ds) * helper_vec[1],
+               (box_min(2) + Real(i) * ds) * helper_vec[2]);
 
-  // 2. write out the velocity profile along y-direction.
-  std::ostringstream filenamey;
-  filenamey << "output_velocity_profile_y_" << NP << "P.txt";
-  outfile.open(filenamey.str(), std::ios_base::out);
+      // get global solution from FEM
+      std::vector<Real> Uglobal(dim);
+      const unsigned int u_var = this->variable_number("u"); // u_var = 0
+      const unsigned int v_var = this->variable_number("v"); // v_var = 1
+      const unsigned int w_var = this->variable_number("w"); // w_var = 2
+      // point_value function is slow, but we only do this for test
+      Uglobal[0] = this->point_value(u_var, pt);
+      Uglobal[1] = this->point_value(v_var, pt);
+      Uglobal[2] = this->point_value(w_var, pt);
 
-  for (std::size_t i = 0; i < yn + 1; ++i)
-  {
-    Point pt(0., box_min(1) + Real(i) * dy, 0.);
+      // compute local solution from GGEM
+      const std::vector<Real>& Ulocal = this->local_velocity_fluid(pt,
+        "regularized");
 
-    // --> 1. global velocity from FEM
-    std::vector<Real>  Uglobal(3), Ulocal(3), Utotal(3);
-    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-    // this is slow, but only for test.
-    Utotal[0] = this->point_value(u_var, pt);
-    Utotal[1] = this->point_value(v_var, pt);
-    Utotal[2] = this->point_value(w_var, pt);
+      // compute total solution
+      std::vector<Real> Utotal(dim);
+      for (int i=0; i<dim; i++)
+        Utotal[i] = Uglobal[i] + Ulocal[i];
 
-    // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact =
-      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
+      // get exact solution for an unbounded domain from analytical solution
+      const std::vector<Real> Uexact =
+        analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
 
-    // write the velocity, y vx vy vz
-    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-    outfile.precision(o_precision);   outfile.width(o_width);
+      // write the result to output file
+      if (this->comm().rank() == 0)
+        outfile <<pt(dim_i) <<","
+                <<Utotal[0] <<"," <<Utotal[1] <<"," << Utotal[2]<<","
+                <<Uglobal[0] <<"," <<Uglobal[1]<<"," <<Uglobal[2]<<","
+                <<Ulocal[0] <<"," <<Ulocal[1]<<"," <<Ulocal[2]<<","
+                <<Uexact[0] <<"," <<Uexact[1]<<"," <<Uexact[2]<<"\n";
+    } // end for i-loop
+    outfile.close();
+  } // end loop dim_i
 
-    if (this->comm().rank() == 0)
-      outfile << pt(1) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-        Utotal[2]
-              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " << Ulocal[2]
-              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-        "\n";
-  } // end for i-loop
-  outfile.close();
-
-  // 3. write out the velocity profile along z-direction.
-  std::ostringstream filenamez;
-  filenamez << "output_velocity_profile_z_" << NP << "P.txt";
-  outfile.open(filenamez.str(), std::ios_base::out);
-
-  for (std::size_t i = 0; i < zn + 1; ++i)
-  {
-    Point pt(0., 0., box_min(2) + Real(i) * dz);
-
-    // --> 1. get global velocity from FEM
-    std::vector<Real>  Uglobal(3), Ulocal(3), Utotal(3);
-    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-    Utotal[0] = this->point_value(u_var, pt);             // this is slow, but
-                                                           // only for test.
-    Utotal[1] = this->point_value(v_var, pt);
-    Utotal[2] = this->point_value(w_var, pt);
-    // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact =
-      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-
-    // write the velocity, z vx vy vz
-    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-    outfile.precision(o_precision);   outfile.width(o_width);
-
-    if (this->comm().rank() == 0)
-      outfile << pt(2) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-        Utotal[2]
-              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " <<  Ulocal[2]
-              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-        "\n";
-  } // end for i-loop
-  outfile.close();
-  // done and write out the results
+  // write equation system to output file
   std::ostringstream output_filename;
-  output_filename << "output_velocity_profile_" << NP << "P.e";
+  output_filename << "global_solution.e";
 #ifdef LIBMESH_HAVE_EXODUS_API
-  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+  PMToolBox::output_message("writing global solution to global_solution.e",
+    this->comm());
+      ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
                                                        this->get_equation_systems());
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
-  STOP_LOG("test_velocity_profile()", "PMSystemStokes");
+      STOP_LOG("test_velocity_profile()", "PMSystemStokes");
 }
 
-// ==================================================================================
-//void PMSystemStokes::test_velocity_profile()
-//{
-//  START_LOG("test_velocity_profile()", "PMSystemStokes");
-//  bool neighbor_list_update_flag = true;
-//  std::ostringstream ss;
-//  // solve the disturbed velocity field: global solution(FEM solution)
-//  // In this test, we assume that undisturbed velocity is zero!
-//  ss <<"========>2. Test in PMSystemStokes:: test_velocity_profile()";
-//  PMToolBox::output_message(ss, this->comm());
-//  // build both particle-particle and particle-elem neighbor list
-//  _re_init = true;
-//  this->solve("disturbed");
-//  // output the velocity profiles along xyz directions, global + local
-//  // solutions.
-//  const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
-//  const Point& box_len = _point_mesh->pm_periodic_boundary()->box_length();
-//  const Real   xn = 10, yn = 10, zn = 10;
-//  const Real   dx = box_len(0) / xn, dy = box_len(1) / yn, dz = box_len(2) / zn;
-//  const unsigned int NP = _point_mesh->num_particles();
-//
-//  // AnalyticalSolution analytical_solution(*this);
-//
-//  std::ofstream outfile;
-//  int o_width = 12, o_precision = 9;
-//
-//  // 1. write out the velocity profile along x-direction.
-//  std::ostringstream filenamex;
-//  filenamex << "output_velocity_profile_x_" << NP << "P.txt";
-//  outfile.open(filenamex.str(), std::ios_base::out);
-//
-//  for (std::size_t i = 0; i < xn + 1; ++i)
-//  {
-//    Point pt(box_min(0) + Real(i) * dx, 0., 0.);
-//
-//    // global velocity from FEM
-//    std::vector<Real>  Uglobal(3), Utotal(3);
-//    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-//    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-//    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-//    Uglobal[0] = this->point_value(u_var, pt);             // this is slow, but
-//    // only for test.
-//    Uglobal[1] = this->point_value(v_var, pt);
-//    Uglobal[2] = this->point_value(w_var, pt);
-//
-//    // local velocity from analytical function
-//    const std::vector<Real> Ulocal =
-//      this->local_velocity_fluid(pt, "regularized");
-//
-//    for (std::size_t j = 0; j < 3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
-//
-//    // Exact solution for an unbounded domain
-//    const std::vector<Real> Uexact =
-//      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-//
-//    // write the velocity, x vx vy vz
-//    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-//    outfile.precision(o_precision);   outfile.width(o_width);
-//
-//    if (this->comm().rank() == 0)
-//      outfile << pt(0) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-//              Utotal[2]
-//              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-//              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " << Ulocal[2]
-//              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-//              "\n";
-//  } // end for i-loop
-//  outfile.close();
-//
-//  // 2. write out the velocity profile along y-direction.
-//  std::ostringstream filenamey;
-//  filenamey << "output_velocity_profile_y_" << NP << "P.txt";
-//  outfile.open(filenamey.str(), std::ios_base::out);
-//
-//  for (std::size_t i = 0; i < yn + 1; ++i)
-//  {
-//    Point pt(0., box_min(1) + Real(i) * dy, 0.);
-//
-//    // global velocity from FEM
-//    std::vector<Real>  Uglobal(3), Utotal(3);
-//    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-//    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-//    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-//    Uglobal[0] = this->point_value(u_var, pt);             // this is slow, but
-//    // only for test.
-//    Uglobal[1] = this->point_value(v_var, pt);
-//    Uglobal[2] = this->point_value(w_var, pt);
-//
-//    // local velocity from analytical function
-//    const std::vector<Real> Ulocal =
-//      this->local_velocity_fluid(pt, "regularized");
-//
-//    for (std::size_t j = 0; j < 3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
-//
-//    // Exact solution for an unbounded domain
-//    const std::vector<Real> Uexact =
-//      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-//
-//    // write the velocity, y vx vy vz
-//    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-//    outfile.precision(o_precision);   outfile.width(o_width);
-//
-//    if (this->comm().rank() == 0)
-//      outfile << pt(1) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-//              Utotal[2]
-//              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-//              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " << Ulocal[2]
-//              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-//              "\n";
-//  } // end for i-loop
-//  outfile.close();
-//
-//  // 3. write out the velocity profile along z-direction.
-//  std::ostringstream filenamez;
-//  filenamez << "output_velocity_profile_z_" << NP << "P.txt";
-//  outfile.open(filenamez.str(), std::ios_base::out);
-//
-//  for (std::size_t i = 0; i < zn + 1; ++i)
-//  {
-//    Point pt(0., 0., box_min(2) + Real(i) * dz);
-//
-//    // global velocity from FEM
-//    std::vector<Real>  Uglobal(3), Utotal(3);
-//    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-//    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-//    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-//    Uglobal[0] = this->point_value(u_var, pt);             // this is slow, but
-//    // only for test.
-//    Uglobal[1] = this->point_value(v_var, pt);
-//    Uglobal[2] = this->point_value(w_var, pt);
-//
-//    // local velocity from analytical function
-//    const std::vector<Real> Ulocal =
-//      this->local_velocity_fluid(pt, "regularized");
-//
-//    for (std::size_t j = 0; j < 3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
-//
-//    // Exact solution for an unbounded domain
-//    const std::vector<Real> Uexact =
-//      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-//
-//    // write the velocity, z vx vy vz
-//    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-//    outfile.precision(o_precision);   outfile.width(o_width);
-//
-//    if (this->comm().rank() == 0)
-//      outfile << pt(2) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-//              Utotal[2]
-//              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-//              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " <<  Ulocal[2]
-//              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-//              "\n";
-//  } // end for i-loop
-//  outfile.close();
-//  // done and write out the results
-//  std::ostringstream output_filename;
-//  output_filename << "output_velocity_profile_" << NP << "P.e";
-//#ifdef LIBMESH_HAVE_EXODUS_API
-//  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
-//                                                   this->get_equation_systems());
-//#endif // #ifdef LIBMESH_HAVE_EXODUS_API
-//  STOP_LOG("test_velocity_profile()", "PMSystemStokes");
-//}
-
-// ==================================================================================
-// This function has to be called after test_velocity_profile()
+// =========================================================================
 void PMSystemStokes::test_l2_norm()
 {
   START_LOG("test_l2_norm()", "PMSystemStokes");
   std::ostringstream ss;
-  ss << "--->test in PMSystemStokes::test_l2_norm(): \n";
+  ss << "===> test in PMSystemStokes::test_l2_norm(): \n";
   PMToolBox::output_message(ss, this->comm());
 
-  // Numerical solution: Global(FEM) + Local(Analytical)
-//  bool neighbor_list_update_flag = true;
-//  this->reinit_system(neighbor_list_update_flag, "disturbed");
-//  _re_init = true;
-//  this->solve("disturbed");
-//  this->add_local_solution();
+  // solve the disturbed test system to get global solution
+  bool neighbor_list_update_flag = true;
+  this->reinit_system(neighbor_list_update_flag, "disturbed");
+  _re_init = true;
+  this->solve("disturbed");
+
+  // add local solution to global solution
+  this->add_local_solution();
 
   // Theoretical solution(only velocity)
   const unsigned int dim = 3;
@@ -993,9 +811,19 @@ void PMSystemStokes::test_l2_norm()
 
   const Real l1_norm = val0_norm / val1_norm;
   const Real l2_norm = std::sqrt(val2_norm) / std::sqrt(val3_norm);
-  ss << "--->test in test_l1_norm: l1_norm = " << l1_norm
+  ss << ">>> l1_norm = " << l1_norm
      << "; l2_norm = " << l2_norm << "\n";
   PMToolBox::output_message(ss, this->comm());
+
+  // write equation system to output file
+  std::ostringstream output_filename;
+  output_filename << "total_solution.e";
+#ifdef LIBMESH_HAVE_EXODUS_API
+  PMToolBox::output_message("writing total solution to total_solution.e",
+    this->comm());
+  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+                                                   this->get_equation_systems());
+#endif // #ifdef LIBMESH_HAVE_EXODUS_API
   STOP_LOG("test_l2_norm()", "PMSystemStokes");
 }
 

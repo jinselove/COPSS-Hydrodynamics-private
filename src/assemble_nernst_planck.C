@@ -248,11 +248,17 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
   // Get a Reference to the LinearImplicitSystem we are solving
   PMSystemNP &np_system = _eqn_sys.get_system<PMSystemNP>(system_name);
 
-  // create pointers to other systems depending on the "option"
-  PMLinearImplicitSystem* poisson_system = nullptr;
-  DofMap* poisson_dof_map = nullptr;
+  // create null pointers to other systems, some of the null pointers will be
+  // redirected to objects if the corresponding system exists.
+  // Stokes system
   PMLinearImplicitSystem* stokes_system = nullptr;
   DofMap* stokes_dof_map = nullptr;
+  std::vector<unsigned short int> vel_vars(_dim);
+
+  // Poisson system
+  PMLinearImplicitSystem* poisson_system = nullptr;
+  DofMap* poisson_dof_map = nullptr;
+  unsigned short int phi_var;
 
   // Reassign pointers depending on 'option'; notice that these pointers will
   // be destroyed when the systems they point to are destroyed at the end of
@@ -264,19 +270,8 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
   {
     // no need to do anything
   }
-  else if (option == "diffusion&electrostatics") {
-    poisson_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Poisson"));
-    poisson_dof_map = &(poisson_system->get_dof_map());
-  }
   else if (option == "diffusion&convection"){
     stokes_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Stokes"));
-    stokes_dof_map = &(stokes_system->get_dof_map());
-  }
-  else if (option=="diffusion&electrostatics&convection") {
-    poisson_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Poisson"));
-    poisson_dof_map = &(poisson_system->get_dof_map());
-    stokes_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Stokes"));
-    stokes_dof_map = &(stokes_system->get_dof_map());
   }
   else{
     std::stringstream oss;
@@ -284,6 +279,15 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
            "(system_name, option), option specified is :" << option
             << ". Exiting...";
     libmesh_error();
+  }
+
+  // prepare FEM objects for Stokes system if existed
+  if (stokes_system != nullptr)
+  {
+    stokes_dof_map = &(stokes_system->get_dof_map());
+    vel_vars[0] = stokes_system->variable_number("u");
+    vel_vars[1] = stokes_system->variable_number("v");
+    vel_vars[2] = stokes_system->variable_number("w");
   }
 
   // Get a const reference to the Finite element type for the first (and only
@@ -421,16 +425,22 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
     // for diffusion+convection system
     else if((stokes_system!=nullptr) and (poisson_system==nullptr))
     {
-      // get dof_indices of stokes system for this element
-      std::vector<dof_id_type> stokes_dof_indices;
-      stokes_dof_map->dof_indices(elem, stokes_dof_indices);
-
+      // get dof_indices associated with u, v, w of
+      // the stokes system for this element
+      std::vector<std::vector<dof_id_type>> stokes_dof_indices(_dim,
+        std::vector<dof_id_type>());
+      for (int dim_i=0; dim_i<_dim; dim_i++)
+        stokes_dof_map->dof_indices(elem, stokes_dof_indices[dim_i],
+          vel_vars[dim_i]);
 
       for (unsigned int qp=0; qp<qrule.n_points(); qp++)
       {
         // Values to hold the old system solution & its gradient at this qp point
         Number c_old = 0.;
         Gradient gradient_c_old;
+        // use Gradient type to store the velocity vector at this qp point,
+        // this doesn't mean vel_old is a gradient
+        Gradient vel_old;
 
         // compute the old solution & its gradient at this qp point
         for (unsigned int l = 0; l < phi.size(); l++)
@@ -446,6 +456,12 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
           gradient_c_old.add_scaled(dphi[l][qp],
                                     (*np_system.current_local_solution)(
                                       dof_indices[l]));
+
+          // get velocity vector (size=_dim) from total stokes solution at this
+          // qp point
+          for (int dim_i=0; dim_i<_dim; dim_i++)
+            vel_old(dim_i) += phi[l][qp] * ((*(stokes_system->solution))
+              (stokes_dof_indices[dim_i][l]));
         }
         // Now compute the element rhs
         for (unsigned int i = 0; i < phi.size(); i++)
@@ -455,7 +471,10 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
             c_old * phi[i][qp]
             // diffusion term when using semi-implicit Euler for diffusion
             - 0.5 * np_system.dt * np_system.ion_diffusivity * gradient_c_old
-              * dphi[i][qp]);
+              * dphi[i][qp]
+            // convection term when using fully explicit Euler for convection
+            - np_system.dt * (vel_old * gradient_c_old) * phi[i][qp]
+            );
         }
       } // end loop over qp
     }

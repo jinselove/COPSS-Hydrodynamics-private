@@ -116,24 +116,6 @@ public:
 
 
   /*
-   * Add the local solution to the global solution
-   * This is currently only used for calculating total solution to write the
-   * equation systems output. The solution will be reset to global solution
-   * after writing output.
-   */
-  void add_local_solution() override;
-
-
-  /**
-   * Evaluate and get total solution
-   * Total solution = undisturbed_solution (if existed) +
-   * global_disturbed_solution +
-   * local_disturbed_solution
-   */
-//  UniquePtr<NumericVector<Real>> eval_get_total_solution() override;
-    void eval_total_solution() override;
-
-  /*
    * Return the SolverStokes
    */
   SolverStokes& solver_stokes() {
@@ -302,31 +284,20 @@ public:
    /**
     * Write out Total solution of equation systems
     * Total solution = local + global + undisturbed (if exists)
-    * 
-    * params o_step: output_step
-    * params real_time: current real simulation time
-    * params solution_name: "disturbed_global": only write the global part of
-    * the disturbed solution, i.e., only solution of the FEM system;
-    * "disturbed_total": the global and local part of the disturbed solution,
-    * i.e., solution of the FEM system + solution of the GGEM part for local;
-    * "total": solution of the disturbed system and the undisturbed system.
     */
   void write_equation_systems(const unsigned int& o_step,
-                              const Real& real_time,
-                              const std::string& solution_name = "total");
-
-  /**
-   * update system solution for output
-   */
-  void update_solution_before_output(const std::string& solution_name = "total")
-    override;
+                              const Real& real_time);
 
 
   /**
-   * override the resume function defined in PMLinearImplicitSystem
    *
    */
-  void resume_solution_after_output() override ;
+  void update_solution_to_total() override;
+
+  /**
+   *
+   */
+  void resume_solution_to_global() override;
 
   
    /**

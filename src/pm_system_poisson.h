@@ -91,21 +91,6 @@ public:
 
 
   /*
-   * Add the local solution to the global solution for electrical potential
-   */
-  void add_local_solution() override;
-
-  /**
-   * Evaluate and get total solution
-   * Total solution = global_solution + local_solution
-   */
-//  UniquePtr<NumericVector<Real>> eval_get_total_solution() override
-  void eval_total_solution() override
-  {
-    // fixme: implement this function
-  };
-
-  /*
    * Compute electrical potential at all beads' locations
    */
   void compute_point_potential(std::vector<Real>& pv);
@@ -169,15 +154,15 @@ public:
 
 
   /**
-   * update system solution for output
+   *
    */
-  void update_solution_before_output(const std::string& solution_name = "total")
-    override;
+  void update_solution_to_total() override {PMToolBox::output_message
+  ("please implement this", this->comm()); libmesh_error();};
 
   /**
-   * resume solution after writing output
+   *
    */
-  void resume_solution_after_output() override;
+  void resume_solution_to_global() override;
 
 
 private:

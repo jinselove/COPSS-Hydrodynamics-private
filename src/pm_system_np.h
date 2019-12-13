@@ -122,39 +122,16 @@ public:
 
 
   /**
-   * Add the local solution to the global solution
-   * This function does not apply to NP system
-   * but need to re-implement it here to avoid compilation error
+   * update system solution to total
+   * the FEM solution of NP is already the total, thus we don't do anything
    */
-  void add_local_solution() override {};
-
+  void update_solution_to_total() override{};
 
   /**
-   * evaluate and get the total solution
+   * resume solution_to_global
+   * no need to do anything in NP
    */
-//   UniquePtr<NumericVector<Real>> eval_get_total_solution() override {};
-  void eval_total_solution() override {};
-
-  /**
-   * update system solution for output equation systems
-   * There is only 'total' solution for NP system, no need to update
-   */
-  void update_solution_before_output(const std::string& solution_name = "total")
-    override
-    {
-      // we don't need solution_name input, but we have to put it in
-      // function
-      // definition since it's overriding the virtual function in parent class
-      (void) solution_name;
-    };
-
-  /**
-   * override the resume_solution_after_output defined in
-   * PMLinearImplicitSystem class.
-   * We don't need to do anything in this resume function for NP system since
-   * we didn't do anything in the update_solution_before_output function
-   */
-  void resume_solution_after_output() override {};
+  void resume_solution_to_global() override {};
 
 
   /**

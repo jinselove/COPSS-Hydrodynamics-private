@@ -301,88 +301,23 @@ void PMSystemStokes::solve(const std::string& option)
 }
 
 // ==================================================================================
-void PMSystemStokes::add_local_solution()
+void PMSystemStokes::update_solution_to_total()
 {
-  START_LOG("add_local_solution()", "PMSystemStokes");
+  START_LOG("update_solution_to_local()", "PMSystemStokes");
 
   // Check if the system solution vector is closed or not
   if ((this->solution->closed()) == false) this->solution->close();
 
-//  PMToolBox::output_message(">>>> Adding local solution to system "
-//                            "solution", this->comm());
-  // Get the parameters and Initialize the quantities
-  MeshBase& mesh = this->get_mesh();
-  const unsigned int& dim = mesh.mesh_dimension();
+  // clone solution to global solution before make changes
+  this->_global_solution = this->solution->clone();
 
-  // loop over local nodes and update local solution vector according to the
-  // dof_indices of each node
-  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
-  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
-
-  for (; nd != end_nd; ++nd) {
-    // Store a pointer to the current node, and extract a point
-    Node *node = *nd;
-    Point pt;
-    for (unsigned int i = 0; i < dim; ++i) pt(i) = (*node)(i);
-
-    // get the element id of this node from stored mapping
-    const dof_id_type &elem_id = _point_mesh->get_node_elem_id(node->id());
-
-    // get the global dof numbers of this node for u, v, w three directions
-    std::vector<dof_id_type> dof_indices(dim);
-    for (unsigned int i = 0; i < dim; ++i) { // var = 0, 1, 2 = i
-      dof_indices[i] = node->dof_number(this->number(), i, 0);
-    }
-
-    // get the local velocity on this node calling GGEM
-    const std::vector<Real> Ulocal = this->local_velocity_fluid(pt,
-      "regularized", elem_id);
-
-    // add local solution to system solution
-    this->solution->add_vector(Ulocal, dof_indices);
-  } // end loop over local nodes
-
-  this->solution->close();
-  this->update();
-
-//  PMToolBox::output_message(">>>> Adding local solution Done!!!", this->comm());
-  STOP_LOG("add_local_solution()", "PMSystemStokes");
-}
-
-// =======================================================================
-//UniquePtr<NumericVector<Real>> PMSystemStokes::eval_get_total_solution()
-void PMSystemStokes::eval_total_solution()
-{
-  START_LOG("eval_total_solution()", "PMSystemStokes");
-
-//  PMToolBox::output_message(">>>>> Evaluating total Stokes solution",
-//                            this->comm());
-
-  // Make sure current solution are closed
-  if (!this->solution->closed())
-    this->solution->close();
-
-  // clone current solution (which should be global) to _total_solution --->
-  // gives total_solution = global_disturbed_solution
-//  PMToolBox::output_message("> Setting total solution to be current global "
-//                            "disturbed solution", this->comm());
-  this->total_solution = this->solution->clone();
-
-  // add undisturbed solution to total --> gives total_solution =
-  // global_disturbed_solution + undisturbed_solution
+  // add undisturbed solution to solution
   if (this->undisturbed_solution != nullptr) {
-//    PMToolBox::output_message("> Adding undisturbed solution to total "
-//                              "solution", this->comm());
-    this->total_solution->add(*this->undisturbed_solution);
+    this->solution->add(*this->undisturbed_solution);
   }
 
-  // Make sure total_solution is closed now
-  if (!this->total_solution->closed())
-    this->total_solution->close();
-
   // Add local_disturbed_solution for each nodes
-//  PMToolBox::output_message("> Adding local disturbed solution to total "
-//                            "solution", this->comm());
+
   // Get the parameters and Initialize the quantities
   MeshBase& mesh = this->get_mesh();
   const unsigned int& dim = mesh.mesh_dimension();
@@ -412,15 +347,28 @@ void PMSystemStokes::eval_total_solution()
       this->local_velocity_fluid(pt,"regularized", elem_id);
 
     // add local solution to system solution
-    this->total_solution->add_vector(Ulocal, dof_indices);
+    this->solution->add_vector(Ulocal, dof_indices);
   } // end loop over local nodes
 
-//  PMToolBox::output_message(">>>>> Evaluating total Stokes solution, "
-//                            "Done!!!", this->comm());
-  STOP_LOG("eval_total_solution()", "PMSystemStokes");
+  this->solution->close();
 
-  // return the pointer to _total_solution
-//  return _total_solution;
+  // update the local values in current_local_solution to reflect the
+  // solution on neighboring processors since we make changes to this->solution
+  this->update();
+
+//  PMToolBox::output_message(">>>> Adding local solution Done!!!", this->comm());
+  STOP_LOG("update_solution_to_local()", "PMSystemStokes");
+}
+
+// ===========================================================================
+void PMSystemStokes::resume_solution_to_global()
+{
+  START_LOG("resume_solution_to_global()", "PMSystemStokes");
+
+  *(this->solution) = *(this->_global_solution);
+  this->update();
+
+  STOP_LOG("resume_solution_to_global()", "PMSystemStokes");
 }
 
 // ==================================================================================
@@ -812,7 +760,7 @@ void PMSystemStokes::test_l2_norm()
   this->solve("disturbed");
 
   // evaluate the total solution
-  this->eval_total_solution();
+  this->update_solution_to_total();
 
   // Theoretical solution(only velocity)
   const unsigned int dim = 3;
@@ -842,7 +790,7 @@ void PMSystemStokes::test_l2_norm()
 
     // Get the numerical total solution
     std::vector<Real> Utotal;
-    this->total_solution->get(dof_nums, Utotal);
+    this->solution->get(dof_nums, Utotal);
 
     // compute the local velocity of fluid at the current node
     const std::vector<Real> Uexact =
@@ -871,14 +819,18 @@ void PMSystemStokes::test_l2_norm()
   PMToolBox::output_message(ss, this->comm());
 
   // write equation system to output file
-//  std::ostringstream output_filename;
-//  output_filename << "total_solution.e";
-//#ifdef LIBMESH_HAVE_EXODUS_API
-//  PMToolBox::output_message("writing total solution to total_solution.e",
-//    this->comm());
-//  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
-//                                                   this->get_equation_systems());
-//#endif // #ifdef LIBMESH_HAVE_EXODUS_API
+  std::ostringstream output_filename;
+  output_filename << "total_solution.e";
+#ifdef LIBMESH_HAVE_EXODUS_API
+  PMToolBox::output_message("writing total solution to total_solution.e",
+    this->comm());
+  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+                                                   this->get_equation_systems());
+#endif // #ifdef LIBMESH_HAVE_EXODUS_API
+
+  // resume solution to global
+  this->resume_solution_to_global();
+
   STOP_LOG("test_l2_norm()", "PMSystemStokes");
 }
 
@@ -986,21 +938,23 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
     PMToolBox::output_message(oss, this->comm());
     if (with_hi)
     {
-      PMToolBox::output_message(">> evaluating total stokes solution ...",
+      // Update Stokes Solution to total solution
+      PMToolBox::output_message(">> Updating stokes solution to total...",
         this->comm());
-      this->eval_total_solution();
-      oss <<"* max(total_stokes_solution) = " << this->total_solution->max();
+      this->update_solution_to_total();
+      oss <<"* max(total_stokes_solution) = " << this->solution->max();
       PMToolBox::output_message(oss, this->comm());
     }
     // evaluate total solutions of Poisson system if exists
     if (module_poisson)
     {
-      PMToolBox::output_message(">> evaluating total Poisson solution ...",
+      // Update Poisson Solution to total solution
+      PMToolBox::output_message(">> Updating Poisson solution to total...",
                                 this->comm());
       this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-        .eval_total_solution();
+        .update_solution_to_total();
       oss <<"* max(total_poisson_solution) = " << this->get_equation_systems
-      ().get_system<PMSystemPoisson>("Poisson").total_solution->max();
+      ().get_system<PMSystemPoisson>("Poisson").solution->max();
       PMToolBox::output_message(oss, this->comm());
     }
 
@@ -1023,6 +977,24 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
       PMToolBox::output_message(oss, this->comm());
     }
 
+    // resume Stokes solution to global after solving Poisson
+    if (with_hi)
+    {
+      // Update Stokes Solution to total solution
+      PMToolBox::output_message(">> resume stokes solution to global ...",
+                                this->comm());
+      this->resume_solution_to_global();
+    }
+    // evaluate total solutions of Poisson system if exists
+    if (module_poisson)
+    {
+      // Update Poisson Solution to total solution
+      PMToolBox::output_message(">> resume Poisson solution to global ...",
+                                this->comm());
+      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+        .resume_solution_to_global();
+      PMToolBox::output_message(oss, this->comm());
+    }
   }
   // if NP system are not relaxed, we relax them; this will be done recursively
   else
@@ -1048,9 +1020,10 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
       std::ostringstream oss;
       // update real_time since we are solving concentration for t = t+dt
       params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
-      if (relax_step_id%output_interval==0)
-        oss <<"----> relaxing all NP systems for one step without fluid to get c"
-            <<"(t=t+dt="<<params.get<Real>("real_time") <<"):\n";
+      if (relax_step_id%output_interval==0) {
+        oss << "----> relaxing real_time = " << params.get<Real>("real_time");
+        PMToolBox::output_message(oss, this->comm());
+      }
       // solve all NP systems for one step with Electrostatics on but Fluid
       // off --> this gives us c(t+dt)
       const std::string option = std::string("diffusion")
@@ -1060,10 +1033,13 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
         // solve this NP system for one step
         this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
           .solve(option);
-        if (relax_step_id%output_interval==0)
-        oss <<"* system '" << np_sys_names[s_id] <<"' max_solution = "
-            <<this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
-              .solution->max()<<"\n";
+        if (relax_step_id%output_interval==0) {
+          oss << "* system '" << np_sys_names[s_id] << "' max_solution = "
+              << this->get_equation_systems().get_system<PMSystemNP>(
+                  np_sys_names[s_id])
+                .solution->max() << "\n";
+          PMToolBox::output_message(oss, this->comm());
+        }
         // set system relaxed status if real_time > relax_t_final
         if (params.get<Real>("real_time") > relax_t_final)
         {
@@ -1073,13 +1049,21 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
       }
 
       // update poisson system to get phi(t+dt)
-      if (module_poisson) this->get_equation_systems().get_system<PMSystemPoisson>
-        ("Poisson").solve("unused");
+      if (module_poisson) {
+        this->get_equation_systems().get_system<PMSystemPoisson>
+          ("Poisson").solve("unused");
+        if (relax_step_id%output_interval==0) {
+          oss << "* system 'Poisson' max_solution = "
+              << this->get_equation_systems().get_system<PMSystemPoisson>
+                ("Poisson").solution->max() << "\n";
+          PMToolBox::output_message(oss, this->comm());
+        }
+      }
       if(relax_step_id%output_interval==0)
       {
         #ifdef LIBMESH_HAVE_EXODUS_API
-        PMToolBox::output_message("* append equation systems to init_cd.e",
-          this->comm());
+//        PMToolBox::output_message("* append equation systems to init_cd.e",
+//          this->comm());
           ExodusII_IO exo(this->get_mesh());
           exo.append(true);
           exo.write_timestep("init_cd.e", this->get_equation_systems(),
@@ -1100,92 +1084,27 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
 }
 
 // ===========================================================================
-void PMSystemStokes::update_solution_before_output(
-  const std::string &solution_name)
-{
-  START_LOG("update_solution_before_output()", "PMSystemStokes");
-
-  // update Stokes system solution if with_hi is true
-  if (this->get_equation_systems().parameters.get<bool>("with_hi"))
-  {
-    // clone Stokes FEM solution to _global_solution
-    this->_global_solution = this->solution->clone();
-    // update this->solution depends on solution_name
-    if (solution_name == "disturbed_global")
-    {
-      // do nothing
-    }
-    else if (solution_name == "disturbed_total")
-    {
-      this->add_local_solution();
-    }
-    else if (solution_name == "total")
-    {
-      this->add_local_solution();
-      this->solution->add(*this->undisturbed_solution);
-    }
-    else
-    {
-      std::ostringstream ss;
-      ss << "Error: invalid solution_name: " << solution_name
-         << "; Suggested options are: " << "'disturbed_global', 'disturbed_total'"
-         << ", 'undisturbed', 'total'. Exiting ...";
-      PMToolBox::output_message(ss.str(), this->comm());
-    }
-  }// end if with_hi
-
-  STOP_LOG("update_solution_before_output()", "PMSystemStokes");
-}
-
-// ===========================================================================
-void PMSystemStokes::resume_solution_after_output()
-{
-  // only need to resume solution to global solution when 'with_hi' is true
-  if (this->get_equation_systems().parameters.get<bool>("with_hi"))
-  {
-    *(this->solution) = *(this->_global_solution);
-  }
-  else
-  {
-    // do nothing
-  }
-}
-
-// ===========================================================================
 void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
-                                            const Real&  real_time,
-                                            const std::string& solution_name)
+                                            const Real&  real_time)
 {
   START_LOG("write_equation_systems()", "PMSystemStokes");
 
   // Get number of systems in equation_systems
   unsigned int n_sys = this->get_equation_systems().n_systems();
 
-  // Update solutions for all systems
-  // the 'update_solution_before_output' function can be different for different
-  // system: For 'Stokes' or 'Poisson' system, this update function needs to
-  // update the system solution to global (solution from FEM) + local
-  // (solution from GGEM local) for output if 'solution_name' == 'total'; For
-  // 'NP:*', the FEM solution is the total solution, so there is no need to
-  // update.
-  // We will resume system solutions to FEM solutions after writing output
+  // Update solutions to total for all systems before writing the output
   for (unsigned int s_id=0; s_id<n_sys; s_id++)
   {
-//    const std::string& s_name = this->get_equation_systems().get_system(s_id)
-//      .name();
-//    PMToolBox::output_message(std::string("-->Update solution for system ") +
-//                              s_name, this->comm());
     this->get_equation_systems().get_system<PMLinearImplicitSystem>
-      (s_id).update_solution_before_output(solution_name);
+      (s_id).update_solution_to_total();
   }
 
   // get a reference to the mesh object
   MeshBase& mesh = this->get_mesh();
   std::ostringstream output_filename;
-  output_filename << "output_equation_systems_" << solution_name;
+  output_filename << "output_equation_systems_total.e";
   // write equation systems to Exodus file
 #ifdef LIBMESH_HAVE_EXODUS_API
-  output_filename << ".e";
   if (o_step == 0)
   {
     ExodusII_IO(mesh).write_equation_systems(output_filename.str(),
@@ -1206,12 +1125,8 @@ void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
   // the 'resume_solution_after_output' can be different for different systems
   for (unsigned int s_id=0; s_id<n_sys; s_id++)
   {
-//    const std::string& s_name = this->get_equation_systems().get_system(s_id)
-//      .name();
-//    PMToolBox::output_message(std::string("-->Resume solution for system ") +
-//                              s_name, this->comm());
     this->get_equation_systems().get_system<PMLinearImplicitSystem>
-      (s_id).resume_solution_after_output();
+      (s_id).resume_solution_to_global();
   }
 
   STOP_LOG("write_equation_systems()", "PMSystemStokes");

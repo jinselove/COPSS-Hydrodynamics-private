@@ -1457,7 +1457,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       if (std::find(output_file.begin(), output_file.end(), "equation_systems")
         != output_file.end())
       {
-        system.write_equation_systems(o_step, real_time, "total");
+        system.write_equation_systems(o_step, real_time);
       }
       /*
        * write particle to output file
@@ -1792,7 +1792,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
         if (std::find(output_file.begin(), output_file.end(), "equation_systems") 
           != output_file.end())
         {
-          system.write_equation_systems(o_step, real_time, "total");
+          system.write_equation_systems(o_step, real_time);
         } // end if (write es)
       // write particle to output file
       this->write_object(i);

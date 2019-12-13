@@ -151,70 +151,70 @@ void PMSystemPoisson::solve(const std::string& option)
 }
 
 // ==================================================================================
-void PMSystemPoisson::add_local_solution()
-{
-  START_LOG("add_local_solution()", "PMSystemPoisson");
-
-  // Check if the system solution vector is closed or not
-  if ((this->solution->closed()) == false) this->solution->close();
-
-  // Get parameters and initialize the quantities
-  MeshBase& mesh                    = this->get_mesh();
-  const std::size_t   dim           = mesh.mesh_dimension();
-  const std::size_t   n_local_nodes = mesh.n_local_nodes();
-  std::vector<Number> local_solution(n_local_nodes);
-  std::vector<numeric_index_type> dof_indices(n_local_nodes);
-
-  // printf("--->test in add_local_solution() n_local_nodes = %lu on the
-  // processor %u\n",
-  //       n_local_nodes,this->comm().rank());
-
-  // Update the system solution by adding the local solution (from Green's
-  // function)
-  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
-  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
-  std::size_t local_count              = 0;
-
-  for (; nd != end_nd; ++nd)
-  {
-    // Store a pointer to the current node, and extract a point coordinate
-    Node *node = *nd;
-    Point pt;
-
-    for (unsigned int i = 0; i < dim; ++i) pt(i) = (*node)(i);
-
-    // this is a test for dof_number at each node
-    // const unsigned int node_id = node->id();
-    // std::ostringstream oss;
-    // oss << "          NODE " << node_id;
-    // PMToolBox::output_message(oss.str(), this->comm());
-    // node->print_info();
-    // if(this->comm().rank()==0) printf("--->test: nodal dof number :");
-    // for(unsigned int i=0; i<dim; ++i)
-    // {
-    //  dof_id_type dof_num = node->dof_number(this->number(), i, 0);
-    //  if(this->comm().rank()==0) printf(" %u", dof_num);
-    // }
-    // if(this->comm().rank()==0) printf(" \n");
-
-    // Store local electrical potential and dof indices
-    local_solution[local_count] = this->local_potential_field(pt, "regularized");
-    dof_indices[local_count]    = node->dof_number(this->number(), 0, 0);
-
-    local_count++;
-  }
-
-  // printf("--->test in add_local_solution() local_count = %lu on the processor
-  // %u\n",
-  //       n_local_nodes,this->comm().rank());
-
-  // add local potential to the global potential
-  this->solution->add_vector(local_solution, dof_indices);
-  this->solution->close();
-  this->update();
-
-  STOP_LOG("add_local_solution()", "PMSystemPoisson");
-}
+//void PMSystemPoisson::add_local_solution()
+//{
+//  START_LOG("add_local_solution()", "PMSystemPoisson");
+//
+//  // Check if the system solution vector is closed or not
+//  if ((this->solution->closed()) == false) this->solution->close();
+//
+//  // Get parameters and initialize the quantities
+//  MeshBase& mesh                    = this->get_mesh();
+//  const std::size_t   dim           = mesh.mesh_dimension();
+//  const std::size_t   n_local_nodes = mesh.n_local_nodes();
+//  std::vector<Number> local_solution(n_local_nodes);
+//  std::vector<numeric_index_type> dof_indices(n_local_nodes);
+//
+//  // printf("--->test in add_local_solution() n_local_nodes = %lu on the
+//  // processor %u\n",
+//  //       n_local_nodes,this->comm().rank());
+//
+//  // Update the system solution by adding the local solution (from Green's
+//  // function)
+//  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
+//  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
+//  std::size_t local_count              = 0;
+//
+//  for (; nd != end_nd; ++nd)
+//  {
+//    // Store a pointer to the current node, and extract a point coordinate
+//    Node *node = *nd;
+//    Point pt;
+//
+//    for (unsigned int i = 0; i < dim; ++i) pt(i) = (*node)(i);
+//
+//    // this is a test for dof_number at each node
+//    // const unsigned int node_id = node->id();
+//    // std::ostringstream oss;
+//    // oss << "          NODE " << node_id;
+//    // PMToolBox::output_message(oss.str(), this->comm());
+//    // node->print_info();
+//    // if(this->comm().rank()==0) printf("--->test: nodal dof number :");
+//    // for(unsigned int i=0; i<dim; ++i)
+//    // {
+//    //  dof_id_type dof_num = node->dof_number(this->number(), i, 0);
+//    //  if(this->comm().rank()==0) printf(" %u", dof_num);
+//    // }
+//    // if(this->comm().rank()==0) printf(" \n");
+//
+//    // Store local electrical potential and dof indices
+//    local_solution[local_count] = this->local_potential_field(pt, "regularized");
+//    dof_indices[local_count]    = node->dof_number(this->number(), 0, 0);
+//
+//    local_count++;
+//  }
+//
+//  // printf("--->test in add_local_solution() local_count = %lu on the processor
+//  // %u\n",
+//  //       n_local_nodes,this->comm().rank());
+//
+//  // add local potential to the global potential
+//  this->solution->add_vector(local_solution, dof_indices);
+//  this->solution->close();
+//  this->update();
+//
+//  STOP_LOG("add_local_solution()", "PMSystemPoisson");
+//}
 
 // ==================================================================================
 void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
@@ -657,45 +657,16 @@ void PMSystemPoisson::test_potential_profile()
   STOP_LOG("test_potential_profile()", "PMSystemPoisson");
 }
 
-// =============================================================================
-void PMSystemPoisson::update_solution_before_output(const std::string&
-  solution_name)
-
+// ===========================================================================
+void PMSystemPoisson::resume_solution_to_global()
 {
-  START_LOG("update_solution_before_output()", "PMSystemPoisson");
+  START_LOG("resume_solution_to_global()", "PMSystemPoisson");
 
-  // clone Poisson FEM System Solution to _global_solution
-  this->_global_solution = this->solution->clone();
-  // update system solution based on the "solution_name"
-  if (solution_name == "disturbed_global")
-  {
-    // do nothing
-  }
-  else if (solution_name == "disturbed_total" or solution_name == "total")
-  {
-    this->add_local_solution();
-  }
-  else
-  {
-    std::ostringstream ss;
-    ss << "Error: invalid solution_name: " << solution_name
-       << "; Suggested options are: "
-       << "'disturbed_global', 'disturbed_total'"
-       << ", 'undisturbed', 'total'. Exiting ...";
-    PMToolBox::output_message(ss.str(), this->comm());
-  }
-
-  STOP_LOG("update_solution_before_output()", "PMSystemPoisson");
-}
-
-void PMSystemPoisson::resume_solution_after_output()
-{
-  START_LOG("resume_solution_after_output()", "PMSystemPoisson");
-
-  // resume system solution to global solution
   *(this->solution) = *(this->_global_solution);
+  this->update();
 
-  STOP_LOG("resume_solution_after_output()", "PMSystemPoisson");
+  STOP_LOG("resume_solution_to_global()", "PMSystemPoisson");
 }
+
 
 } // end of namespace

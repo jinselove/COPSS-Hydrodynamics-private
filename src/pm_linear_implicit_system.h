@@ -107,29 +107,19 @@ public:
 
 
   /**
-   * update system solution for output
+   * Update solution to total solution, this function will also backup
+   * solution to global solution
    */
-  virtual void update_solution_before_output(const std::string& solution_name =
-    "total") = 0;
+  virtual void update_solution_to_total() = 0;
 
   /**
-   * resume system solution after writing the solution to output
+   * Resume solution to global solution of the system. This function often
+   * gets called after update_solution_to_total()
    */
-  virtual void resume_solution_after_output() = 0;
-
-  /**
-   * Add the local solution to the global solution
-   */
-  virtual void add_local_solution() = 0;
-
-  /**
-   * evaluate and get total solution of the system
-   */
-//  virtual UniquePtr<NumericVector<Real>> eval_get_total_solution() = 0;
-  virtual void eval_total_solution() = 0;
+  virtual void resume_solution_to_global() = 0;
 
 
-  /**
+    /**
    * Compute the L2-error by comparing numerical and analytical solutions
    */
   void test_l2_norm(bool& neighbor_list_update_flag);
@@ -218,10 +208,6 @@ public:
                                  Vec               *petsc_vector,
                                  const bool         write_velocity) const;
 
-
-
-  // A Pointer to the total solution
-  UniquePtr<NumericVector<Number>> total_solution;
 
 protected:
 

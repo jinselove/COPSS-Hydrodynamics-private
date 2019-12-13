@@ -308,8 +308,8 @@ void PMSystemStokes::add_local_solution()
   // Check if the system solution vector is closed or not
   if ((this->solution->closed()) == false) this->solution->close();
 
-  PMToolBox::output_message(">>>> Adding local solution to system "
-                            "solution", this->comm());
+//  PMToolBox::output_message(">>>> Adding local solution to system "
+//                            "solution", this->comm());
   // Get the parameters and Initialize the quantities
   MeshBase& mesh = this->get_mesh();
   const unsigned int& dim = mesh.mesh_dimension();
@@ -355,8 +355,8 @@ void PMSystemStokes::eval_total_solution()
 {
   START_LOG("eval_total_solution()", "PMSystemStokes");
 
-  PMToolBox::output_message(">>>>> Evaluating total Stokes solution",
-                            this->comm());
+//  PMToolBox::output_message(">>>>> Evaluating total Stokes solution",
+//                            this->comm());
 
   // Make sure current solution are closed
   if (!this->solution->closed())
@@ -364,25 +364,25 @@ void PMSystemStokes::eval_total_solution()
 
   // clone current solution (which should be global) to _total_solution --->
   // gives total_solution = global_disturbed_solution
-  PMToolBox::output_message("> Setting total solution to be current global "
-                            "disturbed solution", this->comm());
-  this->_total_solution = this->solution->clone();
+//  PMToolBox::output_message("> Setting total solution to be current global "
+//                            "disturbed solution", this->comm());
+  this->total_solution = this->solution->clone();
 
   // add undisturbed solution to total --> gives total_solution =
   // global_disturbed_solution + undisturbed_solution
   if (this->undisturbed_solution != nullptr) {
-    PMToolBox::output_message("> Adding undisturbed solution to total "
-                              "solution", this->comm());
-    this->_total_solution->add(*this->undisturbed_solution);
+//    PMToolBox::output_message("> Adding undisturbed solution to total "
+//                              "solution", this->comm());
+    this->total_solution->add(*this->undisturbed_solution);
   }
 
-  // Make sure _total_solution is closed now
-  if (!this->_total_solution->closed())
-    this->_total_solution->close();
+  // Make sure total_solution is closed now
+  if (!this->total_solution->closed())
+    this->total_solution->close();
 
   // Add local_disturbed_solution for each nodes
-  PMToolBox::output_message("> Adding local disturbed solution to total "
-                            "solution", this->comm());
+//  PMToolBox::output_message("> Adding local disturbed solution to total "
+//                            "solution", this->comm());
   // Get the parameters and Initialize the quantities
   MeshBase& mesh = this->get_mesh();
   const unsigned int& dim = mesh.mesh_dimension();
@@ -412,11 +412,11 @@ void PMSystemStokes::eval_total_solution()
       this->local_velocity_fluid(pt,"regularized", elem_id);
 
     // add local solution to system solution
-    this->_total_solution->add_vector(Ulocal, dof_indices);
+    this->total_solution->add_vector(Ulocal, dof_indices);
   } // end loop over local nodes
 
-  PMToolBox::output_message(">>>>> Evaluating total Stokes solution, "
-                            "Done!!!", this->comm());
+//  PMToolBox::output_message(">>>>> Evaluating total Stokes solution, "
+//                            "Done!!!", this->comm());
   STOP_LOG("eval_total_solution()", "PMSystemStokes");
 
   // return the pointer to _total_solution
@@ -842,7 +842,7 @@ void PMSystemStokes::test_l2_norm()
 
     // Get the numerical total solution
     std::vector<Real> Utotal;
-    this->_total_solution->get(dof_nums, Utotal);
+    this->total_solution->get(dof_nums, Utotal);
 
     // compute the local velocity of fluid at the current node
     const std::vector<Real> Uexact =
@@ -946,59 +946,6 @@ void PMSystemStokes::couple_poisson()
   STOP_LOG("couple_poisson()", "PMSystemStokes");
 }
 
-// ===========================================================================
-//void PMSystemStokes::couple_np()
-//{
-//  START_LOG("couple_np()", "PMSystemStokes");
-//
-//  const bool& module_poisson = this->get_equation_systems()
-//    .parameters.get<bool>("module_poisson");
-//  const bool& with_hi = this->get_equation_systems()
-//    .parameters.get<bool>("with_hi");
-//  unsigned int n_sys = this->get_equation_systems().n_systems();
-//  for (unsigned int s_id=0; s_id<n_sys; s_id++)
-//  {
-//    const std::string& s_name = this->get_equation_systems().get_system(s_id)
-//      .name();
-//    if (s_name.rfind("NP:", 0)==0)
-//    {
-//      PMSystemNP& np_system = this->get_equation_systems()
-//        .get_system<PMSystemNP>(s_name);
-//      std::string option;
-//      if (np_system.set_init_cd)
-//      {
-//        // --> initialize this NP system
-//        np_system.init_cd(this->get_equation_systems().parameters.get<Real>
-//          ("np_system_relaxation_time"));
-//      }
-//      else
-//      {
-//        // generate option for NP system
-//        option = std::string("diffusion")
-//          + ((module_poisson) ? ("electrostatics") : (""))
-//          + ((with_hi) ? ("convection") : (""));
-//        // check if dt has changed
-//        if (abs(this->get_equation_systems().parameters.get<Real>("dt")
-//          -np_system.dt) > 1.e-6)
-//        {
-//          PMToolBox::output_message("Error: simulation time step is "
-//                                    "different from np_system time step (when "
-//                                    "module_np is on, simulation time step "
-//                                    "should be determined by the "
-//                                    "time step of NP system. Need to "
-//                                    "implement additional function to take "
-//                                    "care of this extreme case)", this->comm());
-//          libmesh_error();
-//        }
-//        // solve this np_system with option
-//        np_system.solve(option);
-//      }
-//    }
-//  }
-//
-//  STOP_LOG("couple_np()", "PMSystemStokes");
-//}
-
 //===========================================================================
 void PMSystemStokes::couple_np(unsigned int relax_step_id,
                                const unsigned int output_interval)
@@ -1028,28 +975,54 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
   if (this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[0])
     .relaxed)
   {
+    std::ostringstream oss;
     // update real_time since we are solve concentration for t = t+dt
     params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
+    oss <<"====> All NP system are relaxed. Solved all NP systems for c(t=t+dt="
+        <<params.get<Real>("real_time")<<"):\n";
+    PMToolBox::output_message(oss, this->comm());
 
-    // set solve options
+    // evaluate total solutions of Stokes system if exists
+    PMToolBox::output_message(oss, this->comm());
+    if (with_hi)
+    {
+      PMToolBox::output_message(">> evaluating total stokes solution ...",
+        this->comm());
+      this->eval_total_solution();
+      oss <<"* max(total_stokes_solution) = " << this->total_solution->max();
+      PMToolBox::output_message(oss, this->comm());
+    }
+    // evaluate total solutions of Poisson system if exists
+    if (module_poisson)
+    {
+      PMToolBox::output_message(">> evaluating total Poisson solution ...",
+                                this->comm());
+      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+        .eval_total_solution();
+      oss <<"* max(total_poisson_solution) = " << this->get_equation_systems
+      ().get_system<PMSystemPoisson>("Poisson").total_solution->max();
+      PMToolBox::output_message(oss, this->comm());
+    }
+
+    // set solve options for NP solver
     const std::string option = std::string("diffusion")
-      + ((module_poisson) ? ("electrostatics") : (""))
-      + ((with_hi) ? ("convection") : (""));
+                               + ((module_poisson) ? ("&electrostatics") : (""))
+                               + ((with_hi) ? ("&convection") : (""));
 
     // solve all NP system for t = t+dt
-    for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
+    oss <<">> Solving all NP systems...";
+    PMToolBox::output_message(oss, this->comm());
+    for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++) {
       this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
         .solve(option);
+      oss << "* Solved system '" << np_sys_names[s_id];
+      oss << ", max solution="
+          << this->get_equation_systems().get_system<PMSystemNP>(
+              np_sys_names[s_id])
+            .solution->max();
+      PMToolBox::output_message(oss, this->comm());
+    }
 
-    // output info to screen
-    std::ostringstream oss;
-    oss <<"----> All NP system are relaxed. Solved all NP systems for c(t=t+dt="
-        <<params.get<Real>("real_time")<<"):\n";
-    for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
-      oss <<"* system '" << np_sys_names[s_id] <<"' max_solution = "
-      <<this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
-        .solution->max()<<"\n";
-    PMToolBox::output_message(oss, this->comm());
   }
   // if NP system are not relaxed, we relax them; this will be done recursively
   else

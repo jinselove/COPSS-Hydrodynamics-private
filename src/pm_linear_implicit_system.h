@@ -218,7 +218,11 @@ public:
                                  Vec               *petsc_vector,
                                  const bool         write_velocity) const;
 
-                                      
+
+
+  // A Pointer to the total solution
+  UniquePtr<NumericVector<Number>> total_solution;
+
 protected:
 
   // particle mesh pointer
@@ -233,9 +237,6 @@ protected:
   // bool _re_init: If true, global_matrix will be rebuilt. It's only true
   // at the beginining of the simulation.
   bool _re_init;
-
-  // A Pointer to the total solution
-  UniquePtr<NumericVector<Number>> _total_solution;
 
   // A Pointer to the global_solution
   UniquePtr<NumericVector<Number>> _global_solution;

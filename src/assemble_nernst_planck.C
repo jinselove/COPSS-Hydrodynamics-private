@@ -241,12 +241,50 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
 
 // ==================================================================================
 void AssembleNP::assemble_global_F(const std::string& system_name,
-                                   const std::string& option)
-{
+                                   const std::string& option) {
   START_LOG("assemble_global_F()", "AssembleNP");
 
+
   // Get a Reference to the LinearImplicitSystem we are solving
-  PMSystemNP& np_system = _eqn_sys.get_system<PMSystemNP> (system_name);
+  PMSystemNP &np_system = _eqn_sys.get_system<PMSystemNP>(system_name);
+
+  // create pointers to other systems depending on the "option"
+  PMLinearImplicitSystem* poisson_system = nullptr;
+  DofMap* poisson_dof_map = nullptr;
+  PMLinearImplicitSystem* stokes_system = nullptr;
+  DofMap* stokes_dof_map = nullptr;
+
+  // Reassign pointers depending on 'option'; notice that these pointers will
+  // be destroyed when the systems they point to are destroyed at the end of
+  // the simulation so that there will not be data leak; cannot use smarter
+  // pointer here since when smarter pointer at the end of this function,
+  // the system they point to will be destroyed too, thus the simulation
+  // won't continue
+  if (option == "diffusion")
+  {
+    // no need to do anything
+  }
+  else if (option == "diffusion&electrostatics") {
+    poisson_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Poisson"));
+    poisson_dof_map = &(poisson_system->get_dof_map());
+  }
+  else if (option == "diffusion&convection"){
+    stokes_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Stokes"));
+    stokes_dof_map = &(stokes_system->get_dof_map());
+  }
+  else if (option=="diffusion&electrostatics&convection") {
+    poisson_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Poisson"));
+    poisson_dof_map = &(poisson_system->get_dof_map());
+    stokes_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Stokes"));
+    stokes_dof_map = &(stokes_system->get_dof_map());
+  }
+  else{
+    std::stringstream oss;
+    std::cout << "Error: invalid option in AssembleNP::assemble_global_F"
+           "(system_name, option), option specified is :" << option
+            << ". Exiting...";
+    libmesh_error();
+  }
 
   // Get a const reference to the Finite element type for the first (and only
   // for NP system) variable in the system
@@ -343,14 +381,16 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
     // calculated at each quadrature point by summing the
     // solution degree-of-freedom values by the appropriate
     // weight functions.
-    for (unsigned int qp=0; qp<qrule.n_points(); qp++)
-    {
-      // Values to hold the old system solution & its gradient at this qp point
-      Number c_old = 0.;
-      Gradient gradient_c_old;
 
-      if (option == "diffusion")
+    // for Diffusion only system
+    if ((stokes_system==nullptr) and (poisson_system==nullptr))
+    {
+      for (unsigned int qp=0; qp<qrule.n_points(); qp++)
       {
+        // Values to hold the old system solution & its gradient at this qp point
+        Number c_old = 0.;
+        Gradient gradient_c_old;
+
         // compute the old solution & its gradient at this qp point
         for (unsigned int l = 0; l < phi.size(); l++)
         {
@@ -358,50 +398,72 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
           // notice that we are not using Libmesh::TransientSystem, thus the
           // current_solution of our system is actually solution from previous
           // time step
-          c_old += phi[l][qp] * (*np_system.current_local_solution)(dof_indices[l]);
-//          c_old += phi[l][qp] * 1.;
+          c_old +=
+            phi[l][qp] * (*np_system.current_local_solution)(dof_indices[l]);
 
           // get solution gradient at this qp_point
-          gradient_c_old.add_scaled(dphi[l][qp], (*np_system.current_local_solution)(dof_indices[l]));
-//          gradient_c_old.add_scaled(dphi[l][qp], 1.);
+          gradient_c_old.add_scaled(dphi[l][qp],
+                                    (*np_system.current_local_solution)(
+                                      dof_indices[l]));
         }
-
         // Now compute the element rhs
         for (unsigned int i = 0; i < phi.size(); i++)
         {
-//          std::cout << "JxW[qp]="<<JxW[qp]<<"; c_old="<<c_old
-//            <<"; phi[i][qp]="<< phi[i][qp] << "; np_system.dt" << np_system.dt
-//            <<"; np_system.ion_diffusivity="<<np_system.ion_diffusivity
-//            <<"; gradient_c_old="<<gradient_c_old
-//            <<"; dphi[i][qp]="<<dphi[i][qp]<<std::endl;
           Fe(i) += JxW[qp] * (
             // Mass term
             c_old * phi[i][qp]
             // diffusion term when using semi-implicit Euler for diffusion
             - 0.5 * np_system.dt * np_system.ion_diffusivity * gradient_c_old
-            * dphi[i][qp]);
-//          std::cout<<"Fe(i)="<<Fe(i)<<std::endl;
-        } // end loop i < phi.size()
-      }
-      else if (option == "diffusion&convection")
+              * dphi[i][qp]);
+        }
+      } // end loop over qp
+    }
+    // for diffusion+convection system
+    else if((stokes_system!=nullptr) and (poisson_system==nullptr))
+    {
+      // get dof_indices of stokes system for this element
+      std::vector<dof_id_type> stokes_dof_indices;
+      stokes_dof_map->dof_indices(elem, stokes_dof_indices);
+
+
+      for (unsigned int qp=0; qp<qrule.n_points(); qp++)
       {
-        // fixme
-      }
-      else if (option == "diffusion&electrostatics")
-      {
-        // fixme
-      }
-      else if (option == "diffusion&electrostatics&convection")
-      {
-        // fixme
-      }
-      else
-      {
-        std::cout << "Error: unsupported option to assembel global F for NP "
-                     "system. Exiting..." << std::endl;
-        libmesh_error();
-      }
-    } // end loop qp<q_rule.n_points()
+        // Values to hold the old system solution & its gradient at this qp point
+        Number c_old = 0.;
+        Gradient gradient_c_old;
+
+        // compute the old solution & its gradient at this qp point
+        for (unsigned int l = 0; l < phi.size(); l++)
+        {
+          // get old solution at this qp point
+          // notice that we are not using Libmesh::TransientSystem, thus the
+          // current_solution of our system is actually solution from previous
+          // time step
+          c_old +=
+            phi[l][qp] * (*np_system.current_local_solution)(dof_indices[l]);
+
+          // get solution gradient at this qp_point
+          gradient_c_old.add_scaled(dphi[l][qp],
+                                    (*np_system.current_local_solution)(
+                                      dof_indices[l]));
+        }
+        // Now compute the element rhs
+        for (unsigned int i = 0; i < phi.size(); i++)
+        {
+          Fe(i) += JxW[qp] * (
+            // Mass term
+            c_old * phi[i][qp]
+            // diffusion term when using semi-implicit Euler for diffusion
+            - 0.5 * np_system.dt * np_system.ion_diffusivity * gradient_c_old
+              * dphi[i][qp]);
+        }
+      } // end loop over qp
+    }
+    else
+    {
+      std::cout << "please implement this condition..." << std::endl;
+      libmesh_error();
+    }
 
     // apply bc by penalty
     {
@@ -484,7 +546,6 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
     _reinit_node_penalty = true;
   else
     _reinit_node_penalty = false;
-
 
   STOP_LOG("assemble_global_F()", "AssembleNP");
 }

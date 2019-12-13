@@ -1406,7 +1406,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if (i > 0) {
+  if (i > 0)
+  {
     *(system.solution) = *(system.undisturbed_solution); // re-assign the undisturbed solution
     // Update the local values to reflect the solution on neighboring processors
     system.update();
@@ -1420,6 +1421,9 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       timestep_duration         = 0;
     }
   }
+  ss << ">>>>>>>>>>>>>>>>>>>>>> reinit disturbed system at the beginning of "
+        "fixman integration, step id = "<< i <<"...";
+  PMToolBox::output_message(ss, *comm_in);
   system.reinit_system(neighbor_list_update_flag, "disturbed");
   if (print_info) 
   {
@@ -1665,6 +1669,9 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 
       // comment the line below if not update neighbor list at each time step
       if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
+      ss << ">>>>>>>>>>>>>>>>>>>>> reinit disturbed system before second half "
+            "step of fixman integration, step id = " << i<<"...";
+      PMToolBox::output_message(ss, *comm_in);
       system.reinit_system(neighbor_list_update_flag, "disturbed");
       system.compute_point_velocity("undisturbed", vel0);
       system.solve("disturbed"); // solve the disturbed solution
@@ -1745,6 +1752,9 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
     // whether or not reinit neighbor list depends on the
     // neighbor_list_update_flag
   }
+  ss << ">>>>>>>>>>>>>>>>>>>>>>>>> reinit disturbed system at the beginning of "
+        "langevin integration, step id = "<< i <<"...";
+  PMToolBox::output_message(ss, *comm_in);
   system.reinit_system(neighbor_list_update_flag, "disturbed");
   if (print_info) 
   {

@@ -249,35 +249,48 @@ Real GGEMPoisson::green_tensor_local_regularized(const Point& x
 // ======================================================================
 Real GGEMPoisson::local_potential_field(PointMesh<3>      *point_mesh,
                                         const Point      & ptx,
-                                        const std::string& charge_type) const
+                                        const std::string& charge_type,
+                                        const dof_id_type ptx_elem_id) const
 {
   START_LOG("local_potential_field()", "GGEMPoisson");
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     build the particle neighbor list around the given point \p ptx
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  const bool is_sorted = false;
-  std::vector<std::pair<std::size_t, Real> > IndicesDists;
-  point_mesh->build_particle_neighbor_list(ptx, is_sorted, IndicesDists);
+  // Initialize point neighbor list around ptx
+  std::vector<dof_id_type> point_nb_list;
 
+  // if elem_id (id of the element that contains ptx) of ptx isn't
+  // given, we can build particle neighbor list using KD tree
+  if (ptx_elem_id == -1)
+  {
+    std::cout<<"Warning: ("<<ptx(0)<<","<<ptx(1)<<","<<ptx(2)<<"), elem_id = "
+             <<ptx_elem_id
+             << "is invalid. Build point neighbor list using KDtree instead";
+    //build the particle neighbor list around the given point \p ptx
+    const bool is_sorted = false;
+    std::vector<std::pair<std::size_t, Real> > IndicesDists;
+    point_mesh->build_particle_neighbor_list(ptx, is_sorted, IndicesDists);
+    for (std::size_t v=0; v<IndicesDists.size(); v++)
+      point_nb_list.push_back(IndicesDists[v].first);
+  }
+  // if elem_id is given, we can get point_nb_list from the point_nb_list of
+  // this element
+  else
+  {
+    point_nb_list = point_mesh->get_elem_point_neighbor_list(ptx_elem_id);
+  }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
      Loop over all the neighbor list beads, and compute the local potential:
      phi_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*q_v(j)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  Real phi = 0;
+  Real phi = 0.;
   Real GT;
-
-  for (std::size_t v = 0; v < IndicesDists.size(); ++v)
+  for (std::size_t v = 0; v < point_nb_list.size(); ++v)
   {
     // 0. particle id and position, vector x = ptx - pt0
-    const std::size_t p_id = IndicesDists[v].first;
-    const Point pt0        = point_mesh->particles()[p_id]->point();
-    const Point x          = point_mesh->pm_periodic_boundary()->point_vector(pt0,
-                                                                              ptx);
+    const std::size_t& p_id = point_nb_list[v];
+    const Point& pt0 = point_mesh->particles()[p_id]->point();
+    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(pt0, ptx);
 
     // 1. compute the Green function of particle-v
     if (charge_type == "regularized") {

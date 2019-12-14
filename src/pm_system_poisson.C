@@ -521,12 +521,21 @@ void PMSystemPoisson::add_electrostatic_forces()
 
 // ==================================================================================
 Real PMSystemPoisson::local_potential_field(const Point      & p,
-                                            const std::string& charge_type) const
+                                            const std::string& charge_type,
+                                            dof_id_type p_elem_id)
+                                            const
 {
   START_LOG("local_potential_field()", "PMSystemPoisson");
 
+  // locate point element id if it's not given
+  if (p_elem_id==-1)
+  {
+    const MeshBase& mesh = this->get_mesh();
+    p_elem_id = mesh.point_locator().operator()(p)->id();
+  }
+
   Real phi_local =
-    ggem_poisson->local_potential_field(_point_mesh, p, charge_type);
+    ggem_poisson->local_potential_field(_point_mesh, p, charge_type, p_elem_id);
 
   STOP_LOG("local_potential_field()", "PMSystemPoisson");
   return phi_local;
@@ -569,9 +578,11 @@ void PMSystemPoisson::test_potential_profile()
 
   PMToolBox::output_message("========>2. Test in PMSystemPoisson::"
                             "test_potential_profile(): \n", this->comm());
+
   // Solve the electrical potential field: global solution by FEM
   _re_init = true; // assemble global matrix and init ksp_solver
   this->solve("unused");
+
   // get system dimension
   MeshBase& mesh = this->get_mesh();
   const std::size_t dim = mesh.mesh_dimension();
@@ -583,6 +594,7 @@ void PMSystemPoisson::test_potential_profile()
   const unsigned int ns = 200;
   // NP: number of point particles (beads) in the system
   const unsigned int NP = _point_mesh->num_particles();
+
   // define output file format parameters
   std::ofstream outfile;
   o_precision = this->get_equation_systems().parameters.get<int>
@@ -592,6 +604,7 @@ void PMSystemPoisson::test_potential_profile()
   filenames.push_back("x");
   filenames.push_back("y");
   if (dim==3) filenames.push_back("z");
+
   // loop over all [dim_i] directions and write the output
   for (int dim_i=0; dim_i<dim; dim_i++)
   {
@@ -629,13 +642,17 @@ void PMSystemPoisson::test_potential_profile()
       // get global phi from FEM solution, this is slow, but we tolerate it
       // only for test
       phi_global = this->point_value(phi_var, pt);
+
       // get local potential from analytical function
       const Real phi_local = this->local_potential_field(pt, "regularized");
+
       // get total solution at this point
       phi_total = phi_global + phi_local;
+
       // get exact solution for an unbounded domain from analytical solution
       const Real phi_exact = analytical_solution->exact_solution_infinite_domain(
               *ggem_poisson, pt);
+
       // write the result to output file
       if (this->comm().rank() == 0)
         outfile << pt(dim_i) << "," << phi_total
@@ -647,14 +664,247 @@ void PMSystemPoisson::test_potential_profile()
   } // end loop dim_i
 
   // write equation system to output file
-  std::ostringstream output_filename;
-  output_filename << "output_potential_profile_" << NP << "P.e";
+
 #ifdef LIBMESH_HAVE_EXODUS_API
-  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+  PMToolBox::output_message("writing global solution to global_solution.e",
+    this->comm());
+  std::string output_filename = "global_solution.e";
+  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename,
                                                        this->get_equation_systems());
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
 
+  // write points value (for test only)
+//  const int n_pts = 200;
+//  std::vector<Point> pts(n_pts);
+//  for (int i=0; i<pts.size(); i++)
+//    pts[i]=Point(box_min(0) + i*box_len(0)/Real(n_pts), 0., 0.);
+//  this->output_point_solution(pts, "test_point_solution.csv");
+
+//  PMToolBox::output_message("writing nodal global solution to "
+//                            "poisson_global_solution.out", this->comm());
+//  this->output_nodal_solution("poisson_global_solution.out");
+
   STOP_LOG("test_potential_profile()", "PMSystemPoisson");
+}
+
+// =========================================================================
+void PMSystemPoisson::test_nodal_error()
+{
+  START_LOG("test_nodal_error()", "PMSystemPoisson");
+  std::ostringstream ss;
+  ss << "===> test in PMSystemPoisson::test_nodal_error(): \n";
+  PMToolBox::output_message(ss, this->comm());
+
+  // neighbor list is already updated before calling this function
+
+  // solve the disturbed test system to get global solution
+  _re_init = true;
+  this->solve("disturbed");
+
+  // evaluate the total solution
+  this->update_solution_to_total();
+
+  // Theoretical solution
+  const unsigned int dim = 3;
+  MeshBase& mesh = this->get_mesh();
+  const unsigned int n_nodes = mesh.n_nodes();
+  Real max_abs_error=0.;
+  Real val0_norm = 0.;
+  Real val1_norm = 0.;
+  Real val2_norm = 0.;
+  Real val3_norm = 0.;
+
+  // Loop over each node and compute the nodal solution
+  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
+  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
+
+  for (; nd != end_nd; ++nd)
+  {
+    // Store a pointer to the current node, and extract a point
+    Node *node = *nd;
+    Point pt;
+
+    for (unsigned int i = 0; i < dim; ++i) pt(i) =  (*node)(i);
+
+    // get the dof index at this node
+    const unsigned int phi_var = this->variable_number("phi");
+    const dof_id_type& dof_index = node->dof_number(this->number(), phi_var, 0);
+
+    // Get the numerical total solution
+    const Real& phi_total = this->solution->operator()(dof_index);
+
+    // compute the local velocity of fluid at the current node
+    const Real& phi_exact =
+      analytical_solution->exact_solution_infinite_domain(*ggem_poisson, pt);
+
+    // compute the errors
+    max_abs_error = std::max(std::abs(phi_total-phi_exact), max_abs_error);
+    Real tmpt = std::abs(phi_total-phi_exact);
+    val0_norm += tmpt;
+    val1_norm += std::abs(phi_exact);
+    val2_norm += tmpt * tmpt;
+    val3_norm += phi_exact * phi_exact;
+  } // end for nd-loop
+
+  // Compute the error: l1 and l2-norm of errors
+  this->comm().sum(val0_norm);
+  this->comm().sum(val1_norm);
+  this->comm().sum(val2_norm);
+  this->comm().sum(val3_norm);
+  this->comm().max(max_abs_error);
+
+  const Real l1_norm = val0_norm / val1_norm;
+  const Real l2_norm = std::sqrt(val2_norm) / std::sqrt(val3_norm);
+  ss << ">>> sum(|phi_total-phi_exact|) / sum(|phi_exact|) = " << l1_norm
+     << "; sum(|phi_total-phi_exact|^2) / sum(|phi_exact|^2) = " << l2_norm
+     << "; max(|phi_total-phi_exact|) = "<<max_abs_error<<"\n";
+  PMToolBox::output_message(ss, this->comm());
+
+  // write equation system to output file
+#ifdef LIBMESH_HAVE_EXODUS_API
+  PMToolBox::output_message("writing total solution to total_solution.e",
+this->comm());
+  std::string output_filename = "total_solution.e";
+ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename,
+                                               this->get_equation_systems());
+#endif // #ifdef LIBMESH_HAVE_EXODUS_API
+
+  // output nodal solution
+//  PMToolBox::output_message("writing nodal total solution to "
+//                            "poisson_total_solution.out", this->comm());
+//  this->output_nodal_solution("poisson_total_solution.out");
+
+  // resume solution to global
+  this->resume_solution_to_global();
+
+  STOP_LOG("test_nodal_error()", "PMSystemPoisson");
+}
+
+// ===========================================================================
+void PMSystemPoisson::output_nodal_solution(const std::string& output_filename)
+{
+  START_LOG("output_nodal_solution()", "PMSystemPoisson");
+  std::filebuf fb;
+  fb.open (output_filename,std::ios::out);
+  std::ostream os(&fb);
+
+  std::vector<Real> v(this->solution->size());
+  this->solution->localize(v);
+  // right now we only want one copy of the output
+  if (this->solution->processor_id())
+    return;
+
+  // get a reference to mesh
+  const MeshBase& mesh = this->get_mesh();
+  // loop over all nodes
+  os <<"node_dof_id,x,y,z,phi\n";
+  for(dof_id_type i=0; i!=v.size(); i++){
+    const Node* node = mesh.node_ptr(i);
+    os<<i<<","
+    <<node->operator()(0)<<","<<node->operator()(1)<<","<<node->operator()(2)
+    <<","<<v[i]<<"\n";
+  }
+
+  fb.close();
+  STOP_LOG("output_nodal_solution()", "PMSystemPoisson");
+}
+
+// ===========================================================================
+void PMSystemPoisson::output_point_solution(const std::vector<Point>& pts,
+                          const std::string& filename)
+{
+  START_LOG("output_point_solution()", "PMSystemPoisson");
+
+  // get system dimension
+  MeshBase& mesh = this->get_mesh();
+  const std::size_t dim = mesh.mesh_dimension();
+
+  // define output file format parameters
+  o_precision = this->get_equation_systems().parameters.get<int>
+    ("o_precision");
+  std::ofstream outfile;
+  outfile.open(filename, std::ios_base::out);
+  // set output file format (fixed + precision)
+  outfile.setf(std::ios::fixed);
+  outfile.precision(o_precision);
+
+  if (this->comm().rank() == 0)
+    outfile << "x,y,z,phi_local,phi_global,phi_total\n";
+
+  for (std::size_t i = 0; i < pts.size(); i++)
+  {
+    // global potential from FEM
+    Real phi_global, phi_total;
+    const unsigned int phi_var = this->variable_number("phi"); // phi_var = 0
+    // get global phi from FEM solution, this is slow, but we tolerate it
+    // only for test
+    phi_global = this->point_value(phi_var, pts[i]);
+
+    // get local potential from analytical function
+    const Real phi_local = this->local_potential_field(pts[i], "regularized");
+
+    // get total solution at this point
+    phi_total = phi_global + phi_local;
+
+    // write the result to output file
+    if (this->comm().rank() == 0)
+      outfile << pts[i](0)<<","<<pts[i](1)<<","<<pts[i](2)<<","
+              << phi_local<<","<<phi_global<<","<<phi_total<<"\n";
+  } // end for i-loop
+  outfile.close();
+
+  STOP_LOG("output_point_solution()", "PMSystemPoisson");
+}
+
+// ===========================================================================
+void PMSystemPoisson::update_solution_to_total()
+{
+  START_LOG("update_solution_to_total()", "PMSystemPoisson");
+  // Check if the system solution vector is closed or not
+  if ((this->solution->closed()) == false) this->solution->close();
+
+  // clone solution to global solution before make changes
+  this->_global_solution = this->solution->clone();
+
+  // Add local_disturbed_solution for each nodes
+
+  // Get the parameters and Initialize the quantities
+  MeshBase& mesh = this->get_mesh();
+  const unsigned int& dim = mesh.mesh_dimension();
+
+  // loop over local nodes and update local solution vector according to the
+  // dof_indices of each node
+  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
+  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
+
+  for (; nd != end_nd; ++nd) {
+    // Store a pointer to the current node, and extract a point
+    Node *node = *nd;
+    Point pt;
+    for (unsigned int i = 0; i < dim; ++i) pt(i) = (*node)(i);
+
+    // get the element id of this node from stored mapping
+    const dof_id_type &elem_id = _point_mesh->get_node_elem_id(node->id());
+
+    // get the dof index at this node
+    const unsigned int phi_var = this->variable_number("phi");
+    const dof_id_type& dof_index = node->dof_number(this->number(), phi_var, 0);
+
+    // get the local solution on this node calling GGEM
+    const Real& phi_local =
+      this->local_potential_field(pt,"regularized", elem_id);
+
+    // add local solution to system solution
+    this->solution->add(dof_index, phi_local);
+  } // end loop over local nodes
+
+  this->solution->close();
+
+  // update the local values in current_local_solution to reflect the
+  // solution on neighboring processors since we make changes to this->solution
+  this->update();
+
+  STOP_LOG("update_solution_to_total()", "PMSystemPoisson");
 }
 
 // ===========================================================================

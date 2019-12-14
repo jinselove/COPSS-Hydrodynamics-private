@@ -169,7 +169,8 @@ public:
    */
   Real local_potential_field(PointMesh<3>      *point_mesh,
                              const Point      & ptx, /* a pt in space */
-                             const std::string& charge_type) const;
+                             const std::string& charge_type,
+                             const dof_id_type ptx_elem_id=-1) const;
 
   /* Compute the local electrostatic potential field at a given point ptx
    * due to smoothed/regularized point charges.

@@ -365,9 +365,11 @@ const
 {
   START_LOG("local_velocity_fluid()", "GGEMStokes");
 
+  // Initialize point neighbor list around ptx
   std::vector<dof_id_type> point_nb_list;
-  // ---> if the elem_id (id of the element that contains ptx) of the point is
-  // given, we can get the point neighbor list from elem_point_neighbor_list
+
+  // if elem_id (id of the element that contains ptx) of ptx isn't
+  // given, we can build particle neighbor list using KD tree
   if (ptx_elem_id == -1)
   {
     std::cout<<"Warning: ("<<ptx(0)<<","<<ptx(1)<<","<<ptx(2)<<"), elem_id = "
@@ -380,6 +382,8 @@ const
     for (std::size_t v=0; v<IndicesDists.size(); v++)
       point_nb_list.push_back(IndicesDists[v].first);
   }
+  // if elem_id is given, we can get point_nb_list from the point_nb_list of
+  // this element
   else
   {
     point_nb_list = point_mesh->get_elem_point_neighbor_list(ptx_elem_id);
@@ -396,18 +400,16 @@ const
   //  const bool  zero_limit  = false;  // for fluid, we let it be false, and
   // allow singularity
   std::vector<Real> u(dim, 0.0);
+  DenseMatrix<Number> GT;
   for (std::size_t v = 0; v < point_nb_list.size(); ++v)
   {
     // 0. particle id and position, vector x = ptx - pt0
     const std::size_t& p_id = point_nb_list[v];
-    const Point& pt0        = point_mesh->particles()[p_id]->point();
-    const Point& x          = point_mesh->pm_periodic_boundary()
-      ->point_vector(pt0, ptx);
+    const Point& pt0 = point_mesh->particles()[p_id]->point();
+    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(pt0, ptx);
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 1. compute the Green function (Oseen Tensor) of particle-v
-    DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
-
     if (force_type == "regularized") {
       GT = this->green_tensor_local_regularized(x);
     }
@@ -455,6 +457,7 @@ const
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
   std::vector<Real> u(dim, 0.0);
+  DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
 
   for (std::size_t v = 0; v < elem_neighbors.size(); ++v)
   {
@@ -465,7 +468,6 @@ const
                                                                               ptx);
 
     // 1. compute the Green function (Oseen Tensor) of particle-v
-    DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
 
     if (force_type == "regularized") GT = this->green_tensor_local_regularized(x);
     else libmesh_assert("GGEMStokes::local_velocity_fluid, wrong force_type!");

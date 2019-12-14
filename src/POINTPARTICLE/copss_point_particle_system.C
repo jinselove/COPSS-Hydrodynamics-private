@@ -363,7 +363,7 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
     perf_log.push("GGEM validation");
     system.reinit_system(neighbor_list_update_flag, "disturbed");
     system.test_velocity_profile();
-    system.test_l2_norm();
+    system.test_nodal_error();
     perf_log.pop("GGEM validation");
     return;
   }
@@ -372,11 +372,11 @@ void CopssPointParticleSystem::run(EquationSystems& equation_systems) {
   if (simulation_name=="ggem_validation_poisson")
   {
     perf_log.push("GGEMPoisson validation");
+    system.reinit_system(neighbor_list_update_flag, "disturbed");
     PMSystemPoisson& system_poisson =
       equation_systems.get_system<PMSystemPoisson>("Poisson");
-    // Build neighbor list, will this update point_mesh in PMSystemPoisson?
-    system.reinit_system(neighbor_list_update_flag, "disturbed");
     system_poisson.test_potential_profile();
+    system_poisson.test_nodal_error();
     perf_log.pop("GGEMPoisson validation");
     return;
   }

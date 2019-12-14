@@ -570,10 +570,6 @@ const
   {
     const MeshBase& mesh = this->get_mesh();
     p_elem_id = mesh.point_locator().operator()(p)->id();
-//    std::ostringstream oss;
-//    oss << "Locate pt ("<<p(0)<<","<<p(1)<<","<<p(2)
-//      <<") in elem_id = "<<p_elem_id;
-//    PMToolBox::output_message(oss, this->comm());
   }
 
   std::vector<Real> Ulocal = ggem_stokes->local_velocity_fluid(_point_mesh,
@@ -635,8 +631,7 @@ void PMSystemStokes::test_velocity_profile()
   PMToolBox::output_message("========>2. Test in PMSystemStokes::"
                             "test_velocity_profile(): \n", this->comm());
 
-  // we need to update neighbor list in test function
-  bool neighbor_list_update_flag = true;
+  // neighbor list is already updated before calling this function
 
   // Solve the disturbed velocity field: global solution by FEM
   _re_init = true; // assemble global matrix and init ksp_solver
@@ -734,28 +729,36 @@ void PMSystemStokes::test_velocity_profile()
   } // end loop dim_i
 
   // write equation system to output file
-  std::ostringstream output_filename;
-  output_filename << "global_solution.e";
 #ifdef LIBMESH_HAVE_EXODUS_API
   PMToolBox::output_message("writing global solution to global_solution.e",
     this->comm());
-      ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+  std::string output_filename = "global_solution.e";
+  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename,
                                                        this->get_equation_systems());
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
-      STOP_LOG("test_velocity_profile()", "PMSystemStokes");
+
+  // write points value (for test only)
+//  const int n_pts = 200;
+//  std::vector<Point> pts(n_pts);
+//  for (int i=0; i<pts.size(); i++)
+//    pts[i]=Point(box_min(0) + i*box_len(0)/Real(n_pts), 0., 0.);
+//  this->output_point_solution(pts, "test_point_solution.csv");
+
+
+  STOP_LOG("test_velocity_profile()", "PMSystemStokes");
 }
 
 // =========================================================================
-void PMSystemStokes::test_l2_norm()
+void PMSystemStokes::test_nodal_error()
 {
-  START_LOG("test_l2_norm()", "PMSystemStokes");
+  START_LOG("test_nodal_error()", "PMSystemStokes");
   std::ostringstream ss;
-  ss << "===> test in PMSystemStokes::test_l2_norm(): \n";
+  ss << "===> test in PMSystemStokes::test_nodal_error(): \n";
   PMToolBox::output_message(ss, this->comm());
 
+  // neighbor list is already updated before calling this function
+
   // solve the disturbed test system to get global solution
-  bool neighbor_list_update_flag = true;
-  this->reinit_system(neighbor_list_update_flag, "disturbed");
   _re_init = true;
   this->solve("disturbed");
 
@@ -768,6 +771,7 @@ void PMSystemStokes::test_l2_norm()
   const unsigned int n_nodes = mesh.n_nodes();
   Real val0_norm = 0., val1_norm = 0.;
   Real val2_norm = 0., val3_norm = 0.;
+  Real max_abs_error = 0.;
 
   // Loop over each node and compute the nodal velocity value
   MeshBase::node_iterator nd           = mesh.local_nodes_begin();
@@ -799,6 +803,7 @@ void PMSystemStokes::test_l2_norm()
     // compute the errors
     for (unsigned int i = 0; i < dim; ++i) {
       Real tmpt = std::abs(Utotal[i] - Uexact[i]);
+      max_abs_error = std::max(tmpt, max_abs_error);
       val0_norm += tmpt;
       val1_norm += std::abs(Uexact[i]);
       val2_norm += tmpt * tmpt;
@@ -811,28 +816,86 @@ void PMSystemStokes::test_l2_norm()
   this->comm().sum(val1_norm);
   this->comm().sum(val2_norm);
   this->comm().sum(val3_norm);
+  this->comm().max(max_abs_error);
 
   const Real l1_norm = val0_norm / val1_norm;
   const Real l2_norm = std::sqrt(val2_norm) / std::sqrt(val3_norm);
-  ss << ">>> l1_norm = " << l1_norm
-     << "; l2_norm = " << l2_norm << "\n";
+  ss << ">>> sum(|vel_total-vel_exact|) / sum(|vel_exact|) = " << l1_norm
+     << "; sum(|vel_total-vel_exact|^2) / sum(|vel_exact|^2) = " << l2_norm
+     << "; max(|vel_total-vel_exact|) = "<<max_abs_error<<"\n";
   PMToolBox::output_message(ss, this->comm());
 
   // write equation system to output file
-  std::ostringstream output_filename;
-  output_filename << "total_solution.e";
 #ifdef LIBMESH_HAVE_EXODUS_API
   PMToolBox::output_message("writing total solution to total_solution.e",
     this->comm());
-  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+  std::string output_filename = "total_solution.e";
+  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename,
                                                    this->get_equation_systems());
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
 
   // resume solution to global
   this->resume_solution_to_global();
 
-  STOP_LOG("test_l2_norm()", "PMSystemStokes");
+  STOP_LOG("test_nodal_error()", "PMSystemStokes");
 }
+
+// ===========================================================================
+void PMSystemStokes::output_point_solution(const std::vector<Point>& pts,
+                                            const std::string& filename)
+{
+  START_LOG("output_point_solution()", "PMSystemStokes");
+
+  // get system dimension
+  MeshBase& mesh = this->get_mesh();
+  const std::size_t dim = mesh.mesh_dimension();
+
+  // define output file format parameters
+  o_precision = this->get_equation_systems().parameters.get<int>
+    ("o_precision");
+  std::ofstream outfile;
+  outfile.open(filename, std::ios_base::out);
+  // set output file format (fixed + precision)
+  outfile.setf(std::ios::fixed);
+  outfile.precision(o_precision);
+
+  if (this->comm().rank() == 0)
+    outfile << "x,y,z,u_local,v_local,w_local,u_global,v_global,w_global,"
+               "u_total,v_total,w_total\n";
+
+  for (std::size_t i = 0; i < pts.size(); i++)
+  {
+    // get global solution from FEM
+    std::vector<Real> Uglobal(dim);
+    const unsigned int u_var = this->variable_number("u"); // u_var = 0
+    const unsigned int v_var = this->variable_number("v"); // v_var = 1
+    const unsigned int w_var = this->variable_number("w"); // w_var = 2
+    // point_value function is slow, but we only do this for test
+    Uglobal[0] = this->point_value(u_var, pts[i]);
+    Uglobal[1] = this->point_value(v_var, pts[i]);
+    Uglobal[2] = this->point_value(w_var, pts[i]);
+
+    // compute local solution from GGEM
+    const std::vector<Real>& Ulocal = this->local_velocity_fluid(pts[i],
+                                                                 "regularized");
+
+    // compute total solution
+    std::vector<Real> Utotal(dim);
+    for (int i=0; i<dim; i++)
+      Utotal[i] = Uglobal[i] + Ulocal[i];
+
+    // write the result to output file
+    if (this->comm().rank() == 0)
+      outfile << pts[i](0)<<","<<pts[i](1)<<","<<pts[i](2)<<","
+              << Ulocal[0]<<","<<Ulocal[1]<<","<<Ulocal[2]<<","
+              << Uglobal[0]<<","<<Uglobal[1]<<","<<Uglobal[2]<<","
+              << Utotal[0]<<","<<Utotal[1]<<","<<Utotal[2]<<"\n";
+  } // end for i-loop
+  outfile.close();
+
+  STOP_LOG("output_point_solution()", "PMSystemPoisson");
+}
+
 
 // ==================================================================================
 void PMSystemStokes::write_fluid_velocity_data(const std::string& filename)
@@ -1131,5 +1194,7 @@ void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
 
   STOP_LOG("write_equation_systems()", "PMSystemStokes");
 }
+
+
 
 } // end namespace libMesh

@@ -122,7 +122,7 @@ public:
     /**
    * Compute the L2-error by comparing numerical and analytical solutions
    */
-  void test_l2_norm(bool& neighbor_list_update_flag);
+  void test_nodal_error(bool& neighbor_list_update_flag);
 
 
   /*

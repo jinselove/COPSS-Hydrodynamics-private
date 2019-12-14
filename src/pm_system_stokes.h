@@ -193,7 +193,14 @@ public:
   /**
    * Test function. Test solutions on all nodes
    */
-  void test_l2_norm();
+  void test_nodal_error();
+
+
+  /**
+    * output total solution on a list of points
+    */
+  void output_point_solution(const std::vector<Point>& pts,
+                             const std::string& output_filename);
 
 
     /*

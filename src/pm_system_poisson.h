@@ -122,7 +122,8 @@ public:
    * charge_type: "regularized"
    */
   Real local_potential_field(const Point      & p,
-                             const std::string& charge_type) const;
+                             const std::string& charge_type,
+                             dof_id_type p_elem_id=-1) const;
 
 
   /**
@@ -152,12 +153,29 @@ public:
    */
   void test_potential_profile();
 
+  /**
+   * Test function. Test difference between total Poisson solution and Exact
+   * solution on Mesh nodes. This function is mainly used in GGEM validation
+   * tests, i.e., called after test_potential_profile();
+   */
+  void test_nodal_error();
+
+
+  /**
+   * output total solution at all nodes
+   */
+  void output_nodal_solution(const std::string& output_filename);
+
+  /**
+   * output total solution on a list of points
+   */
+  void output_point_solution(const std::vector<Point>& pts,
+                            const std::string& output_filename);
 
   /**
    *
    */
-  void update_solution_to_total() override {PMToolBox::output_message
-  ("please implement this", this->comm()); libmesh_error();};
+  void update_solution_to_total() override;
 
   /**
    *

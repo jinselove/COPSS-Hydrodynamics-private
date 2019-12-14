@@ -909,23 +909,16 @@ void AssembleStokes::apply_bc_by_penalty(const Elem          *elem,
 
       // Find the node on the element matching this node on the side.
       // That defined where in the element matrix the BC will be applied.
-      for (unsigned int n = 0; n < elem->n_nodes(); n++)
-      {
-        if (elem->node(n) == side->node(nn))
-        {
-          // Penalize u, v and w at the current node.
-          for (unsigned int k = 0; k < _dim; ++k) {
-            this->penalize_elem_matrix_vector(Ke,
-                                              Fe,
-                                              matrix_or_vector,
-                                              k,
-                                              n,
-                                              n_nodes,
-                                              penalty,
-                                              uvw[k]);
-          } // end for k-loop
-        }   // end if (elem->node(n) == side->node(nn))
-      }     // enf for n-loop
+      const unsigned int& local_node_id = elem->local_node(side->node_id(nn));
+      for (unsigned int k = 0; k < _dim; ++k)
+          this->penalize_elem_matrix_vector(Ke,
+                                            Fe,
+                                            matrix_or_vector,
+                                            k,
+                                            local_node_id,
+                                            n_nodes,
+                                            penalty,
+                                            uvw[k]);
     }       // end for nn-loop
   } // end for s-loop
   STOP_LOG("apply_bc_by_penalty()", "AssembleStokes");

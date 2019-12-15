@@ -959,8 +959,10 @@ void PMSystemStokes::couple_poisson()
     add_electrostatic_forces();
 
   // for test purpose, we output Poisson system solution along x, y=0, z=0
-  if (this->get_equation_systems().parameters.get<std::string>
-    ("simulation_name") =="poisson_validation_dirichlet_bc") {
+  if ((this->get_equation_systems().parameters.get<std::string>
+    ("simulation_name") =="poisson_validation_dirichlet_bc") |
+    (this->get_equation_systems().parameters.get<std::string>
+      ("simulation_name") =="poisson_validation_dbc_with_pbc")) {
     PMToolBox::output_message(
       "----> output Poisson solution for validation purpose",
       this->comm());

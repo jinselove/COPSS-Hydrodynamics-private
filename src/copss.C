@@ -241,8 +241,6 @@ void Copss::read_physical_info()
   {
     ss << "   characteristic electrostatic potential = " << phi0 <<  " (uV)\n"
        << "   relative dielectric permittivity = " << epsilon << " (1)\n"
-       << "   characteristic electrostatic potential: phi0 = " << phi0 << " V\n"
-       << "   characteristic electrostatic potential: phi0 = " << phi0 << " V\n"
        << "   characteristic electrostatic field: efield0 = " << efield0 <<" V/um\n"
        << "   characteristic volume charge density: charge_rho0 = " <<
        charge_rho0 << " C/um^3\n"

@@ -958,6 +958,33 @@ void PMSystemStokes::couple_poisson()
   this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
     add_electrostatic_forces();
 
+  // for test purpose, we output Poisson system solution along x, y=0, z=0
+  if (this->get_equation_systems().parameters.get<std::string>
+    ("simulation_name") =="poisson_validation_dirichlet_bc") {
+    PMToolBox::output_message(
+      "----> output Poisson solution for validation purpose",
+      this->comm());
+    const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
+    const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
+    const std::vector<std::string> directions{"x", "y", "z"};
+    for (int dim_i=0; dim_i<3; dim_i++) {
+      std::ostringstream oss;
+      oss << "potential_along_"<<directions[dim_i]<<"_alpha_"
+          << this->get_equation_systems().parameters
+            .get<Real>("alpha") << ".csv";
+      const int n_pts = 200;
+      std::vector <Point> pts(n_pts);
+      for (int i = 0; i < pts.size(); i++)
+        pts[i] = Point(
+          (dim_i==0) * (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+          (dim_i==1) * (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+          (dim_i==2) * (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts))
+          );
+      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+        .output_point_solution(pts, oss.str());
+    }
+  }
+
   STOP_LOG("couple_poisson()", "PMSystemStokes");
 }
 

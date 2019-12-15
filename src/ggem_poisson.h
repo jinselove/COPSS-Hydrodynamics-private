@@ -150,8 +150,17 @@ public:
   Real green_tensor_local_regularized(const Point& x /* vector x = pt1 - pt0 */
                                       ) const;
 
+  /**
+   * Calculate the gradient over three directions for
+   * green_tensor_local_regularized. This function uses the derivation from
+   * Mathematica and hand-work, should be valid
+   */
+   Point green_tensor_local_regularized_grad(const Point& x /* vector x = pt1 - pt0 */
+                                            ) const;
 
-  /* Compute the local electrostatic potential field at a given point ptx
+
+  /* Compute the local electrostatic potential field and the local potential
+   * gradient at a given point ptx
    * due to smoothed/regularized point charges. This point cannot be a particle.
    * charge_type: regularized
    *
@@ -167,21 +176,47 @@ public:
    *
    * Eqn (16) in Membrane paper, Jarol E Molina, J de Pablo, J.Hernandez-Ortiz
    */
-  Real local_solution_field(PointMesh<3>      *point_mesh,
+  Real local_solution_field(PointMesh<3>*point_mesh,
                             const Point      & ptx, /* a pt in space */
                             const std::string& charge_type,
-                            const dof_id_type ptx_elem_id=-1) const;
+                            const dof_id_type ptx_elem_id) const;
 
+  /**
+   * Similar to the function above, but used for the case that local solution
+   * gradient is also needed. One can specify whether phi or grad(phi) or both
+   * should be passed to a placeholder, local_sol. For example, if
+   * sol_option="phi", then local_sol->second will just be Point(0.).
+  */
+  void local_solution_field(PointMesh<3>*point_mesh,
+                            const Point      & ptx, /* a pt in space */
+                            const std::string& charge_type,
+                            const dof_id_type ptx_elem_id,
+                            const std::string& sol_option, //"phi" or
+                            // "grad" or "phi&grad"
+                            std::map<Real, Point>& local_sol
+                            );
 
-  /* Compute the local electrostatic potential field at a given bead
+  /* Compute the local electrostatic potential field and the local
+   * potential gradient at a given bead
    * due to smoothed/regularized point charges.
    * charge_type: regularized
    */
-  Real local_solution_bead(PointMesh<3>      *point_mesh,
+  Real local_solution_bead(PointMesh<3>*point_mesh,
                             const dof_id_type& bead_id,
                             const std::string& charge_type) const;
 
-
+  /**
+   * Similar to the function above, but used for the case that local solution
+   * gradient is also needed. One can specify whether phi or grad(phi) or both
+   * should be passed to a placeholder, local_sol. For example, if
+   * sol_option="phi", then local_sol->second will just be Point(0.).
+  */
+  void local_solution_bead(PointMesh<3>*point_mesh,
+                           const dof_id_type& bead_id,
+                           const std::string& charge_type,
+                           const std::string& sol_option, //"phi" or
+    // "grad" or "phi&grad"
+                           std::map<Real, Point>& local_sol);
 
     // ! set PointType
   void set_point_type(const PointType& _point_type) {

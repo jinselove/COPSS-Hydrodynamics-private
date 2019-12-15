@@ -591,9 +591,9 @@ const
   START_LOG("local_velocity_fluid()", "PMSystemStokes");
 
   std::vector<Real> Ulocal = ggem_stokes->local_velocity_fluid(_point_mesh,
-                                                               elem,
                                                                p,
-                                                               force_type);
+                                                               force_type,
+                                                               elem->id());
 
   STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
 

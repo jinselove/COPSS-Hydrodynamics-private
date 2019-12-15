@@ -313,56 +313,6 @@ Real GGEMPoisson::local_potential_field(PointMesh<3>      *point_mesh,
 }
 
 // ======================================================================
-Real GGEMPoisson::local_potential_field(PointMesh<3>      *point_mesh,
-                                        const Elem        *elem,
-                                        const Point      & ptx,
-                                        const std::string& charge_type) const
-{
-  START_LOG("local_potential_field()", "GGEMPoisson");
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     build the particle neighbor list around the given point \p ptx
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  const bool is_sorted                    = false;
-  const std::vector<dof_id_type>& elem_neighbors =
-    point_mesh->get_elem_point_neighbor_list(elem->id());
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     Loop over all the neighbor list beads, and compute the local potential:
-     phi_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*q_v(j)
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  Real phi = 0.;
-  Real GT;
-
-  for (std::size_t v = 0; v < elem_neighbors.size(); ++v)
-  {
-    // 0. particle id and position, vector x = ptx - pt0
-    const std::size_t p_id = elem_neighbors[v];
-    const Point pt0        = point_mesh->particles()[p_id]->point();
-    const Point x          = point_mesh->pm_periodic_boundary()->point_vector(pt0,
-                                                                              ptx);
-
-    if (charge_type ==
-        "regularized") GT = this->green_tensor_local_regularized(x);
-    else libmesh_assert("GGEMPoisson::local_potential_field, wrong charge_type!");
-
-    // 2. Get the charge of particle-v
-    const Real q = point_mesh->particles()[p_id]->charge();
-
-    // 3. compute phi due to this particle
-    phi += GT * q;
-  } // end for v-loop
-
-  STOP_LOG("local_velocity_fluid()", "GGEMPoisson");
-
-  return phi;
-}
-
-// ======================================================================
 Real GGEMPoisson::local_potential_bead(PointMesh<3>      *point_mesh,
                                        const std::size_t& pid0,
                                        const std::string& charge_type) const

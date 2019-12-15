@@ -172,27 +172,6 @@ public:
                              const std::string& charge_type,
                              const dof_id_type ptx_elem_id=-1) const;
 
-  /* Compute the local electrostatic potential field at a given point ptx
-   * due to smoothed/regularized point charges.
-   * charge_type: regularized
-   *
-   * NOTE: due to the fast convergence of gaussian function, only a small group
-   *of
-   * particles within the neighbor list are considered. There are two ways
-   * to construct this neighbor list:
-   * (1) element independent: directly search particles near the given point
-   *using KDTree;
-   * (2) element dependent: directly use the neighbor list of the parent
-   *element;
-   * this function implement method (2), which contains a short neighbor list
-   *
-   * Eqn (16) in Membrane paper, Jarol E Molina, J de Pablo, J.Hernandez-Ortiz
-   */
-  Real local_potential_field(PointMesh<3>      *point_mesh,
-                             const Elem        *elem,
-                             const Point      & ptx, /* a pt in space */
-                             const std::string& charge_type) const;
-
 
   /*
    * Compute the local electrostatic potential at a point/bead with point_id =

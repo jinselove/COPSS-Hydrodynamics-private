@@ -433,59 +433,6 @@ const
 }
 
 // ======================================================================
-std::vector<Real>GGEMStokes::local_velocity_fluid(PointMesh<3>      *point_mesh,
-                                                  const Elem        *elem,
-                                                  const Point      & ptx,
-                                                  const std::string& force_type)
-const
-{
-  START_LOG("local_velocity_fluid()", "GGEMStokes");
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     build the particle neighbor list around the given point \p ptx
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  */
-  const bool is_sorted                    = false;
-  const std::vector<dof_id_type>& elem_neighbors =
-    point_mesh->get_elem_point_neighbor_list(elem->id());
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     Loop over all the neighbor list beads, and compute the local velocity:
-     u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*f_v(j)
-     zero_limit = false, if the given point is 'fluid' (not a bead/tracking pt.)
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  std::vector<Real> u(dim, 0.0);
-  DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
-
-  for (std::size_t v = 0; v < elem_neighbors.size(); ++v)
-  {
-    // 0. particle id and position, vector x = ptx - pt0
-    const std::size_t p_id = elem_neighbors[v];
-    const Point pt0        = point_mesh->particles()[p_id]->point();
-    const Point x          = point_mesh->pm_periodic_boundary()->point_vector(pt0,
-                                                                              ptx);
-
-    // 1. compute the Green function (Oseen Tensor) of particle-v
-
-    if (force_type == "regularized") GT = this->green_tensor_local_regularized(x);
-    else libmesh_assert("GGEMStokes::local_velocity_fluid, wrong force_type!");
-
-    // 2. compute the force vector of particle-v
-    const Point fv = point_mesh->particles()[p_id]->particle_force();
-
-    // 3. compute u due to this particle
-    for (int i = 0; i < dim; ++i)
-      for (int j = 0; j < dim; ++j) u[i] += GT(i, j) * fv(j);
-  } // end for v-loop
-
-  STOP_LOG("local_velocity_fluid()", "GGEMStokes");
-
-  return u;
-}
-
-// ======================================================================
 Point GGEMStokes::local_velocity_bead(PointMesh<3>      *point_mesh,
                                       const std::size_t& pid0,
                                       const std::string& force_type) const

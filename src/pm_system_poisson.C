@@ -151,72 +151,6 @@ void PMSystemPoisson::solve(const std::string& option)
 }
 
 // ==================================================================================
-//void PMSystemPoisson::add_local_solution()
-//{
-//  START_LOG("add_local_solution()", "PMSystemPoisson");
-//
-//  // Check if the system solution vector is closed or not
-//  if ((this->solution->closed()) == false) this->solution->close();
-//
-//  // Get parameters and initialize the quantities
-//  MeshBase& mesh                    = this->get_mesh();
-//  const std::size_t   dim           = mesh.mesh_dimension();
-//  const std::size_t   n_local_nodes = mesh.n_local_nodes();
-//  std::vector<Number> local_solution(n_local_nodes);
-//  std::vector<numeric_index_type> dof_indices(n_local_nodes);
-//
-//  // printf("--->test in add_local_solution() n_local_nodes = %lu on the
-//  // processor %u\n",
-//  //       n_local_nodes,this->comm().rank());
-//
-//  // Update the system solution by adding the local solution (from Green's
-//  // function)
-//  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
-//  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
-//  std::size_t local_count              = 0;
-//
-//  for (; nd != end_nd; ++nd)
-//  {
-//    // Store a pointer to the current node, and extract a point coordinate
-//    Node *node = *nd;
-//    Point pt;
-//
-//    for (unsigned int i = 0; i < dim; ++i) pt(i) = (*node)(i);
-//
-//    // this is a test for dof_number at each node
-//    // const unsigned int node_id = node->id();
-//    // std::ostringstream oss;
-//    // oss << "          NODE " << node_id;
-//    // PMToolBox::output_message(oss.str(), this->comm());
-//    // node->print_info();
-//    // if(this->comm().rank()==0) printf("--->test: nodal dof number :");
-//    // for(unsigned int i=0; i<dim; ++i)
-//    // {
-//    //  dof_id_type dof_num = node->dof_number(this->number(), i, 0);
-//    //  if(this->comm().rank()==0) printf(" %u", dof_num);
-//    // }
-//    // if(this->comm().rank()==0) printf(" \n");
-//
-//    // Store local electrical potential and dof indices
-//    local_solution[local_count] = this->local_potential_field(pt, "regularized");
-//    dof_indices[local_count]    = node->dof_number(this->number(), 0, 0);
-//
-//    local_count++;
-//  }
-//
-//  // printf("--->test in add_local_solution() local_count = %lu on the processor
-//  // %u\n",
-//  //       n_local_nodes,this->comm().rank());
-//
-//  // add local potential to the global potential
-//  this->solution->add_vector(local_solution, dof_indices);
-//  this->solution->close();
-//  this->update();
-//
-//  STOP_LOG("add_local_solution()", "PMSystemPoisson");
-//}
-
-// ==================================================================================
 void PMSystemPoisson::compute_point_potential(std::vector<Real>& pv)
 {
   START_LOG("compute_point_potential()", "PMSystemPoisson");
@@ -549,9 +483,9 @@ Real PMSystemPoisson::local_potential_field(const Elem        *elem,
   START_LOG("local_potential_field()", "PMSystemPoisson");
 
   Real phi_local = ggem_poisson->local_potential_field(_point_mesh,
-                                                       elem,
                                                        p,
-                                                       charge_type);
+                                                       charge_type,
+                                                       elem->id());
 
   STOP_LOG("local_potential_field()", "PMSystemPoisson");
   return phi_local;

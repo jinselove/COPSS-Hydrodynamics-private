@@ -178,6 +178,7 @@ public:
         const std::string& force_type,
         const dof_id_type& ptx_elem_id)const;
 
+
   /* Compute the local vel-solution of the fluid at the position of bead
    * due to smoothed/regularized point forces.
    * force_type: regularized

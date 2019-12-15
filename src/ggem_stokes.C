@@ -439,8 +439,7 @@ Point GGEMStokes::local_solution_bead(PointMesh<3>      *point_mesh,
      Loop over all the neighbor list beads, and compute the local velocity:
      u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*f_v(j)
      zero_limit = false, if the given point is 'fluid' (not a bead/tracking pt.)
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  */
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
   // const Real br0    = 1.0;    // normalized bead radius.
   //  const bool  zero_limit  = false;  // for fluid, we let it be false, and

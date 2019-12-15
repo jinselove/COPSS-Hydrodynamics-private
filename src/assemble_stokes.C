@@ -880,13 +880,10 @@ void AssembleStokes::apply_bc_by_penalty(const Elem          *elem,
       // Note this only influence the rhs vector
       if (option == "disturbed")
       {
-        const Point ptx                 = side->point(nn);
-        const std::vector<Real> u_local = pm_system.local_velocity_fluid(elem,
-                                                                         ptx,
-                                                                         "regularized");
+        const Point& ptx                 = side->point(nn);
+        const Point& u_local = pm_system.local_velocity_fluid(elem, ptx,
+          "regularized");
 
-        // const std::vector<Real> u_local =
-        // pm_system.local_velocity_fluid(ptx,"regularized");
         // ---------------- setup for validation test 01 -------------
         if (_eqn_sys.parameters.get<std::string>("simulation_name") ==
             "ggem_validation")
@@ -896,14 +893,14 @@ void AssembleStokes::apply_bc_by_penalty(const Elem          *elem,
                                                                 ptx);
 
           for (unsigned int k = 0; k < _dim;
-               ++k) uvw[k] = u_boundary[k] - u_local[k];
+               ++k) uvw[k] = u_boundary[k] - u_local(k);
         }
 
         // Normally on the boundary, disturbed_velocity = undistrubed_velocity -
         // ggem_local_velocity
         else
         {
-          for (unsigned int k = 0; k < _dim; ++k) uvw[k] = uvw[k] - u_local[k];
+          for (unsigned int k = 0; k < _dim; ++k) uvw[k] = uvw[k] - u_local(k);
         }
       }
 

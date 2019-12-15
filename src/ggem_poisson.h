@@ -152,7 +152,7 @@ public:
 
 
   /* Compute the local electrostatic potential field at a given point ptx
-   * due to smoothed/regularized point charges.
+   * due to smoothed/regularized point charges. This point cannot be a particle.
    * charge_type: regularized
    *
    * NOTE: due to the fast convergence of gaussian function, only a small group
@@ -167,48 +167,23 @@ public:
    *
    * Eqn (16) in Membrane paper, Jarol E Molina, J de Pablo, J.Hernandez-Ortiz
    */
-  Real local_potential_field(PointMesh<3>      *point_mesh,
-                             const Point      & ptx, /* a pt in space */
-                             const std::string& charge_type,
-                             const dof_id_type ptx_elem_id=-1) const;
+  Real local_solution_field(PointMesh<3>      *point_mesh,
+                            const Point      & ptx, /* a pt in space */
+                            const std::string& charge_type,
+                            const dof_id_type ptx_elem_id=-1) const;
 
-  /* Compute the local electrostatic potential field at a given point ptx
+
+  /* Compute the local electrostatic potential field at a given bead
    * due to smoothed/regularized point charges.
    * charge_type: regularized
-   *
-   * NOTE: due to the fast convergence of gaussian function, only a small group
-   *of
-   * particles within the neighbor list are considered. There are two ways
-   * to construct this neighbor list:
-   * (1) element independent: directly search particles near the given point
-   *using KDTree;
-   * (2) element dependent: directly use the neighbor list of the parent
-   *element;
-   * this function implement method (2), which contains a short neighbor list
-   *
-   * Eqn (16) in Membrane paper, Jarol E Molina, J de Pablo, J.Hernandez-Ortiz
    */
-  Real local_potential_field(PointMesh<3>      *point_mesh,
-                             const Elem        *elem,
-                             const Point      & ptx, /* a pt in space */
-                             const std::string& charge_type) const;
-
-
-  /*
-   * Compute the local electrostatic potential at a point/bead with point_id =
-   *pid0.
-   * charge_type: regularized
-   *
-   * Eqn (16) in Membrane paper, Jarol E Molina, J de Pablo, J.Hernandez-Ortiz
-   * This potential should be include the potential field induced by the bead
-   *itself.
-   */
-  Real local_potential_bead(PointMesh<3>      *point_mesh,
-                            const std::size_t& pid0, /* point id */
+  Real local_solution_bead(PointMesh<3>      *point_mesh,
+                            const dof_id_type& bead_id,
                             const std::string& charge_type) const;
 
 
-  // ! set PointType
+
+    // ! set PointType
   void set_point_type(const PointType& _point_type) {
     point_type = _point_type;
   }

@@ -552,6 +552,11 @@ public:
    */
    void build_point_point_neighbor_list();
 
+   const MeshBase& get_mesh()
+   {
+     return _mesh;
+   }
+
 protected:
 
   /**
@@ -559,14 +564,6 @@ protected:
    * within build_elem_point_neighbor_list().
    */
   void build_elem_point_containing_list();
-
-  /**
-   * get mesh
-   */
-   const MeshBase& get_mesh() const
-   {
-     return _mesh;
-   }
 
 private:
 

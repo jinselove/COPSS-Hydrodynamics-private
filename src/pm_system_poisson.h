@@ -93,7 +93,7 @@ public:
   /*
    * Compute electrical potential at all beads' locations
    */
-  void compute_point_potential(std::vector<Real>& pv);
+//  void compute_point_potential(std::vector<Real>& pv);
 
 
   /*

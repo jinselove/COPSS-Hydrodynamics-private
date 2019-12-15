@@ -155,9 +155,9 @@ public:
    * which is computed from Green's function
    * force_type: "regularized" or "smooth"
    */
-  std::vector<Real>local_velocity_fluid(const Point      & p,
-                                        const std::string& force_type,
-                                        dof_id_type p_elem_id=-1) const;
+  Point local_velocity_fluid(const Point      & p,
+                              const std::string& force_type,
+                              dof_id_type p_elem_id=-1) const;
 
 
   /**
@@ -165,9 +165,9 @@ public:
    * which is computed from Green's function
    * force_type: "regularized" or "smooth"
    */
-  std::vector<Real>local_velocity_fluid(const Elem        *elem,
-                                        const Point      & p,
-                                        const std::string& force_type) const;
+  Point local_velocity_fluid(const Elem        *elem,
+                              const Point      & p,
+                              const std::string& force_type) const;
 
 
   /**

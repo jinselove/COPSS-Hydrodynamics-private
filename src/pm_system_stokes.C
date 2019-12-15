@@ -343,8 +343,11 @@ void PMSystemStokes::update_solution_to_total()
     }
 
     // get the local velocity on this node calling GGEM
-    const std::vector<Real> Ulocal =
-      this->local_velocity_fluid(pt,"regularized", elem_id);
+    std::vector<Real> Ulocal(dim);
+    const Point& Ulocal_tmp = this->local_velocity_fluid(pt,"regularized",
+      elem_id);
+    for(int i=0; i<dim; i++)
+      Ulocal[i] = Ulocal_tmp(i);
 
     // add local solution to system solution
     this->solution->add_vector(Ulocal, dof_indices);
@@ -558,10 +561,9 @@ std::vector<Real>PMSystemStokes::point_velocity(
 }
 
 // ==================================================================================
-std::vector<Number>PMSystemStokes::local_velocity_fluid(const Point      & p,
-                                                  const std::string&force_type,
-                                                  dof_id_type p_elem_id)
-const
+Point PMSystemStokes::local_velocity_fluid(const Point      & p,
+                                          const std::string&force_type,
+                                          dof_id_type p_elem_id) const
 {
   START_LOG("local_velocity_fluid()", "PMSystemStokes");
   // if p_elem_id is not given, i.e, equals to the default value -1, we first
@@ -572,10 +574,10 @@ const
     p_elem_id = mesh.point_locator().operator()(p)->id();
   }
 
-  std::vector<Real> Ulocal = ggem_stokes->local_velocity_fluid(_point_mesh,
-                                                               p,
-                                                               force_type,
-                                                               p_elem_id);
+  Point Ulocal = ggem_stokes->local_solution_field(_point_mesh,
+                                                   p,
+                                                   force_type,
+                                                   p_elem_id);
 
   STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
 
@@ -583,17 +585,16 @@ const
 }
 
 // ==================================================================================
-std::vector<Number>PMSystemStokes::local_velocity_fluid(const Elem        *elem,
-                                                        const Point      & p,
-                                                        const std::string& force_type)
-const
+Point PMSystemStokes::local_velocity_fluid(const Elem        *elem,
+                                          const Point      & p,
+                                          const std::string& force_type)const
 {
   START_LOG("local_velocity_fluid()", "PMSystemStokes");
 
-  std::vector<Real> Ulocal = ggem_stokes->local_velocity_fluid(_point_mesh,
-                                                               elem,
-                                                               p,
-                                                               force_type);
+  Point Ulocal = ggem_stokes->local_solution_field(_point_mesh,
+                                                   p,
+                                                   force_type,
+                                                   elem->id());
 
   STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
 
@@ -607,7 +608,7 @@ Point PMSystemStokes::local_velocity_bead(const std::size_t& bead_id,
   START_LOG("local_velocity_bead()", "PMSystemStokes");
 
   Point Ulocal =
-    ggem_stokes->local_velocity_bead(_point_mesh, bead_id, force_type);
+    ggem_stokes->local_solution_bead(_point_mesh, bead_id, force_type);
 
   STOP_LOG("local_velocity_bead()", "PMSystemStokes");
   return Ulocal;
@@ -705,13 +706,12 @@ void PMSystemStokes::test_velocity_profile()
       Uglobal[2] = this->point_value(w_var, pt);
 
       // compute local solution from GGEM
-      const std::vector<Real>& Ulocal = this->local_velocity_fluid(pt,
-        "regularized");
+      const Point& Ulocal = this->local_velocity_fluid(pt, "regularized");
 
       // compute total solution
       std::vector<Real> Utotal(dim);
       for (int i=0; i<dim; i++)
-        Utotal[i] = Uglobal[i] + Ulocal[i];
+        Utotal[i] = Uglobal[i] + Ulocal(i);
 
       // get exact solution for an unbounded domain from analytical solution
       const std::vector<Real> Uexact =
@@ -722,7 +722,7 @@ void PMSystemStokes::test_velocity_profile()
         outfile <<pt(dim_i) <<","
                 <<Utotal[0] <<"," <<Utotal[1] <<"," << Utotal[2]<<","
                 <<Uglobal[0] <<"," <<Uglobal[1]<<"," <<Uglobal[2]<<","
-                <<Ulocal[0] <<"," <<Ulocal[1]<<"," <<Ulocal[2]<<","
+                <<Ulocal(0) <<"," <<Ulocal(1)<<"," <<Ulocal(2)<<","
                 <<Uexact[0] <<"," <<Uexact[1]<<"," <<Uexact[2]<<"\n";
     } // end for i-loop
     outfile.close();
@@ -876,18 +876,17 @@ void PMSystemStokes::output_point_solution(const std::vector<Point>& pts,
     Uglobal[2] = this->point_value(w_var, pts[i]);
 
     // compute local solution from GGEM
-    const std::vector<Real>& Ulocal = this->local_velocity_fluid(pts[i],
-                                                                 "regularized");
+    const Point& Ulocal = this->local_velocity_fluid(pts[i], "regularized");
 
     // compute total solution
     std::vector<Real> Utotal(dim);
     for (int i=0; i<dim; i++)
-      Utotal[i] = Uglobal[i] + Ulocal[i];
+      Utotal[i] = Uglobal[i] + Ulocal(i);
 
     // write the result to output file
     if (this->comm().rank() == 0)
       outfile << pts[i](0)<<","<<pts[i](1)<<","<<pts[i](2)<<","
-              << Ulocal[0]<<","<<Ulocal[1]<<","<<Ulocal[2]<<","
+              << Ulocal(0)<<","<<Ulocal(1)<<","<<Ulocal(2)<<","
               << Uglobal[0]<<","<<Uglobal[1]<<","<<Uglobal[2]<<","
               << Utotal[0]<<","<<Utotal[1]<<","<<Utotal[2]<<"\n";
   } // end for i-loop

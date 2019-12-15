@@ -193,6 +193,36 @@ Real GGEMPoisson::green_tensor_unbounded_smoothed(const Point& x,
   return G;
 }
 
+//=======================================================================
+Point GGEMPoisson::green_tensor_unbounded_smoothed_grad(const Point& x,
+                                                  const Real & alpha_or_ksi) const
+{
+  START_LOG("green_tensor_unbounded_smoothed_grad()", "GGEMPoisson");
+
+  // DenseMatrix<Number> G(dim,dim);
+  Point G_grad;
+  const Real r2 = x.norm_sq();
+  const Real r = std::sqrt(r2);
+
+  // check zero limit
+  if (r < r_eps)
+  {
+    // don't need to do anything since G_grad = (0., 0., 0.) at this limit
+  }
+  else
+  {
+    const Real r3 = r2 * r;
+    Real tmp = -2 * alpha_or_ksi * std::exp(-alpha_or_ksi * alpha_or_ksi * r2) /
+      (sqrt_pi * r2) + std::erf(alpha_or_ksi * r) / r3;
+    for (int i=0; i<3; i++)
+      G_grad(i) = tmp * x(i);
+  } // end if-else
+  STOP_LOG("green_tensor_unbounded_smoothed_grad()", "GGEMPoisson");
+
+  // done
+  return G_grad;
+}
+
 // ======================================================================
 Real GGEMPoisson::green_tensor_local_singular(const Point& x) const
 {
@@ -268,8 +298,9 @@ Point GGEMPoisson::green_tensor_local_regularized_grad(
     const Real r3 = r2 * r;
     // this tmp is the same for all directions
     const Real tmp =
-      (two_alpha_sqrt_pi * std::exp(-ksi2 * r2) - two_alpha_sqrt_pi *std::exp(-alpha2 * r2)) / r
-      + (std::erf(alpha * r) - std::erf(ksi * r)) / r3;
+      (two_alpha_sqrt_pi * std::exp(-alpha2 * r2) - two_ksi_sqrt_pi *std::exp
+      (-ksi2 * r2)) / r
+      + (std::erf(ksi * r) - std::erf(alpha * r)) / r3;
 
     // calculate gradient of green's function on all directions
     for (int i=0; i<3; i++)
@@ -325,8 +356,8 @@ Real GGEMPoisson::local_solution_field(PointMesh<3>      *point_mesh,
   {
     // 0. particle id and position, vector x = ptx - pt0
     const dof_id_type& p_id = point_nb_list[v];
-    const Point& pt0 = point_mesh->particles()[p_id]->point();
-    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(pt0, ptx);
+    const Point& ptj = point_mesh->particles()[p_id]->point();
+    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(ptx, ptj);
 
     // 1. compute the Green function of particle-v
     if (charge_type == "regularized") {
@@ -400,8 +431,8 @@ void GGEMPoisson::local_solution_field(PointMesh<3>*point_mesh,
   {
     // 0. particle id and position, vector x = ptx - pt0
     const dof_id_type& p_id = point_nb_list[v];
-    const Point& pt0 = point_mesh->particles()[p_id]->point();
-    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(pt0, ptx);
+    const Point& ptj = point_mesh->particles()[p_id]->point();
+    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(ptx, ptj);
 
     // 1. compute the Green function of particle-v
     if (charge_type == "regularized") {

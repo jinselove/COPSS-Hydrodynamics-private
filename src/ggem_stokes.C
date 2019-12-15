@@ -397,8 +397,8 @@ Point GGEMStokes::local_solution_field(PointMesh<3>      *point_mesh,
   {
     // 0. particle id and position, vector x = ptx - pt0
     const std::size_t& p_id = point_nb_list[v];
-    const Point& pt0 = point_mesh->particles()[p_id]->point();
-    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(pt0, ptx);
+    const Point& ptj = point_mesh->particles()[p_id]->point();
+    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(ptx, ptj);
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 1. compute the Green function (Oseen Tensor) of particle-v

@@ -125,6 +125,15 @@ public:
                                        ) const;
 
 
+  /**
+   * Calculate the gradient of unbounded smoothed green tensor. Notice that
+   * the point x is the point from x0 to xi, i.e, xi - x0. And we calculate
+   * the gradient at x0.
+   */
+  Point green_tensor_unbounded_smoothed_grad(const Point& x,
+    const Real& alpha_or_ksi) const;
+
+
   /*
    * Green tensor for the local charge density. The charge density is written as
    *a singular
@@ -153,7 +162,9 @@ public:
   /**
    * Calculate the gradient over three directions for
    * green_tensor_local_regularized. This function uses the derivation from
-   * Mathematica and hand-work, should be valid
+   * Mathematica and hand-work, should be valid.
+   * Notice that the point x is the point from x0 to xi, i.e, xi - x0. And we
+   * calculate the gradient at x0.
    */
    Point green_tensor_local_regularized_grad(const Point& x /* vector x = pt1 - pt0 */
                                             ) const;

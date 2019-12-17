@@ -408,14 +408,17 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
                                       dof_indices[l]));
         }
         // Now compute the element rhs
+        const Gradient coeff_1 = -0.5 * np_system.dt * np_system
+          .ion_diffusivity * gradient_c_old;
+
         for (unsigned int i = 0; i < phi.size(); i++)
         {
           Fe(i) += JxW[qp] * (
             // Mass term
             c_old * phi[i][qp]
             // diffusion term when using semi-implicit Euler for diffusion
-            - 0.5 * np_system.dt * np_system.ion_diffusivity * gradient_c_old
-              * dphi[i][qp]);
+            + coeff_1 * dphi[i][qp]
+            );
         }
       } // end loop over qp
     }
@@ -471,16 +474,19 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
           }
         }
         // Now compute the element rhs
+        const Gradient coeff_1 = -0.5 * np_system.dt * np_system
+          .ion_diffusivity * gradient_c_old;
+        const Real coeff_2 = -np_system.dt * (vel_old * gradient_c_old);
+
         for (unsigned int i = 0; i < phi.size(); i++)
         {
           Fe(i) += JxW[qp] * (
             // Mass term
             c_old * phi[i][qp]
             // diffusion term when using semi-implicit Euler for diffusion
-            - 0.5 * np_system.dt * np_system.ion_diffusivity * gradient_c_old
-              * dphi[i][qp]
+            + coeff_1 * dphi[i][qp]
             // convection term when using fully explicit Euler for convection
-            - np_system.dt * (vel_old * gradient_c_old) * phi[i][qp]
+            + coeff_2 * phi[i][qp]
             );
         }
       } // end loop over qp

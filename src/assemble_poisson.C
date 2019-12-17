@@ -529,9 +529,8 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
     {
       // Calculate local part of the electrical potential from GGEM
       const Point ptx       = side->point(nn); // Coordinate of the node
-      const Real  phi_local = pm_system.local_potential_field(elem,
-                                                              ptx,
-                                                              "regularized");
+      const Real  phi_local = pm_system.local_potential_field(ptx,
+        "regularized", elem->id());
 
       // When we run ggem_validation_poisson, Dirichelet boundary condition is
       // applied on all
@@ -587,6 +586,9 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   {
     return;
   }
+  std::cout<<"Warning: needs more testing/validation on the Neumann BC of "
+             "Poisson system. Exiting..." <<std::endl;
+  libmesh_error();
   
   
   // Get a reference to the Particle-Mesh System

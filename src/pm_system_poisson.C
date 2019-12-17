@@ -357,9 +357,8 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
         const Point ptx = elem->point(nn);
 
         // Evaluate local electrical potential (phi) on each node
-        phi_local[nn] = this->local_potential_field(elem, ptx, "regularized");
-
-        // phi_local[nn] = this->local_potential_field(ptx, "regularized");
+        phi_local[nn] = this->local_potential_field(ptx, "regularized",
+          elem->id());
       }
 
       // Interpolate local electric field on this bead location
@@ -476,20 +475,20 @@ Real PMSystemPoisson::local_potential_field(const Point      & p,
 }
 
 // ==================================================================================
-Real PMSystemPoisson::local_potential_field(const Elem        *elem,
-                                            const Point      & p,
-                                            const std::string& charge_type) const
-{
-  START_LOG("local_potential_field()", "PMSystemPoisson");
-
-  Real phi_local = ggem_poisson->local_solution_field(_point_mesh,
-                                                 p,
-                                                 charge_type,
-                                                 elem->id());
-
-  STOP_LOG("local_potential_field()", "PMSystemPoisson");
-  return phi_local;
-}
+//Real PMSystemPoisson::local_potential_field(const Elem        *elem,
+//                                            const Point      & p,
+//                                            const std::string& charge_type) const
+//{
+//  START_LOG("local_potential_field()", "PMSystemPoisson");
+//
+//  Real phi_local = ggem_poisson->local_solution_field(_point_mesh,
+//                                                 p,
+//                                                 charge_type,
+//                                                 elem->id());
+//
+//  STOP_LOG("local_potential_field()", "PMSystemPoisson");
+//  return phi_local;
+//}
 
 // ==================================================================================
 Real PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,

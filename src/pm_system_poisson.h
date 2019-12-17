@@ -125,18 +125,6 @@ public:
                              const std::string& charge_type,
                              dof_id_type p_elem_id=-1) const;
 
-
-  /**
-   * Local electrical potential of a point in an unbounded space,
-   * which is computed from Green's function. This function uses
-   * already-built neighbor list of Elem* elem.
-   * charge_type: "regularized"
-   */
-  Real local_potential_field(const Elem        *elem,
-                             const Point      & p,
-                             const std::string& charge_type) const;
-
-
   /**
    * Local electrical potential at a bead in an unbounded space,
    * which is computed from Green's function.

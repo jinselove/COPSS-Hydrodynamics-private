@@ -881,8 +881,8 @@ void AssembleStokes::apply_bc_by_penalty(const Elem          *elem,
       if (option == "disturbed")
       {
         const Point& ptx                 = side->point(nn);
-        const Point& u_local = pm_system.local_velocity_fluid(elem, ptx,
-          "regularized");
+        const Point& u_local = pm_system.local_velocity_fluid(ptx,
+          "regularized", elem_id);
 
         // ---------------- setup for validation test 01 -------------
         if (_eqn_sys.parameters.get<std::string>("simulation_name") ==

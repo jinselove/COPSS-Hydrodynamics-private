@@ -585,23 +585,6 @@ Point PMSystemStokes::local_velocity_fluid(const Point      & p,
 }
 
 // ==================================================================================
-Point PMSystemStokes::local_velocity_fluid(const Elem        *elem,
-                                          const Point      & p,
-                                          const std::string& force_type)const
-{
-  START_LOG("local_velocity_fluid()", "PMSystemStokes");
-
-  Point Ulocal = ggem_stokes->local_solution_field(_point_mesh,
-                                                   p,
-                                                   force_type,
-                                                   elem->id());
-
-  STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
-
-  return Ulocal;
-}
-
-// ==================================================================================
 Point PMSystemStokes::local_velocity_bead(const std::size_t& bead_id,
                                           const std::string& force_type) const
 {

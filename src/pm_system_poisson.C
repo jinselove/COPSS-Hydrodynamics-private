@@ -452,7 +452,7 @@ void PMSystemPoisson::add_electrostatic_forces()
   STOP_LOG("add_electrostatic_forces()", "PMSystemPoisson");
 }
 
-// ==================================================================================
+// ==========================================================================
 Real PMSystemPoisson::local_potential_field(const Point      & p,
                                             const std::string& charge_type,
                                             dof_id_type p_elem_id)
@@ -474,7 +474,29 @@ Real PMSystemPoisson::local_potential_field(const Point      & p,
   return phi_local;
 }
 
-// ==================================================================================
+// ===========================================================================
+void PMSystemPoisson::local_potential_field(const Point &p,
+                                            const std::string &charge_type,
+                                            const std::string& sol_option,
+                                            std::map<Real, Point>& local_sol,
+                                            dof_id_type p_elem_id)const
+{
+  START_LOG("local_potential_field()", "PMSystemPoisson");
+
+  // locate point element id if it's not given
+  if (p_elem_id==-1)
+  {
+    const MeshBase& mesh = this->get_mesh();
+    p_elem_id = mesh.point_locator().operator()(p)->id();
+  }
+
+  ggem_poisson->local_solution_field(_point_mesh, p, charge_type, p_elem_id,
+    sol_option, local_sol);
+
+  STOP_LOG("local_potential_field()", "PMSystemPoisson");
+}
+
+// ===========================================================================
 Real PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,
                                            const std::string& charge_type) const
 {
@@ -487,7 +509,22 @@ Real PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,
   return phi_local;
 }
 
-// ==================================================================================
+// ===========================================================================
+void PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,
+                                           const std::string& charge_type,
+                                           const std::string& sol_type,
+                                           std::map<Real, Point>& local_sol)
+                                           const
+{
+  START_LOG("local_potential_bead()", "PMSystemPoisson");
+
+  ggem_poisson->local_solution_bead(_point_mesh, bead_id, charge_type,
+    sol_type, local_sol);
+
+  STOP_LOG("local_potential_bead()", "PMSystemPoisson");
+}
+
+// ===========================================================================
 void PMSystemPoisson::test_potential_profile()
 {
   START_LOG("test_potential_profile()", "PMSystemPoisson");

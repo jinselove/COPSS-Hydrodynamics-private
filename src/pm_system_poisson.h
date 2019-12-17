@@ -126,12 +126,42 @@ public:
                              dof_id_type p_elem_id=-1) const;
 
   /**
+   * Fill local_sol with local electrical potential and local electrical
+   * potential gradient of a point in an unbounded space,
+   * which is computed from Green's function. This function directly
+   * search the neighbor list around Point &p.
+   * charge_type: "regularized"
+    * sol_type: "phi" or "grad" or "phi&grad" controls whether potential or
+   * potential gradient or both are evaluated.
+   */
+  void local_potential_field(const Point      & p,
+                             const std::string& charge_type,
+                             const std::string& sol_type,
+                             std::map<Real, Point>& local_sol,
+                             dof_id_type p_elem_id=-1) const;
+
+
+  /**
    * Local electrical potential at a bead in an unbounded space,
    * which is computed from Green's function.
    * charge_type: "regularized"
    */
   Real local_potential_bead(const std::size_t& bead_id,
                             const std::string& charge_type) const;
+
+
+  /**
+   * Fill local_sol with Local electrical potential and potential grad at a
+   * bead in an unbounded space,
+   * which is computed from Green's function.
+   * charge_type: "regularized"
+   * sol_type: "phi" or "grad" or "phi&grad" controls whether potential or
+   * potential gradient or both are evaluated.
+   */
+  void local_potential_bead(const std::size_t& bead_id,
+                            const std::string& charge_type,
+                            const std::string& sol_type,
+                            std::map<Real, Point>& local_sol) const;
 
 
   /*

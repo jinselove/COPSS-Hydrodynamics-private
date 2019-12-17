@@ -26,6 +26,7 @@
 #include "solver_poisson.h"
 #include "pm_linear_implicit_system.h"
 #include "ggem_poisson.h"
+#include "libmesh/parallel_algebra.h"
 
 namespace libMesh {
 /*
@@ -99,7 +100,7 @@ public:
   /*
    * Compute electric field (Ex, Ey, Ez) at all beads' locations
    */
-  void compute_point_efield(std::vector<Real>& pv);
+  void compute_point_efield(std::vector<Point>& pv);
 
 
   /*

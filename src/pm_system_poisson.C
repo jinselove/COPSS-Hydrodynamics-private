@@ -265,7 +265,7 @@ void PMSystemPoisson::solve(const std::string& option)
 //}
 
 // ==================================================================================
-void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
+void PMSystemPoisson::compute_point_efield(std::vector<Point>& pv)
 {
   START_LOG("compute_point_efield()", "PMSystemPoisson");
 
@@ -274,31 +274,14 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
   const std::size_t NP     =  _point_mesh->num_particles();
   const std::size_t dim    = mesh.mesh_dimension();
   const dof_id_type& n_elem = mesh.n_elem();
-
-  // std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
-  std::vector<Real> _pv_send_list;                               // point
-                                                                 // electric
-                                                                 // field send
-                                                                 // list
-  std::vector<Real> _pglobal_send_list;
-  std::vector<Real> _plocal_send_list;
-  std::vector<std::size_t> _pid_send_list;                       // point id
-                                                                 // send list
   const unsigned int phi_var     = this->variable_number("phi"); // phi_var = 0
   const std::string  charge_type = "regularized";
 
-  // Get Finite Element type for "phi"
-  FEType fe_phi_type = this->variable_type(phi_var);
-
-  // Build a Finite Element object of the specified type for the potential
-  // variable
-  UniquePtr<FEBase> fe_phi(FEBase::build(dim, fe_phi_type));
-
-  // Gauss quadrature rule for numerical integration
-  QGauss qrule(dim, fe_phi_type.default_quadrature_order());
-
-  // Tell finite element objects to use the quadrature rule
-  fe_phi->attach_quadrature_rule(&qrule);
+  // create local buffer of total efield and
+  // particle id. These vectors will be evaluated in each processor locally
+  // and then gathered together using this->comm().allgather function
+  std::vector<Point> efield_total_send_list;
+  std::vector<size_t> pid_send_list;
 
   // Loop over each point, and compute electric field in its location
   // Collect the global electrical potential from FEM through Allgather
@@ -309,7 +292,6 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
     const Point pt               = _point_mesh->particles()[i]->point();
     const PointType   point_type = _point_mesh->particles()[i]->point_type();
     const dof_id_type elem_id    = _point_mesh->particles()[i]->elem_id();
-
     if (elem_id > n_elem)
     {
       std::cout << "---> Error in PMSystemPoisson::compute_point_efield():\n"
@@ -319,14 +301,11 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
     }
     const Elem *elem = mesh.elem(elem_id);
 
-    // 1. Global(FEM) solution at the current point. This is done on local
-    // processors
+    // global potential gradient
     Gradient efield_global;
-
-    // 2. Local electric field at particle i, This is also done on local
-    // processors
-    RealGradient efield_local;
-
+    // local solution, but we only need to compute the gradient
+    std::pair<Real, Point> sol_local;
+    const std::string sol_type = "grad";
     // 3. total electric field
     Point efield_total;
 
@@ -334,91 +313,43 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
     {
       // Global electric field
       efield_global = this->point_gradient(phi_var, pt, *elem);
-
-      // Extract shape function derivatives to be evaluated at the bead location
-      const std::vector<std::vector<RealGradient> >& dphi = fe_phi->get_dphi();
-
-      // Extract bead coordinates in the reference frame
-      std::vector<Point> bead_ptx;
-      bead_ptx.resize(1);
-      bead_ptx[0] = FE<3, LAGRANGE>::inverse_map(elem, pt);
-
-      // Evaluate the shape functions derivatives at this bead location
-      fe_phi->reinit(elem, &bead_ptx);
-
-      // Local electrical potential on all nodes in this element
-      std::vector<Real> phi_local;
-      phi_local.resize(elem->n_nodes());
-
-      // Loop through nodes on this element
-      for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
-      {
-        // Coordinate of the node
-        const Point ptx = elem->point(nn);
-
-        // Evaluate local electrical potential (phi) on each node
-        phi_local[nn] = this->local_potential_field(ptx, "regularized",
-          elem->id());
-      }
-
-      // Interpolate local electric field on this bead location
-      for (unsigned int j = 0; j < phi_local.size();
-           j++) efield_local += phi_local[j] * dphi[j][0];
-
+      // evaluate local solution
+      this->local_potential_field(pt, charge_type, sol_type, sol_local,
+        elem_id);
       // FIXME: do we need to exclude self exclusion term for point_type =
       // "POLYMER_BEAD"
       if (point_type == POLYMER_BEAD) {
-        efield_total(0) = efield_global(0) + efield_local(0);
-        efield_total(1) = efield_global(1) + efield_local(1);
-        efield_total(2) = efield_global(2) + efield_local(2);
+        efield_total(0) = efield_global(0) + sol_local.second(0);
+        efield_total(1) = efield_global(1) + sol_local.second(1);
+        efield_total(2) = efield_global(2) + sol_local.second(2);
       }
       else if (point_type == LAGRANGIAN_POINT) {
         std::cout << "---> Error in PMSystemPoisson::compute_point_potential: \n"
-                  <<
-          "     point_type LAGRANGIAN_POINT is not supported yet for electrostatics."
+                  <<"     point_type LAGRANGIAN_POINT is not supported yet for electrostatics."
                   << std::endl << std::endl;
-
         libmesh_error();
       }
-
-      // pack particle id and its velocity
-      _pid_send_list.push_back(i);
-
-      for (unsigned int j = 0; j < dim; j++) {
-        _pv_send_list.push_back(efield_total(j));
-
-        // _pglobal_send_list.push_back(efield_global(j));
-        // _plocal_send_list.push_back(efield_local(j));
-      }
-
-      // printf("i = %i, processor_id = %i, efield_local = %f, %f, %f\n", i,
-      // this->processor_id(), efield_local(0), efield_local(1),
-      // efield_local(2));
-    } // end if (elem->processor_id() == this->processor_id)
-  }   // end for i-loop
+      // pack particle id
+      pid_send_list.push_back(i);
+      efield_total_send_list.push_back(efield_total);
+    }// end if (elem->processor_id() == this->processor_id)
+  } // end for i-loop
 
   // Check the size of local_pv and the size of list on each process after
   // allgather
-  this->comm().allgather(_pid_send_list); // allgather the particle id
-  this->comm().allgather(_pv_send_list); // allgather the total electric field
-
-  // this->comm().allgather(_pglobal_send_list);
-  // this->comm().allgather(_plocal_send_list);
-  if (_pid_send_list.size() != NP)
+  this->comm().allgather(pid_send_list);
+  this->comm().allgather(efield_total_send_list);
+  if (pid_send_list.size() != NP)
   {
     std::cout << "---> Error in PMSystemPoisson::compute_point_efield: \n"
-              << "       _pid_send_list.size() != NP"
+              << "       pid_send_list.size() != NP"
               << std::endl << std::endl;
     libmesh_error();
   }
 
-  for (std::size_t i = 0; i < NP; ++i) {
-    const std::size_t p_id = _pid_send_list[i];
-
-    for (unsigned int j = 0; j < dim; ++j) {
-      pv[dim * p_id + j] = _pv_send_list[i * dim + j];
-    }
-  }
+  // Fill pv
+  for (std::size_t i = 0; i < NP; ++i)
+    pv[pid_send_list[i]] = efield_total_send_list[pid_send_list[i]];
 
   STOP_LOG("compute_point_efield()", "PMSystemPoisson");
 }
@@ -433,19 +364,14 @@ void PMSystemPoisson::add_electrostatic_forces()
   const std::size_t dim  = mesh.mesh_dimension();
 
   // Compute electric field at every bead's location
-  std::vector<Real> pv(NP * dim, 0.);
+  std::vector<Point> pv(NP, 0.);
   this->compute_point_efield(pv);
 
   Point pforce;
   Real  charge;
-
   for (std::size_t i = 0; i < NP; ++i) {
     charge = _point_mesh->particles()[i]->charge();
-
-    pforce(0) = charge * pv[dim * i];
-    pforce(1) = charge * pv[dim * i + 1];
-    pforce(2) = charge * pv[dim * i + 2];
-
+    pforce = pv[i] * charge;
     _point_mesh->particles()[i]->add_particle_force(pforce);
   }
 

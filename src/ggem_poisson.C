@@ -102,16 +102,25 @@ void GGEMPoisson::set_ksi()
 }
 
 // ======================================================================
-Real GGEMPoisson::smoothed_charge_exp(const Real& r) const
+Real GGEMPoisson::smoothed_charge_exp(const Point& pt) const
 {
-  START_LOG("smoothed_force_exp()", "GGEMSystem");
+  START_LOG("smoothed_force_exp()", "GGEMPoisson");
 
-  const Real r2   = r * r;
-  const Real a2r2 = alpha2 * r2;
+  Real g = alpha3_pi_23 * std::exp(-alpha2 * pt.norm_sq());
 
-  Real g = alpha3_pi_23 * std::exp(-a2r2);
+  STOP_LOG("smoothed_force_exp()", "GGEMPoisson");
 
-  STOP_LOG("smoothed_force_exp()", "GGEMSystem");
+  return g;
+}
+
+// ==================================================================
+Real GGEMPoisson::regularized_charge_exp(const Point& r) const
+{
+  START_LOG("regularized_charge_exp()", "GGEMPoisson");
+
+  Real g = ksi3_pi_23 * std::exp(-ksi2 * r.norm_sq());
+
+  STOP_LOG("regularized_charge_exp()", "GGEMPoisson");
 
   return g;
 }
@@ -221,6 +230,19 @@ Point GGEMPoisson::green_tensor_unbounded_smoothed_grad(const Point& x,
 
   // done
   return G_grad;
+}
+
+//=======================================================================
+Real GGEMPoisson::green_tensor_unbounded_smoothed_laplacian(const Point& x)const
+{
+  START_LOG("green_tensor_unbounded_smoothed_laplacian()", "GGEMPoisson");
+
+  // DenseMatrix<Number> G(dim,dim);
+  Real laplacian = -4 * ksi3 * std::exp(-ksi2 * x.norm_sq()) / sqrt_pi;
+
+  STOP_LOG("green_tensor_unbounded_smoothed_laplacian()", "GGEMPoisson");
+
+  return laplacian;
 }
 
 // ======================================================================

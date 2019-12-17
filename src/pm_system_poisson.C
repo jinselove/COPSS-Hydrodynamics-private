@@ -496,6 +496,57 @@ void PMSystemPoisson::local_potential_field(const Point &p,
   STOP_LOG("local_potential_field()", "PMSystemPoisson");
 }
 
+
+// ===========================================================================
+Real PMSystemPoisson::total_potential_laplacian_field(const Point &pt,
+                                                      const std::string&charge_type,
+                                                      dof_id_type elem_id) const
+{
+  START_LOG("total_potential_laplacian_field()", "PMSystemPoisson");
+
+  // locate point element id if it's not given
+  if (elem_id==-1)
+  {
+    const MeshBase& mesh = this->get_mesh();
+    elem_id = mesh.point_locator().operator()(pt)->id();
+  }
+
+  const std::vector<dof_id_type>& point_nb_list =
+    _point_mesh->get_elem_point_neighbor_list(elem_id);
+
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Loop over all the neighbor list beads, and
+     and compute the laplacian, which is identical to -4*pi*charge_density
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  // Initialize variables
+  Real laplacian = 0., rho=0.;
+
+  // loop over all neighbor points of this field point
+  for (std::size_t v = 0; v < point_nb_list.size(); ++v)
+  {
+    // 0. particle id and position, vector x = ptx - pt0
+    const dof_id_type& p_id = point_nb_list[v];
+    const Point& ptj = _point_mesh->particles()[p_id]->point();
+    const Point& x = _point_mesh->pm_periodic_boundary()->point_vector(pt, ptj);
+
+    // 1. compute the Green function of particle-v
+    if (charge_type == "regularized") {
+        rho += ggem_poisson->regularized_charge_exp(x) *
+          (_point_mesh->particles()[p_id]->charge());
+    }
+    else {
+      std::cout<<"Error: invalid charge_type. Exiting..."<<std::endl;
+      libmesh_error();
+    } // end if-else
+  }
+
+  laplacian = -4 * pi * rho;
+
+  STOP_LOG("total_potential_laplacian_field()", "PMSystemPoisson");
+
+  return laplacian;
+}
+
 // ===========================================================================
 Real PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,
                                            const std::string& charge_type) const
@@ -582,7 +633,7 @@ void PMSystemPoisson::test_potential_profile()
         <<"phi_grad_global(x),phi_grad_global(y),phi_grad_global(z),"
         <<"phi_grad_local(x),phi_grad_local(y),phi_grad_local(z),"
         <<"phi_grad_exact(x),phi_grad_exact(y),phi_grad_exact(z),"
-        <<"phi_grad_total_itp(x),phi_grad_total_itp(x),";
+        <<"phi_laplacian_total,phi_laplacian_exact"<<"\n";
 
     // separation between spacial points in this direction
     const Real ds = box_len(dim_i) / Real(ns);
@@ -622,6 +673,13 @@ void PMSystemPoisson::test_potential_profile()
         analytical_solution->exact_solution_infinite_domain_grad
         (*ggem_poisson, pt);
 
+      // get laplacian
+      Real phi_exact_laplacian =
+        analytical_solution->exact_solution_infinite_domain_laplacian
+        (*ggem_poisson, pt);
+      Real phi_total_laplacian = this->total_potential_laplacian_field(pt,
+        "regularized");
+
       // write the result to output file
       if (this->comm().rank() == 0)
         outfile <<pt(dim_i)<<","
@@ -632,8 +690,9 @@ void PMSystemPoisson::test_potential_profile()
         <<phi_grad_total(0)<<","<<phi_grad_total(1)<<","<<phi_grad_total(2)<<","
         <<phi_grad_global(0)<<","<<phi_grad_global(1)<<","<<phi_grad_global(2)<<","
         <<local_sol.second(0)<<","<<local_sol.second(1)<<","<<local_sol.second(2)<<","
-        <<phi_grad_exact(0)<<","<<phi_grad_exact(1)<<","<<phi_grad_exact(2)
-        << "\n";
+        <<phi_grad_exact(0)<<","<<phi_grad_exact(1)<<","<<phi_grad_exact(2)<<","
+        <<phi_total_laplacian<<","<<phi_exact_laplacian
+        <<"\n";
     } // end for i-loop
     outfile.close();
   } // end loop dim_i

@@ -70,7 +70,13 @@ public:
    * Modified smoothed Dirac delta function with exponent form
    * Reference: equation (13) in JCP, 143. 014108 (2015)
    */
-  Real smoothed_charge_exp(const Real& r) const;
+  Real smoothed_charge_exp(const Point& pt) const;
+
+  /**
+   * Regularized charge density kernel for GGEM system,
+   * this is to calculate the total charge density
+   */
+  Real regularized_charge_exp(const Point& r) const;
 
 
   /*
@@ -132,6 +138,13 @@ public:
    */
   Point green_tensor_unbounded_smoothed_grad(const Point& x,
     const Real& alpha_or_ksi) const;
+
+  /**
+   * Calculate the gradient of unbounded smoothed green tensor. Notice that
+   * the point x is the point from x0 to xi, i.e, xi - x0. And we calculate
+   * the gradient at x0.
+   */
+  Real green_tensor_unbounded_smoothed_laplacian(const Point& x) const;
 
 
   /*

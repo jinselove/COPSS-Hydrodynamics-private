@@ -125,6 +125,7 @@ public:
                              const std::string& charge_type,
                              dof_id_type p_elem_id=-1) const;
 
+
   /**
    * Fill local_sol with local electrical potential and local electrical
    * potential gradient of a point in an unbounded space,
@@ -139,6 +140,17 @@ public:
                              const std::string& sol_type,
                              std::pair<Real, Point>& local_sol,
                              dof_id_type p_elem_id=-1) const;
+
+
+  /**
+   * compute Laplacian of potential at a point
+   * Notice that laplacian(potential) = -4*pi*total_charge_density in
+   * dimensionless Poisson Equation. This 4*pi
+   * comes from the non-dimensionless process.
+   */
+  Real total_potential_laplacian_field(const Point& pt,
+                                        const std::string& charge_type,
+                                       dof_id_type p_elem_id=-1) const;
 
 
   /**
@@ -162,6 +174,7 @@ public:
                             const std::string& charge_type,
                             const std::string& sol_type,
                             std::pair<Real, Point>& local_sol) const;
+
 
 
   /*

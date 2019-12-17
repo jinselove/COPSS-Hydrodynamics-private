@@ -369,7 +369,8 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
 
     // Initialize variables for position, charge, distance, etc.
     Point np_pos(0.);
-    Real  r = 0., charge_val = 0., np_charge = 0., pi_4 = 4. * libMesh::pi;
+    Real charge_val = 0., np_charge = 0., pi_4 = 4. * libMesh::pi;
+    Point r;
     unsigned int qp_size = q_xyz.size();
 
     // Assemble int_force to avoid duplicate calculations
@@ -392,7 +393,7 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
       np_pos = _particles[n_list[np]]->point();
       for (unsigned int qp = 0; qp < qp_size; qp++) {
         // Distance from quadrature point to the charge point
-        r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
+        r = _pm_periodic_boundary->point_vector(q_xyz[qp], np_pos);
         // Evaluate the value of regularized gaussian charge at this quadrature
         // point
         charge_val = ggem_poisson->smoothed_charge_exp(r) * np_charge;

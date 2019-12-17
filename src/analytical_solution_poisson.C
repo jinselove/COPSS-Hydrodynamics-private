@@ -57,9 +57,9 @@ PointMesh<3> * AnalyticalSolutionPoisson::get_point_mesh()
 {
   START_LOG("get_point_mesh()", "AnalyticalSolutionPoisson");
 
-  return _point_mesh;
-
   STOP_LOG("get_point_mesh()", "AnalyticalSolutionPoisson");
+
+  return _point_mesh;
 }
 
 // ======================================================================
@@ -127,4 +127,31 @@ Point AnalyticalSolutionPoisson::exact_solution_infinite_domain_grad(
   STOP_LOG("exact_solution_infinite_domain_grad()",
     "AnalyticalSolutionPoisson");
   return phi_grad;
+}
+
+// =========================================================================
+Real AnalyticalSolutionPoisson::exact_solution_infinite_domain_laplacian(
+  GGEMPoisson& ggem_poisson, const Point& pt0) const
+{
+  START_LOG("exact_solution_infinite_domain_laplacian()",
+            "AnalyticalSolutionPoisson");
+
+  // GGEM object and number of points in the system
+  const std::size_t n_points = _point_mesh->num_particles();
+
+  Real laplacian = 0.;
+
+  // loop over each point
+  for (std::size_t i = 0; i < n_points; ++i)
+  {
+    const Point pti = _point_mesh->particles()[i]->point();
+    const Point x   = pti - pt0;
+
+    laplacian += ggem_poisson.green_tensor_unbounded_smoothed_laplacian(x) *
+      _point_mesh->particles()[i]->charge();
+  } // end for i
+
+  STOP_LOG("exact_solution_infinite_domain_laplacian()",
+           "AnalyticalSolutionPoisson");
+  return laplacian;
 }

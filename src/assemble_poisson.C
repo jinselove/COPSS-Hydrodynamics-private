@@ -95,7 +95,7 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
   UniquePtr<FEBase> fe_phi(FEBase::build(_dim, fe_phi_type));
 
   // Gauss quadrature rule for numerical integration
-  QGauss qrule(_dim, SECOND);
+  QGauss qrule(_dim, fe_phi_type.default_quadrature_order());
 
   // Tell finite element objects to use the quadrature rule
   fe_phi->attach_quadrature_rule(&qrule);
@@ -195,9 +195,9 @@ void AssemblePoisson::assemble_global_K(const std::string& system_name,
     // PMToolBox::output_dense_matrix(Ke);
     _pm_system.matrix->add_matrix(Ke, dof_indices);
   }
-  return;
 
   STOP_LOG("assemble_global_K()", "AssemblePoisson");
+  return;
 }
 
 // ==================================================================================
@@ -226,7 +226,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   UniquePtr<FEBase> fe_phi(FEBase::build(_dim, fe_phi_type));
 
   // Define Gauss quadrature rule for numerical integration.
-  QGauss qrule(_dim, SECOND);
+  QGauss qrule(_dim, fe_phi_type.default_quadrature_order());
   fe_phi->attach_quadrature_rule(&qrule);
 
   // Declare a special finite element object for
@@ -235,7 +235,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   // Boundary integration requires one quadrature rule,
   // with dimensionality one less than the dimensionality
   // of the element.
-  QGauss qface(_dim - 1, SECOND);
+  QGauss qface(_dim - 1, fe_phi_type.default_quadrature_order());
   fe_face->attach_quadrature_rule(&qface);
 
   // The element Jacobian * quadrature weight at each integration point.
@@ -582,7 +582,7 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   const std::size_t  elem_id = elem->id();
   
   // If the Neumann boundaries of this element is None, return None
-  if (_boundary_sides_neumann_poisson.size() == 0)
+  if (_boundary_sides_neumann_poisson[elem->id()].size() == 0)
   {
     return;
   }

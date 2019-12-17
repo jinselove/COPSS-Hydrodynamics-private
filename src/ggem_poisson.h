@@ -204,7 +204,7 @@ public:
                             const dof_id_type ptx_elem_id,
                             const std::string& sol_option, //"phi" or
                             // "grad" or "phi&grad"
-                            std::map<Real, Point>& local_sol
+                            std::pair<Real, Point>& local_sol
                             );
 
   /* Compute the local electrostatic potential field and the local
@@ -227,7 +227,7 @@ public:
                            const std::string& charge_type,
                            const std::string& sol_option, //"phi" or
     // "grad" or "phi&grad"
-                           std::map<Real, Point>& local_sol);
+                           std::pair<Real, Point>& local_sol);
 
     // ! set PointType
   void set_point_type(const PointType& _point_type) {

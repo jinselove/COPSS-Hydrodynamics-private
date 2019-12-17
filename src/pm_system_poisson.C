@@ -295,7 +295,7 @@ void PMSystemPoisson::compute_point_efield(std::vector<Real>& pv)
   UniquePtr<FEBase> fe_phi(FEBase::build(dim, fe_phi_type));
 
   // Gauss quadrature rule for numerical integration
-  QGauss qrule(dim, SECOND);
+  QGauss qrule(dim, fe_phi_type.default_quadrature_order());
 
   // Tell finite element objects to use the quadrature rule
   fe_phi->attach_quadrature_rule(&qrule);
@@ -478,7 +478,7 @@ Real PMSystemPoisson::local_potential_field(const Point      & p,
 void PMSystemPoisson::local_potential_field(const Point &p,
                                             const std::string &charge_type,
                                             const std::string& sol_option,
-                                            std::map<Real, Point>& local_sol,
+                                            std::pair<Real, Point>& local_sol,
                                             dof_id_type p_elem_id)const
 {
   START_LOG("local_potential_field()", "PMSystemPoisson");
@@ -513,7 +513,7 @@ Real PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,
 void PMSystemPoisson::local_potential_bead(const std::size_t& bead_id,
                                            const std::string& charge_type,
                                            const std::string& sol_type,
-                                           std::map<Real, Point>& local_sol)
+                                           std::pair<Real, Point>& local_sol)
                                            const
 {
   START_LOG("local_potential_bead()", "PMSystemPoisson");
@@ -536,9 +536,11 @@ void PMSystemPoisson::test_potential_profile()
   _re_init = true; // assemble global matrix and init ksp_solver
   this->solve("unused");
 
-  // get system dimension
+  // get reference to system essentials
   MeshBase& mesh = this->get_mesh();
-  const std::size_t dim = mesh.mesh_dimension();
+  const std::size_t& dim = mesh.mesh_dimension();
+  const unsigned int& phi_var = this->variable_number("phi"); // phi_var = 0
+
   // Output electrical potential profiles along xyz directions, global + local
   // solutions
   const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
@@ -574,8 +576,14 @@ void PMSystemPoisson::test_potential_profile()
     outfile.precision(o_precision);
     // write column header
     if (this->comm().rank() == 0)
-      outfile << filenames[dim_i] << ",phi_total,phi_global,phi_local,"
-                                     "phi_exact\n";
+      outfile <<filenames[dim_i]<<","
+        <<"phi_total,phi_global,phi_local,phi_exact,"
+        <<"phi_grad_total(x),phi_grad_total(y),phi_grad_total(z),"
+        <<"phi_grad_global(x),phi_grad_global(y),phi_grad_global(z),"
+        <<"phi_grad_local(x),phi_grad_local(y),phi_grad_local(z),"
+        <<"phi_grad_exact(x),phi_grad_exact(y),phi_grad_exact(z),"
+        <<"phi_grad_total_itp(x),phi_grad_total_itp(x),";
+
     // separation between spacial points in this direction
     const Real ds = box_len(dim_i) / Real(ns);
     // create helper vector
@@ -589,29 +597,43 @@ void PMSystemPoisson::test_potential_profile()
       Point pt((box_min(0) + Real(i) * ds) * helper_vec[0],
                (box_min(1) + Real(i) * ds) * helper_vec[1],
                (box_min(2) + Real(i) * ds) * helper_vec[2]);
-      // global potential from FEM
-      Real phi_global, phi_total;
-      const unsigned int phi_var = this->variable_number("phi"); // phi_var = 0
-      // get global phi from FEM solution, this is slow, but we tolerate it
-      // only for test
-      phi_global = this->point_value(phi_var, pt);
+      // Initialize solution
+      Real phi_global=0., phi_total=0., phi_exact;
+      // Initialize solution gradient
+      Point phi_grad_global, phi_grad_total, phi_grad_exact;
 
-      // get local potential from analytical function
-      const Real phi_local = this->local_potential_field(pt, "regularized");
+      // evaluate global solution from FEM solution, this is slow, but we
+      // tolerate it only for test
+      phi_global = this->point_value(phi_var, pt);
+      phi_grad_global = this->point_gradient(phi_var, pt);
+
+      // evaluate local potential from GGEM
+      std::pair<Real, Point> local_sol;
+      this->local_potential_field(pt, "regularized", "phi&grad", local_sol);
 
       // get total solution at this point
-      phi_total = phi_global + phi_local;
+      phi_total = phi_global + local_sol.first;
+      phi_grad_total = phi_grad_global + local_sol.second;
 
       // get exact solution for an unbounded domain from analytical solution
-      const Real phi_exact = analytical_solution->exact_solution_infinite_domain(
-              *ggem_poisson, pt);
+      phi_exact = analytical_solution->exact_solution_infinite_domain(
+        *ggem_poisson, pt);
+      phi_grad_exact =
+        analytical_solution->exact_solution_infinite_domain_grad
+        (*ggem_poisson, pt);
 
       // write the result to output file
       if (this->comm().rank() == 0)
-        outfile << pt(dim_i) << "," << phi_total
-                << "," << phi_global
-                << "," << phi_local
-                << "," << phi_exact << "\n";
+        outfile <<pt(dim_i)<<","
+        <<phi_total<<","
+        <<phi_global<<","
+        <<local_sol.first<<","
+        <<phi_exact<<","
+        <<phi_grad_total(0)<<","<<phi_grad_total(1)<<","<<phi_grad_total(2)<<","
+        <<phi_grad_global(0)<<","<<phi_grad_global(1)<<","<<phi_grad_global(2)<<","
+        <<local_sol.second(0)<<","<<local_sol.second(1)<<","<<local_sol.second(2)<<","
+        <<phi_grad_exact(0)<<","<<phi_grad_exact(1)<<","<<phi_grad_exact(2)
+        << "\n";
     } // end for i-loop
     outfile.close();
   } // end loop dim_i
@@ -654,7 +676,7 @@ void PMSystemPoisson::test_nodal_error()
   _re_init = true;
   this->solve("disturbed");
 
-  // evaluate the total solution
+  //update system solution to total
   this->update_solution_to_total();
 
   // Theoretical solution
@@ -662,10 +684,13 @@ void PMSystemPoisson::test_nodal_error()
   MeshBase& mesh = this->get_mesh();
   const unsigned int n_nodes = mesh.n_nodes();
   Real max_abs_error=0.;
+//  Real max_abs_error_grad=0.;
   Real val0_norm = 0.;
   Real val1_norm = 0.;
   Real val2_norm = 0.;
   Real val3_norm = 0.;
+
+  const unsigned int phi_var = this->variable_number("phi");
 
   // Loop over each node and compute the nodal solution
   MeshBase::node_iterator nd           = mesh.local_nodes_begin();
@@ -680,18 +705,29 @@ void PMSystemPoisson::test_nodal_error()
     for (unsigned int i = 0; i < dim; ++i) pt(i) =  (*node)(i);
 
     // get the dof index at this node
-    const unsigned int phi_var = this->variable_number("phi");
     const dof_id_type& dof_index = node->dof_number(this->number(), phi_var, 0);
 
-    // Get the numerical total solution
+    // get the element id of this node from stored mapping
+    const dof_id_type &elem_id = _point_mesh->get_node_elem_id(node->id());
+    const Elem* elem = mesh.elem_ptr(elem_id);
+
     const Real& phi_total = this->solution->operator()(dof_index);
+//    const RealGradient& phi_total_grad = this->point_gradient(phi_var, pt,
+//      *elem);
 
     // compute the local velocity of fluid at the current node
-    const Real& phi_exact =
+    Real phi_exact =
       analytical_solution->exact_solution_infinite_domain(*ggem_poisson, pt);
+//    Point phi_exact_grad =
+//      analytical_solution->exact_solution_infinite_domain_grad(*ggem_poisson,
+//        pt);
 
     // compute the errors
     max_abs_error = std::max(std::abs(phi_total-phi_exact), max_abs_error);
+//    max_abs_error_grad =
+//      std::max({std::abs(phi_total_grad(0)-phi_exact_grad(0)),std::abs
+//      (phi_total_grad(1)-phi_exact_grad(1)), std::abs(phi_total_grad(2)
+//      -phi_exact_grad(2)), max_abs_error_grad});
     Real tmpt = std::abs(phi_total-phi_exact);
     val0_norm += tmpt;
     val1_norm += std::abs(phi_exact);
@@ -705,12 +741,15 @@ void PMSystemPoisson::test_nodal_error()
   this->comm().sum(val2_norm);
   this->comm().sum(val3_norm);
   this->comm().max(max_abs_error);
+//  this->comm().max(max_abs_error_grad);
 
   const Real l1_norm = val0_norm / val1_norm;
   const Real l2_norm = std::sqrt(val2_norm) / std::sqrt(val3_norm);
   ss << ">>> sum(|phi_total-phi_exact|) / sum(|phi_exact|) = " << l1_norm
      << "; sum(|phi_total-phi_exact|^2) / sum(|phi_exact|^2) = " << l2_norm
-     << "; max(|phi_total-phi_exact|) = "<<max_abs_error<<"\n";
+     << "; max(|phi_total-phi_exact|) = "<<max_abs_error
+//     <<"; max(phi_grad_total-phi_grad_exact|) = "<<max_abs_error_grad
+     <<"\n";
   PMToolBox::output_message(ss, this->comm());
 
   // write equation system to output file
@@ -846,11 +885,11 @@ void PMSystemPoisson::update_solution_to_total()
     const dof_id_type& dof_index = node->dof_number(this->number(), phi_var, 0);
 
     // get the local solution on this node calling GGEM
-    const Real& phi_local =
-      this->local_potential_field(pt,"regularized", elem_id);
+    std::pair<Real, Point> sol_local;
+    this->local_potential_field(pt, "regularized", "phi&grad", sol_local, elem_id);
 
     // add local solution to system solution
-    this->solution->add(dof_index, phi_local);
+    this->solution->add(dof_index, sol_local.first);
   } // end loop over local nodes
 
   this->solution->close();

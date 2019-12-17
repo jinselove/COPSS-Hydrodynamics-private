@@ -299,7 +299,7 @@ Point GGEMPoisson::green_tensor_local_regularized_grad(
     // this tmp is the same for all directions
     const Real tmp =
       (two_alpha_sqrt_pi * std::exp(-alpha2 * r2) - two_ksi_sqrt_pi *std::exp
-      (-ksi2 * r2)) / r
+      (-ksi2 * r2)) / r2
       + (std::erf(ksi * r) - std::erf(alpha * r)) / r3;
 
     // calculate gradient of green's function on all directions
@@ -387,7 +387,7 @@ void GGEMPoisson::local_solution_field(PointMesh<3>*point_mesh,
                                       const std::string& charge_type,
                                       const dof_id_type ptx_elem_id,
                                       const std::string& sol_option,
-                                      std::map<Real, Point>& local_sol)
+                                      std::pair<Real, Point>& local_sol)
 {
 
   // create a reference to mesh
@@ -418,10 +418,6 @@ void GGEMPoisson::local_solution_field(PointMesh<3>*point_mesh,
      and the gradient of the local potential
         phi_l_grad(i) = sum[v=1:Nl] grad(G_v(x-x_v; i,j)) * q_v(j)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-  // clean local_sol before writing
-  local_sol.clear();
-
   // Initialize variables
   Real phi = 0., GT = 0.;
   Point phi_grad, GT_grad;
@@ -466,7 +462,7 @@ void GGEMPoisson::local_solution_field(PointMesh<3>*point_mesh,
   } // end for v-loop
 
   // insert phi and phi_grad to local_sol.
-  local_sol.insert(std::make_pair(phi, phi_grad));
+  local_sol=std::make_pair(phi, phi_grad);
 
   STOP_LOG("local_solution_field()", "GGEMPoisson");
 }
@@ -516,7 +512,7 @@ void GGEMPoisson::local_solution_bead(PointMesh<3>*point_mesh,
                          const dof_id_type& bead_id,
                          const std::string& charge_type,
                          const std::string& sol_option,
-                         std::map<Real, Point>& local_sol)
+                         std::pair<Real, Point>& local_sol)
 {
   START_LOG("local_solution_bead()", "GGEMPoisson");
 
@@ -528,10 +524,6 @@ void GGEMPoisson::local_solution_bead(PointMesh<3>*point_mesh,
      Loop over all the neighbor list beads, and compute the local potential:
      phi_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*q_v(j)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-
-  // clean local_sol before writing
-  local_sol.clear();
-
   Real phi = 0., GT = 0.;
   Point phi_grad, GT_grad;
 
@@ -571,7 +563,7 @@ void GGEMPoisson::local_solution_bead(PointMesh<3>*point_mesh,
   } // end for v-loop
 
   // insert phi and phi_grad to local_sol.
-  local_sol.insert(std::make_pair(phi, phi_grad));
+  local_sol=std::make_pair(phi, phi_grad);
 
   STOP_LOG("local_solution_bead()", "GGEMPoisson");
 }

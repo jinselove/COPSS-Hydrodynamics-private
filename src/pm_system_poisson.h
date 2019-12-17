@@ -137,7 +137,7 @@ public:
   void local_potential_field(const Point      & p,
                              const std::string& charge_type,
                              const std::string& sol_type,
-                             std::map<Real, Point>& local_sol,
+                             std::pair<Real, Point>& local_sol,
                              dof_id_type p_elem_id=-1) const;
 
 
@@ -161,7 +161,7 @@ public:
   void local_potential_bead(const std::size_t& bead_id,
                             const std::string& charge_type,
                             const std::string& sol_type,
-                            std::map<Real, Point>& local_sol) const;
+                            std::pair<Real, Point>& local_sol) const;
 
 
   /*
@@ -199,6 +199,10 @@ public:
    *
    */
   void resume_solution_to_global() override;
+
+
+  // A Pointer to the solution gradient
+//  UniquePtr<NumericVector<Point>> solution_gradient;
 
 
 private:

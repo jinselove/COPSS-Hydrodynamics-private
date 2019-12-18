@@ -25,6 +25,8 @@
 #include "assemble_system.h"
 #include "analytical_solution_stokes.h"
 #include "ggem_stokes.h"
+#include "pm_system_np.h"
+
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
@@ -126,7 +128,8 @@ public:
                            const std::vector<dof_id_type>& n_list,
                            const bool                  & pf_flag,
                            const std::string           & option,
-                           DenseVector<Number>         & Fe);
+                           DenseVector<Number>         & Fe,
+                           const bool& couple_np);
 
 
   /*! \brief select sides on the boundary for all elements
@@ -193,4 +196,14 @@ private:
   std::vector<unsigned int> _n_uvw_dofs;
   std::vector<std::vector<dof_id_type>> _dof_indices_u;
   std::vector<std::vector<dof_id_type>> _dof_indices_p;
+
+  // initialize a pointer to all PMSystemNP systems; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<PMSystemNP*> np_systems;
+
+  // initialize a pointer to the dof map of Poisson system; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<DofMap*> np_dof_maps;
 };

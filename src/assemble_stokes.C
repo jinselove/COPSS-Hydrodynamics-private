@@ -359,6 +359,26 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   //  const MeshBase& _mesh = _eqn_sys.get_mesh();
   PMSystemStokes& _pm_system = _eqn_sys.get_system<PMSystemStokes>(system_name);
 
+  if (_eqn_sys.parameters.get<bool>("module_np")){
+    // if np_systems vectors are not filled with NP systems pointers, we do it
+    if (np_systems.size()==0)
+    {
+      // loop over all systems and push the references of all NP systems and
+      // their dof maps to np_systems and np_dof_maps vector respectively
+      unsigned int n_sys = _eqn_sys.n_systems();
+      for (unsigned int s_id=0; s_id<n_sys; s_id++){
+        const std::string& s_name = _eqn_sys.get_system(s_id).name();
+        if (s_name.rfind("NP:", 0)==0){
+          // np system
+          np_systems.push_back(&(_eqn_sys.get_system<PMSystemNP>(s_name)));
+          // np system dof map
+          np_dof_maps.push_back(&(_eqn_sys.get_system<PMSystemNP>(s_name)
+            .get_dof_map()));
+        }
+      }
+    }
+  }
+
   // Numeric ids corresponding to each variable in the system
   const unsigned int u_var = _pm_system.variable_number("u"); // u_var = 0
   const unsigned int p_var = _pm_system.variable_number("p"); // p_var =
@@ -511,8 +531,12 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
     if (option == "undisturbed") pf_flag = false;  // No point force
 
     // perf_log.push("compute_element_rhs");
+
+    // we only couple NP solutions to RHS when module_np is true and
+    // is_brownian is false
     this->compute_element_rhs(elem, _n_u_dofs[elem_id], *fe_vel, n_list,
-                              pf_flag, option, Fe);
+      pf_flag, option, Fe, (_eqn_sys.parameters.get<bool>("module_np")&
+        (!is_brownian)));
 
 
     // perf_log.pop("compute_element_rhs");
@@ -548,7 +572,8 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
                                          const std::vector<dof_id_type>& n_list,
                                          const bool                  & pf_flag,
                                          const std::string           & option,
-                                         DenseVector<Number>         & Fe)
+                                         DenseVector<Number>         & Fe,
+                                         const bool& couple_np)
 {
   START_LOG("compute_element_rhs()", "AssembleStokes"); // libMesh log
 
@@ -568,14 +593,6 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
     _pm_periodic_boundary->inlet_pressure();
   std::vector<PointParticle *> _particles = _point_mesh->particles();
 
-  // The element Jacobian * quadrature weight at each quad pt(high order
-  // Qgauss).
-  // const std::vector<Real>& JxW                = fe_v.get_JxW();
-  // const std::vector<std::vector<Real> >& phi  = fe_v.get_phi();
-  // const std::vector<Point>& q_xyz             = fe_v.get_xyz(); // xyz coords
-  // of quad pts
-  // printf("q_xyz size = %d\n", q_xyz.size());
-  // fe_v.reinit(elem);
   const unsigned int elem_id      = elem->id();
   const std::vector<Point>& q_xyz = _q_xyz[elem_id]; // xyz coords of quad pts
 
@@ -588,36 +605,6 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
     // get the location of points in the neighbor list
     const std::size_t n_pts = n_list.size();
     unsigned int qp_size = q_xyz.size();
-
-//    // Now we will build the element RHS using high order gauss quadrature.
-//    // first loop over all neighboring particles near this element
-//    Point np_pos(0.);
-//    Point np_force(0.);
-//    Real  r = 0., force_val = 0.;
-//
-//    // printf("qp_size = %d\n", q_xyz.size());
-//    for (unsigned int np = 0; np < n_pts; ++np)
-//    {
-//      np_force = _particles[n_list[np]]->particle_force();
-//      np_pos   = _particles[n_list[np]]->point();
-//
-//      for (unsigned int qp = 0; qp < qp_size; qp++) {
-//        // distance from Gaussian point to the force point
-//        r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
-//
-//        // evaluate the value of gauss force at this quad pt.
-//        force_val = ggem_stokes->smoothed_force_exp(r);
-//
-//        for (unsigned int j = 0; j < _dim; ++j) {
-//          for (unsigned int k = 0; k < n_u_dofs; ++k) {
-//            // force_val * np_force is the global force density contributed for
-//            // this particle
-//            Fe(j * n_u_dofs + k) +=
-//              _int_force[elem_id][k * qp_size + qp] * force_val *np_force(j);
-//          } // end loop over nodes
-//        }// end loop over dimensions
-//      } // end loop over gaussian points
-//    } // end loop over beads
 
     // loop over qp points to compute rhs for this element
     for (unsigned int qp=0; qp<qp_size; qp++)

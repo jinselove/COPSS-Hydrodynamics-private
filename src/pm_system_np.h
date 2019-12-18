@@ -186,10 +186,10 @@ public:
   // ion name
   std::string ion_name;
 
-  // ion diffusivity
+  // ion diffusivity, unit = [1]
   Real ion_diffusivity;
 
-  // ion valence
+  // ion valence, unit = [1]
   int ion_valence;
 
   // Dirichlet Boundary id for this ion
@@ -203,6 +203,11 @@ public:
 
   // if NP system is relaxed without fluid
   bool relaxed;
+
+  // NP coefficient = bjerrum_length * ion_diffusivity * ion_valence, where
+  // bjerrum length = e^2/(4*pi*epsilon_0*epsilon*KB*T*bead_radius). Unit = [1]
+  Real np_coeff;
+
 
 private:
 

@@ -133,10 +133,14 @@ public:
   std::vector<Real> ion_diffusivity;
   // valence of each ion species (unit = 1)
   std::vector<int> ion_valence;
+  // Bjerrum length, unit = 1
+  Real lambda_B;
   // NP system relaxation time for initialization. By default, this
   // relaxation time is 2 * Rb^2/max(ion_diffusivity), i.e., the time it takes
   // for ions to diffuse 2 particle radius. 
   Real np_system_relaxation_time;
+  // np system relaxation write interval
+  unsigned int np_system_relaxation_write_interval;
 
   // characteristic variables
   Real tc; // characteristic time (diffusion time) (s)

@@ -113,6 +113,8 @@ void PMSystemNP::init_params()
   Parameters& params = this->get_equation_systems().parameters;
   ion_diffusivity = (params.get<std::vector<Real>>("ion_diffusivity"))[ion_id];
   ion_valence = (params.get<std::vector<int>>("ion_valence"))[ion_id];
+  np_coeff = params.get<Real>("bjerrum_length") * ion_diffusivity *
+    ion_valence;
   boundary_id_dirichlet_np = params.get<std::vector<unsigned int>>
     ("boundary_id_dirichlet_np");
   boundary_value_dirichlet_np = (params.get<std::vector<std::vector<Real>>>

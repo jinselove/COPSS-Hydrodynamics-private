@@ -278,8 +278,11 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
       = ion_diffusivity;
     equation_systems.parameters.set<std::vector<int>>("ion_valence")
       = ion_valence;
+    equation_systems.parameters.set<Real>("bjerrum_length") = lambda_B;
     equation_systems.parameters.set<Real>("np_system_relaxation_time") =
       np_system_relaxation_time;
+    equation_systems.parameters.set<unsigned int>
+      ("np_system_relaxation_write_interval") =np_system_relaxation_write_interval;
     // calculate minimum dt required by all NP systems
     // this dt will be updated during integration process if dt required by
     // other systems are even smaller

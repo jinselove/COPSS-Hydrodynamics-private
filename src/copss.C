@@ -195,6 +195,9 @@ void Copss::read_physical_info()
     ion_diffusivity.resize(input_file.vector_variable_size("ion_diffusivity"));
     // valence of all ion species (1)
     ion_valence.resize(input_file.vector_variable_size("ion_valence"));
+    // Bjerrum length
+    lambda_B = elementary_charge * elementary_charge / (4. * PI * epsilon *
+      epsilon_0 * kBT * Rb);
     // real in data for individual ions
     if (ion_name.size() ==ion_diffusivity.size()
       and ion_name.size() == ion_valence.size())
@@ -219,6 +222,9 @@ void Copss::read_physical_info()
     // np system relaxation time for initialization (unit = tc)
     np_system_relaxation_time = input_file("np_system_relaxation_time",
       2. / (*std::min_element(ion_diffusivity.begin(), ion_diffusivity.end())));
+    // write interval
+    np_system_relaxation_write_interval = input_file
+      ("np_system_relaxation_write_interval", 10);
   } // end if module_np
 
   // print out physical parameters information related to Stokes System

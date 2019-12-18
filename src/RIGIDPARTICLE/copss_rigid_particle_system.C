@@ -269,8 +269,11 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
             = ion_diffusivity;
     equation_systems.parameters.set<std::vector<int>>("ion_valence")
             = ion_valence;
+    equation_systems.parameters.set<Real>("bjerrum_length") = lambda_B;
     equation_systems.parameters.set<Real>("np_system_relaxation_time") =
       np_system_relaxation_time;
+    equation_systems.parameters.set<unsigned int>
+      ("np_system_relaxation_write_interval") =np_system_relaxation_write_interval;
     equation_systems.parameters.set<std::vector<unsigned int> >(
             "boundary_id_dirichlet_np") = boundary_id_dirichlet_poisson;
     equation_systems.parameters.set<std::vector<std::vector<Real>> >(
@@ -319,7 +322,7 @@ void CopssRigidParticleSystem::run(EquationSystems& equation_systems) {
 
   // only when with_hi==true and with_brownian ==false, we can use a larger time
   // step
-  if (with_brownian == false and with_hi == true) {
+  if (!with_brownian and with_hi) {
     for (int i = 1; i < max_dr_coeff.size(); i++) max_dr_coeff[i] *= hmin;  // only
                                                                             // magnify
                                                                             // max_dr_coeff[1]

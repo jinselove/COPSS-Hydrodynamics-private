@@ -6,7 +6,7 @@
 #			   system_name         			
 #############################################
 
-simulation_name = poisson_validation_dirichlet_bc
+simulation_name = 'np'
 
 #############################################
 #			   Physical parameters         			
@@ -27,10 +27,7 @@ viscosity = 1.018E-15
 temperature = 297
 
 # radius of the bead (um)
-radius = 0.01
-
-# dielectric constant of fluid
-epsilon = 80.
+radius = 0.077
 
 #############################################
 #			   Geometry info         			
@@ -43,14 +40,14 @@ dimension = 3
 wall_type = slit
 
 # domain size #
-slit = '-10. 10. -10. 10. -5. 5.'
+slit = '-1. 1. -1. 1. -1. 1.'
 
 # periodicity #
 periodicity = 'false false false'
 
 # inlet info #
-inlet = 'false false false'
-inlet_pressure = '0 0 0'
+inlet = 'true false false'
+inlet_pressure = '0.1 0 0'
 
 # shear info #
 shear = 'false false false'
@@ -61,8 +58,7 @@ shear_direction = '0. 0. 0.'
 #			   Mesh info
 #############################################
 generate_mesh = true
-n_mesh = '20 20 10'
-generate_mesh = true
+n_mesh = '10 10 10'
 
 #############################################
 #	 Force info         			
@@ -73,7 +69,7 @@ force_field = 'p_constant'
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.6
+alpha = 0.35
 
 #############################################
 #			   Solver info
@@ -113,6 +109,7 @@ schur_user_ksp_atol = 1E-6
 # decrease as the mesh becomes finer! (Try finer mesh)
 schur_pc_type = SMp
 
+
 #############################################
 #	Chebyshev info (only for brownian system)         			
 #############################################
@@ -147,25 +144,64 @@ solver_poisson = superLU_dist
 
 # Boundary conditions
 boundary_id_dirichlet_poisson = '1 2 3 4 5 6'
-boundary_value_dirichlet_poisson = '0. 0. 0. 0. 0. 0.'
+boundary_value_dirichlet_poisson = '0. 0. 0. 0. 0. 0.001'
 
 #boundary_id_neumann_poisson = '1 2'
 #boundary_value_neumann_poisson = '0 0'
 
+############################################
+# Nernst Planck System Specific Parameters
+############################################
+
+# module np on or off
+module_np = true
+
+# ion names ('string, string')
+ion_name = 'ion1 ion2'
+
+# ion diffusivity (um^2/s)
+ion_diffusivity = '0.0277526 0.0277526'
+
+# ion valence (1)
+ion_valence = '1 -1'
+
+# solver
+solver_np = superLU_dist
+
+# boundary conditions
+boundary_id_dirichlet_np = '1 2 3 4 5 6'
+boundary_value_dirichlet_np_ion1 = '0. 0. 0. 0.00001 0. 0.'
+boundary_value_dirichlet_np_ion2 = '0. 0. 0. 0.00001 0. 0.'
+
+# enforce charge neutrality
+check_charge_neutrality = true
+
+# time interval for all np system
+np_system_dt = 0.0001
+
+# np system relaxation time at initialization
+np_system_relaxation_time = 0.008
+
+# np system relaxation write interval
+np_system_relaxation_write_interval = 1
 #############################################
 #			   Run info
 #############################################
 with_hi	       = false
 with_brownian  = false
 adaptive_dt    = false
-max_dr_coeff   = '0. 0.1 0.1'
+max_dr_coeff   = '0.0 0.001 0.001'
 update_neighbor_list_everyStep = true
 restart        = false
 random_seed    = 123456789
-nstep          = 1
+nstep          = 0
 n_relax_step   = 1
 write_interval = 1
-output_file    = 'equation_systems trajectory' 
-solution_name = 'total'
-debug_info     = true
-print_info = true
+output_file    = 'equation_systems trajectory center_of_mass mean_square_displacement' 
+debug_info     = false
+print_info = false
+output_precision = 9
+
+
+
+

@@ -325,8 +325,7 @@ Point GGEMPoisson::green_tensor_local_regularized_grad(
       + (std::erf(ksi * r) - std::erf(alpha * r)) / r3;
 
     // calculate gradient of green's function on all directions
-    for (int i=0; i<3; i++)
-      G_grad(i) = x(i) * tmp;
+    G_grad = x * tmp;
   } // end if-else
 
   STOP_LOG("green_tensor_local_regularized_grad()", "GGEMPoisson");
@@ -442,7 +441,7 @@ void GGEMPoisson::local_solution_field(PointMesh<3>*point_mesh,
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   // Initialize variables
   Real phi = 0., GT = 0.;
-  Point phi_grad, GT_grad;
+  Point phi_grad(0.), GT_grad(0.);
 
   // loop over all neighbor points of this field point
   for (std::size_t v = 0; v < point_nb_list.size(); ++v)

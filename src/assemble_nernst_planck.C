@@ -47,6 +47,8 @@
 #include "pm_toolbox.h"
 #include "assemble_nernst_planck.h"
 #include "pm_system_np.h"
+#include "pm_system_poisson.h"
+#include "pm_system_stokes.h"
 
 // ==================================================================================
 AssembleNP::AssembleNP(EquationSystems& es,
@@ -249,12 +251,12 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
   // create null pointers to other systems, some of the null pointers will be
   // redirected to objects if the corresponding system exists.
   // Stokes system
-  PMLinearImplicitSystem* stokes_system = nullptr;
+  PMSystemStokes* stokes_system = nullptr;
   DofMap* stokes_dof_map = nullptr;
   std::vector<unsigned short int> vel_vars(_dim);
 
   // Poisson system
-  PMLinearImplicitSystem* poisson_system = nullptr;
+  PMSystemPoisson* poisson_system = nullptr;
   DofMap* poisson_dof_map = nullptr;
   unsigned short int phi_var;
 
@@ -269,7 +271,14 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
     // no need to do anything
   }
   else if (option == "diffusion&convection"){
-    stokes_system = &(_eqn_sys.get_system<PMLinearImplicitSystem>("Stokes"));
+    stokes_system = &(_eqn_sys.get_system<PMSystemStokes>("Stokes"));
+  }
+  else if (option == "diffusion&electrostatics"){
+    poisson_system = &(_eqn_sys.get_system<PMSystemPoisson>("Poisson"));
+  }
+  else if (option == "diffusion&electrostatics&convection"){
+    poisson_system = &(_eqn_sys.get_system<PMSystemPoisson>("Poisson"));
+    stokes_system = &(_eqn_sys.get_system<PMSystemStokes>("Stokes"));
   }
   else{
     std::stringstream oss;
@@ -279,12 +288,15 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
     libmesh_error();
   }
   // prepare FEM objects for Stokes system if existed
-  if (stokes_system != nullptr)
-  {
+  if (stokes_system != nullptr){
     stokes_dof_map = &(stokes_system->get_dof_map());
     vel_vars[0] = stokes_system->variable_number("u");
     vel_vars[1] = stokes_system->variable_number("v");
     vel_vars[2] = stokes_system->variable_number("w");
+  }
+  if (poisson_system != nullptr){
+    poisson_dof_map = &(poisson_system->get_dof_map());
+    phi_var = poisson_system->variable_number("phi");
   }
 
   // Get a const reference to the Finite element type for the first (and only
@@ -320,6 +332,11 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
   // The element shape function gradients evaluated at the quadrature
   // points.
   const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+
+  // The XY locations of the quadrature points of 3D elements, this will give
+  // the coordinates of quadrature points in real space instead of reference
+  // space
+  const std::vector<Point> & q_points = fe->get_xyz();
 
   // The XY locations of the quadrature points used for face integration
   const std::vector<Point> & qface_points = fe_face->get_xyz();
@@ -479,11 +496,164 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
         }
       } // end loop over qp
     }
+      // for diffusion&electrostatics&convection system
+    else if((stokes_system == nullptr) and (poisson_system != nullptr))
+    {
+      // get dof_indices associated with "phi" of the Poisson system
+      std::vector<dof_id_type> poisson_dof_indices(phi.size());
+      poisson_dof_map->dof_indices(elem, poisson_dof_indices);
+
+      // loop over all qp points to compute rhs
+      for (unsigned int qp=0; qp<qrule.n_points(); qp++)
+      {
+        // Values to hold the old system solution & its gradient at this qp point
+        Number c_old = 0.;
+        Gradient gradient_c_old;
+
+        // evaluate laplacian of the total potential on this qp point
+        Real total_potential_laplacian_old =
+          poisson_system->total_potential_laplacian_field(q_points[qp],
+                                                          "regularized", elem_id);
+
+        // evaluate gradient of the local potential on this qp point
+        std::pair<Real, Point> local_potential_old;
+        poisson_system->local_potential_field(q_points[qp], "regularized",
+                                              "grad", local_potential_old, elem_id);
+
+        // initialize the gradient of the global potential on this qp point,
+        // the value of this gradient will be calculated using interpolation
+        Gradient global_potential_gradient_old;
+
+        // compute the old solution & its gradient at this qp point
+        for (unsigned int l = 0; l < phi.size(); l++)
+        {
+          // get old solution at this qp point
+          // notice that we are not using Libmesh::TransientSystem, thus the
+          // current_solution of our system is actually solution from previous
+          // time step
+          c_old +=
+            phi[l][qp] * (*np_system.current_local_solution)(dof_indices[l]);
+
+          // get solution gradient at this qp_point
+          gradient_c_old.add_scaled(dphi[l][qp],
+                                    (*np_system.current_local_solution)(
+                                      dof_indices[l]));
+
+          // interpolate the global potential gradient at this qp point
+          global_potential_gradient_old.add_scaled(dphi[l][qp],
+            poisson_system->current_local_solution->operator()(dof_indices[l]));
+        }
+
+        // coefficient for diffusion term
+        const Gradient coeff_1 = -0.5 * np_system.dt * np_system
+          .ion_diffusivity * gradient_c_old;
+        // coefficient for electrostatics term
+        const Real coeff_2 = np_system.np_coeff * (c_old *
+          total_potential_laplacian_old + gradient_c_old *
+          (local_potential_old.second + global_potential_gradient_old));
+        for (unsigned int i = 0; i < phi.size(); i++)
+        {
+          Fe(i) += JxW[qp] * (
+            // Mass term
+            c_old * phi[i][qp]
+            // diffusion term when using semi-implicit Euler for diffusion
+            + coeff_1 * dphi[i][qp]
+            // electrostatics term using full explicit Euler for electrostatics
+            + coeff_2 * phi[i][qp]
+          );
+        }
+      } // end loop over qp
+    }
+    // for diffusion&electrostatics&convection system
     else
     {
-      std::cout << "please implement this condition..." << std::endl;
-      libmesh_error();
+      // get dof_indices associated with u, v, w of
+      // the stokes system for this element
+      std::vector<std::vector<dof_id_type>> stokes_dof_indices(_dim,
+        std::vector<dof_id_type>(phi.size()));
+      for (int dim_i=0; dim_i<_dim; dim_i++)
+        stokes_dof_map->dof_indices(elem,
+          stokes_dof_indices[dim_i], vel_vars[dim_i]);
+
+      // get dof_indices associated with "phi" of the Poisson system
+      std::vector<dof_id_type> poisson_dof_indices(phi.size());
+      poisson_dof_map->dof_indices(elem, poisson_dof_indices);
+
+      // loop over all qp points to compute rhs
+      for (unsigned int qp=0; qp<qrule.n_points(); qp++)
+      {
+        // Values to hold the old system solution & its gradient at this qp point
+        Number c_old = 0.;
+        Gradient gradient_c_old;
+        // use Gradient type to store the velocity vector at this qp point,
+        // this doesn't mean vel_old is a gradient
+        Gradient vel_old;
+
+        // evaluate laplacian of the total potential on this qp point
+        Real total_potential_laplacian_old =
+          poisson_system->total_potential_laplacian_field(q_points[qp],
+            "regularized", elem_id);
+
+        // evaluate gradient of the local potential on this qp point
+        std::pair<Real, Point> local_potential_old;
+        poisson_system->local_potential_field(q_points[qp], "regularized",
+          "grad", local_potential_old, elem_id);
+        // initialize the gradient of the global potential on this qp point,
+        // the value of this gradient will be calculated using interpolation
+        Gradient global_potential_gradient_old;
+
+        // compute the old solution & its gradient at this qp point
+        for (unsigned int l = 0; l < phi.size(); l++)
+        {
+          // get old solution at this qp point
+          // notice that we are not using Libmesh::TransientSystem, thus the
+          // current_solution of our system is actually solution from previous
+          // time step
+          c_old +=
+            phi[l][qp] * (*np_system.current_local_solution)(dof_indices[l]);
+
+          // get solution gradient at this qp_point
+          gradient_c_old.add_scaled(dphi[l][qp],
+                                    (*np_system.current_local_solution)(
+                                      dof_indices[l]));
+          // get velocity vector (size=_dim) from total stokes solution at this
+          // qp point
+          for (int dim_i=0; dim_i<_dim; dim_i++)
+            vel_old(dim_i) += phi[l][qp] *
+                              (stokes_system->current_local_solution->operator()
+                                (stokes_dof_indices[dim_i][l]));
+
+          // interpolate the global potential gradient at this qp point
+          global_potential_gradient_old.add_scaled(dphi[l][qp],
+            poisson_system->current_local_solution->operator()(dof_indices[l]));
+        }
+
+        // coefficient for diffusion term
+        const Gradient coeff_1 = -0.5 * np_system.dt * np_system
+          .ion_diffusivity * gradient_c_old;
+        // coefficient for convection term
+        const Real coeff_2 = -np_system.dt * (vel_old * gradient_c_old);
+        // coefficient for electrostatics term
+        const Real coeff_3 = np_system.np_coeff * (c_old *
+          total_potential_laplacian_old + gradient_c_old *
+          (local_potential_old.second + global_potential_gradient_old));
+
+        for (unsigned int i = 0; i < phi.size(); i++)
+        {
+          Fe(i) += JxW[qp] * (
+            // Mass term
+            c_old * phi[i][qp]
+            // diffusion term when using semi-implicit Euler for diffusion
+            + coeff_1 * dphi[i][qp]
+            // convection term when using fully explicit Euler for convection
+            + coeff_2 * phi[i][qp]
+            // electrostatics term using full explicit Euler for electrostatics
+            + coeff_3 * phi[i][qp]
+          );
+        }
+      } // end loop over qp
     }
+
     // apply bc by penalty
     {
       // if _reinit_node_penalty is true, we recalculate penalty on the boundary

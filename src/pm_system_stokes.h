@@ -274,8 +274,7 @@ public:
             }
           }
    */
-  void couple_np(unsigned int relax_step_id=0,
-                 const unsigned int output_interval=10);
+  void couple_np(unsigned int relax_step_id=0);
   
   
    /**

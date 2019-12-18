@@ -973,14 +973,16 @@ void PMSystemStokes::couple_poisson()
 }
 
 //===========================================================================
-void PMSystemStokes::couple_np(unsigned int relax_step_id,
-                               const unsigned int output_interval)
+void PMSystemStokes::couple_np(unsigned int relax_step_id)
 {
   Parameters& params = this->get_equation_systems().parameters;
   const bool& module_poisson = params.get<bool>("module_poisson");
   const bool& with_hi = params.get<bool>("with_hi");
   const Real& dt = params.get<Real>("dt");
   const Real& relax_t_final = params.get<Real>("np_system_relaxation_time");
+  const unsigned int output_interval = params.get<unsigned int>
+    ("np_system_relaxation_write_interval");
+  std::ostringstream oss;
 
   // store all np system names to a vector
   std::vector<std::string> np_sys_names;
@@ -1001,7 +1003,6 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
   if (this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[0])
     .relaxed)
   {
-    std::ostringstream oss;
     // update real_time since we are solve concentration for t = t+dt
     params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
     oss <<"====> All NP system are relaxed. Solved all NP systems for c(t=t+dt="
@@ -1019,19 +1020,6 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
       oss <<"* max(total_stokes_solution) = " << this->solution->max();
       PMToolBox::output_message(oss, this->comm());
     }
-    // evaluate total solutions of Poisson system if exists
-    if (module_poisson)
-    {
-      // Update Poisson Solution to total solution
-      PMToolBox::output_message(">> Updating Poisson solution to total...",
-                                this->comm());
-      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-        .update_solution_to_total();
-      oss <<"* max(total_poisson_solution) = " << this->get_equation_systems
-      ().get_system<PMSystemPoisson>("Poisson").solution->max();
-      PMToolBox::output_message(oss, this->comm());
-    }
-
     // set solve options for NP solver
     const std::string option = std::string("diffusion")
                                + ((module_poisson) ? ("&electrostatics") : (""))
@@ -1059,16 +1047,6 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
                                 this->comm());
       this->resume_solution_to_global();
     }
-    // evaluate total solutions of Poisson system if exists
-    if (module_poisson)
-    {
-      // Update Poisson Solution to total solution
-      PMToolBox::output_message(">> resume Poisson solution to global ...",
-                                this->comm());
-      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-        .resume_solution_to_global();
-      PMToolBox::output_message(oss, this->comm());
-    }
   }
   // if NP system are not relaxed, we relax them; this will be done recursively
   else
@@ -1079,11 +1057,26 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
     if (! this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[0])
       .init_cd_set)
     {
+      // Initialize all NP system
       PMToolBox::output_message("----> Initializing all NP systems",
         this->comm());
       for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
         this->get_equation_systems().get_system<PMSystemNP>
           (np_sys_names[s_id]).init_cd();
+
+      // Initialize Poisson system solution if existed
+      if (module_poisson){
+        // we need to solve the Poisson system to initialized all the
+        // parameters and the solution
+        this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+          .solve("unused");
+        oss<<"----> Initializing Poisson systems\n"
+           << "* Poisson system max_solution = "
+           << this->get_equation_systems().get_system<PMSystemPoisson>
+           ("Poisson").solution->max();
+        PMToolBox::output_message(oss, this->comm());
+      }
+
 #ifdef LIBMESH_HAVE_EXODUS_API
       ExodusII_IO(this->get_mesh()).write_equation_systems("init_cd.e",
         this->get_equation_systems());
@@ -1101,7 +1094,7 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
       // solve all NP systems for one step with Electrostatics on but Fluid
       // off --> this gives us c(t+dt)
       const std::string option = std::string("diffusion")
-        + ((module_poisson) ? ("electrostatics") : (""));
+        + ((module_poisson) ? ("&electrostatics") : (""));
       for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
       {
         // solve this NP system for one step
@@ -1115,7 +1108,7 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
           PMToolBox::output_message(oss, this->comm());
         }
         // set system relaxed status if real_time > relax_t_final
-        if (params.get<Real>("real_time") > relax_t_final)
+        if (params.get<Real>("real_time") >= relax_t_final)
         {
           this->get_equation_systems().get_system<PMSystemNP>
             (np_sys_names[s_id]).relaxed = true;
@@ -1133,6 +1126,7 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
           PMToolBox::output_message(oss, this->comm());
         }
       }
+
       if(relax_step_id%output_interval==0)
       {
         #ifdef LIBMESH_HAVE_EXODUS_API
@@ -1147,13 +1141,13 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id,
       }
 
       // set real time to 0. if relax time > relax_t_final
-      if (params.get<Real>("real_time") > relax_t_final)
+      if (params.get<Real>("real_time") >= relax_t_final)
         params.set<Real>("real_time") = 0.;
     }
 
     // recursively call couple_np. Recursion will stop once all systems are
     // relaxed
-    this->couple_np(relax_step_id+1, output_interval);
+    this->couple_np(relax_step_id+1);
   }
 }
 

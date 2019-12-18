@@ -250,8 +250,7 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   DenseVector<Number> sigma_e;
   DenseVector<Number> sigma_e_global;
   DenseVector<Number> sigma_e_local;
-  
-  
+
   // This vector will hold the degree of freedom indices for
   // the element.  These define where in the global system
   // the element degrees of freedom get mapped.
@@ -384,26 +383,32 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
       }
     }
 
-    // Now we will build the element RHS using gauss quadrature integration.
-    // first loop over all neighboring particles near this element
-    for (unsigned int np = 0; np < n_pts; ++np) {
-      // Charge on this bead, multiplied by 4*PI in Poisson equation
-      np_charge = _particles[n_list[np]]->charge() * pi_4;
-      // Get the location of this bead
-      np_pos = _particles[n_list[np]]->point();
-      for (unsigned int qp = 0; qp < qp_size; qp++) {
-        // Distance from quadrature point to the charge point
-        r = _pm_periodic_boundary->point_vector(q_xyz[qp], np_pos);
-        // Evaluate the value of regularized gaussian charge at this quadrature
-        // point
-        charge_val = ggem_poisson->smoothed_charge_exp(r) * np_charge;
-        // loop over all dof 
-        for (unsigned int k = 0; k < n_dofs; ++k) {
-          // Fe(k) += JxW[qp]*phi[k][qp]*charge_val;
-          Fe(k) += int_force[k * qp_size + qp] * charge_val;
-        } // end loop over nodes (dofs)
-      }   // end loop over quadrature points
-    }     // end loop over beads
+    // loop over all qp points to compute rhs
+    for (unsigned int qp=0; qp<qp_size; qp++)
+    {
+      // calculate the global charge density at this qp
+      Real rho_global = 0.;
+
+      // loop over all neighbor points of this qp point to accumulate rho_global
+      for (unsigned int np=0; np<n_pts; np++)
+      {
+        // get a constant pointer to this neighbor particle
+        const Point& pt = _particles[n_list[np]]->point();
+        const Real& charge = _particles[n_list[np]]->charge();
+        // calculate the contribution of this neighbor particle to global
+        // charge density of this qp point
+        rho_global += ggem_poisson->smoothed_charge_exp
+          (_pm_periodic_boundary->point_vector(q_xyz[qp], pt)) * charge;
+      }
+
+      // scale rho_global by 4*pi, this comes from the dimensionless process
+      rho_global *= pi_4;
+
+      for (unsigned int k=0; k<n_dofs; k++)
+      {
+        Fe(k) += int_force[k * qp_size + qp] * rho_global;
+      }
+    }
   }       // end if( pc_flag )
 
   STOP_LOG("compute_element_rhs()", "AssemblePoisson");

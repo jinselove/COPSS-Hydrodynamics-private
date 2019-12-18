@@ -301,6 +301,13 @@ public:
     */
    UniquePtr<NumericVector<Number>> undisturbed_solution;
 
+   /**
+    * localized undisturbed solution
+    * this localized solution vector has the undisturbed solution on all dof
+    * indices
+    */
+   std::vector<Number> local_undisturbed_solution;
+
 private:
 
   // Stokes solver

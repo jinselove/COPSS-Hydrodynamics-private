@@ -765,7 +765,7 @@ void PMSystemPoisson::output_nodal_solution(const std::string& output_filename)
   fb.open (output_filename,std::ios::out);
   std::ostream os(&fb);
 
-  std::vector<Real> v(this->solution->size());
+  std::vector<Real> v;
   this->solution->localize(v);
   // right now we only want one copy of the output
   if (this->solution->processor_id())

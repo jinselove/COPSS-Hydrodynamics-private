@@ -454,9 +454,10 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
         // Values to hold the old system solution & its gradient at this qp point
         Number c_old = 0.;
         Gradient gradient_c_old;
-        // use Gradient type to store the velocity vector at this qp point,
-        // this doesn't mean vel_old is a gradient
-        Gradient vel_old;
+
+        // Initialize global, local and undisturbed velocity at this qp point
+        Point total_vel_old;
+
         // compute the old solution & its gradient at this qp point
         for (unsigned int l = 0; l < phi.size(); l++)
         {
@@ -471,18 +472,29 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
           gradient_c_old.add_scaled(dphi[l][qp],
                                     (*np_system.current_local_solution)(
                                       dof_indices[l]));
-          // get velocity vector (size=_dim) from total stokes solution at this
-          // qp point
-          for (int dim_i=0; dim_i<_dim; dim_i++)
-            vel_old(dim_i) += phi[l][qp] *
-              (stokes_system->current_local_solution->operator()
-              (stokes_dof_indices[dim_i][l]));
+
+          // get velocity vector (size=_dim) from stokes solution at this
+          // qp point, this only gives us the global + undisturbed
+          // contribution of velocity
+          for (int dim_i=0; dim_i<_dim; dim_i++) {
+            total_vel_old(dim_i) += phi[l][qp] *
+              (
+                stokes_system->current_local_solution->operator()
+                  (stokes_dof_indices[dim_i][l])
+                + stokes_system->local_undisturbed_solution
+                [stokes_dof_indices[dim_i][l]]
+              );
+          }
         }
+
+        // add local velocity of this qp point
+        total_vel_old += stokes_system->local_velocity_fluid(q_points[qp],
+          "regularized", elem_id);
 
         // Now compute the element rhs
         const Gradient coeff_1 = -0.5 * np_system.dt * np_system
           .ion_diffusivity * gradient_c_old;
-        const Real coeff_2 = -np_system.dt * (vel_old * gradient_c_old);
+        const Real coeff_2 = -np_system.dt * (total_vel_old * gradient_c_old);
         for (unsigned int i = 0; i < phi.size(); i++)
         {
           Fe(i) += JxW[qp] * (
@@ -585,9 +597,9 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
         // Values to hold the old system solution & its gradient at this qp point
         Number c_old = 0.;
         Gradient gradient_c_old;
-        // use Gradient type to store the velocity vector at this qp point,
-        // this doesn't mean vel_old is a gradient
-        Gradient vel_old;
+
+        // Initialize global, local and undisturbed velocity at this qp point
+        Point total_vel_old;
 
         // evaluate laplacian of the total potential on this qp point
         Real total_potential_laplacian_old =
@@ -616,23 +628,34 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
           gradient_c_old.add_scaled(dphi[l][qp],
                                     (*np_system.current_local_solution)(
                                       dof_indices[l]));
-          // get velocity vector (size=_dim) from total stokes solution at this
-          // qp point
-          for (int dim_i=0; dim_i<_dim; dim_i++)
-            vel_old(dim_i) += phi[l][qp] *
-                              (stokes_system->current_local_solution->operator()
-                                (stokes_dof_indices[dim_i][l]));
+
+          // get velocity vector (size=_dim) from stokes solution at this
+          // qp point, this only gives us the global + undisturbed
+          // contribution of velocity
+          for (int dim_i=0; dim_i<_dim; dim_i++) {
+            total_vel_old(dim_i) += phi[l][qp] *
+                                    (
+                                      stokes_system->current_local_solution->operator()
+                                        (stokes_dof_indices[dim_i][l])
+                                      + stokes_system->local_undisturbed_solution
+                                      [stokes_dof_indices[dim_i][l]]
+                                    );
+          }
 
           // interpolate the global potential gradient at this qp point
           global_potential_gradient_old.add_scaled(dphi[l][qp],
             poisson_system->current_local_solution->operator()(dof_indices[l]));
         }
 
+        // add local velocity of this qp point
+        total_vel_old += stokes_system->local_velocity_fluid(q_points[qp],
+          "regularized", elem_id);
+
         // coefficient for diffusion term
         const Gradient coeff_1 = -0.5 * np_system.dt * np_system
           .ion_diffusivity * gradient_c_old;
         // coefficient for convection term
-        const Real coeff_2 = -np_system.dt * (vel_old * gradient_c_old);
+        const Real coeff_2 = -np_system.dt * (total_vel_old * gradient_c_old);
         // coefficient for electrostatics term
         const Real coeff_3 = np_system.np_coeff * (c_old *
           total_potential_laplacian_old + gradient_c_old *

@@ -294,6 +294,8 @@ void PMSystemStokes::solve(const std::string& option)
   if (option == "undisturbed")
   {
       undisturbed_solution = this->solution->clone();
+      undisturbed_solution->localize(local_undisturbed_solution);
+      std::cout<<"local_undisturbed_vector.size="<<local_undisturbed_solution.size()<<std::endl;
   }
 
 
@@ -1010,16 +1012,15 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
     PMToolBox::output_message(oss, this->comm());
 
     // evaluate total solutions of Stokes system if exists
-    PMToolBox::output_message(oss, this->comm());
-    if (with_hi)
-    {
-      // Update Stokes Solution to total solution
-      PMToolBox::output_message(">> Updating stokes solution to total...",
-        this->comm());
-      this->update_solution_to_total();
-      oss <<"* max(total_stokes_solution) = " << this->solution->max();
-      PMToolBox::output_message(oss, this->comm());
-    }
+//    if (with_hi)
+//    {
+//      // Update Stokes Solution to total solution
+//      PMToolBox::output_message(">> Updating stokes solution to total...",
+//        this->comm());
+//      this->update_solution_to_total();
+//      oss <<"* max(total_stokes_solution) = " << this->solution->max();
+//      PMToolBox::output_message(oss, this->comm());
+//    }
     // set solve options for NP solver
     const std::string option = std::string("diffusion")
                                + ((module_poisson) ? ("&electrostatics") : (""))
@@ -1040,13 +1041,13 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
     }
 
     // resume Stokes solution to global after solving Poisson
-    if (with_hi)
-    {
-      // Update Stokes Solution to total solution
-      PMToolBox::output_message(">> resume stokes solution to global ...",
-                                this->comm());
-      this->resume_solution_to_global();
-    }
+//    if (with_hi)
+//    {
+//      // Update Stokes Solution to total solution
+//      PMToolBox::output_message(">> resume stokes solution to global ...",
+//                                this->comm());
+//      this->resume_solution_to_global();
+//    }
   }
   // if NP system are not relaxed, we relax them; this will be done recursively
   else

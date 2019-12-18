@@ -298,6 +298,10 @@ void PMSystemStokes::solve(const std::string& option)
       std::cout<<"local_undisturbed_vector.size="<<local_undisturbed_solution.size()<<std::endl;
   }
 
+  std::ostringstream oss;
+  oss<<"* Solved '"<<this->name()<<"' with option '"<<option
+     <<"'. Max solution = "<<this->solution->max();
+  PMToolBox::output_message(oss, this->comm());
 
   STOP_LOG("solve()", "PMSystemStokes");
 }
@@ -1032,12 +1036,12 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
     for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++) {
       this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
         .solve(option);
-      oss << "* Solved system '" << np_sys_names[s_id];
-      oss << ", max solution="
-          << this->get_equation_systems().get_system<PMSystemNP>(
-              np_sys_names[s_id])
-            .solution->max();
-      PMToolBox::output_message(oss, this->comm());
+//      oss << "* Solved system '" << np_sys_names[s_id];
+//      oss << ", max solution="
+//          << this->get_equation_systems().get_system<PMSystemNP>(
+//              np_sys_names[s_id])
+//            .solution->max();
+//      PMToolBox::output_message(oss, this->comm());
     }
 
     // resume Stokes solution to global after solving Poisson
@@ -1073,9 +1077,9 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
         PMToolBox::output_message(oss, this->comm());
         this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
           .solve("unused");
-        oss << "* Poisson system max_solution = "
-           << this->get_equation_systems().get_system<PMSystemPoisson>
-           ("Poisson").solution->max();
+//        oss << "* Poisson system max_solution = "
+//           << this->get_equation_systems().get_system<PMSystemPoisson>
+//           ("Poisson").solution->max();
         PMToolBox::output_message(oss, this->comm());
       }
 
@@ -1102,13 +1106,13 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
         // solve this NP system for one step
         this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
           .solve(option);
-        if (relax_step_id%output_interval==0) {
-          oss << "* system '" << np_sys_names[s_id] << "' max_solution = "
-              << this->get_equation_systems().get_system<PMSystemNP>(
-                  np_sys_names[s_id])
-                .solution->max() << "\n";
-          PMToolBox::output_message(oss, this->comm());
-        }
+//        if (relax_step_id%output_interval==0) {
+//          oss << "* system '" << np_sys_names[s_id] << "' max_solution = "
+//              << this->get_equation_systems().get_system<PMSystemNP>(
+//                  np_sys_names[s_id])
+//                .solution->max() << "\n";
+//          PMToolBox::output_message(oss, this->comm());
+//        }
         // set system relaxed status if real_time > relax_t_final
         if (params.get<Real>("real_time") >= relax_t_final)
         {
@@ -1121,12 +1125,12 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
       if (module_poisson) {
         this->get_equation_systems().get_system<PMSystemPoisson>
           ("Poisson").solve("unused");
-        if (relax_step_id%output_interval==0) {
-          oss << "* system 'Poisson' max_solution = "
-              << this->get_equation_systems().get_system<PMSystemPoisson>
-                ("Poisson").solution->max() << "\n";
-          PMToolBox::output_message(oss, this->comm());
-        }
+//        if (relax_step_id%output_interval==0) {
+//          oss << "* system 'Poisson' max_solution = "
+//              << this->get_equation_systems().get_system<PMSystemPoisson>
+//                ("Poisson").solution->max() << "\n";
+//          PMToolBox::output_message(oss, this->comm());
+//        }
       }
 
       if(relax_step_id%output_interval==0)

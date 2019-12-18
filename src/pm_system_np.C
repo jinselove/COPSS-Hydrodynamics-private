@@ -244,6 +244,11 @@ void PMSystemNP::solve(const std::string& option)
 //  PMToolBox::output_message("start solve Ax=b", this->comm());
   _solver_np.solve(this->name());
 
+  std::ostringstream oss;
+  oss<<"* Solved '"<<this->name()<<"' with option '"<<option
+     <<"'. Max solution = "<<this->solution->max();
+  PMToolBox::output_message(oss, this->comm());
+
   STOP_LOG("solve()", "PMSystemNP");
 }
 

@@ -633,7 +633,7 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
                                   rho_global(j);
         }
       }
-    }
+    } // end loop over qp
   } // end if( pf_flag )
 
   if (option == "undisturbed")

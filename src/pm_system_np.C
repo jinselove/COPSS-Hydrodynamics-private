@@ -97,9 +97,9 @@ Real PMSystemNP::get_dt()
   // Nernst-Planck dt (unit=tc=6*pi*eta*Rb^3/kbT)
   // fixme: we need to calculate dt_np automatically to ensure numerical
   // stability
-  Real dt = 0.001;
+  Real dt = this->get_equation_systems().parameters.get<Real>("np_system_dt");
   PMToolBox::output_message("Warning:: need to implement get_dt for NP "
-                            "system, currently dt is set to be 0.1 constant",
+                            "system, currently dt is set in the control file",
                             this->comm());
 
   STOP_LOG("get_dt()", "PMSystemNP");

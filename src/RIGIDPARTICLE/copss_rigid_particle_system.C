@@ -261,10 +261,12 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
   {
     equation_systems.parameters.set<SystemSolverType>("solver_type_np")
             = solver_type_np;
-    equation_systems.parameters.set<Real>("c0")
-            = c0;
+    equation_systems.parameters.set<Real>("epsilon") = epsilon;
+    equation_systems.parameters.set<Real>("c0") = c0;
     equation_systems.parameters.set<Real>("NA") = NA;
-    equation_systems.parameters.set<Real>("NA_normalized") = NA_normalized;
+    equation_systems.parameters.set<Real>("coeff_ion_charge_density") = coeff_ion_charge_density;
+    equation_systems.parameters.set<Real>("coeff_ion_force_density") =
+      coeff_ion_force_density;
     equation_systems.parameters.set<std::vector<std::string>>("ion_name")
             = ion_name;
     equation_systems.parameters.set<std::vector<Real>>("ion_diffusivity")
@@ -272,6 +274,7 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
     equation_systems.parameters.set<std::vector<int>>("ion_valence")
             = ion_valence;
     equation_systems.parameters.set<Real>("bjerrum_length") = lambda_B;
+    equation_systems.parameters.set<Real>("np_system_dt") = np_dt;
     equation_systems.parameters.set<Real>("np_system_relaxation_time") =
       np_system_relaxation_time;
     equation_systems.parameters.set<unsigned int>

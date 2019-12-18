@@ -142,6 +142,8 @@ public:
   Real np_system_relaxation_time;
   // np system relaxation write interval
   unsigned int np_system_relaxation_write_interval;
+  // dt for np system
+  Real np_dt;
 
   // characteristic variables
   Real tc; // characteristic time (diffusion time) (s)
@@ -154,11 +156,22 @@ public:
   Real charge_sigma0; // characteristic surface charge density (C/um^2)
   Real c0 = 1.0; // characteristic concentration of ion species (M=mol/L)
 
-  // coefficient use when calculating the contribution of ion cloud to global
-  // electrostatic potential, unit = [1], where Rb has unit um, and 1.E5
-  // comes from 1dm = 10^5 um. Use 1dm because c0 is given by mol/L, i.e.,
-  // mol/(dm)^3. This value should change if the unit of Rb or C0 changed.
-  Real NA_normalized = NA * (Rb / (1.E5)) * (Rb / (1.E5)) * (Rb / (1.E5));
+  // coefficient used when calculating the contribution of ion cloud to global
+  // electrostatic potential, unit = [1]. Contribution of ions to global
+  // charge density is defined as Sum{NA * Zj * e * Cj} where j is the j-th
+  // ion species, Cj is the concentration which has the unit Mol/(10^-1 m)^3.
+  // In dimensionless Poisson equation, the terms shrinks to Rb^3 / (10^-1 m)
+  // ^3 * NA * Sum{zj * Cj}, i.e., thus we have this coefficient NA * Rb^3 /
+  // (10^5 m)^3
+  Real coeff_ion_charge_density;
+
+  // coefficient used when calculating the contribution of ion cloud to
+  // global force density, unit = [1]. Contribution of ions to global force
+  // density is defined as Sum{NA * Zj * e * E}, where j is the j-th ion
+  // species, Cj is the concentration which has the unit Mol/(10^-1 m)^3. In
+  // dimensionless Stokes equation, this term shrinks to  (e * NA * mol /
+  // (10^-1 m)^3) * (e / (4 * pi * epsilon_0 * epsilon * Rb)) / (fc / Rb^3)
+  Real coeff_ion_force_density;
 
   // Geometry information
   unsigned int dim;                         // dimension of the box

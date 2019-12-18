@@ -176,9 +176,9 @@ void Copss::read_physical_info()
   {
     // Relative permittivity of the fluid
     epsilon = input_file("epsilon", 1.);
-    // Characteristic electrostatic potential (V)
-    phi0    = elementary_charge / (4. * PI * epsilon * epsilon_0 * Rb * 1E-6);
-    // characteristic electrostatic field, [efield_c] = V/um
+    // Characteristic electrostatic potential (uV)
+    phi0    = elementary_charge / (4. * PI * epsilon * epsilon_0 * Rb);
+    // characteristic electrostatic field, [efield_c] = uV/um = V/m
     efield0 = phi0 / (Rb);
     // characteristic volume charge density, [charge_rho0] = C/um^3
     charge_rho0 = elementary_charge / (Rb * Rb * Rb);
@@ -189,6 +189,8 @@ void Copss::read_physical_info()
   // read parameters related to
   if (module_np)
   {
+    // Relative permittivity of the fluid, we need this even without Poisson
+    epsilon = input_file("epsilon", 1.);
     // name of all ion species
     ion_name.resize(input_file.vector_variable_size("ion_name"));
     // diffusivity of all ion species (unit=um^2/s)
@@ -198,6 +200,12 @@ void Copss::read_physical_info()
     // Bjerrum length
     lambda_B = elementary_charge * elementary_charge / (4. * PI * epsilon *
       epsilon_0 * kBT * Rb);
+    coeff_ion_charge_density = NA * (Rb / (1.E5)) * (Rb / (1.E5)) * (Rb / (1.E5));
+//    coeff_ion_charge_density = 10;
+    coeff_ion_force_density = (Rb*Rb*Rb/fc) * elementary_charge * NA
+      * (1.E-5) * (1.E-5) * (1.E-5) * elementary_charge / (4. * PI * epsilon
+      * epsilon_0 * Rb);
+//    coeff_ion_force_density = 10;
     // real in data for individual ions
     if (ion_name.size() ==ion_diffusivity.size()
       and ion_name.size() == ion_valence.size())
@@ -219,6 +227,8 @@ void Copss::read_physical_info()
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
     }
+    // np system dt
+    np_dt = input_file("np_system_dt", 0.0001);
     // np system relaxation time for initialization (unit = tc)
     np_system_relaxation_time = input_file("np_system_relaxation_time",
       2. / (*std::min_element(ion_diffusivity.begin(), ion_diffusivity.end())));
@@ -247,7 +257,7 @@ void Copss::read_physical_info()
   {
     ss << "   characteristic electrostatic potential = " << phi0 <<  " (uV)\n"
        << "   relative dielectric permittivity = " << epsilon << " (1)\n"
-       << "   characteristic electrostatic field: efield0 = " << efield0 <<" V/um\n"
+       << "   characteristic electrostatic field: efield0 = " << efield0 <<" V/m\n"
        << "   characteristic volume charge density: charge_rho0 = " <<
        charge_rho0 << " C/um^3\n"
        << "   characteristic surface charge density: charge_sigma0 = " <<
@@ -258,7 +268,11 @@ void Copss::read_physical_info()
   if (module_np)
   {
     ss << "   characteristic ion concentration = " << c0 << " (M)\n"
-       << "   relaxation time for system initialization, "
+       << "   coefficient for global dimensionless charge density induced by "
+          "ions = "<<coeff_ion_charge_density<<" (1)\n"
+      << "   coefficient for global dimensionless force density induced by "
+         "ions = "<<coeff_ion_force_density<<" (1)\n"
+      << "   relaxation time for system initialization, "
           "np_system_relaxation_time = " << np_system_relaxation_time
           << " (unit=characteristic time tc ~= O(R_ion/R_bead) ~= O"
              "(D_bead/D_ion))\n"

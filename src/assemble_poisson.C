@@ -442,7 +442,7 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
             (np_dof_indices[l]));
         }
         // scale tmp by the coefficients of this np system
-        tmp *= (_eqn_sys.parameters.get<Real>("NA_normalized") *
+        tmp *= (_eqn_sys.parameters.get<Real>("coeff_ion_charge_density") *
           np_systems[s_id]->ion_valence);
 
         // add the contribution of this np system to global charge density

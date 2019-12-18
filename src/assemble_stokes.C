@@ -56,6 +56,7 @@ AssembleStokes::AssembleStokes(EquationSystems  & es,
   if (name != "Stokes") libmesh_error();
   analytical_solution = new AnalyticalSolutionStokes(name);
   ggem_stokes         = new GGEMStokes();
+  _int_force.resize(1);
 }
 
 // ==================================================================================
@@ -112,29 +113,25 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
   fe_vel->attach_quadrature_rule(&qrule);
   fe_pres->attach_quadrature_rule(&qrule);
 
-  // Here we define some references to cell-specific data that will be used to
-  // assemble
-  // linear system.
-
   // The element Jacobian * quadrature weight at each integration point.
   const std::vector<Real>& JxW = fe_vel->get_JxW();
 
-  // The element shape function gradients for the velocity variables evaluated
-  // at the
-  // quadrature points.
-  const std::vector<std::vector<RealGradient> >& dphi = fe_vel->get_dphi();
-
-  //
+  // shape function of velocity variables evaluated at the quadrature points
   const std::vector<std::vector<Real> >& phi = fe_vel->get_phi();
 
-  // The element shape functions for the pressure variable evaluated at the
-  // quadrature
-  // points.
-  const std::vector<std::vector<Real> >& psi = fe_pres->get_phi();
+  // The element shape function gradients for the velocity variables evaluated
+  // at the quadrature points.
+  const std::vector<std::vector<RealGradient> >& dphi = fe_vel->get_dphi();
 
+  // The element shape functions for the pressure variable evaluated at the
+  // quadrature points.
+  const std::vector<std::vector<Real> >& psi = fe_pres->get_phi();
 
   // A reference to the DofMap object for this system.
   const DofMap& dof_map = _pm_system.get_dof_map();
+
+  // Temporary place holders for element dof_indices, velocity dof_indices,
+  // and pressure dof_indices
   std::vector<dof_id_type> dof_indices;
   std::vector<dof_id_type> dof_indices_u, dof_indices_p;
 
@@ -228,6 +225,7 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
     fe_vel->reinit(elem);
     fe_pres->reinit(elem);
 
+    // Assemble element matrix for velocities
     DenseMatrix<Number> Ktt(n_u_dofs, n_u_dofs);
 
     for (unsigned int i = 0; i < _dim; ++i)
@@ -277,10 +275,6 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
         }
       }
     } // end for I-loop
-    //    if(_eqn_sys.comm().rank()==0){
-    //      printf("----->TEST: element id = %u\n", elem->id());
-    //      PMToolBox::output_dense_matrix(Ktt);
-    //    }
 
     // apply BCs by penalty method
     this->apply_bc_by_penalty(elem, "matrix", Ke, Fe, option);
@@ -356,10 +350,15 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   // It is a good idea to make sure we are assembling the proper system.
   libmesh_assert_equal_to(system_name, "Stokes");
 
+  const dof_id_type& n_mesh_elem = _mesh.n_elem();
   //  const MeshBase& _mesh = _eqn_sys.get_mesh();
   PMSystemStokes& _pm_system = _eqn_sys.get_system<PMSystemStokes>(system_name);
 
-  if (_eqn_sys.parameters.get<bool>("module_np")){
+  // we can only include the ion contribution to global force when the
+  // poisson system is on as well.
+  if (_eqn_sys.parameters.get<bool>("module_np") and _eqn_sys.parameters
+  .get<bool>("module_poisson")){
+
     // if np_systems vectors are not filled with NP systems pointers, we do it
     if (np_systems.size()==0)
     {
@@ -377,13 +376,17 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
         }
       }
     }
+
+    // only initialize poisson_system once
+    if (poisson_system == nullptr) {
+      poisson_system = &(_eqn_sys.get_system<PMSystemPoisson>("Poisson"));
+      poisson_dof_map = &(poisson_system->get_dof_map());
+    }
   }
 
   // Numeric ids corresponding to each variable in the system
-  const unsigned int u_var = _pm_system.variable_number("u"); // u_var = 0
-  const unsigned int p_var = _pm_system.variable_number("p"); // p_var =
-                                                              // 2(dim=2); =
-                                                              // 3(dim=3)
+  const unsigned int u_var = _pm_system.variable_number("u");
+  const unsigned int p_var = _pm_system.variable_number("p");
 
   // Get the FE type for "u" and "p".  Note "u" is the same as the type for "v".
   FEType fe_vel_type = _pm_system.variable_type(u_var);
@@ -392,42 +395,32 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
   // Define Gauss quadrature rule for numerical integration.
   // Let the FEType object decide what order rule is appropriate.
   QGauss qrule(_dim, SECOND); // 3^dim pts
-  //  QGauss qrule (_dim, FIFTH);   // SIXTH
   fe_vel->attach_quadrature_rule(&qrule);
 
-  // build the face element for boundary traction
-  UniquePtr<FEBase> fe_face(FEBase::build(_dim, fe_vel_type));
-  QGauss qface(_dim - 1, SECOND);
-  fe_face->attach_quadrature_rule(&qface);
-
-
-  // The element Jacobian * quadrature weight at each integration point.
+  // get reference to element quantities
   const std::vector<Real>& JxW               = fe_vel->get_JxW();
   const std::vector<std::vector<Real> >& phi = fe_vel->get_phi();
-  const std::vector<Point>& q_xyz            = fe_vel->get_xyz(); // xyz coords
-                                                                  // of quad pts
+  const std::vector<std::vector<RealGradient>>& dphi = fe_vel->get_dphi();
+  const std::vector<Point>& q_xyz            = fe_vel->get_xyz();
+
   // A reference to the DofMap object for this system.
   const DofMap& dof_map = _pm_system.get_dof_map();
 
-  // std::vector<dof_id_type> dof_indices;
-  // std::vector<dof_id_type> dof_indices_u, dof_indices_p;
-
   // Define data structures to contain the element matrix Ke and vector Fe
-  DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
+  DenseMatrix<Number> Ke;
 
-  // perf_log.pop("preparation");
-
-  // build _int_force vector at the beginning of simulation
-  if (_int_force.size() == 1)
+  // This has to be called within assemble_global_F (not sure why, but it's
+  // true)
+  if (_int_force.size()==1)
   {
-    // perf_log.push("compute_int_force");
-    PMToolBox::output_message("------> computing helper quantities to ease "
-                              "numerical integrations later (only do this once)",
+    PMToolBox::output_message(">>>>> computing helper quantities to ease "
+                              "numerical integrations later (This is going to"
+                              " take a while, but it only happens once)",
                               _pm_system.comm());
-    const dof_id_type& n_mesh_elem = _mesh.n_elem();
     _int_force.resize(n_mesh_elem);
     _q_xyz.resize(n_mesh_elem);
+    _JxW.resize(n_mesh_elem);
     _n_dofs.resize(n_mesh_elem);
     _n_u_dofs.resize(n_mesh_elem);
     _n_p_dofs.resize(n_mesh_elem);
@@ -435,6 +428,8 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
     _dof_indices.resize(n_mesh_elem);
     _dof_indices_u.resize(n_mesh_elem);
     _dof_indices_p.resize(n_mesh_elem);
+    _phi.resize(n_mesh_elem);
+    _dphi.resize(n_mesh_elem);
 
     // Now we will loop over all the elements in the mesh that live
     // on the local processor, and compute the element matrix Ke.
@@ -443,12 +438,10 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
     const MeshBase::const_element_iterator end_el =
       _mesh.active_local_elements_end();
 
-    for (; el != end_el; ++el)
-    {
+    for (; el != end_el; ++el) {
       // Store a pointer to the element we are currently working on.
-      const Elem *elem           = *el;
-      const unsigned int elem_id = elem->id();
-
+      const Elem *elem = *el;
+      const dof_id_type &elem_id = elem->id();
       // Get the degree of freedom indices for the current element.
       dof_map.dof_indices(elem, _dof_indices[elem_id]);
       dof_map.dof_indices(elem, _dof_indices_u[elem_id], u_var);
@@ -457,7 +450,6 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
       _n_dofs[elem_id]   = _dof_indices[elem_id].size();
       _n_u_dofs[elem_id] = _dof_indices_u[elem_id].size();
       _n_p_dofs[elem_id] = _dof_indices_p[elem_id].size();
-
       Fe.resize(_n_dofs[elem_id]);
 
       // NOTE: here JxW and dphi and other element quantities are not computed
@@ -467,8 +459,8 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 
       this->assemble_int_force(elem, _n_u_dofs[elem_id], *fe_vel);
     }
-
-    // perf_log.pop("compute_int_force");
+    PMToolBox::output_message(">>>>> helper quantities computed!",
+                              _pm_system.comm());
   }
 
   // Now we will loop over all the elements in the mesh that live
@@ -480,74 +472,35 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
 
   for (; el != end_el; ++el)
   {
-    // perf_log.push("preparation 2.1");
     // Store a pointer to the element we are currently working on.
     const Elem *elem           = *el;
     const unsigned int elem_id = elem->id();
 
-    // perf_log.pop("preparation 2.1");
-    // Get the degree of freedom indices for the current element.
-
-    // perf_log.push("preparation 2.2");
-
-    /*
-     * why do we update need dof_indices again ?
-     */
+    // get dof indices of this element
     dof_map.dof_indices(elem, _dof_indices[elem_id]);
 
-    // dof_map.dof_indices (elem, _dof_indices_u[elem_id], u_var);
-    // dof_map.dof_indices (elem, dof_indices_p, p_var);
-
-    // perf_log.pop("preparation 2.2");
-    // perf_log.push("preparation 2.3");
-    // const unsigned int n_dofs   = dof_indices.size();
-    // const unsigned int n_u_dofs = dof_indices_u.size();
-    // const unsigned int n_p_dofs = dof_indices_p.size();
-    // const unsigned int n_uvw_dofs = n_u_dofs*_dim;
+    // resize element RHS
     Fe.resize(_n_dofs[elem_id]);
 
-    // Fe.resize(_n_dofs[elem_id]);
-    // perf_log.pop("preparation 2.3");
-    // perf_log.push("preparation 2.4");
-    // NOTE: here JxW and dphi and other element quantities are not computed up
-    // to now,
-    // and these will be done in the elem loop after fe->reinit()
-    // fe_vel->reinit (elem);
-    // qrule.print_info();
-    // perf_log.pop("preparation 2.4");
-    // if elem_neighbor_list is pre-built, we can access it directly
+    // get particle neighbor list of this element
     const std::vector<dof_id_type>& n_list =
       _pm_system.point_mesh()->get_elem_point_neighbor_list(elem->id());
 
     // Now compute Fe caused by the regularized point force and boundary
-    // traction.
-    // if this elem has no neighboring particle or only the undisturbed field
-    // is required, we turn the pf_flag to 'false'!
-    bool pf_flag = true;                           // a flag for the point force
+    // traction. If this elem has no neighboring particle or only the
+    // undisturbed field is required, we turn the pf_flag to 'false'!
+    bool pf_flag = true;
+    if (n_list.size()==0 or option == "undisturbed")
+      pf_flag = false;
 
-    if (n_list.size() == 0) pf_flag = false;       // No point force because no
-                                                   // point list.
-
-    if (option == "undisturbed") pf_flag = false;  // No point force
-
-    // perf_log.push("compute_element_rhs");
-
-    // we only couple NP solutions to RHS when module_np is true and
-    // is_brownian is false
+    // Fill Fe for this element
     this->compute_element_rhs(elem, _n_u_dofs[elem_id], *fe_vel, n_list,
-      pf_flag, option, Fe, (_eqn_sys.parameters.get<bool>("module_np")&
-        (!is_brownian)));
+      pf_flag, option, Fe, is_brownian);
 
-
-    // perf_log.pop("compute_element_rhs");
     // imposed the Dirichlet BC at no-slip walls & pressure jump at the
     // inlet/outlet
     // via the penalty method.
-
-    // perf_log.push("apply_bc_by_penalty");
     this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
-
-    // perf_log.pop("apply_bc_by_penalty");
 
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
@@ -573,11 +526,9 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
                                          const bool                  & pf_flag,
                                          const std::string           & option,
                                          DenseVector<Number>         & Fe,
-                                         const bool& couple_np)
+                                         const bool& is_brownian)
 {
   START_LOG("compute_element_rhs()", "AssembleStokes"); // libMesh log
-
-  // libmesh_assert_equal_to(system_name, "Stokes");
 
   //  const MeshBase& _mesh = _eqn_sys.get_mesh();
   PMSystemStokes& _pm_system = _eqn_sys.get_system<PMSystemStokes>("Stokes");
@@ -593,8 +544,11 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
     _pm_periodic_boundary->inlet_pressure();
   std::vector<PointParticle *> _particles = _point_mesh->particles();
 
-  const unsigned int elem_id      = elem->id();
-  const std::vector<Point>& q_xyz = _q_xyz[elem_id]; // xyz coords of quad pts
+  // get const reference to pre-evaluated quantities of this element
+  const unsigned int& elem_id      = elem->id();
+  const std::vector<Point>& q_xyz = _q_xyz[elem_id];
+  const std::vector<std::vector<Real>>& phi = _phi[elem_id];
+  const std::vector<std::vector<RealGradient>>& dphi = _dphi[elem_id];
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      1. add the regularized point force for "disturbed" flow field!
@@ -605,42 +559,124 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
     // get the location of points in the neighbor list
     const std::size_t n_pts = n_list.size();
     unsigned int qp_size = q_xyz.size();
-
-    // loop over qp points to compute rhs for this element
-    for (unsigned int qp=0; qp<qp_size; qp++)
+    // we only include the contribution of ions to the global force density
+    // when this conditions is satisfied. Notice that is_brownian does not
+    // equal to "with_brownian" in the control file, "is_brownian" is only
+    // true when we call StokesSystem.solve() in Brownian_system.C
+    if ((!is_brownian) and poisson_dof_map!=nullptr and np_systems.size()!=0)
     {
-      // calculate the global force density at this qp
-      Point rho_global(0.);
+      // get NP system dof indices for this element. Assuming all NP systems
+      // have the same dof_indices for this element
+      std::vector<dof_id_type> np_dof_indices;
+      np_dof_maps[0]->dof_indices(elem, np_dof_indices);
 
-      // loop over all neighbor points of this qp points to accumulate
-      // rho_global
-      for (unsigned int np=0; np<n_pts; np++)
+      // get Poisson system dof indices for this element.
+      std::vector<dof_id_type> poisson_dof_indices;
+      poisson_dof_map->dof_indices(elem, poisson_dof_indices);
+
+      // loop over qp points to compute rhs for this element
+      for (unsigned int qp=0; qp<qp_size; qp++)
       {
-        // get a pointer to this neighbor particle
-        const Point& pt = _particles[n_list[np]]->point();
-        const Point& force = _particles[n_list[np]]->particle_force();
+        // calculate the global force density at this qp
+        Point rho_global(0.);
 
-        // calculate the contribution of this neighbor particle to global
-        // force density of this qp point
-        rho_global += ggem_stokes->smoothed_force_exp
-          (_pm_periodic_boundary->point_vector(q_xyz[qp], pt)) * force;
-      }
+        // loop over all neighbor points of this qp points to accumulate
+        // rho_global
+        for (unsigned int np=0; np<n_pts; np++)
+        {
+          // get a pointer to this neighbor particle
+          const Point& pt = _particles[n_list[np]]->point();
+          const Point& force = _particles[n_list[np]]->particle_force();
 
-      // add the contribution of this qp point to the rhs vector
-      for (unsigned int j=0; j<_dim; j++) {
-        for (unsigned int l = 0; l < n_u_dofs; l++) {
-          Fe(j * n_u_dofs + l) += _int_force[elem_id][l * qp_size + qp] *
-                                  rho_global(j);
+          // calculate the contribution of this neighbor particle to global
+          // force density of this qp point
+          rho_global += ggem_stokes->smoothed_force_exp
+            (_pm_periodic_boundary->point_vector(q_xyz[qp], pt)) * force;
         }
-      }
-    } // end loop over qp
+
+        // calculate the ion concentration from all NP systems at this qp
+        // point. and the global potential gradient on this qp point
+        Real charge_qp = 0.;
+        Gradient global_potential_gradient_qp;
+        for (unsigned int l=0; l<n_u_dofs; l++)
+        {
+          // first calculate the sum of charge (ion_valence *
+          // ion_concentration) on this node
+          Real charge_l = 0.;
+          for (short int s_id=0; s_id<np_systems.size(); s_id++)
+            charge_l += (np_systems[s_id]->current_local_solution->operator()
+              (np_dof_indices[l])) * np_systems[s_id]->ion_valence;
+          // add the contribution to the concentration of this qp point from
+          // this node
+          charge_qp += (charge_l * phi[l][qp]);
+
+          // calculate global potential gradient
+          global_potential_gradient_qp.add_scaled(dphi[l][qp],
+            poisson_system->current_local_solution->operator()
+            (poisson_dof_indices[l]));
+        }
+
+        // calculate the local potential gradient on this qp point first
+        std::pair<Real, Point> local_potential_qp;
+        poisson_system->local_potential_field(q_xyz[qp], "regularized",
+          "grad", local_potential_qp, elem_id);
+
+        // Add the contribution of ions to the rho_global. Notice that we
+        // have this minus sign since E = - potential_gradient
+        rho_global += (local_potential_qp.second +
+          global_potential_gradient_qp) * (charge_qp * (-1.) * _eqn_sys
+            .parameters.get<Real>("coeff_ion_force_density"));
+
+        // add the contribution of this qp point to the rhs vector
+        for (unsigned int j=0; j<_dim; j++) {
+          for (unsigned int l = 0; l < n_u_dofs; l++) {
+            Fe(j * n_u_dofs + l) += _int_force[elem_id][l * qp_size + qp] *
+                                    rho_global(j);
+          }
+        }
+      } // end loop over qp
+    } // end if
+
+    // otherwise we only consider the contribution to the global force
+    // density from discrete particles
+    else
+    {
+      // loop over qp points to compute rhs for this element
+      for (unsigned int qp=0; qp<qp_size; qp++)
+      {
+        // calculate the global force density at this qp
+        Point rho_global(0.);
+
+        // loop over all neighbor points of this qp points to accumulate
+        // rho_global
+        for (unsigned int np=0; np<n_pts; np++)
+        {
+          // get a pointer to this neighbor particle
+          const Point& pt = _particles[n_list[np]]->point();
+          const Point& force = _particles[n_list[np]]->particle_force();
+
+          // calculate the contribution of this neighbor particle to global
+          // force density of this qp point
+          rho_global += ggem_stokes->smoothed_force_exp
+            (_pm_periodic_boundary->point_vector(q_xyz[qp], pt)) * force;
+        }
+
+        // add the contribution of this qp point to the rhs vector
+        for (unsigned int j=0; j<_dim; j++) {
+          for (unsigned int l = 0; l < n_u_dofs; l++) {
+            Fe(j * n_u_dofs + l) += _int_force[elem_id][l * qp_size + qp] *
+                                    rho_global(j);
+          }
+        }
+      } // end loop over qp
+    } // end else
   } // end if( pf_flag )
 
   if (option == "undisturbed")
   {
     FEType fe_vel_type = fe_v.get_fe_type();
     UniquePtr<FEBase> fe_face(FEBase::build(_dim, fe_vel_type));
-    QGauss qface(_dim - 1, SECOND);
+    QGauss qface(_dim-1, SECOND);
     fe_face->attach_quadrature_rule(&qface);
 
     const std::vector<std::vector<Real> >& phi_face = fe_face->get_phi();
@@ -691,8 +727,33 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
     }   // end for s-loop
   }     // end if( option == "undisturbed" )
 
-  STOP_LOG("compute_element_rhs()",
-           "AssembleStokes");
+  STOP_LOG("compute_element_rhs()", "AssembleStokes");
+}
+
+void AssembleStokes::assemble_int_force(const Elem* elem,
+                                        const unsigned int& n_u_dofs,
+                                        FEBase& fe_v)
+{
+  START_LOG("assemble_int_force()", "AssembleStokes");
+
+  // Get a reference to pre-evaluated quantities of this element
+  const std::vector<Point>& q_xyz = fe_v.get_xyz();
+  _q_xyz[elem->id()] = q_xyz;
+  const std::vector<std::vector<Real>>& phi = fe_v.get_phi();
+  _phi[elem->id()] = phi;
+  const std::vector<std::vector<RealGradient>>& dphi = fe_v.get_dphi();
+  _dphi[elem->id()] = dphi;
+  const std::vector<Real>& JxW = fe_v.get_JxW();
+  _JxW[elem->id()] = JxW;
+
+  _int_force[elem->id()].resize(n_u_dofs * q_xyz.size(), 0.);
+  // evaluate _int_force for this element
+  for (unsigned int l=0; l<n_u_dofs; l++) {
+    for (unsigned int qp = 0; qp < q_xyz.size(); qp++) {
+      _int_force[elem->id()][l * q_xyz.size() + qp] = JxW[qp] * phi[l][qp];
+    }
+  }
+  STOP_LOG("assemble_int_force()", "AssembleStokes");
 }
 
 // ==================================================================================

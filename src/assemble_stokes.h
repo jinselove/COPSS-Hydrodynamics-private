@@ -26,6 +26,7 @@
 #include "analytical_solution_stokes.h"
 #include "ggem_stokes.h"
 #include "pm_system_np.h"
+#include "pm_system_poisson.h"
 
 
 /*! \brief This class provides the basic components
@@ -77,6 +78,14 @@ public:
                          const std::string& option,
                          const bool is_brownian = false);
 
+  /*! \brief Assemble int_force matrix for every element,
+ * this includes Gaussian quadrature weights multiplied by shape functions.
+ * The product is calculated once and is stored in _int_force.
+
+ */
+  void assemble_int_force(const Elem* elem,
+                          const unsigned int& n_u_dofs,
+                          FEBase& fe_v);
 
   /*! \brief Assemble the element matrix K_IJ
 
@@ -186,16 +195,13 @@ private:
   // ! Get a reference to GGEMStokes
   GGEMStokes *ggem_stokes = nullptr;
 
-  // vector stores dof sizes for all elems
-  std::vector<unsigned int> _n_dofs;
-  
-  // dof indices
-  std::vector<std::vector<dof_id_type> > _dof_indices;
+  // Stokes specific vectors to store element quantities
   std::vector<unsigned int> _n_u_dofs;
   std::vector<unsigned int> _n_p_dofs;
   std::vector<unsigned int> _n_uvw_dofs;
   std::vector<std::vector<dof_id_type>> _dof_indices_u;
   std::vector<std::vector<dof_id_type>> _dof_indices_p;
+  std::vector<std::vector<Real> > _int_force;
 
   // initialize a pointer to all PMSystemNP systems; no need to clean these
   // pointers afterwards since we will only attach the reference here and the
@@ -206,4 +212,15 @@ private:
   // pointers afterwards since we will only attach the reference here and the
   // actual object will be destroyed somewhere else.
   std::vector<DofMap*> np_dof_maps;
+
+  // initialize a pointer to Poisson systems; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  PMSystemPoisson* poisson_system = nullptr;
+
+  // initialize a pointer to the dof map of Poisson system; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  DofMap* poisson_dof_map = nullptr;
+
 };

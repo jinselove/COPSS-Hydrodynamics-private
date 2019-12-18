@@ -55,7 +55,6 @@ AssembleSystem::AssembleSystem(EquationSystems& es)
 {
   _dim = es.get_mesh().mesh_dimension();
   _boundary_sides.resize(1); // intialize _boundary_sides matrix
-  _int_force.resize(1);      // initialize _int_force matrix
 }
 
 // ==================================================================================
@@ -65,34 +64,7 @@ AssembleSystem::~AssembleSystem()
 }
 
 // ==================================================================================
-void AssembleSystem::assemble_int_force(const Elem        *elem,
-                                        const unsigned int n_u_dofs,
-                                        FEBase           & fe_v)
-{
-  START_LOG("assemble_int_force()", "AssembleSystem");
-  const std::vector<Real>& JxW               = fe_v.get_JxW();
-  const std::vector<std::vector<Real> >& phi = fe_v.get_phi();
-  const std::vector<Point>& q_xyz            = fe_v.get_xyz(); // xyz coords of
-                                                               // quad pts
-  const std::size_t elem_id = elem->id();
-  _int_force[elem_id].resize(n_u_dofs * q_xyz.size(), 0.);     // resize this
-                                                               // row
-  _q_xyz[elem_id] = q_xyz;
 
-  for (unsigned int k = 0; k < n_u_dofs; ++k) {
-    // loop over all gauss quadrature points
-    for (unsigned int qp = 0; qp < q_xyz.size(); qp++) {
-      _int_force[elem_id][k * q_xyz.size() + qp] = JxW[qp] * phi[k][qp];
-
-      // _int_force[elem_id][k] += JxW[qp]*phi[k][qp];
-      // printf("_int_force[elem_id=%d][k*q_xyz.size()+qp=%d] =
-      // JxW[qp=%d]*phi[k=%d][qp=%d] = %f *%f = %f\n", elem_id,
-      // k*q_xyz.size()+qp, qp,k,qp, JxW[qp],phi[k][qp],
-      // _int_force[elem_id][k*q_xyz.size()+qp]);
-    }
-  }
-  STOP_LOG("assemble_int_force()", "AssembleSystem");
-}
 
 // =======================================================================================
 void AssembleSystem::penalize_elem_matrix_vector(DenseMatrix<Number>& Ke,

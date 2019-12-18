@@ -86,16 +86,6 @@ public:
 //                                 const std::string& option) = 0;
 
 
-  /*! \brief Assemble int_force matrix for every element,
-   * this includes Gaussian quadrature weights multiplied by shape functions.
-   * The product is calculated once and is stored in _int_force.
-
-   */
-  void assemble_int_force(const Elem        *elem,
-                          const unsigned int n_u_dofs,
-                          FEBase           & fe_v);
-
-
   /*! \brief select sides on the boundary for all elements
    *
    */
@@ -149,13 +139,24 @@ protected:
   // condition
   // to decide whether this side has to be included in the Dirichlet BC.
   std::vector<std::vector<unsigned int> > _boundary_sides;
-  
-  // int_force matrix
-  // this matrix stores the product of JxW[qp] * phi[k][qp]
-  // size = num_elem * (n_u_dofs * n_quad_points)
-  std::vector<std::vector<Real> > _int_force;
 
-  // vector stores q_xyz size
+  // vector stores quadrature points for all elements
   // size = num_elem * q_xyz.size()
   std::vector<std::vector<Point> > _q_xyz;
+
+  // vector store shape function
+  std::vector<std::vector<std::vector<Real>>> _phi;
+
+  // vector stores the gradient of the shape function
+  std::vector<std::vector<std::vector<RealGradient>>> _dphi;
+
+  // Jacobian of each element
+  std::vector<std::vector<Real>> _JxW;
+
+  // number of dofs for each element
+  std::vector<unsigned int> _n_dofs;
+
+  // dof indices of each element.
+  std::vector<std::vector<dof_id_type> > _dof_indices;
+
 };

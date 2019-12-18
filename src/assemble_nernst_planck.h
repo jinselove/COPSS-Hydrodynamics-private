@@ -68,7 +68,7 @@ public:
      @param[out] Fe Add rhs vector to system.
    */
   void assemble_global_F(const std::string& system_name,
-                         const std::string& option) override;
+                         const std::string& option);
 
 
   /*! \brief select sides on the boundary for all elements

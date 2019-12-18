@@ -103,7 +103,8 @@ public:
    * Assemble the system rhs.
    */
   void assemble_rhs(const std::string& system_name,
-                    const std::string& option) override;
+                    const std::string& option,
+                    const bool is_brownian=false);
 
 
   /*
@@ -111,8 +112,11 @@ public:
    * option = "undisturbed", compute the undisturbed field of flow without
    *particles
    * option = "disturbed",   compute the disturbed field of flow with particles
+   * when is_brownian is true, we are solving Stokes system for the
+   * Chebyshev, is this case the force vector on particles are not actual
    */
-  void solve(const std::string& option) override;
+  void solve(const std::string& option,
+             const bool is_brownian=false);
 
 
   /*

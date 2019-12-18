@@ -346,7 +346,8 @@ void AssembleStokes::assemble_global_K(const std::string& system_name,
 
 // ==================================================================================
 void AssembleStokes::assemble_global_F(const std::string& system_name,
-                                       const std::string& option)
+                                       const std::string& option,
+                                       const bool is_brownian)
 {
   START_LOG("assemble_global_F()", "AssembleStokes");
 
@@ -437,7 +438,6 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
       _n_u_dofs[elem_id] = _dof_indices_u[elem_id].size();
       _n_p_dofs[elem_id] = _dof_indices_p[elem_id].size();
 
-      //  _n_uvw_dofs[elem_id] = _n_u_dofs[elem_id]*_dim;
       Fe.resize(_n_dofs[elem_id]);
 
       // NOTE: here JxW and dphi and other element quantities are not computed
@@ -445,10 +445,7 @@ void AssembleStokes::assemble_global_F(const std::string& system_name,
       // and these will be done in the elem loop after fe->reinit()
       fe_vel->reinit(elem);
 
-      // qrule.print_info();
       this->assemble_int_force(elem, _n_u_dofs[elem_id], *fe_vel);
-
-      // printf("finished assemble_int_force\n");
     }
 
     // perf_log.pop("compute_int_force");
@@ -590,37 +587,66 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
   {
     // get the location of points in the neighbor list
     const std::size_t n_pts = n_list.size();
-
-    // Now we will build the element RHS using high order gauss quadrature.
-    // first loop over all neighboring particles near this element
-    Point np_pos(0.);
-    Point np_force(0.);
-    Real  r = 0., force_val = 0.;
     unsigned int qp_size = q_xyz.size();
 
-    // printf("qp_size = %d\n", q_xyz.size());
-    for (unsigned int np = 0; np < n_pts; ++np) {
-      np_force = _particles[n_list[np]]->particle_force();
-      np_pos   = _particles[n_list[np]]->point();
+//    // Now we will build the element RHS using high order gauss quadrature.
+//    // first loop over all neighboring particles near this element
+//    Point np_pos(0.);
+//    Point np_force(0.);
+//    Real  r = 0., force_val = 0.;
+//
+//    // printf("qp_size = %d\n", q_xyz.size());
+//    for (unsigned int np = 0; np < n_pts; ++np)
+//    {
+//      np_force = _particles[n_list[np]]->particle_force();
+//      np_pos   = _particles[n_list[np]]->point();
+//
+//      for (unsigned int qp = 0; qp < qp_size; qp++) {
+//        // distance from Gaussian point to the force point
+//        r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
+//
+//        // evaluate the value of gauss force at this quad pt.
+//        force_val = ggem_stokes->smoothed_force_exp(r);
+//
+//        for (unsigned int j = 0; j < _dim; ++j) {
+//          for (unsigned int k = 0; k < n_u_dofs; ++k) {
+//            // force_val * np_force is the global force density contributed for
+//            // this particle
+//            Fe(j * n_u_dofs + k) +=
+//              _int_force[elem_id][k * qp_size + qp] * force_val *np_force(j);
+//          } // end loop over nodes
+//        }// end loop over dimensions
+//      } // end loop over gaussian points
+//    } // end loop over beads
 
-      for (unsigned int qp = 0; qp < qp_size; qp++) {
-        // distance from Gaussian point to the force point
-        r = _pm_periodic_boundary->point_distance(q_xyz[qp], np_pos);
+    // loop over qp points to compute rhs for this element
+    for (unsigned int qp=0; qp<qp_size; qp++)
+    {
+      // calculate the global force density at this qp
+      Point rho_global(0.);
 
-        // evaluate the value of gauss force at this quad pt.
-        force_val = ggem_stokes->smoothed_force_exp(r);
+      // loop over all neighbor points of this qp points to accumulate
+      // rho_global
+      for (unsigned int np=0; np<n_pts; np++)
+      {
+        // get a pointer to this neighbor particle
+        const Point& pt = _particles[n_list[np]]->point();
+        const Point& force = _particles[n_list[np]]->particle_force();
 
-        for (unsigned int j = 0; j < _dim; ++j) {
-          for (unsigned int k = 0; k < n_u_dofs; ++k) {
-            // force_val * np_force is the global force density contributed for
-            // this particle
-            Fe(j * n_u_dofs +
-               k) +=
-              _int_force[elem_id][k * qp_size + qp] *force_val *np_force(j);
-          } // end loop over nodes
-        }// end loop over dimensions
-      } // end loop over gaussian points
-    } // end loop over beads
+        // calculate the contribution of this neighbor particle to global
+        // force density of this qp point
+        rho_global += ggem_stokes->smoothed_force_exp
+          (_pm_periodic_boundary->point_vector(q_xyz[qp], pt)) * force;
+      }
+
+      // add the contribution of this qp point to the rhs vector
+      for (unsigned int j=0; j<_dim; j++) {
+        for (unsigned int l = 0; l < n_u_dofs; l++) {
+          Fe(j * n_u_dofs + l) += _int_force[elem_id][l * qp_size + qp] *
+                                  rho_global(j);
+        }
+      }
+    }
   } // end if( pf_flag )
 
   if (option == "undisturbed")

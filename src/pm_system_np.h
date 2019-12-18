@@ -103,7 +103,7 @@ public:
    * Assemble the system rhs.
    */
   void assemble_rhs(const std::string& system_name,
-                    const std::string& option) override;
+                    const std::string& option);
 
 
   /**
@@ -111,7 +111,7 @@ public:
    * option = ...
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve(const std::string& option) override;
+  void solve(const std::string& option);
 
 
   /**

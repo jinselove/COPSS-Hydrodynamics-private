@@ -114,11 +114,11 @@ void GGEMStokes::set_ksi()
 }
 
 // ======================================================================
-Real GGEMStokes::smoothed_force_exp(const Real& r) const
+Real GGEMStokes::smoothed_force_exp(const Point& r) const
 {
   START_LOG("smoothed_force_exp()", "GGEMSystem");
 
-  const Real r2   = r * r;
+  const Real r2   = r.norm_sq();
   const Real a2r2 = alpha2 * r2;
   Real g          = alpha3_pi_23 * std::exp(-a2r2) * (2.5 - a2r2);
 

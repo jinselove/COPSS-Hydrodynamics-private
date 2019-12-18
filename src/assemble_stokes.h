@@ -72,7 +72,8 @@ public:
      @param[out] Fe Add rhs vector to system.
    */
   void assemble_global_F(const std::string& system_name,
-                         const std::string& option) override;
+                         const std::string& option,
+                         const bool is_brownian = false);
 
 
   /*! \brief Assemble the element matrix K_IJ

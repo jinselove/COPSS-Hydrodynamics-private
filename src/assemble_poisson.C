@@ -452,6 +452,7 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
       // scale rho_global by 4*pi, this comes from the dimensionless process
       rho_global *= pi_4;
 
+      // add the contribution of this qp point to the rhs vector
       for (unsigned int l=0; l<n_dofs; l++)
       {
         Fe(l) += int_force[l * qp_size + qp] * rho_global;

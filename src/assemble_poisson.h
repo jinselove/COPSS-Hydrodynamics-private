@@ -76,7 +76,7 @@ public:
      @param[out] Fe Add rhs vector to global vector F
    */
   void assemble_global_F(const std::string& system_name,
-                         const std::string& option) override;
+                         const std::string& option);
 
 
   /*! \brief Assemble function on each element for the right-hand-side in

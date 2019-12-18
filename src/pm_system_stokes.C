@@ -237,7 +237,8 @@ void PMSystemStokes::assemble_matrix(const std::string& system_name,
 
 // ==================================================================================
 void PMSystemStokes::assemble_rhs(const std::string& system_name,
-                                  const std::string& option)
+                                  const std::string& option,
+                                  const bool is_brownian)
 {
   libmesh_assert(this->rhs);
   libmesh_assert(this->rhs->initialized());
@@ -252,7 +253,7 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
   // assemble_rhs_sedimentation_ex1 (this->get_equation_systems(), system_name,
   // option);
   // perf_log.push("assemble");
-  assemble_stokes->assemble_global_F(system_name, option);
+  assemble_stokes->assemble_global_F(system_name, option, is_brownian);
 
   // perf_log.pop("assemble");
   // perf_log.push("close");
@@ -264,7 +265,7 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
 }
 
 // ==================================================================================
-void PMSystemStokes::solve(const std::string& option)
+void PMSystemStokes::solve(const std::string& option, const bool is_brownian)
 {
   START_LOG("solve()", "PMSystemStokes");
   
@@ -285,7 +286,7 @@ void PMSystemStokes::solve(const std::string& option)
     _re_init = false;
   }
   // assemble rhs 
-  this->assemble_rhs(this->name(), option);
+  this->assemble_rhs(this->name(), option, is_brownian);
 
   // solve the problem
   _solver_stokes.solve(this->name());

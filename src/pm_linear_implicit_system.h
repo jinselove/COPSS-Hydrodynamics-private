@@ -96,14 +96,14 @@ public:
   /**
    * Assemble the system rhs.
    */
-  virtual void assemble_rhs(const std::string& system_name,
-                            const std::string& option) = 0;
+//  virtual void assemble_rhs(const std::string& system_name,
+//                            const std::string& option);
 
 
   /**
    * Solve the system.
    */
-  virtual void solve(const std::string& option) = 0;
+//  virtual void solve(const std::string& option) = 0;
 
 
   /**

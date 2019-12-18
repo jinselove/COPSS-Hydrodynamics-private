@@ -69,7 +69,7 @@ public:
    * Reference: Eqn (27) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo
    *and Graham.
    */
-  Real smoothed_force_exp(const Real& r) const;
+  Real smoothed_force_exp(const Point& r) const;
 
 
   /*

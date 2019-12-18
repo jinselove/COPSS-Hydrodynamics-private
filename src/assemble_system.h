@@ -82,8 +82,8 @@ public:
         "undisturbed") for Stokes equation
      @param[out] Fe Add rhs vector to system.
    */
-  virtual void assemble_global_F(const std::string& system_name,
-                                 const std::string& option) = 0;
+//  virtual void assemble_global_F(const std::string& system_name,
+//                                 const std::string& option) = 0;
 
 
   /*! \brief Assemble int_force matrix for every element,

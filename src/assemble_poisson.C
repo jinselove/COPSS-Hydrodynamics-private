@@ -212,6 +212,26 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
   // Get a reference to the LinearImplicitSystem we are solving
   PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson>(system_name);
 
+  if (_eqn_sys.parameters.get<bool>("module_np")){
+    // if np_systems vectors are not filled with NP systems pointers, we do it
+    if (np_systems.size()==0)
+    {
+      // loop over all systems and push the references of all NP systems and
+      // their dof maps to np_systems and np_dof_maps vector respectively
+      unsigned int n_sys = _eqn_sys.n_systems();
+      for (unsigned int s_id=0; s_id<n_sys; s_id++){
+        const std::string& s_name = _eqn_sys.get_system(s_id).name();
+        if (s_name.rfind("NP:", 0)==0){
+          // np system
+          np_systems.push_back(&(_eqn_sys.get_system<PMSystemNP>(s_name)));
+          // np system dof map
+          np_dof_maps.push_back(&(_eqn_sys.get_system<PMSystemNP>(s_name)
+            .get_dof_map()));
+        }
+      }
+    }
+  }
+
   // A reference to the DofMap object for this system.
   const DofMap& dof_map = _pm_system.get_dof_map();
 
@@ -375,13 +395,19 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
     // Assemble int_force to avoid duplicate calculations
     // Fixme: avoid calculating int_force at every time step
     std::vector<Real> int_force(n_dofs * qp_size, 0.);
-    for (unsigned int k=0; k<n_dofs; k++)
+    for (unsigned int l=0; l<n_dofs; l++)
     {
       for (unsigned int qp=0; qp<qp_size; qp++)
       {
-        int_force[k * qp_size + qp] = JxW[qp] * phi[k][qp];
+        int_force[l * qp_size + qp] = JxW[qp] * phi[l][qp];
       }
     }
+
+    // get dof indices for this element in the NP systems. Assuming all NP
+    // systems have the same dof_indices for this element
+    std::vector<dof_id_type> np_dof_indices;
+    if (np_dof_maps.size()>0)
+      np_dof_maps[0]->dof_indices(elem, np_dof_indices);
 
     // loop over all qp points to compute rhs
     for (unsigned int qp=0; qp<qp_size; qp++)
@@ -401,12 +427,34 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
           (_pm_periodic_boundary->point_vector(q_xyz[qp], pt)) * charge;
       }
 
+      // calculate the contribution of ion cloud to rho_global if NP systems
+      // exists. If there are no np_systems, np_systems.size() is 0, so this
+      // loop will be skipped
+      for (short int s_id=0; s_id<np_systems.size(); s_id++)
+      {
+        // interpolate ion concentration at this qp point using the ion
+        // concentration at all nodes of this element
+        Real tmp = 0.;
+        for (unsigned int l=0; l<n_dofs; l++)
+        {
+          tmp += (phi[l][qp] *
+            np_systems[s_id]->current_local_solution->operator()
+            (np_dof_indices[l]));
+        }
+        // scale tmp by the coefficients of this np system
+        tmp *= (_eqn_sys.parameters.get<Real>("NA_normalized") *
+          np_systems[s_id]->ion_valence);
+
+        // add the contribution of this np system to global charge density
+        rho_global += tmp;
+      }
+
       // scale rho_global by 4*pi, this comes from the dimensionless process
       rho_global *= pi_4;
 
-      for (unsigned int k=0; k<n_dofs; k++)
+      for (unsigned int l=0; l<n_dofs; l++)
       {
-        Fe(k) += int_force[k * qp_size + qp] * rho_global;
+        Fe(l) += int_force[l * qp_size + qp] * rho_global;
       }
     }
   }       // end if( pc_flag )

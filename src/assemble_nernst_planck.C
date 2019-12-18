@@ -553,7 +553,8 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
 
           // interpolate the global potential gradient at this qp point
           global_potential_gradient_old.add_scaled(dphi[l][qp],
-            poisson_system->current_local_solution->operator()(dof_indices[l]));
+            poisson_system->current_local_solution->operator()
+            (poisson_dof_indices[l]));
         }
 
         // coefficient for diffusion term
@@ -644,7 +645,8 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
 
           // interpolate the global potential gradient at this qp point
           global_potential_gradient_old.add_scaled(dphi[l][qp],
-            poisson_system->current_local_solution->operator()(dof_indices[l]));
+            poisson_system->current_local_solution->operator()
+            (poisson_dof_indices[l]));
         }
 
         // add local velocity of this qp point

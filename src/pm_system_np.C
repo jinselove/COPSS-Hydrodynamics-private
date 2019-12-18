@@ -165,6 +165,9 @@ void PMSystemNP::init_cd()
   this->project_solution(init_solution, libmesh_nullptr,
     this->get_equation_systems().parameters);
 
+  // sync solution to current_local_solution in case we need it
+  this->update();
+
   init_cd_set = true;
 
   STOP_LOG("init_cd()", "PMSystemNP");

@@ -114,7 +114,8 @@ public:
                                                        // C^2/(N*m^2) ) =
                                                        // 8.85418781762039E-24 (
                                                        // C^2/(N*um^2) )
-  const Real elementary_charge = 1.6021766208E-19;     // C
+  const Real elementary_charge = 1.6021766208E-19;     // unit = C
+  const Real NA = 6.02214076E23;      // Avogadro constant, unit = [1]
   Real T;                                              // simulation temperature
                                                        // (K)
   Real kBT;                                            // (N*um)
@@ -152,6 +153,12 @@ public:
   Real charge_rho0; // characteristic volume charge density (C/um^3)
   Real charge_sigma0; // characteristic surface charge density (C/um^2)
   Real c0 = 1.0; // characteristic concentration of ion species (M=mol/L)
+
+  // coefficient use when calculating the contribution of ion cloud to global
+  // electrostatic potential, unit = [1], where Rb has unit um, and 1.E5
+  // comes from 1dm = 10^5 um. Use 1dm because c0 is given by mol/L, i.e.,
+  // mol/(dm)^3. This value should change if the unit of Rb or C0 changed.
+  Real NA_normalized = NA * (Rb / (1.E5)) * (Rb / (1.E5)) * (Rb / (1.E5));
 
   // Geometry information
   unsigned int dim;                         // dimension of the box

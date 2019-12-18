@@ -1069,10 +1069,11 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
       if (module_poisson){
         // we need to solve the Poisson system to initialized all the
         // parameters and the solution
+        oss<<"----> Initializing Poisson system";
+        PMToolBox::output_message(oss, this->comm());
         this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
           .solve("unused");
-        oss<<"----> Initializing Poisson systems\n"
-           << "* Poisson system max_solution = "
+        oss << "* Poisson system max_solution = "
            << this->get_equation_systems().get_system<PMSystemPoisson>
            ("Poisson").solution->max();
         PMToolBox::output_message(oss, this->comm());

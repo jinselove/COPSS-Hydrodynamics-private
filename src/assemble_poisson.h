@@ -25,6 +25,7 @@
 #include "assemble_system.h"
 #include "ggem_poisson.h"
 #include "analytical_solution_poisson.h"
+#include "pm_system_np.h"
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector for solving
@@ -161,6 +162,16 @@ private:
 
   // Get a reference to AnalyticalSolutionPoisson
   AnalyticalSolutionPoisson *analytical_solution = nullptr;
+
+  // initialize a pointer to all PMSystemNP systems; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<PMSystemNP*> np_systems;
+
+  // initialize a pointer to the dof map of Poisson system; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<DofMap*> np_dof_maps;
 
   // surface charge density (total)
   

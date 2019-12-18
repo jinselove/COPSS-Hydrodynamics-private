@@ -272,6 +272,8 @@ void CopssPointParticleSystem::set_parameters(EquationSystems& equation_systems)
       = solver_type_np;
     equation_systems.parameters.set<Real>("c0")
       = c0;
+    equation_systems.parameters.set<Real>("NA") = NA;
+    equation_systems.parameters.set<Real>("NA_normalized") = NA_normalized;
     equation_systems.parameters.set<std::vector<std::string>>("ion_name")
       = ion_name;
     equation_systems.parameters.set<std::vector<Real>>("ion_diffusivity")

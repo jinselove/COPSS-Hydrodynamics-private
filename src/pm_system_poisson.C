@@ -357,7 +357,7 @@ void PMSystemPoisson::compute_point_efield(std::vector<Point>& pv)
 
   // Fill pv
   for (std::size_t i = 0; i < NP; ++i)
-    pv[pid_send_list[i]] = efield_total_send_list[pid_send_list[i]];
+    pv[pid_send_list[i]] = (-1) * efield_total_send_list[pid_send_list[i]];
 
   STOP_LOG("compute_point_efield()", "PMSystemPoisson");
 }

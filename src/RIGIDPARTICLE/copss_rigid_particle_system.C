@@ -273,6 +273,8 @@ void CopssRigidParticleSystem::set_parameters(EquationSystems& equation_systems)
             = ion_diffusivity;
     equation_systems.parameters.set<std::vector<int>>("ion_valence")
             = ion_valence;
+    equation_systems.parameters.set<std::vector<Real>>("ion_concentration_cd")
+      = ion_concentration_cd;
     equation_systems.parameters.set<Real>("bjerrum_length") = lambda_B;
     equation_systems.parameters.set<Real>("np_system_dt") = np_dt;
     equation_systems.parameters.set<Real>("np_system_relaxation_time") =

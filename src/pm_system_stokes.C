@@ -952,9 +952,6 @@ void PMSystemStokes::couple_poisson()
     ("simulation_name") =="poisson_validation_dirichlet_bc") |
     (this->get_equation_systems().parameters.get<std::string>
       ("simulation_name") =="poisson_validation_dbc_with_pbc")) {
-    PMToolBox::output_message(
-      "----> output Poisson solution for validation purpose",
-      this->comm());
     const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
     const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
     const std::vector<std::string> directions{"x", "y", "z"};
@@ -1145,6 +1142,34 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
             relax_step_id+1, params.get<Real>("real_time"));
         #endif
         PMToolBox::output_message(oss, this->comm());
+
+        // write potential over line for debug purpose
+        if (module_poisson) {
+          const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
+          const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
+          const std::vector <std::string> directions{"x", "y", "z"};
+          for (int dim_i = 0; dim_i < 3; dim_i++) {
+            std::ostringstream oss;
+            oss << "potential_along_" << directions[dim_i] << "_alpha_"
+                << this->get_equation_systems().parameters
+                  .get<Real>("alpha") << "_relaxstep_" <<
+                    int(relax_step_id/output_interval)
+                << ".csv";
+            const int n_pts = 200;
+            std::vector <Point> pts(n_pts);
+            for (int i = 0; i < pts.size(); i++)
+              pts[i] = Point(
+                (dim_i == 0) *
+                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+                (dim_i == 1) *
+                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+                (dim_i == 2) *
+                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts))
+              );
+            this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+              .output_point_solution(pts, oss.str());
+          }
+        }
       }
 
       // set real time to 0. if relax time > relax_t_final

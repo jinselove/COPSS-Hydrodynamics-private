@@ -161,7 +161,7 @@ public:
    * initial condition will be taken as the exact solution at time 0
    */
 
-  static Number init_solution (const Point & p,
+   static Number init_solution (const Point & p,
                               const Parameters & parameters,
                               const std::string &,
                               const std::string &);

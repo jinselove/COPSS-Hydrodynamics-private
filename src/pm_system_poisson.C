@@ -324,6 +324,10 @@ void PMSystemPoisson::compute_point_efield(std::vector<Point>& pv)
       // evaluate local solution
       this->local_potential_field(pt, charge_type, sol_type, sol_local,
         elem_id);
+//      std::cout<<"local efield = "<<sol_local.second(0)<<","
+//        <<sol_local.second(1)<<","<<sol_local.second(2)<<std::endl;
+//      std::cout<<"global efield = "<<efield_global(0)<<","
+//        <<efield_global(1)<<","<<efield_global(2)<<std::endl;
       // FIXME: do we need to exclude self exclusion term for point_type =
       // "POLYMER_BEAD"
       if (point_type == POLYMER_BEAD) {
@@ -380,6 +384,9 @@ void PMSystemPoisson::add_electrostatic_forces()
   for (std::size_t i = 0; i < NP; ++i) {
     charge = _point_mesh->particles()[i]->charge();
     pforce = pv[i] * charge;
+//    std::ostringstream oss;
+//    oss << "efield = "<< pv[i](0)<<","<<pv[i](1)<<","<<pv[i](2);
+//    PMToolBox::output_message(oss, this->comm());
     _point_mesh->particles()[i]->add_particle_force(pforce);
   }
 

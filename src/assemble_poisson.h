@@ -168,12 +168,10 @@ private:
   // actual object will be destroyed somewhere else.
   std::vector<PMSystemNP*> np_systems;
 
-  // initialize a pointer to the dof map of Poisson system; no need to clean these
+  // initialize a pointer to the dof map of NP system; no need to clean these
   // pointers afterwards since we will only attach the reference here and the
   // actual object will be destroyed somewhere else.
   std::vector<DofMap*> np_dof_maps;
-
-  // surface charge density (total)
   
   
 };

@@ -134,6 +134,8 @@ public:
   std::vector<Real> ion_diffusivity;
   // valence of each ion species (unit = 1)
   std::vector<int> ion_valence;
+  // initial uniform ion concentration
+  std::vector<Real> ion_concentration_cd;
   // Bjerrum length, unit = 1
   Real lambda_B;
   // NP system relaxation time for initialization. By default, this

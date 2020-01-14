@@ -148,7 +148,7 @@ Number PMSystemNP::init_solution(const Point & p,
     return exp(-num / den);
   }
   // in general the initial condition is just 0. everywhere
-  else return 0.;
+  else return parameters.get<std::vector<Real>>("ion_concentration_cd")[0];
 }
 
 

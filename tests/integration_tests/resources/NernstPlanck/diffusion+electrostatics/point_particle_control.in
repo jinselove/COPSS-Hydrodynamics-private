@@ -27,7 +27,7 @@ viscosity = 1.018E-15
 temperature = 297
 
 # radius of the bead (um)
-radius = 0.077
+radius = 0.01
 
 #############################################
 #			   Geometry info         			
@@ -40,14 +40,14 @@ dimension = 3
 wall_type = slit
 
 # domain size #
-slit = '-1. 1. -1. 1. -1. 1.'
+slit = '-10. 10. -10. 10. -10. 10.'
 
 # periodicity #
 periodicity = 'false false false'
 
 # inlet info #
-inlet = 'true false false'
-inlet_pressure = '0.1 0 0'
+inlet = 'false false false'
+inlet_pressure = '0. 0. 0.'
 
 # shear info #
 shear = 'false false false'
@@ -58,7 +58,7 @@ shear_direction = '0. 0. 0.'
 #			   Mesh info
 #############################################
 generate_mesh = true
-n_mesh = '10 10 10'
+n_mesh = '15 15 15'
 
 #############################################
 #	 Force info         			
@@ -69,7 +69,7 @@ force_field = 'p_constant'
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.35
+alpha = 0.4
 
 #############################################
 #			   Solver info
@@ -133,6 +133,20 @@ eig_factor = 1.05
 tol_eigen = 0.01
 
 ############################################
+# Poisson System Specific Parameters
+############################################
+
+# module np on or off
+module_poisson = true
+
+# solver
+solver_poisson = superLU_dist
+
+# Boundary conditions
+boundary_id_dirichlet_poisson = '1 2 3 4 5 6'
+boundary_value_dirichlet_poisson = '0. 0. 0. 0. 0. 0.'
+
+############################################
 # Nernst Planck System Specific Parameters
 ############################################
 
@@ -143,19 +157,28 @@ module_np = true
 ion_name = 'ion1 ion2'
 
 # ion diffusivity (um^2/s)
-ion_diffusivity = '0.0277526 0.0277526'
+ion_diffusivity = '0.0213695 0.0213698'
 
 # ion valence (1)
 ion_valence = '1 -1'
+
+# initial uniform ion concentration
+ion_concentration_cd = '0.000005356 0.000005356'
+#ion_concentration_cd = '0.000010712 0.000010712'
+#ion_concentration_cd = '0. 0.'
 
 # solver
 solver_np = superLU_dist
 
 # boundary conditions
 boundary_id_dirichlet_np = '1 2 3 4 5 6'
-boundary_value_dirichlet_np_ion1 = '0. 0. 0. 0.00001 0. 0.'
-boundary_value_dirichlet_np_ion2 = '0. 0. 0. 0.00001 0. 0.'
 
+boundary_value_dirichlet_np_ion1 = '0.000005356 0.000005356 0.000005356 0.000005356 0.000005356 0.000005356' 
+#boundary_value_dirichlet_np_ion1 = '0.000010712 0.000010712 0.000010712 0.000010712 0.000010712 0.000010712'
+#boundary_value_dirichlet_np_ion1 = '0 0 0 0 0 0'
+boundary_value_dirichlet_np_ion2 = '0.000005356 0.000005356 0.000005356 0.000005356 0.000005356 0.000005356' 
+#boundary_value_dirichlet_np_ion2 = '0.000010712 0.000010712 0.000010712 0.000010712 0.000010712 0.000010712'
+#boundary_value_dirichlet_np_ion2 = '0 0 0 0 0 0' 
 # enforce charge neutrality
 check_charge_neutrality = true
 
@@ -163,10 +186,10 @@ check_charge_neutrality = true
 np_system_dt = 0.0001
 
 # np system relaxation time at initialization
-np_system_relaxation_time = 0.008
+np_system_relaxation_time = 0.1
 
 # np system relaxation write interval
-np_system_relaxation_write_interval = 1
+np_system_relaxation_write_interval = 10
 
 #############################################
 #			   Run info
@@ -174,11 +197,11 @@ np_system_relaxation_write_interval = 1
 with_hi	       = false
 with_brownian  = false
 adaptive_dt    = false
-max_dr_coeff   = '0.0 0.001 0.001'
+max_dr_coeff   = '0.0 0.0001 0.0001'
 update_neighbor_list_everyStep = true
 restart        = false
 random_seed    = 123456789
-nstep          = 0
+nstep          = 1
 n_relax_step   = 1
 write_interval = 1
 output_file    = 'equation_systems trajectory center_of_mass mean_square_displacement' 

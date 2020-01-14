@@ -430,6 +430,7 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
       // calculate the contribution of ion cloud to rho_global if NP systems
       // exists. If there are no np_systems, np_systems.size() is 0, so this
       // loop will be skipped
+      Real rho_global_ion = 0.;
       for (short int s_id=0; s_id<np_systems.size(); s_id++)
       {
         // interpolate ion concentration at this qp point using the ion
@@ -446,8 +447,10 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
           np_systems[s_id]->ion_valence);
 
         // add the contribution of this np system to global charge density
-        rho_global += tmp;
+        rho_global_ion += tmp;
       }
+//      std::cout<<"rho_global_ion = "<<rho_global_ion<<std::endl;
+      rho_global += rho_global_ion;
 
       // scale rho_global by 4*pi, this comes from the dimensionless process
       rho_global *= pi_4;

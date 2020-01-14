@@ -25,6 +25,7 @@
 #include "assemble_system.h"
 #include "analytical_solution_np.h"
 
+
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
  * Nernst-Planck equations.
@@ -114,5 +115,4 @@ private:
 
   // A big number for penalty
   const Real penalty = 1.e10;
-
 };

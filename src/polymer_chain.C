@@ -181,12 +181,12 @@ void PolymerChain::read_particles_data(const std::string& filename)
   }
 
   // check charge neutrality
-  if (std::abs(total_charge) > 1e-6) {
-    std::cout <<
-      "Error: Charge neutrality is not satisfied. Please check the data file..."
-              << std::endl;
-    libmesh_error();
-  }
+//  if (std::abs(total_charge) > 1e-6) {
+//    std::cout <<
+//      "Error: Charge neutrality is not satisfied. Please check the data file..."
+//              << std::endl;
+//    libmesh_error();
+//  }
 
   // Use id of the last chain to set number of chains, and initialize vector
   _n_chains = chain_id;

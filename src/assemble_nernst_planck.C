@@ -42,7 +42,7 @@
 #include "libmesh/dense_submatrix.h"
 #include "libmesh/dense_subvector.h"
 #include "libmesh/mesh.h"
-
+#include <fstream>
 // User defined header includes
 #include "pm_toolbox.h"
 #include "assemble_nernst_planck.h"
@@ -245,20 +245,39 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
 void AssembleNP::assemble_global_F(const std::string& system_name,
                                    const std::string& option) {
   START_LOG("assemble_global_F()", "AssembleNP");
+
   // Get a Reference to the LinearImplicitSystem we are solving
   PMSystemNP &np_system = _eqn_sys.get_system<PMSystemNP>(system_name);
-
-  // create null pointers to other systems, some of the null pointers will be
-  // redirected to objects if the corresponding system exists.
-  // Stokes system
-  PMSystemStokes* stokes_system = nullptr;
-  DofMap* stokes_dof_map = nullptr;
-  std::vector<unsigned short int> vel_vars(_dim);
 
   // Poisson system
   PMSystemPoisson* poisson_system = nullptr;
   DofMap* poisson_dof_map = nullptr;
   unsigned short int phi_var;
+
+
+  // Stokes system
+  PMSystemStokes* stokes_system = nullptr;
+  std::vector<unsigned short int> vel_vars(_dim);
+  DofMap* stokes_dof_map = nullptr;
+
+  // initialize a pointer to all PMSystemNP systems; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<PMSystemNP*> np_systems;
+
+  // loop over all systems and push the references of all NP systems and
+  // their dof maps to np_systems and np_dof_maps vector respectively
+  unsigned int n_sys = _eqn_sys.n_systems();
+  for (unsigned int s_id=0; s_id<n_sys; s_id++){
+    const std::string& s_name = _eqn_sys.get_system(s_id).name();
+    if (s_name.rfind("NP:", 0)==0){
+      // np system
+      np_systems.push_back(&(_eqn_sys.get_system<PMSystemNP>(s_name)));
+//      // np system dof map
+//      np_dof_maps.push_back(&(_eqn_sys.get_system<PMSystemNP>(s_name)
+//        .get_dof_map()));
+    }
+  }
 
   // Reassign pointers depending on 'option'; notice that these pointers will
   // be destroyed when the systems they point to are destroyed at the end of
@@ -361,6 +380,9 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
   // hence we use a variant of the active_elem_iterator.
 
   const dof_id_type& n_elem = _mesh.n_elem();
+//  std::ofstream outfile;
+//  outfile.open("debug.csv", std::ios_base::out);
+//  outfile<<"np_coeff,dt,2nd(ion+particle),2nd(ion),1st_x,1st_y,1st_z,coeff_2\n";
 
   MeshBase::const_element_iterator el = _mesh.active_local_elements_begin();
   const MeshBase::const_element_iterator end_el = _mesh
@@ -523,9 +545,12 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
         Gradient gradient_c_old;
 
         // evaluate laplacian of the total potential on this qp point
+        // (contribution from discrete charges)
         Real total_potential_laplacian_old =
           poisson_system->total_potential_laplacian_field(q_points[qp],
                                                           "regularized", elem_id);
+
+
 
         // evaluate gradient of the local potential on this qp point
         std::pair<Real, Point> local_potential_old;
@@ -535,6 +560,9 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
         // initialize the gradient of the global potential on this qp point,
         // the value of this gradient will be calculated using interpolation
         Gradient global_potential_gradient_old;
+
+        // charge density contributed by all ions at this qp point
+        Real charge_density_ion_old = 0.;
 
         // compute the old solution & its gradient at this qp point
         for (unsigned int l = 0; l < phi.size(); l++)
@@ -555,15 +583,43 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
           global_potential_gradient_old.add_scaled(dphi[l][qp],
             poisson_system->current_local_solution->operator()
             (poisson_dof_indices[l]));
+
+          // interpolate all np systems to get the total ion concentration *
+          // valence at this qp point
+          Real c_z = 0.;
+          for (short int s_id=0; s_id<np_systems.size(); s_id++)
+          {
+            c_z += (phi[l][qp] *
+              np_systems[s_id]->current_local_solution->operator()
+              (dof_indices[l])) * np_systems[s_id]->ion_valence;
+          }
+          charge_density_ion_old += c_z;
         }
+        charge_density_ion_old *= _eqn_sys.parameters.get<Real>
+          ("coeff_ion_charge_density");
+        total_potential_laplacian_old += -4. * pi * charge_density_ion_old;
 
         // coefficient for diffusion term
         const Gradient coeff_1 = -0.5 * np_system.dt * np_system
           .ion_diffusivity * gradient_c_old;
         // coefficient for electrostatics term
-        const Real coeff_2 = np_system.np_coeff * (c_old *
+//        std::cout<<"np_system.np_coeff="<<np_system.np_coeff<<";"
+//          <<"dt="<<np_system.dt<<";first_order="<<gradient_c_old *
+//                                                  (local_potential_old.second + global_potential_gradient_old)
+//          <<";second_order="<<gradient_c_old*total_potential_laplacian_old;
+        const Real coeff_2 = np_system.np_coeff * np_system.dt * (c_old *
           total_potential_laplacian_old + gradient_c_old *
           (local_potential_old.second + global_potential_gradient_old));
+//        std::cout<<"coeff_2="<<coeff_2;
+//        outfile<<np_system.np_coeff<<","<<np_system.dt<<","
+//          <<total_potential_laplacian_old<<","
+//          <<-4.*pi*charge_density_ion_old<<","
+//          << (local_potential_old.second + global_potential_gradient_old)(0)<<","
+//          << (local_potential_old.second + global_potential_gradient_old)(1)
+//          <<","
+//          << (local_potential_old.second + global_potential_gradient_old)(2)
+//          <<","
+//          <<coeff_2<<"\n";
         for (unsigned int i = 0; i < phi.size(); i++)
         {
           Fe(i) += JxW[qp] * (
@@ -659,7 +715,7 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
         // coefficient for convection term
         const Real coeff_2 = -np_system.dt * (total_vel_old * gradient_c_old);
         // coefficient for electrostatics term
-        const Real coeff_3 = np_system.np_coeff * (c_old *
+        const Real coeff_3 = np_system.np_coeff * np_system.dt * (c_old *
           total_potential_laplacian_old + gradient_c_old *
           (local_potential_old.second + global_potential_gradient_old));
 
@@ -747,6 +803,7 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
     // Add the element matrix and rhs vector to the global system.
     np_system.rhs->add_vector(Fe, dof_indices);
   } // end loop over local elements
+//  outfile.close();
 
   // set _reinit_node_penalty to false to avoid duplicate calculation
   // of _node_penalty unless for the test case where Dirichlet Boundary

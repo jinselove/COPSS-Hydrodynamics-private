@@ -197,10 +197,15 @@ void Copss::read_physical_info()
     ion_diffusivity.resize(input_file.vector_variable_size("ion_diffusivity"));
     // valence of all ion species (1)
     ion_valence.resize(input_file.vector_variable_size("ion_valence"));
+    // initial uniform ion concentration
+    ion_concentration_cd.resize(input_file.vector_variable_size
+    ("ion_concentration_cd"));
     // Bjerrum length
     lambda_B = elementary_charge * elementary_charge / (4. * PI * epsilon *
       epsilon_0 * kBT * Rb);
     coeff_ion_charge_density = NA * (Rb / (1.E5)) * (Rb / (1.E5)) * (Rb / (1.E5));
+    std::cout<<"coeff_ion_charge_density "
+               "="<<coeff_ion_charge_density<<std::endl;
 //    coeff_ion_charge_density = 10;
     coeff_ion_force_density = (Rb*Rb*Rb/fc) * elementary_charge * NA
       * (1.E-5) * (1.E-5) * (1.E-5) * elementary_charge / (4. * PI * epsilon
@@ -217,6 +222,7 @@ void Copss::read_physical_info()
         // diffusion coefficient
         ion_diffusivity[j] = input_file("ion_diffusivity", 0.0, j) / Db;
         ion_valence[j] = input_file("ion_valence", 0, j);
+        ion_concentration_cd[j] = input_file("ion_concentration_cd", 0., j);
       }
     }
     else

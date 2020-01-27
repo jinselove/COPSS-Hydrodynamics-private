@@ -203,6 +203,9 @@ void Copss::read_physical_info()
     // Bjerrum length
     lambda_B = elementary_charge * elementary_charge / (4. * PI * epsilon *
       epsilon_0 * kBT * Rb);
+    std::cout<<"lambda_B[unit=Rb]="<<lambda_B<<std::endl;
+    std::cout<<"concentration at lambda_D=Rb [unit=M]="<<1./
+    (8*pi*lambda_B*Rb*NA*Rb*Rb)*1.E15<<std::endl;
     coeff_ion_charge_density = NA * (Rb / (1.E5)) * (Rb / (1.E5)) * (Rb / (1.E5));
     std::cout<<"coeff_ion_charge_density "
                "="<<coeff_ion_charge_density<<std::endl;

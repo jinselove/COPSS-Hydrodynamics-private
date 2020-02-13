@@ -646,18 +646,17 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   }
   std::cout<<"Warning: needs more testing/validation on the Neumann BC of "
              "Poisson system. Exiting..." <<std::endl;
-  libmesh_error();
-  
-  
+//  libmesh_error();
+
   // Get a reference to the Particle-Mesh System
   PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
   
   // Integration terms for side element
   const std::vector<std::vector<Real>>& phi_face = fe_face.get_phi();
-  const std::vector<std::vector<RealGradient>> dphi_face = fe_face.get_dphi();
+//  const std::vector<std::vector<RealGradient>> dphi_face = fe_face.get_dphi();
   const std::vector<Real>& JxW_face               = fe_face.get_JxW();
   const std::vector<Point>& qface_point = fe_face.get_xyz();
-  const std::vector<Point>& face_normals          = fe_face.get_normals();
+//  const std::vector<Point>& face_normals          = fe_face.get_normals();
   // Extract the shape function derivatives to be evaluated at the nodes
   // const std::vector<std::vector<RealGradient> >& dphi = fe_phi.get_dphi();
   // Extract the element node coordinates in the reference frame
@@ -667,11 +666,11 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   // fe_phi.reinit(elem, &nodes);
 
   
-  // fe_phi.reinit(elem);
+//  fe_phi.reinit(elem);
   // Pre-calculate 'Phi_local' and 'dphi_local' on all nodes of this element
   // so that we can directly use them later when we loop over nodes on the 
   // boundary surfaces
-  // std::vector<Real> phi_local(elem->n_nodes());
+//   std::vector<Real> phi_local(elem->n_nodes());
   // std::vector<RealGradient> dphi_local(elem->n_nodes());
   // // Loop through nodes on this element
   // for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)

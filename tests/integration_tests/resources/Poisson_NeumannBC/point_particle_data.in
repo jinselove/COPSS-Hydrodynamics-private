@@ -1,0 +1,17 @@
+LAMMPS FENE chain data file
+2 atoms
+1 bonds
+1 atom types
+1 bond types
+-129.956646435 129.956646435 xlo xhi
+-129.956646435 129.956646435 ylo yhi
+-12.9956646435 12.9956646435 zlo zhi
+
+Masses
+
+1 1.0
+
+Atoms
+
+1  1  1  -2.  0.  0.  0.  0.  0.  0.  0.  0.   0.
+2  1  1   2.  0.  0.  0.  0.  0.  0.  0.  0.  0.

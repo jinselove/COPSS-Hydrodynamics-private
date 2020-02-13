@@ -175,6 +175,11 @@ void Copss::read_physical_info()
   if (module_poisson)
   {
     // Relative permittivity of the fluid
+    if (!input_file.have_variable("epsilon")) {
+      PMToolBox::output_message("Error: epsilon has be to given. Exiting...",
+        *comm_in);
+      libmesh_error();
+    }
     epsilon = input_file("epsilon", 1.);
     // Characteristic electrostatic potential (uV)
     phi0    = elementary_charge / (4. * PI * epsilon * epsilon_0 * Rb);
@@ -184,6 +189,9 @@ void Copss::read_physical_info()
     charge_rho0 = elementary_charge / (Rb * Rb * Rb);
     // characteristic surface charge density, [charge_sigma0] = C/um^2
     charge_sigma0 = elementary_charge / (Rb * Rb);
+    // Bjerrum length, [lambda_B] = 1
+    lambda_B = elementary_charge * elementary_charge / (4. * PI * epsilon *
+      epsilon_0 * kBT * Rb);
   } // end if module_poisson
 
   // read parameters related to
@@ -191,47 +199,65 @@ void Copss::read_physical_info()
   {
     // Relative permittivity of the fluid, we need this even without Poisson
     epsilon = input_file("epsilon", 1.);
+    // characteristic ion concentration (unit=M=mol/dm^3)
+    c0 = input_file("characteristic_ion_concentration", 1.);
     // name of all ion species
     ion_name.resize(input_file.vector_variable_size("ion_name"));
     // diffusivity of all ion species (unit=um^2/s)
     ion_diffusivity.resize(input_file.vector_variable_size("ion_diffusivity"));
     // valence of all ion species (1)
     ion_valence.resize(input_file.vector_variable_size("ion_valence"));
-    // initial uniform ion concentration
-    ion_concentration_cd.resize(input_file.vector_variable_size
-    ("ion_concentration_cd"));
-    // Bjerrum length
-    lambda_B = elementary_charge * elementary_charge / (4. * PI * epsilon *
-      epsilon_0 * kBT * Rb);
-    std::cout<<"lambda_B[unit=Rb]="<<lambda_B<<std::endl;
-    std::cout<<"concentration at lambda_D=Rb [unit=M]="<<1./
-    (8*pi*lambda_B*Rb*NA*Rb*Rb)*1.E15<<std::endl;
-    coeff_ion_charge_density = NA * (Rb / (1.E5)) * (Rb / (1.E5)) * (Rb / (1.E5));
-    std::cout<<"coeff_ion_charge_density "
-               "="<<coeff_ion_charge_density<<std::endl;
-//    coeff_ion_charge_density = 10;
-    coeff_ion_force_density = (Rb*Rb*Rb/fc) * elementary_charge * NA
-      * (1.E-5) * (1.E-5) * (1.E-5) * elementary_charge / (4. * PI * epsilon
-      * epsilon_0 * Rb);
-//    coeff_ion_force_density = 10;
+    // initial uniform ion concentration (unit=1)
+    ion_concentration_bulk.resize(input_file.vector_variable_size
+    ("ion_concentration_bulk"));
     // real in data for individual ions
     if (ion_name.size() ==ion_diffusivity.size()
-      and ion_name.size() == ion_valence.size())
+        and ion_name.size() == ion_valence.size()
+        and ion_valence.size() == ion_concentration_bulk.size())
     {
       for (unsigned int j = 0; j < ion_name.size(); j++)
       {
         ion_name[j] = input_file("ion_name", "", j);
-        // get ion_diffusivity and normalize it using characteristic
-        // diffusion coefficient
+        // normalize ion_diffusivity using Db
         ion_diffusivity[j] = input_file("ion_diffusivity", 0.0, j) / Db;
         ion_valence[j] = input_file("ion_valence", 0, j);
-        ion_concentration_cd[j] = input_file("ion_concentration_cd", 0., j);
+        ion_concentration_bulk[j] = input_file("ion_concentration_bulk", 0., j);
       }
+      // calculate ionic strength = sum(z_j^2 * c_j), and convert the unit
+      // from mol/L to mol/um^3
+      Real ion_strength=0.;
+      for (int ion_id=0; ion_id<ion_valence.size(); ion_id++)
+        ion_strength += (ion_valence[ion_id] * ion_valence[ion_id] *
+                        ion_concentration_bulk[ion_id] * c0 * 1.E-15);
+      // calculate lambda_D
+      lambda_D = std::sqrt(1./ (NA * 4. * PI * Rb * Rb * Rb * lambda_B *
+        ion_strength));
+      // give hints of bulk concentration for z1:z2 electrolytes
+      if (input_file.have_variable("debye_length") and ion_valence.size()==2
+          and (ion_valence[0]+ion_valence[1])==0)
+      {
+        Real debye_length = input_file("debye_length", 1.);
+        Real c_hint = 1.E15 / (4. * PI * NA * debye_length * debye_length*
+          lambda_B * Rb * Rb * Rb * ion_valence[0] * (ion_valence[0] -
+          ion_valence[1]));
+        ss << "==> Suggested ion_concentration_bulk (unit=M=mol/dm^3) for "
+              "'debye_length' (normalized by Rb) = "<<debye_length << " : "
+           <<c_hint<< ", "<<(-c_hint*ion_valence[0]/ion_valence[1])<<"'"
+           <<". Exiting... (comment out 'debye_length' in the input file to "
+             "restart the simulation)";
+        PMToolBox::output_message(ss, *comm_in);
+        libmesh_error();
+      }
+      // calculate coefficients for coupling
+      coeff_ion_charge_density = c0 * 1.E-15 * NA * Rb * Rb * Rb;
+      coeff_ion_force_density = elementary_charge * NA * (c0 * 1.E-15) *
+        elementary_charge / (4. * PI * epsilon * epsilon_0 * Rb * Rb) /
+        (fc / (Rb * Rb * Rb));
     }
     else
     {
       ss << "Error: ion parameters ('ion_name', 'ion_diffusivity', "
-            "'ion_valence') are not correctly set. "
+            "'ion_valence', 'ion_concentration_bulk') are not correctly set. "
             "Exiting ...\n";
       PMToolBox::output_message(ss, *comm_in);
       libmesh_error();
@@ -277,6 +303,8 @@ void Copss::read_physical_info()
   if (module_np)
   {
     ss << "   characteristic ion concentration = " << c0 << " (M)\n"
+       << "   Bjerrum length (normalized by Rb) = "<<lambda_B<<" (1)\n"
+       << "   Debye length (normalized by Rb) = "<<lambda_D<<" (1)\n"
        << "   coefficient for global dimensionless charge density induced by "
           "ions = "<<coeff_ion_charge_density<<" (1)\n"
       << "   coefficient for global dimensionless force density induced by "

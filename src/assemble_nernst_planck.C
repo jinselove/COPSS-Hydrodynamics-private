@@ -530,7 +530,7 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
         }
       } // end loop over qp
     }
-      // for diffusion&electrostatics&convection system
+      // for diffusion&electrostatics system
     else if((stokes_system == nullptr) and (poisson_system != nullptr))
     {
       // get dof_indices associated with "phi" of the Poisson system

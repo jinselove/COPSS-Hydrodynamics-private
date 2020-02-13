@@ -139,6 +139,9 @@ tol_eigen = 0.01
 # module np on or off
 module_np = true
 
+# characteristic ion concentration (unit=M=mol/dm^3)
+characteristic_ion_concentration = 1
+
 # ion names ('string, string')
 ion_name = 'Ion'
 
@@ -155,11 +158,17 @@ solver_np = superLU_dist
 boundary_id_dirichlet_np = '1 2 3 4 5 6'
 boundary_value_dirichlet_np_Ion = '0. 0. 0. 0. 0. 0.'
 
+# initial bulk concentration normalized by characteristic ion concentration
+ion_concentration_bulk = '0.'
+
 # enforce charge neutrality
 check_charge_neutrality = false
 
+# time interval for all np systems
+np_system_dt = 0.01
+
 # np system relaxation time at initialization
-np_system_relaxation_time = 0.0
+np_system_relaxation_time = 0.1
 
 #############################################
 #			   Run info

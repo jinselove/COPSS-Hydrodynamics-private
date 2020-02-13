@@ -40,7 +40,7 @@ dimension = 3
 wall_type = slit
 
 # domain size #
-slit = '-10. 10. -10. 10. -10. 10.'
+slit = '-8 8 -8 8 -8 8'
 
 # periodicity #
 periodicity = 'false false false'
@@ -58,7 +58,7 @@ shear_direction = '0. 0. 0.'
 #			   Mesh info
 #############################################
 generate_mesh = true
-n_mesh = '15 15 15'
+n_mesh = '16 16 16'
 
 #############################################
 #	 Force info         			
@@ -69,7 +69,7 @@ force_field = 'p_constant'
 #			   GGEM info
 #############################################
 # smoothing parameter in GGEM (non-unit) #
-alpha = 0.4
+alpha = 0.7
 
 #############################################
 #			   Solver info
@@ -139,6 +139,9 @@ tol_eigen = 0.01
 # module np on or off
 module_poisson = true
 
+# dielectric permittivity of fluid
+epsilon = 80
+
 # solver
 solver_poisson = superLU_dist
 
@@ -153,6 +156,9 @@ boundary_value_dirichlet_poisson = '0. 0. 0. 0. 0. 0.'
 # module np on or off
 module_np = true
 
+# characteristic ion concentration (unit=M=mol/dm^3)
+characteristic_ion_concentration = 0.000939466
+
 # ion names ('string, string')
 ion_name = 'ion1 ion2'
 
@@ -162,23 +168,18 @@ ion_diffusivity = '0.0213695 0.0213698'
 # ion valence (1)
 ion_valence = '1 -1'
 
-# initial uniform ion concentration
-ion_concentration_cd = '0.000005356 0.000005356'
-#ion_concentration_cd = '0.000010712 0.000010712'
-#ion_concentration_cd = '0. 0.'
+# initial uniform ion concentration normalized by characteristic ion concentration (unit=1)
+#debye_length = 1
+ion_concentration_bulk = '1. 1.'
 
 # solver
 solver_np = superLU_dist
 
-# boundary conditions
+# ion concentration on boundaries normalized by characteristic ion concentration (unit=1)
 boundary_id_dirichlet_np = '1 2 3 4 5 6'
+boundary_value_dirichlet_np_ion1 = '1. 1. 1. 1. 1. 1.' 
+boundary_value_dirichlet_np_ion2 = '1. 1. 1. 1. 1. 1.' 
 
-boundary_value_dirichlet_np_ion1 = '0.000005356 0.000005356 0.000005356 0.000005356 0.000005356 0.000005356' 
-#boundary_value_dirichlet_np_ion1 = '0.000010712 0.000010712 0.000010712 0.000010712 0.000010712 0.000010712'
-#boundary_value_dirichlet_np_ion1 = '0 0 0 0 0 0'
-boundary_value_dirichlet_np_ion2 = '0.000005356 0.000005356 0.000005356 0.000005356 0.000005356 0.000005356' 
-#boundary_value_dirichlet_np_ion2 = '0.000010712 0.000010712 0.000010712 0.000010712 0.000010712 0.000010712'
-#boundary_value_dirichlet_np_ion2 = '0 0 0 0 0 0' 
 # enforce charge neutrality
 check_charge_neutrality = true
 
@@ -186,10 +187,10 @@ check_charge_neutrality = true
 np_system_dt = 0.0001
 
 # np system relaxation time at initialization
-np_system_relaxation_time = 0.1
+np_system_relaxation_time = 1
 
 # np system relaxation write interval
-np_system_relaxation_write_interval = 10
+np_system_relaxation_write_interval = 100
 
 #############################################
 #			   Run info

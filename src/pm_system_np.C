@@ -148,10 +148,8 @@ Number PMSystemNP::init_solution(const Point & p,
     return exp(-num / den);
   }
   // in general the initial condition is just 0. everywhere
-  else return parameters.get<std::vector<Real>>("ion_concentration_cd")[0];
+  else return parameters.get<std::vector<Real>>("ion_concentration_bulk")[0];
 }
-
-
 
 // =============================================================
 void PMSystemNP::init_cd()
@@ -244,10 +242,10 @@ void PMSystemNP::solve(const std::string& option)
 //  PMToolBox::output_message("start solve Ax=b", this->comm());
   _solver_np.solve(this->name());
 
-  std::ostringstream oss;
-  oss<<"* Solved '"<<this->name()<<"' with option '"<<option
-     <<"'. Max solution = "<<this->solution->max();
-  PMToolBox::output_message(oss, this->comm());
+//  std::ostringstream oss;
+//  oss<<"* Solved '"<<this->name()<<"' with option '"<<option
+//     <<"'. Max solution = "<<this->solution->max();
+//  PMToolBox::output_message(oss, this->comm());
 
   STOP_LOG("solve()", "PMSystemNP");
 }

@@ -1104,13 +1104,13 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
         // solve this NP system for one step
         this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
           .solve(option);
-//        if (relax_step_id%output_interval==0) {
-//          oss << "* system '" << np_sys_names[s_id] << "' max_solution = "
-//              << this->get_equation_systems().get_system<PMSystemNP>(
-//                  np_sys_names[s_id])
-//                .solution->max() << "\n";
-//          PMToolBox::output_message(oss, this->comm());
-//        }
+        if (relax_step_id%output_interval==0) {
+          oss << "* system '" << np_sys_names[s_id] << "' max_solution = "
+              << this->get_equation_systems().get_system<PMSystemNP>(
+                  np_sys_names[s_id])
+                .solution->max() << "\n";
+          PMToolBox::output_message(oss, this->comm());
+        }
         // set system relaxed status if real_time > relax_t_final
         if (params.get<Real>("real_time") >= relax_t_final)
         {
@@ -1123,12 +1123,12 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
       if (module_poisson) {
         this->get_equation_systems().get_system<PMSystemPoisson>
           ("Poisson").solve("unused");
-//        if (relax_step_id%output_interval==0) {
-//          oss << "* system 'Poisson' max_solution = "
-//              << this->get_equation_systems().get_system<PMSystemPoisson>
-//                ("Poisson").solution->max() << "\n";
-//          PMToolBox::output_message(oss, this->comm());
-//        }
+        if (relax_step_id%output_interval==0) {
+          oss << "* system 'Poisson' max_solution = "
+              << this->get_equation_systems().get_system<PMSystemPoisson>
+                ("Poisson").solution->max() << "\n";
+          PMToolBox::output_message(oss, this->comm());
+        }
       }
 
       if(relax_step_id%output_interval==0)
@@ -1145,30 +1145,39 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
 
         // write potential over line for debug purpose
         if (module_poisson) {
-          const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
-          const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
-          const std::vector <std::string> directions{"x", "y", "z"};
-          for (int dim_i = 0; dim_i < 3; dim_i++) {
-            std::ostringstream oss;
-            oss << "potential_along_" << directions[dim_i] << "_alpha_"
-                << this->get_equation_systems().parameters
-                  .get<Real>("alpha") << "_relaxstep_" <<
-                    int(relax_step_id/output_interval)
-                << ".csv";
-            const int n_pts = 200;
-            std::vector <Point> pts(n_pts);
-            for (int i = 0; i < pts.size(); i++)
-              pts[i] = Point(
-                (dim_i == 0) *
-                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
-                (dim_i == 1) *
-                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
-                (dim_i == 2) *
-                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts))
-              );
-            this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-              .output_point_solution(pts, oss.str());
-          }
+//          const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
+//          const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
+//          const std::vector <std::string> directions{"x", "y", "z"};
+//          for (int dim_i = 0; dim_i < 3; dim_i++) {
+//            std::ostringstream oss;
+//            oss << "potential_along_" << directions[dim_i] << "_alpha_"
+//                << this->get_equation_systems().parameters
+//                  .get<Real>("alpha") << "_relaxstep_" <<
+//                    int(relax_step_id/output_interval)
+//                << ".csv";
+//            const int n_pts = 200;
+//            std::vector <Point> pts(n_pts);
+//            for (int i = 0; i < pts.size(); i++)
+//              pts[i] = Point(
+//                (dim_i == 0) *
+//                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+//                (dim_i == 1) *
+//                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+//                (dim_i == 2) *
+//                (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts))
+//              );
+//            this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+//              .output_point_solution(pts, oss.str());
+//          }
+//          oss << "surface_potential_relaxstep_"
+//              << int(relax_step_id/output_interval) << ".csv";
+//          std::vector<Point> pts(4);
+//          pts[0] = Point(1., 0., 0.);
+//          pts[1] = Point(-1., 0., 0.);
+//          pts[3] = Point(0., -1., 0.);
+//          pts[4] = Point(0., 1., 0.);
+//          this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").output_point_solution(pts, oss.str());
+//          PMToolBox::output_message(oss, this->comm());
         }
       }
 

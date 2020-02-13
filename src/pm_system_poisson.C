@@ -149,10 +149,10 @@ void PMSystemPoisson::solve(const std::string& option)
 //  PMToolBox::output_message(">> Solving Poisson system", this->comm());
   _solver_poisson.solve(this->name());
 
-  std::ostringstream oss;
-  oss<<"* Solved '"<<this->name()<<"' with option '"<<option
-  <<"'. Max solution = "<<this->solution->max();
-  PMToolBox::output_message(oss, this->comm());
+//  std::ostringstream oss;
+//  oss<<"* Solved '"<<this->name()<<"' with option '"<<option
+//  <<"'. Max solution = "<<this->solution->max();
+//  PMToolBox::output_message(oss, this->comm());
   
 
   STOP_LOG("solve()", "PMSystemPoisson");

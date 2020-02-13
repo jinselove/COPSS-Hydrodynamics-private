@@ -115,7 +115,7 @@ public:
                                                        // 8.85418781762039E-24 (
                                                        // C^2/(N*um^2) )
   const Real elementary_charge = 1.6021766208E-19;     // unit = C
-  const Real NA = 6.02214076E23;      // Avogadro constant, unit = [1]
+  const Real NA = 6.02214076E23;      // Avogadro constant, unit = [1/mol]
   Real T;                                              // simulation temperature
                                                        // (K)
   Real kBT;                                            // (N*um)
@@ -134,10 +134,12 @@ public:
   std::vector<Real> ion_diffusivity;
   // valence of each ion species (unit = 1)
   std::vector<int> ion_valence;
-  // initial uniform ion concentration
-  std::vector<Real> ion_concentration_cd;
-  // Bjerrum length, unit = 1
+  // initial bulk ion concentration normalized by c0 (unit=1)
+  std::vector<Real> ion_concentration_bulk;
+  // Bjerrum length normalized by Rb, unit = 1
   Real lambda_B;
+  // Debye length normalized by Rb, unit = 1
+  Real lambda_D;
   // NP system relaxation time for initialization. By default, this
   // relaxation time is 2 * Rb^2/max(ion_diffusivity), i.e., the time it takes
   // for ions to diffuse 2 particle radius. 
@@ -156,7 +158,7 @@ public:
   Real efield0; // characteristic electric field (V/um)
   Real charge_rho0; // characteristic volume charge density (C/um^3)
   Real charge_sigma0; // characteristic surface charge density (C/um^2)
-  Real c0 = 1.0; // characteristic concentration of ion species (M=mol/L)
+  Real c0; // characteristic concentration of ion species (M=mol/L)
 
   // coefficient used when calculating the contribution of ion cloud to global
   // electrostatic potential, unit = [1]. Contribution of ions to global
@@ -172,7 +174,7 @@ public:
   // density is defined as Sum{NA * Zj * e * E}, where j is the j-th ion
   // species, Cj is the concentration which has the unit Mol/(10^-1 m)^3. In
   // dimensionless Stokes equation, this term shrinks to  (e * NA * mol /
-  // (10^-1 m)^3) * (e / (4 * pi * epsilon_0 * epsilon * Rb)) / (fc / Rb^3)
+  // (10^-1 m)^3) * (e / (4 * pi * epsilon_0 * epsilon * Rb * Rb)) / (fc / Rb^3)
   Real coeff_ion_force_density;
 
   // Geometry information
@@ -201,7 +203,9 @@ public:
   std::vector<Real>boundary_value_dirichlet_poisson,
                    boundary_value_neumann_poisson;
 
-  // Boundary conditions for Nernst-Planck system
+  // Boundary conditions for Nernst-Planck system; notice that the ion
+  // concentration provided in the input file should be the normalized value
+  // by c0
   bool check_charge_neutrality;
   std::vector<unsigned int> boundary_id_dirichlet_np;
   std::vector<std::vector<Real> > boundary_value_dirichlet_np;

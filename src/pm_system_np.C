@@ -147,8 +147,12 @@ Number PMSystemNP::init_solution(const Point & p,
     // return exp(-num/den) / (4. * t + 1)^1.5
     return exp(-num / den);
   }
-  // in general the initial condition is just 0. everywhere
-  else return parameters.get<std::vector<Real>>("ion_concentration_bulk")[0];
+  // in general, set initial solution to the "ion_concentration_bulk" defined
+  // in input file
+  else {
+    const unsigned int& init_ion_id = parameters.get<unsigned int>("init_ion_id");
+    return parameters.get < std::vector < Real >> ("ion_concentration_bulk")[init_ion_id];
+  }
 }
 
 // =============================================================
@@ -160,6 +164,8 @@ void PMSystemNP::init_cd()
   this->init_params();
 
   // set initial ion concentration
+  this->get_equation_systems().parameters.set<unsigned int>("init_ion_id") =
+    ion_id;
   this->project_solution(init_solution, libmesh_nullptr,
     this->get_equation_systems().parameters);
 

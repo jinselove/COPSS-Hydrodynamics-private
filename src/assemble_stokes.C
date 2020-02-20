@@ -554,7 +554,7 @@ void AssembleStokes::compute_element_rhs(const Elem                   *elem,
      1. add the regularized point force for "disturbed" flow field!
      first examine if this element is "close to" the point force sources
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  if (pf_flag && (option == "disturbed"))
+  if ((pf_flag or np_systems.size()!=0) && (option == "disturbed"))
   {
     // get the location of points in the neighbor list
     const std::size_t n_pts = n_list.size();

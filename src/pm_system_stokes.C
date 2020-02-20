@@ -1013,16 +1013,6 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
         <<params.get<Real>("real_time")<<"):\n";
     PMToolBox::output_message(oss, this->comm());
 
-    // evaluate total solutions of Stokes system if exists
-//    if (with_hi)
-//    {
-//      // Update Stokes Solution to total solution
-//      PMToolBox::output_message(">> Updating stokes solution to total...",
-//        this->comm());
-//      this->update_solution_to_total();
-//      oss <<"* max(total_stokes_solution) = " << this->solution->max();
-//      PMToolBox::output_message(oss, this->comm());
-//    }
     // set solve options for NP solver
     const std::string option = std::string("diffusion")
                                + ((module_poisson) ? ("&electrostatics") : (""))
@@ -1034,22 +1024,7 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
     for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++) {
       this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
         .solve(option);
-//      oss << "* Solved system '" << np_sys_names[s_id];
-//      oss << ", max solution="
-//          << this->get_equation_systems().get_system<PMSystemNP>(
-//              np_sys_names[s_id])
-//            .solution->max();
-//      PMToolBox::output_message(oss, this->comm());
     }
-
-    // resume Stokes solution to global after solving Poisson
-//    if (with_hi)
-//    {
-//      // Update Stokes Solution to total solution
-//      PMToolBox::output_message(">> resume stokes solution to global ...",
-//                                this->comm());
-//      this->resume_solution_to_global();
-//    }
   }
   // if NP system are not relaxed, we relax them; this will be done recursively
   else
@@ -1075,16 +1050,44 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
         PMToolBox::output_message(oss, this->comm());
         this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
           .solve("unused");
-//        oss << "* Poisson system max_solution = "
-//           << this->get_equation_systems().get_system<PMSystemPoisson>
-//           ("Poisson").solution->max();
         PMToolBox::output_message(oss, this->comm());
       }
 
 #ifdef LIBMESH_HAVE_EXODUS_API
+      PMToolBox::output_message("--> Writing initial NP and Poisson field "
+                                "solution to init_cd.e", this->comm());
       ExodusII_IO(this->get_mesh()).write_equation_systems("init_cd.e",
         this->get_equation_systems());
 #endif
+
+      // jump out couple_np if relax_t_final is 0. (typically for debug purpose)
+      if (relax_t_final==0.) {
+        const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
+        const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
+        const std::vector <std::string> directions{"x", "y", "z"};
+        PMToolBox::output_message("--> writing initial Poisson solution along"
+                                  " lines to csv files", this->comm());
+        for (int dim_i = 0; dim_i < 3; dim_i++) {
+          std::ostringstream oss;
+          oss << "potential_along_" << directions[dim_i] << "_alpha_"
+              << this->get_equation_systems().parameters
+                .get<Real>("alpha") << "_step_0.csv";
+          const int n_pts = 200;
+          std::vector <Point> pts(n_pts);
+          for (int i = 0; i < pts.size(); i++)
+            pts[i] = Point(
+              (dim_i == 0) *
+              (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+              (dim_i == 1) *
+              (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+              (dim_i == 2) *
+              (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts))
+            );
+          this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+            .output_point_solution(pts, oss.str());
+        }
+        return;
+      }
     }
     else
     {
@@ -1123,6 +1126,8 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
       if (module_poisson) {
         this->get_equation_systems().get_system<PMSystemPoisson>
           ("Poisson").solve("unused");
+
+        // output poisson system max solution for debug purpose
         if (relax_step_id%output_interval==0) {
           oss << "* system 'Poisson' max_solution = "
               << this->get_equation_systems().get_system<PMSystemPoisson>
@@ -1134,17 +1139,16 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
       if(relax_step_id%output_interval==0)
       {
         #ifdef LIBMESH_HAVE_EXODUS_API
-//        PMToolBox::output_message("* append equation systems to init_cd.e",
-//          this->comm());
+        PMToolBox::output_message("--> appending NP and Poisson field solution "
+                                  "to init_cd.e", this->comm());
           ExodusII_IO exo(this->get_mesh());
           exo.append(true);
           exo.write_timestep("init_cd.e", this->get_equation_systems(),
             relax_step_id+1, params.get<Real>("real_time"));
         #endif
-        PMToolBox::output_message(oss, this->comm());
 
-        // write potential over line for debug purpose
-        if (module_poisson) {
+//        // write potential over line for debug purpose
+//        if (module_poisson) {
 //          const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
 //          const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
 //          const std::vector <std::string> directions{"x", "y", "z"};

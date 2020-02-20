@@ -287,7 +287,6 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
     // Store a pointer to the element we are currently working on.
     const Elem *elem           = *el;
     const unsigned int elem_id = elem->id();
-    // std::cout<<"-------------------elem_id = "<<elem_id <<"------------------\n";
     // Get the degree of freedom indices for the current element. These define
     // where in the global matrix and right-hand-side this element will contribute to.
     dof_map.dof_indices(elem, dof_indices);
@@ -328,28 +327,15 @@ void AssemblePoisson::assemble_global_F(const std::string& system_name,
 
     // Impose the Dirichlet BC (electrical potential) via the penalty method.
     this->apply_bc_by_penalty(elem, "vector", Ke, Fe, option);
-    // PMToolBox::output_dense_vector(Fe);
 
     // Impose Neumann BC (surface charge density) to the right hand side
     this->apply_bc_neumann(elem, *fe_phi, *fe_face, Fe, sigma_e, sigma_e_global, sigma_e_local);
-    // PMToolBox::output_dense_vector(Fe);
 
-    // std::cout << "sigma_e:\n";
-    // PMToolBox::output_dense_vector(sigma_e);
-    // std::cout << "sigma_e_global:\n";
-    // PMToolBox::output_dense_vector(sigma_e_global);
-    // std::cout << "sigma_e_local:\n";
-    // PMToolBox::output_dense_vector(sigma_e_local);
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
     dof_map.constrain_element_vector(Fe, dof_indices);
 
-    // PMToolBox::output_dense_vector(Fe);
-
-    // _n_dofs[elem_id] = _dof_indices[elem_id].size();
    // Add the element rhs vector to the global system.
-    // PMToolBox::zero_filter_dense_vector(Fe, 1e-10);
-    // PMToolBox::output_dense_vector(Fe);
     _pm_system.rhs->add_vector(Fe, dof_indices);
   } // end for elem-loop
   STOP_LOG("assemble_global_F()", "AssemblePoisson");
@@ -372,17 +358,16 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
   // we don't need option for Poisson system
   (void) option;
 
-  PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
-
-  // Get a reference to the PointMesh, PMPeriodicBoundary, and PointParticles
-  PointMesh<3> *_point_mesh                 = _pm_system.point_mesh();
-  PMPeriodicBoundary *_pm_periodic_boundary = _point_mesh->pm_periodic_boundary();
-  std::vector<PointParticle *> _particles   = _point_mesh->particles();
-
-  // 1. Add the regularized point charge, first examine if this element has
-  // neighboring point charge sources
-  if (pc_flag)
+  // only need to update rhs when there are neighboring particles
+  // (pc_flag=True) or there are ions (np_systems.size()!=0)
+  if (pc_flag or np_systems.size()!=0)
   {
+    // Create temporary references
+    PMSystemPoisson& _pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
+    PointMesh<3> *_point_mesh                 = _pm_system.point_mesh();
+    PMPeriodicBoundary *_pm_periodic_boundary = _point_mesh->pm_periodic_boundary();
+    std::vector<PointParticle *> _particles   = _point_mesh->particles();
+
     // Number of particles in the neighbor list
     const std::size_t n_pts = n_list.size();
 
@@ -449,7 +434,7 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
         // add the contribution of this np system to global charge density
         rho_global_ion += tmp;
       }
-//      std::cout<<"rho_global_ion = "<<rho_global_ion<<std::endl;
+      // add contribution from ion to global charge density
       rho_global += rho_global_ion;
 
       // scale rho_global by 4*pi, this comes from the dimensionless process
@@ -461,7 +446,7 @@ void AssemblePoisson::compute_element_rhs(const Elem *elem,
         Fe(l) += int_force[l * qp_size + qp] * rho_global;
       }
     }
-  }       // end if( pc_flag )
+  } // end if( pc_flag )
 
   STOP_LOG("compute_element_rhs()", "AssemblePoisson");
 }

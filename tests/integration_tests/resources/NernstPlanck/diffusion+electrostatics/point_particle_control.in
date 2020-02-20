@@ -184,7 +184,7 @@ boundary_value_dirichlet_np_ion2 = '1. 1. 1. 1. 1. 1.'
 check_charge_neutrality = true
 
 # time interval for all np system
-np_system_dt = 0.0001
+np_system_dt = 0.001
 
 # np system relaxation time at initialization
 np_system_relaxation_time = 1

@@ -850,6 +850,56 @@ void PMSystemPoisson::output_point_solution(const std::vector<Point>& pts,
   STOP_LOG("output_point_solution()", "PMSystemPoisson");
 }
 
+void PMSystemPoisson::write_point_solution(const std::string& outfile_name,
+                                           const unsigned int& step_id,
+                                           const unsigned int& n_pts)
+{
+  const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
+  const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
+  const std::vector <std::string> directions{"x", "y", "z"};
+  for (int dim_i = 0; dim_i < 3; dim_i++) {
+    std::fstream outfile_stream;
+    outfile_stream.precision(o_precision);
+    outfile_stream.setf(std::ios::fixed);
+    outfile_stream.open(outfile_name+directions[dim_i]+".csv",
+      step_id==0 ? (std::ios_base::out) : (std::ios_base::app));
+    if (this->comm().rank()==0){
+      if (step_id==0){
+        outfile_stream<<"field_point_id,x_coord,y_coord,z_coord,phi/phi0\n";
+        outfile_stream<<"#phi0 = "<<this->get_equation_systems().parameters
+        .get<Real>("phi0")<<"[uV]\n";
+      }
+      outfile_stream<<"#output_step_id="<<step_id<<"\n";
+    }
+    // loop over all output points
+    for (int i = 0; i < n_pts; i++){
+      Point pt = Point(
+        (dim_i == 0) *
+        (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+        (dim_i == 1) *
+        (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+        (dim_i == 2) *
+        (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts))
+      );
+      // global potential from FEM
+      Real phi_global, phi_total;
+      const unsigned int& phi_var = this->variable_number("phi");
+      // get global phi from FEM solution, this is slow, but we tolerate it
+      // only for test
+      phi_global = this->point_value(phi_var, pt);
+      // get local potential from analytical function
+      const Real phi_local = this->local_potential_field(pt, "regularized");
+      // get total solution at this point
+      phi_total = phi_global + phi_local;
+      if (this->comm().rank()==0)
+        outfile_stream <<i <<","<< pt(0)<<","<<pt(1)<<","
+          <<pt(2)<<","<<phi_total<<"\n";
+    }// end loop over all points
+    outfile_stream.close();
+  } // end loop over all dimensions
+}
+
+
 // ===========================================================================
 void PMSystemPoisson::update_solution_to_total()
 {

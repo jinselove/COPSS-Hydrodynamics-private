@@ -140,6 +140,14 @@ public:
    void write_out_solution();
 
   /**
+   * write total solution on a list of points of multiple time steps to
+   * single csv files
+   */
+  void write_point_solution(const std::string& outfile_name,
+                            const unsigned int& step_id,
+                            const unsigned int& n_pts);
+
+  /**
    * Test the concentration profile for a preset test systems
    * this function is debug and validation purpose
    * Currently test the NP system solution for first 10 steps at dt = 0.01

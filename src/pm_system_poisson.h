@@ -205,6 +205,14 @@ public:
                             const std::string& output_filename);
 
   /**
+   * write total solution on a list of points of multiple time steps to
+   * single csv files
+   */
+  void write_point_solution(const std::string& outfile_name,
+                            const unsigned int& step_id,
+                            const unsigned int& n_pts);
+
+  /**
    *
    */
   void update_solution_to_total() override;

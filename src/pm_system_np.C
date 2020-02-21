@@ -341,6 +341,50 @@ void PMSystemNP::write_out_solution()
   } // end loop dim_i
 }
 
+// =======================================================================
+void PMSystemNP::write_point_solution(const std::string& outfile_name,
+                                       const unsigned int& step_id,
+                                       const unsigned int& n_pts)
+{
+  const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
+  const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
+  const std::vector <std::string> directions{"x", "y", "z"};
+  for (int dim_i = 0; dim_i < 3; dim_i++) {
+    std::fstream outfile_stream;
+    outfile_stream.precision(o_precision);
+    outfile_stream.setf(std::ios::fixed);
+    outfile_stream.open(outfile_name+directions[dim_i]+".csv",
+                        step_id==0 ? (std::ios_base::out) : (std::ios_base::app));
+    if (this->comm().rank()==0){
+      if (step_id==0){
+        outfile_stream<<"field_point_id,x_coord,y_coord,z_coord,c/c0\n";
+        outfile_stream<<"#c0 = "<<this->get_equation_systems().parameters
+          .get<Real>("c0")<<"[M]\n";
+      }
+      outfile_stream<<"#output_step_id="<<step_id<<"\n";
+    }
+    // loop over all output points
+    for (int i = 0; i < n_pts; i++){
+      Point pt = Point(
+        (dim_i == 0) *
+        (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+        (dim_i == 1) *
+        (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+        (dim_i == 2) *
+        (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts))
+      );
+      //  potential from FEM
+      const unsigned int& c_var = 0;
+      Real c = this->point_value(c_var, pt);
+      if (this->comm().rank()==0)
+        outfile_stream <<i <<","<< pt(0)<<","<<pt(1)<<","
+                       <<pt(2)<<","<<c<<"\n";
+    }// end loop over all points
+    outfile_stream.close();
+  } // end loop over all dimensions
+}
+
+
 // =========================================================================
 void PMSystemNP::test_concentration_profile()
 {

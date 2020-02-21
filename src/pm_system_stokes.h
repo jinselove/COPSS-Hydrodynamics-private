@@ -20,6 +20,8 @@
 
 
 #pragma once
+#include <iostream>
+#include <fstream>
 
 // Local Includes -----------------------------------
 #include "assemble_stokes.h"
@@ -328,6 +330,12 @@ private:
 
   // output precision (defined in input file, default is 6)
   int o_precision;
+
+  // output file for potential
+  std::ofstream outfile_poisson;
+
+  // output file for ion
+  std::ofstream outfile_np;
   
 }; // end class
 } // end namespace libMesh

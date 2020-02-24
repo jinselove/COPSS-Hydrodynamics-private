@@ -1398,8 +1398,8 @@ const Real Copss::get_min_dt(EquationSystems &es,
     // get dt from this system
     const Real &dt = sys.get_dt();
     min_dt = (dt < min_dt) ? dt : min_dt;
-    ss << "dt(" << sys_names[s_id] << "): " << dt;
-    PMToolBox::output_message(ss, *comm_in);
+//    ss << "dt(" << sys_names[s_id] << "): " << dt;
+//    PMToolBox::output_message(ss, *comm_in);
   }
   // return minimum dt
   return min_dt;
@@ -1483,8 +1483,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 
   // get time step dt
   const Real& dt = this->get_min_dt(equation_systems);
-  ss << "min{dt} of all systems: " << dt;
-  PMToolBox::output_message(ss, *comm_in);
+//  ss << "min{dt} of all systems: " << dt;
+//  PMToolBox::output_message(ss, *comm_in);
   equation_systems.parameters.set<Real>("dt") = dt;
 
   // use MidPoint scheme if Brownian is on
@@ -1810,8 +1810,8 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
 
   // get time step dt
   const Real& dt = this->get_min_dt(equation_systems);
-  ss << "min{dt} of all systems: " << dt;
-  PMToolBox::output_message(ss, *comm_in);
+//  ss << "min{dt} of all systems: " << dt;
+//  PMToolBox::output_message(ss, *comm_in);
   equation_systems.parameters.set<Real>("dt") = dt;
 
 

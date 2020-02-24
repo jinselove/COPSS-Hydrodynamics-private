@@ -13,6 +13,7 @@
 #include "fix_point_constant.h"
 #include "fix_rigid_surface_constraint.h"
 #include "fix_rigid_sedimentation.h"
+#include "fix_rigid_constant_torque.h"
 #include "fix_rigid_lj_cut.h"
 #include "fix_rigid_slitWall_lj_cut.h"
 #include "fix_rigid_sphereWall_lj_cut.h"

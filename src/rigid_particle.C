@@ -186,6 +186,8 @@ void RigidParticle::read_mesh_sphere(const std::string& filename)
       (*node)(i) =  ((*node)(i) * _radius + _center0(i));
     }
   } // end for
+  // rotate particle mesh
+  PMToolBox::rotate_serial_mesh(_mesh, _rot);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Compute the volume of the sphere.

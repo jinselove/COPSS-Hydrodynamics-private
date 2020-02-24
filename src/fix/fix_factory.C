@@ -57,10 +57,12 @@ Fix * FixFactory::buildFix(std::string           & fix_name,
   else {
     // rigid particle surface constraint has to be added by default
     if (fix_name == "surface_constraint") return new FixRigidSurfaceConstraint(
-        pm_system);
+      pm_system);
     else if (fix_name == "sedimentation") return new FixRigidSedimentation(
-        pm_system);
+      pm_system);
     else if (fix_name == "lj_cut") return new FixRigidLJCut(pm_system);
+    else if (fix_name == "constant_torque") return new FixRigidConstantTorque
+      (pm_system);
 
     // particle wall force
     else if (fix_name == "wall/lj_cut")

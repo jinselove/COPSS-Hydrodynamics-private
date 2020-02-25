@@ -42,8 +42,6 @@
 #include "libmesh/dense_submatrix.h"
 #include "libmesh/dense_subvector.h"
 #include "libmesh/mesh.h"
-#include <fstream>
-
 // User defined header includes
 #include "ggem_poisson.h"
 #include "pm_toolbox.h"
@@ -730,42 +728,13 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
       // calculate the neumann boundary value at the quadrature point
 
 
-
         pm_system.local_potential_field(qface_point[qp], "regularized",
                                         "grad", local_potential_old, elem_id);
-
-        const Real  phi_local = pm_system.local_potential_field(qface_point[qp],
-                                                                "regularized", elem_id);
-
-//        const Real val =local_potential_old;
-//        std::cout << "potential= " << phi_local<<"\n";
-//        std::cout << "potential_gradient (0)= " << local_potential_old.second(0)<<"\n";
-//        std::cout << "potential_gradient (1)= " << local_potential_old.second(1)<<"\n";
-//        std::cout << "potential_gradient (2)= " << local_potential_old.second(2)<<"\n";
-
-//        std::cout << "face normal= " << face_normals[0][0<<"\n";
-
-
-//        std::cout << "face normal (0)= " << face_normals[0](0)<<"\n";
-//        std::cout << "face normal (1)= " << face_normals[0](1)<<"\n";
-//        std::cout << "face normal  (2)= " << face_normals[0](2)<<"\n";
 
         const Real dphi_local=local_potential_old.second(0)*face_normals[0](0)+
                 local_potential_old.second(1)*face_normals[0](1)+
                 local_potential_old.second(2)*face_normals[0](2);
 
-//        std::cout << "dphi_local= " << dphi_local<<"\n";
-
-//        outfile<<face_normals[0](0)<<","<<face_normals[0](1)<<","<<face_normals[0](2)<<","
-//          <<local_potential_old.second(0)<<","<<local_potential_old.second(1)<<","<<local_potential_old.second(2)<<","
-//          <<sigma_total<<","
-//          << dphi_local<<","
-//          << phi_local<<","<<"\n";
-//
-//        if (phi_local>1e-10)
-//            std::cout << "bon " << "\n";
-//        if (phi_local<-1e-10)
-//        std::cout << "bonne " << "\n";
 
         val = sigma_total*(4*libMesh::pi)-dphi_local;
 

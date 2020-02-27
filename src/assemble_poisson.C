@@ -42,7 +42,6 @@
 #include "libmesh/dense_submatrix.h"
 #include "libmesh/dense_subvector.h"
 #include "libmesh/mesh.h"
-
 // User defined header includes
 #include "ggem_poisson.h"
 #include "pm_toolbox.h"
@@ -606,6 +605,8 @@ void AssemblePoisson::apply_bc_by_penalty(const Elem          *elem,
       // Because of Ewald split: global_potential = total_potential -
       // ggem_local_potential
       Real phi_global = phi_total - phi_local;
+      if ((phi_local>0)||(phi_local<0))
+        std::cout<<"vrai"<<"\n";
 
       // Find the node on the element matching this node on the side.
       // That defined where in the element matrix the BC will be applied.
@@ -644,11 +645,10 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   {
     return;
   }
-  std::cout<<"Warning: needs more testing/validation on the Neumann BC of "
-             "Poisson system. Exiting..." <<std::endl;
-  libmesh_error();
-  
-  
+  /*std::cout<<"Warning: needs more testing/validation on the Neumann BC of "
+             "Poisson system. Exiting..." <<std::endl;*/
+//  libmesh_error();
+
   // Get a reference to the Particle-Mesh System
   PMSystemPoisson& pm_system = _eqn_sys.get_system<PMSystemPoisson>("Poisson");
   
@@ -658,6 +658,12 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   const std::vector<Real>& JxW_face               = fe_face.get_JxW();
   const std::vector<Point>& qface_point = fe_face.get_xyz();
   const std::vector<Point>& face_normals          = fe_face.get_normals();
+
+//      std::ofstream outfile;
+//  outfile.open("debug.csv", std::ios_base::out);
+//  outfile<<"face normal x,face normal y,face normal z,Potential gradient x,Potential gradient y,Potential gradient z,sigma_total,dphi_local/dn,phi_local\n";
+
+
   // Extract the shape function derivatives to be evaluated at the nodes
   // const std::vector<std::vector<RealGradient> >& dphi = fe_phi.get_dphi();
   // Extract the element node coordinates in the reference frame
@@ -667,11 +673,11 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   // fe_phi.reinit(elem, &nodes);
 
   
-  // fe_phi.reinit(elem);
+//  fe_phi.reinit(elem);
   // Pre-calculate 'Phi_local' and 'dphi_local' on all nodes of this element
   // so that we can directly use them later when we loop over nodes on the 
   // boundary surfaces
-  // std::vector<Real> phi_local(elem->n_nodes());
+//   std::vector<Real> phi_local(elem->n_nodes());
   // std::vector<RealGradient> dphi_local(elem->n_nodes());
   // // Loop through nodes on this element
   // for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
@@ -685,7 +691,7 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
   // // Gradient of electrical potential on all nodes in this element
   // for (unsigned int nn = 0; nn < elem->n_nodes(); nn++)
   // {
-  //   for (unsigned int i = 0; i < phi_local.size(); i++) 
+  //   for (unsigned int i = 0; i < phi_local.size(); i++)
   //   {
   //     dphi_local[nn] += phi_local[i] * dphi[i][nn];
   //   }
@@ -704,7 +710,7 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
     const auto &t = _boundary_sides_neumann_poisson[elem_id][s];
     const unsigned int& side_id = std::get<0>(t);
     const unsigned int& boundary_id = std::get<1>(t);
-    const Real& sigma_total = std::get<2>(t);  
+    const Real& sigma_total = std::get<2>(t);
     // std::cout << "side id = " << side_id << "\n";
     // std::cout << "boundary id of this side = " << boundary_id << "\n";
     // std::cout << "sigma_total of this side = " << sigma_total <<"\n";
@@ -716,10 +722,22 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
     // std::cout << "size of phi of this side (evaludate on quadrature points) = " << phi_face.size() <<"(of "<< phi_face[0].size()<<")"<<"\n";
     // std::cout << "size of dphi of this side (evaludate on quadrature points) = " << dphi_face.size() <<"\n";
     Real val = 0.;
+      std::pair<Real, Point> local_potential_old;
     for (unsigned int qp=0; qp<qface_point.size(); qp++)
     {
       // calculate the neumann boundary value at the quadrature point
-      val = sigma_total;
+
+
+        pm_system.local_potential_field(qface_point[qp], "regularized",
+                                        "grad", local_potential_old, elem_id);
+
+        const Real dphi_local=local_potential_old.second(0)*face_normals[0](0)+
+                local_potential_old.second(1)*face_normals[0](1)+
+                local_potential_old.second(2)*face_normals[0](2);
+
+
+        val = sigma_total*(4*libMesh::pi)-dphi_local;
+
       for (unsigned int i=0; i<phi_face.size(); i++)
       {
         Fe(i) += JxW_face[qp] * val * phi_face[i][qp];
@@ -797,7 +815,7 @@ void AssemblePoisson::apply_bc_neumann(const Elem          *elem,
     //   // sigma_e_local(i) = sigma_local[i];
     // }
   } // end for s-loop
-
+//    outfile.close();
   STOP_LOG("apply_bc_neumann()", "AssemblePoisson");
 }
 

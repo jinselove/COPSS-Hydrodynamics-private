@@ -1446,8 +1446,8 @@ const Real Copss::get_min_dt(EquationSystems &es,
     // get dt from this system
     const Real &dt = sys.get_dt();
     min_dt = (dt < min_dt) ? dt : min_dt;
-    ss << "dt(" << sys_names[s_id] << "): " << dt;
-    PMToolBox::output_message(ss, *comm_in);
+//    ss << "dt(" << sys_names[s_id] << "): " << dt;
+//    PMToolBox::output_message(ss, *comm_in);
   }
   // return minimum dt
   return min_dt;

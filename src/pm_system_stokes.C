@@ -300,8 +300,10 @@ void PMSystemStokes::solve(const std::string& option, const bool is_brownian)
   }
 
   std::ostringstream oss;
-  oss<<"* Solved '"<<this->name()<<"' with option '"<<option
-     <<"'. Max solution = "<<this->solution->max();
+//  oss<<">> Solved '"<<this->name()<<"' with option '"<<option
+//     <<"'. Max solution = "<<this->solution->max();
+  oss<<">> Solved '"<<this->name()<<"' with option '"<<option <<"'.";
+
   PMToolBox::output_message(oss, this->comm());
 
   STOP_LOG("solve()", "PMSystemStokes");
@@ -942,6 +944,7 @@ void PMSystemStokes::couple_poisson()
 {
   START_LOG("couple_poisson()", "PMSystemStokes");
 
+  PMToolBox::output_message(">> Solving Poisson systems...", this->comm());
   this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solve(
     "unused");
   this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
@@ -1009,8 +1012,8 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
   {
     // update real_time since we are solve concentration for t = t+dt
     params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
-    oss <<"====> All NP system are relaxed. Solved all NP systems for c(t=t+dt="
-        <<params.get<Real>("real_time")<<"):\n";
+    oss <<"====> All NP systems are relaxed, updating systems for c(t=t+dt="
+        <<params.get<Real>("real_time")<<"):";
     PMToolBox::output_message(oss, this->comm());
 
     // set solve options for NP solver

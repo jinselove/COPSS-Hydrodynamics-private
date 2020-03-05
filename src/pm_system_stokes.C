@@ -134,8 +134,9 @@ Real PMSystemStokes::get_dt()
 }
 
 // ==================================================================================
-void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
-                                   const std::string& option)
+void PMSystemStokes::reinit_system(bool & neighbor_list_update_flag,
+                                   const std::string& option,
+                                   const bool& second_half)
 {
   START_LOG("reinit_system()", "PMSystemStokes");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
@@ -189,13 +190,18 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
   // multi-Physics coupling
   if (option == "disturbed")
   {
-    // ---> couple NP systems at time t
-    if (this->get_equation_systems().parameters.get<bool>("module_np"))
+    // ---> couple NP systems at time t only when module_np is true, and
+    // second_half is false, i.e., no need to update NP systems for the
+    // second half step of fixman intergrator
+    if (this->get_equation_systems().parameters.get<bool>("module_np") and
+      !second_half)
       this->couple_np();
 
-    // --> couple Poisson system at time t
+    // --> couple Poisson system at time t. When second_half is true, we
+    // don't update the Poisson system, but we will update the electrostatic
+    // force on particles
     if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
-      this->couple_poisson();
+      this->couple_poisson(second_half);
   }
 
   // perf_log.pop("fix compute");
@@ -298,13 +304,6 @@ void PMSystemStokes::solve(const std::string& option, const bool is_brownian)
       undisturbed_solution->localize(local_undisturbed_solution);
       std::cout<<"local_undisturbed_vector.size="<<local_undisturbed_solution.size()<<std::endl;
   }
-
-  std::ostringstream oss;
-//  oss<<">> Solved '"<<this->name()<<"' with option '"<<option
-//     <<"'. Max solution = "<<this->solution->max();
-  oss<<">> Solved '"<<this->name()<<"' with option '"<<option <<"'.";
-
-  PMToolBox::output_message(oss, this->comm());
 
   STOP_LOG("solve()", "PMSystemStokes");
 }
@@ -940,13 +939,16 @@ void PMSystemStokes::write_fluid_velocity_data(const std::string& filename)
 }
 
 // ============================================================================
-void PMSystemStokes::couple_poisson()
+void PMSystemStokes::couple_poisson(const bool& second_half)
 {
   START_LOG("couple_poisson()", "PMSystemStokes");
 
-  PMToolBox::output_message(">> Solving Poisson systems...", this->comm());
-  this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solve(
-    "unused");
+  if (!second_half){
+    PMToolBox::output_message(">>>>>>>> Solving Poisson systems...",
+        this->comm());
+    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
+        solve("unused");
+  }
   this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
     add_electrostatic_forces();
 
@@ -1012,7 +1014,7 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
   {
     // update real_time since we are solve concentration for t = t+dt
     params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
-    oss <<"====> All NP systems are relaxed, updating systems for c(t=t+dt="
+    oss <<">>>>>> All NP systems are relaxed, updating systems for c(t=t+dt="
         <<params.get<Real>("real_time")<<"):";
     PMToolBox::output_message(oss, this->comm());
 
@@ -1022,7 +1024,7 @@ void PMSystemStokes::couple_np(unsigned int relax_step_id)
                                + ((with_hi) ? ("&convection") : (""));
 
     // solve all NP system for t = t+dt
-    oss <<">> Solving all NP systems...";
+    oss <<">>>>>>>> Solving all NP systems with option = '"<<option<<"'...";
     PMToolBox::output_message(oss, this->comm());
     for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++) {
       this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])

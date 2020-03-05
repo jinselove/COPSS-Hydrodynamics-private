@@ -1198,14 +1198,6 @@ EquationSystems Copss::create_equation_systems()
   // Nernst-Planck Module
   if (module_np)
   {
-    // fixme: remove the following if condition after final implementation
-    if(with_brownian & with_hi){
-      PMToolBox::output_message("Error: cannot support module_np with both "
-                                "Brownian and HI on for now because of the "
-                                "half-point scheme in Fixman's integration. "
-                                "", *comm_in);
-      libmesh_error();
-    }
     // add a NP system to equation systems for each ion
     for (int ion_id=0 ; ion_id<ion_name.size(); ion_id++)
     {
@@ -1449,7 +1441,7 @@ const Real Copss::get_min_dt(EquationSystems &es,
 //    ss << "dt(" << sys_names[s_id] << "): " << dt;
 //    PMToolBox::output_message(ss, *comm_in);
   }
-  // return minimum dt
+
   return min_dt;
 }
 
@@ -1457,6 +1449,8 @@ const Real Copss::get_min_dt(EquationSystems &es,
 void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 {
   // PerfLog perf_log("integration");
+  ss << "\n>> Starting Fixman integration at step " + std::to_string(i);
+  PMToolBox::output_message(ss, *comm_in);
   PMSystemStokes& system = equation_systems.get_system<PMSystemStokes>("Stokes");
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Compute the "disturbed" particle velocity + "undisturbed" velocity = U0
@@ -1476,8 +1470,8 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
       timestep_duration         = 0;
     }
   }
-  ss << ">>>>>>>>>>>>>>>>>>>>>> reinit disturbed system at the beginning of "
-        "fixman integration, step id = "<< i <<"...";
+  ss << ">>>> reinit disturbed system at the beginning of "
+        "fixman integration ...";
   PMToolBox::output_message(ss, *comm_in);
   system.reinit_system(neighbor_list_update_flag, "disturbed");
   if (print_info) 
@@ -1505,8 +1499,6 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
      -----------------------------------------------------------------------------------------*/
   if (i % write_interval == 0) 
   {
-    ss << "Starting Fixman integration at step " + std::to_string(i);
-    PMToolBox::output_message(ss, *comm_in);
     if (i != restart_step) 
     {
       if (std::find(output_file.begin(), output_file.end(), "equation_systems")
@@ -1535,7 +1527,7 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 
   // get time step dt
   const Real& dt = this->get_min_dt(equation_systems);
-  ss << "min{dt} of all systems: " << dt;
+  ss << "(min{dt} of all systems: " << dt<<")";
   PMToolBox::output_message(ss, *comm_in);
   equation_systems.parameters.set<Real>("dt") = dt;
 
@@ -1724,10 +1716,10 @@ void Copss::fixman_integrate(EquationSystems& equation_systems, unsigned int& i)
 
       // comment the line below if not update neighbor list at each time step
       if (update_neighbor_list_everyStep) neighbor_list_update_flag = true;
-      ss << ">>>>>>>>>>>>>>>>>>>>> reinit disturbed system before second half "
-            "step of fixman integration, step id = " << i<<"...";
+      ss << ">>>> reinit disturbed system before second half "
+            "step of fixman integration ...";
       PMToolBox::output_message(ss, *comm_in);
-      system.reinit_system(neighbor_list_update_flag, "disturbed");
+      system.reinit_system(neighbor_list_update_flag, "disturbed", true);
       system.compute_point_velocity("undisturbed", vel0);
       system.solve("disturbed"); // solve the disturbed solution
       system.compute_point_velocity("disturbed", vel1);
@@ -1807,7 +1799,7 @@ void Copss::langevin_integrate(EquationSystems& equation_systems, unsigned int& 
     // whether or not reinit neighbor list depends on the
     // neighbor_list_update_flag
   }
-  ss << ">>>>>>>>>>>>>>>>>>>>>>>>> reinit disturbed system at the beginning of "
+  ss << ">>>>>>>> reinit disturbed system at the beginning of "
         "langevin integration, step id = "<< i <<"...";
   PMToolBox::output_message(ss, *comm_in);
   system.reinit_system(neighbor_list_update_flag, "disturbed");

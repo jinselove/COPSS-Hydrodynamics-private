@@ -81,9 +81,11 @@ public:
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    * only if option=="disturbed", we calculate forces
+   * if second=half is true, we don't update Poisson and NP systems
    */
   void reinit_system(bool& neighbor_list_update_flag,
-                     const std::string& option);
+                     const std::string& option,
+                     const bool& second_half=false);
 
 
   /**
@@ -227,7 +229,7 @@ public:
    * from ion cloud, and then couple the total electrostatic force to Stokes
    * system.
    */  
-  void couple_poisson();
+  void couple_poisson(const bool& second_half);
 
   /**
    * Couple Stokes System with Nernst-Planck System to create a

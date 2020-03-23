@@ -114,5 +114,5 @@ private:
   AnalyticalSolutionNP *analytical_solution = nullptr;
 
   // A big number for penalty
-  const Real penalty = 1.e10;
+  const Real penalty = 1.E10;
 };

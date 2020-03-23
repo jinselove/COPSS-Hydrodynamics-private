@@ -205,31 +205,32 @@ void AssembleNP::assemble_global_K(const std::string& system_name,
     } // end loop for qp
 
     // apply bc by penalty on K matrix
-    {
-      // The following loops over the sides of the element.
-      // If the element has no neighbor on a side then that
-      // side MUST live on a boundary of the domain.
-      for (unsigned int s=0; s<elem->n_sides(); s++)
-      {
-        if (elem->neighbor_ptr(s) == libmesh_nullptr) {
-          fe_face->reinit(elem, s);
-          for (unsigned int qp = 0; qp < qface.n_points(); qp++)
-          {
-            // Matrix contribution
-            for (unsigned int i = 0; i < psi.size(); i++)
-              for (unsigned int j = 0; j < psi.size(); j++)
-                Ke(i, j) += penalty * JxW_face[qp] * psi[i][qp] * psi[j][qp];
-          } // end for loop over qp
-        } // end if condition
-      } // end for loop over all sides
 
-      // resize the penalty vector of this element. This has to be done after
-      // fe_face->reinit(elem, s) so that psi.size() is not zero. And notice
-      // that psi.size() should not change for different s so we can do it
-      // after the last s. For elements without sides on the boundaries, psi
-      // .size() will be just zero.
-      _node_penalty[elem_id].resize(psi.size(), 0.);
+    // loop over pre-selected boundary sides of this element, which can be none.
+    for (dof_id_type s_id=0; s_id<_boundary_sides_dirichlet_np[elem_id].size(); s_id++)
+    {
+      // get side s for this element
+      const auto& t = _boundary_sides_dirichlet_np[elem_id][s_id];
+      const dof_id_type& s = std::get<0>(t);
+      // reinit fe_face on this side
+      fe_face->reinit(elem, s);
+      // loop over all qp points on this surface to integrate the penalty
+      for (unsigned int qp = 0; qp < qface.n_points(); qp++)
+      {
+        // Matrix contribution
+        for (unsigned int i = 0; i < psi.size(); i++)
+          for (unsigned int j = 0; j < psi.size(); j++)
+            Ke(i, j) += penalty * JxW_face[qp] * psi[i][qp] * psi[j][qp];
+      } // end for loop over qp
     }
+
+    // resize the penalty vector of this element. This has to be done after
+    // fe_face->reinit(elem, s) so that psi.size() is not zero. And notice
+    // that psi.size() should not change for different s so we can do it
+    // after the last s. For elements without sides on the boundaries, psi
+    // .size() will be just zero.
+    _node_penalty[elem_id].resize(psi.size(), 0.);
+
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
     dof_map.constrain_element_matrix(Ke, dof_indices);
@@ -736,64 +737,59 @@ void AssembleNP::assemble_global_F(const std::string& system_name,
     }
 
     // apply bc by penalty
+
+    // if _reinit_node_penalty is true, we recalculate penalty on the boundary
+    // nodes of this element
+    if (_reinit_node_penalty)
     {
-      // if _reinit_node_penalty is true, we recalculate penalty on the boundary
-      // nodes of this element
-      if (_reinit_node_penalty)
+      // reset the penalty value of this element to 0.
+      std::fill(_node_penalty[elem_id].begin(), _node_penalty[elem_id].end(), 0.);
+      // loop over all boundary sides of this element
+      for (dof_id_type s_id=0;
+        s_id<_boundary_sides_dirichlet_np[elem_id].size(); s_id++)
       {
-        // reset the penalty value of this element to 0.
-        std::fill(_node_penalty[elem_id].begin(),
-          _node_penalty[elem_id].end(), 0.);
-        // loop over all boundary sides of this element
-        for (dof_id_type s_id=0;
-          s_id<_boundary_sides_dirichlet_np[elem_id].size(); s_id++)
+        // extract the tuple for this side of this element, use referece to avoid data copying
+        // get<0>(t) : side id
+        // get<1>(t) : the dirichlet boundary id associated with this side
+        // get<2>(t) : the dirichlet value associated with this side
+        const auto &t = _boundary_sides_dirichlet_np[elem_id][s_id];
+        // get side
+        const dof_id_type& s = std::get<0>(t);
+        // get the Dirichlet Boundary Value on this side
+        Real boundary_value = std::get<2>(t);
+//        if (std::get<1>(t)!=1){std::cout<<"invalid dbc id="<<std::get<1>(t); libmesh_error();}
+
+        // reinit fe_face on this surface
+        fe_face->reinit(elem, s);
+
+        // loop over all qp points on this surface to integrate the penalty
+        for (unsigned int qp=0; qp<qface.n_points(); qp++)
         {
-          // extract the tuple for this side of this element, use referece to avoid data copying
-          // get<0>(t) : side id
-          // get<1>(t) : the dirichlet boundary id associated with this side
-          // get<2>(t) : the dirichlet value associated with this side
-          const auto &t = _boundary_sides_dirichlet_np[elem_id][s_id];
-          // get side
-          const dof_id_type& s = std::get<0>(t);
-          // get the Dirichlet Boundary Value on this side
-          Real boundary_value = std::get<2>(t);
+          // reset boundary value to be the exact solution on boundaries
+          // for the test system
+          if (_eqn_sys.parameters.get<std::string>("simulation_name")=="np_validation_analytic")
+            boundary_value =
+              analytical_solution->exact_solution_infinite_domain(
+                qface_points[qp],
+                _eqn_sys.parameters.get<Real>("real_time"),
+                _eqn_sys.parameters.get<std::vector<Real>>
+                ("ion_diffusivity")[0]);
 
-          // reinit fe_face on this surface
-          fe_face->reinit(elem, s);
+          // RHS contribution
+          for (dof_id_type i=0; i<psi.size(); i++)
+            _node_penalty[elem_id][i] += penalty * JxW_face[qp] *
+              boundary_value * psi[i][qp];
+        } // end loop over qp
+      } // end loop over s_id (boundary side id of this element)
+    } // end if _reinit_node_penalty
 
-          // loop over all qp points on this surface to integrate the penalty
-          for (unsigned int qp=0; qp<qface.n_points(); qp++)
-          {
-            // reset boundary value to be the exact solution on boundaries
-            // for the test system
-            if (_eqn_sys.parameters.get<std::string>("simulation_name")=="np_validation_analytic")
-              boundary_value =
-                analytical_solution->exact_solution_infinite_domain(
-                  qface_points[qp],
-                  _eqn_sys.parameters.get<Real>("real_time"),
-                  _eqn_sys.parameters.get<std::vector<Real>>
-                  ("ion_diffusivity")[0]);
-
-            // RHS contribution
-            for (dof_id_type i=0; i<psi.size(); i++)
-              _node_penalty[elem_id][i] += penalty * JxW_face[qp] *
-                boundary_value * psi[i][qp];
-          } // end loop over qp
-        } // end loop over s_id (boundary side id of this element)
-      } // end if _reinit_node_penalty
-
-      // add penalty to each node of the Fe vector; notice that we cannot use
-      // i<psi.size() as the for loop condition because when
-      // _reinit_node_penalty is false, then psi will not be initialized, i.e
-      // ., psi.size() = 0.
-      for (unsigned int i=0; i<_node_penalty[elem_id].size(); i++){
-//        std::cout<<"elem_id = " << elem_id
-//          <<"; _node_penalty[elem_id].size()=" << _node_penalty[elem_id].size()
-//          <<"; i=" << i
-//          <<"; node_penalty = " << _node_penalty[elem_id][i] << std::endl;
-        Fe(i) += _node_penalty[elem_id][i];
-      }
-    }// end apply penalty
+    // add penalty to each node of the Fe vector; notice that we cannot use
+    // i<psi.size() as the for loop condition because when
+    // _reinit_node_penalty is false, then psi will not be initialized, i.e
+    // ., psi.size() = 0.
+    for (unsigned int i=0; i<_node_penalty[elem_id].size(); i++){
+      Fe(i) += _node_penalty[elem_id][i];
+    }
 
     // If this assembly program were to be used on an adaptive mesh,
     // we would have to apply any hanging node constraint equations.
@@ -829,7 +825,6 @@ void AssembleNP::select_boundary_side(const Elem *elem,
   PMSystemNP & pm_system = _eqn_sys.get_system<PMSystemNP>(system_name);
   const std::size_t elem_id   = elem->id();
   _boundary_sides_dirichlet_np[elem_id].resize(0);
-
   // The following loops over the sides of the element. If the element has NO
   // neighbors on a side then that side MUST live on a boundary of the domain.
   for (dof_id_type s = 0; s < elem->n_sides(); s++)

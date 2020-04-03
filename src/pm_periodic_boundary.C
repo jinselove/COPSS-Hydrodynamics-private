@@ -354,7 +354,6 @@ Point PMPeriodicBoundary::point_vector(const Point& pt0,
 
   // the original distance vector
   Point dpt = pt1 - pt0;
-
   // Modify the value due to periodic boundaries.
   for (std::size_t i = 0; i < _dim; ++i)
   {
@@ -366,9 +365,6 @@ Point PMPeriodicBoundary::point_vector(const Point& pt0,
       if (dpt(i) <= -xsize / 2.0) dpt(i) += xsize;
 
       if (dpt(i) > xsize / 2.0) dpt(i) -= xsize;
-
-      // printf("******************** I am here!
-      // point_vector()*****************\n");
     }
   }
 
@@ -385,7 +381,6 @@ std::vector<bool>PMPeriodicBoundary::image_elem(const Elem *elem) const
   // Get elem maximum size and the domain box size
   const Real   hmax     = elem->hmax();
   const Point& box_size = this->box_length();
-
 
   // Loop over each direction
   std::vector<bool> direction_flag(_dim, false);

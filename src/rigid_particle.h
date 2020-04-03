@@ -143,11 +143,24 @@ public:
   }
 
   /*
+ * Elem id that the particle resides in.
+ * Note this id will change when a particle moves from one element to another.
+ * Therefore, it needs to be reset in this situation.
+ */
+  dof_id_type elem_id() const {
+    return _elem_id;
+  }
+
+  void set_elem_id(const dof_id_type& e_id) {
+    _elem_id = e_id;
+  }
+
+
+  /*
    * Set the neighbor list of the particle
    * This is set by the member function in the class "ParticleMesh"
    */
-  void set_neighbor_list(const std::vector<std::pair<std::size_t,
-                                                     Real> >& nei_list)
+  void set_neighbor_list(const std::vector<dof_id_type>& nei_list)
   {
     _neighbor_list = nei_list;
   }
@@ -156,7 +169,7 @@ public:
    * Return the neighbor list of the particle.
    * NOTE, this includes the particle ids and distance values to this particle.
    */
-  std::vector<std::pair<std::size_t, Real> >neighbor_list() const
+  std::vector<dof_id_type>neighbor_list() const
   {
     return _neighbor_list;
   }
@@ -499,7 +512,7 @@ private:
   std::size_t _num_mesh_node;
 
   // number of surface element
-  std::size_t _num_mesh_elem;
+  dof_id_type _num_mesh_elem;
 
   // mesh size
   std::vector<Real>_mesh_size;
@@ -528,14 +541,13 @@ private:
 
   // neighbor particles around the present particle: particle id and distance
   // value.
-  std::vector<std::pair<std::size_t, Real> >_neighbor_list;
+  std::vector<dof_id_type> _neighbor_list;
 
   // mesh of the particle, which can be eigther surface mesh or volume mesh
   SerialMesh _mesh;
 
   // Type of the particle's mesh: surface_mesh or volume_mesh
   std::string _mesh_type;
-
 
   // Mesh - spring network
   MeshSpringNetwork *_mesh_spring_network = nullptr;
@@ -546,11 +558,13 @@ private:
   Point _center0;
   Point _centroid0;
 
-
   // discretized values
   Real _volume;
   Real _area;
   Point _centroid;
+
+  // Elem id that the particle centroid is in
+  dof_id_type _elem_id;
 
   // particle shape
   std::string _particle_shape;

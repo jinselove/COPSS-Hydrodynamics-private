@@ -98,7 +98,7 @@ PetscErrorCode _MatMult_Stokes(Mat M, Vec f, Vec u)
      Solve the Stokes equation to obtain the particle velocity vector pv
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - - */
-  pm_system.solve("disturbed");
+  pm_system.solve("disturbed", true);
   std::vector<Real> pvelocity(_dim * _n_points, 0);
   pm_system.compute_point_velocity("disturbed", pvelocity);
   MPI_Barrier(PETSC_COMM_WORLD);

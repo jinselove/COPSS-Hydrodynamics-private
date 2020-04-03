@@ -69,7 +69,7 @@ public:
    * Reference: Eqn (27) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo
    *and Graham.
    */
-  Real smoothed_force_exp(const Real& r) const;
+  Real smoothed_force_exp(const Point& r) const;
 
 
   /*
@@ -154,7 +154,8 @@ public:
                                                     ) const;
 
 
-  /* Compute the local vel-solution of the fluid at a given point ptx
+  /* Compute the local vel-solution of the fluid at a given point ptx in the
+   * field. This point cannot be a particle.
    * due to smoothed/regularized point forces.
    * force_type: regularized
    *
@@ -169,48 +170,26 @@ public:
    * this function implement method (1), which contains a short neighbor list
    *
    * Eqn (33) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
+   *
+   * Notice that this solution only contains velocity
    */
-  std::vector<Real>local_velocity_fluid(PointMesh<3>      *point_mesh,
-                                        const Point      & ptx, /* a pt in space
-                                                                   */
-                                        const std::string& force_type) const;
+  Point local_solution_field(PointMesh<3>      *point_mesh,
+        const Point      & ptx, /* a pt in space*/
+        const std::string& force_type,
+        const dof_id_type& ptx_elem_id)const;
 
 
-  /* Compute the local vel-solution of the fluid at a given point ptx
+  /* Compute the local vel-solution of the fluid at the position of bead
    * due to smoothed/regularized point forces.
    * force_type: regularized
-   *
-   * NOTE: due to the fast convergence of gaussian function, only a small group
-   *of
-   * particles within the neighbor list are considered. There are two ways
-   * to construct this neighbor list:
-   * (1) element independent: directly search particles near the given point
-   *using KDTree;
-   * (2) element dependent: directly use the neighbor list of the parent
-   *element;
-   * this function implement method (2), which contains a short neighbor list
-   *
-   * Eqn (33) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and Graham.
+   * Notice that this solution only contains velocity
    */
-  std::vector<Real>local_velocity_fluid(PointMesh<3>      *point_mesh,
-                                        const Elem        *elem,
-                                        const Point      & ptx, /* a pt in space
-                                                                   */
-                                        const std::string& force_type) const;
+  Point local_solution_bead(PointMesh<3>      *point_mesh,
+                            const std::size_t& bead_id,
+                             const std::string& force_type)const;
 
 
-  /*
-   * Compute the local velocity of a point/bead with point_id = pid0.
-   * force_type: regularized, smooth
-   *
-   * Eqn (34)&(35) in J Chem Phys. 136, 014901(2012), Yu Zhang, de Pablo and
-   *Graham.
-   */
-  Point local_velocity_bead(PointMesh<3>      *point_mesh,
-                            const std::size_t& pid0, /* point id */
-                            const std::string& force_type) const;
-
-  /*
+    /*
    * Self-exclusion term for the GLOBAL velocity at the i-th bead
    */
   Point global_self_exclusion(PointMesh<3>      *point_mesh,

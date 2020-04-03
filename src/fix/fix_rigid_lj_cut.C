@@ -66,14 +66,13 @@ void FixRigidLJCut::compute()
       // get neighbor list of this point
       const std::vector<Point>& neighbor_vector =
         point_particles[point_id]->neighbor_vector();
-      std::vector<std::pair<std::size_t,
-                            Real> > n_list =
+      const std::vector<dof_id_type>& n_list =
         point_particles[point_id]->neighbor_list();
 
       // Loop over each neigbhor
       for (std::size_t j = 0; j < neighbor_vector.size(); ++j)
       {
-        const std::size_t n_id = n_list[j].first;
+        const std::size_t n_id = n_list[j];
 
         // if n_id is not on the same rigid particle and n_id != point_id
         //   printf("point_id = %d, n_id = %d, node_start_id = %d,

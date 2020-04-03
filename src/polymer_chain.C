@@ -181,12 +181,12 @@ void PolymerChain::read_particles_data(const std::string& filename)
   }
 
   // check charge neutrality
-  if (std::abs(total_charge) > 1e-6) {
-    std::cout <<
-      "Error: Charge neutrality is not satisfied. Please check the data file..."
-              << std::endl;
-    libmesh_error();
-  }
+//  if (std::abs(total_charge) > 1e-6) {
+//    std::cout <<
+//      "Error: Charge neutrality is not satisfied. Please check the data file..."
+//              << std::endl;
+//    libmesh_error();
+//  }
 
   // Use id of the last chain to set number of chains, and initialize vector
   _n_chains = chain_id;
@@ -1034,9 +1034,9 @@ void PolymerChain::print_info() const
   // Bead info (Note there is no neighbor list info before initialized)
   printf("There are totally %lu beads in the polymer chain:\n", _n_beads);
 
-  for (std::size_t j = 0; j < _n_beads; ++j) {
-    _beads[j]->print_info();
-  }
+//  for (std::size_t j = 0; j < _n_beads; ++j) {
+//    _beads[j]->print_info();
+//  }
   printf(
     "======================= end of the polymer information =======================\n\n");
 

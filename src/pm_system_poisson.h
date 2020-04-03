@@ -26,6 +26,7 @@
 #include "solver_poisson.h"
 #include "pm_linear_implicit_system.h"
 #include "ggem_poisson.h"
+#include "libmesh/parallel_algebra.h"
 
 namespace libMesh {
 /*
@@ -80,39 +81,26 @@ public:
    * Assemble the system rhs.
    */
   void assemble_rhs(const std::string& system_name,
-                    const std::string& option) override;
+                    const std::string& option);
 
 
   /*
    * Solve the system.
    * re_init = true => re-assemble the matrix and reinit the KSP solver.
    */
-  void solve(const std::string& option) override;
-
-
-  /*
-   * Compute the L2-error in an unbounded domain
-   * This function will change the system solution vector by add local solution.
-   */
-  void test_l2_norm(bool& neighbor_list_update_flag) override;
-
-
-  /*
-   * Add the local solution to the global solution for electrical potential
-   */
-  void add_local_solution();
+  void solve(const std::string& option);
 
 
   /*
    * Compute electrical potential at all beads' locations
    */
-  void compute_point_potential(std::vector<Real>& pv);
+//  void compute_point_potential(std::vector<Real>& pv);
 
 
   /*
    * Compute electric field (Ex, Ey, Ez) at all beads' locations
    */
-  void compute_point_efield(std::vector<Real>& pv);
+  void compute_point_efield(std::vector<Point>& pv);
 
 
   /*
@@ -135,18 +123,35 @@ public:
    * charge_type: "regularized"
    */
   Real local_potential_field(const Point      & p,
-                             const std::string& charge_type) const;
+                             const std::string& charge_type,
+                             dof_id_type p_elem_id=-1) const;
 
 
   /**
-   * Local electrical potential of a point in an unbounded space,
-   * which is computed from Green's function. This function uses
-   * already-built neighbor list of Elem* elem.
+   * Fill local_sol with local electrical potential and local electrical
+   * potential gradient of a point in an unbounded space,
+   * which is computed from Green's function. This function directly
+   * search the neighbor list around Point &p.
    * charge_type: "regularized"
+    * sol_type: "phi" or "grad" or "phi&grad" controls whether potential or
+   * potential gradient or both are evaluated.
    */
-  Real local_potential_field(const Elem        *elem,
-                             const Point      & p,
-                             const std::string& charge_type) const;
+  void local_potential_field(const Point      & p,
+                             const std::string& charge_type,
+                             const std::string& sol_type,
+                             std::pair<Real, Point>& local_sol,
+                             dof_id_type p_elem_id=-1) const;
+
+
+  /**
+   * compute Laplacian of potential at a point
+   * Notice that laplacian(potential) = -4*pi*total_charge_density in
+   * dimensionless Poisson Equation. This 4*pi
+   * comes from the non-dimensionless process.
+   */
+  Real total_potential_laplacian_field(const Point& pt,
+                                        const std::string& charge_type,
+                                       dof_id_type p_elem_id=-1) const;
 
 
   /**
@@ -158,6 +163,21 @@ public:
                             const std::string& charge_type) const;
 
 
+  /**
+   * Fill local_sol with Local electrical potential and potential grad at a
+   * bead in an unbounded space,
+   * which is computed from Green's function.
+   * charge_type: "regularized"
+   * sol_type: "phi" or "grad" or "phi&grad" controls whether potential or
+   * potential gradient or both are evaluated.
+   */
+  void local_potential_bead(const std::size_t& bead_id,
+                            const std::string& charge_type,
+                            const std::string& sol_type,
+                            std::pair<Real, Point>& local_sol) const;
+
+
+
   /*
    * Test function. Output electrical potential profile along x-y-z direction.
    * Compare numerical solution with analytical solution for 3 charged beads
@@ -165,12 +185,46 @@ public:
    */
   void test_potential_profile();
 
+  /**
+   * Test function. Test difference between total Poisson solution and Exact
+   * solution on Mesh nodes. This function is mainly used in GGEM validation
+   * tests, i.e., called after test_potential_profile();
+   */
+  void test_nodal_error();
+
 
   /**
-   * update system solution for output
+   * output total solution at all nodes
    */
-  void update_solution_for_output(const std::string& solution_name = "total")
-    override;
+  void output_nodal_solution(const std::string& output_filename);
+
+  /**
+   * output total solution on a list of points
+   */
+  void output_point_solution(const std::vector<Point>& pts,
+                            const std::string& output_filename);
+
+  /**
+   * write total solution on a list of points of multiple time steps to
+   * single csv files
+   */
+  void write_point_solution(const std::string& outfile_name,
+                            const unsigned int& step_id,
+                            const unsigned int& n_pts);
+
+  /**
+   *
+   */
+  void update_solution_to_total() override;
+
+  /**
+   *
+   */
+  void resume_solution_to_global() override;
+
+
+  // A Pointer to the solution gradient
+//  UniquePtr<NumericVector<Point>> solution_gradient;
 
 
 private:

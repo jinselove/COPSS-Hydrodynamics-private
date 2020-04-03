@@ -1,0 +1,169 @@
+# ---------------------------------------------------------------------------------
+# ------------------------- Stokes Solver parameters ------------------------------
+# ---------------------------------------------------------------------------------
+
+#############################################
+#			   system_name         			
+#############################################
+
+simulation_name = poisson_validation_dbc_with_pbc
+
+#############################################
+#			   Physical parameters         			
+#############################################
+
+# particle_type #
+particle_type = point_particle
+
+# point_particle_model #
+point_particle_model = bead
+
+# viscosity. Here we use the unit (cP)
+# The visocity of water is
+# 1 cP = 1 mPa·s = 0.001 Pa·s = 0.001 N·s·m−2 = 1E-15 N*s/um^2
+viscosity = 1.018E-15
+
+# temperature # (K)
+temperature = 297
+
+# radius of the bead (um)
+radius = 0.01
+
+# dielectric constant of fluid
+epsilon = 80.
+
+#############################################
+#			   Geometry info         			
+#############################################
+
+# Dimensions #
+dimension = 3
+ 
+# wall type #
+wall_type = slit
+
+# domain size #
+slit = '-10. 10. -10. 10. -5. 5.'
+
+# periodicity #
+periodicity = 'true true false'
+
+# inlet info #
+inlet = 'false false false'
+inlet_pressure = '0 0 0'
+
+# shear info #
+shear = 'false false false'
+shear_rate = '0. 0. 0.'
+shear_direction = '0. 0. 0.'
+
+#############################################
+#			   Mesh info
+#############################################
+generate_mesh = true
+n_mesh = '20 20 10'
+generate_mesh = true
+#domain_mesh_file = 'volume_mesh/slit_HEX20.e'
+#domain_mesh_file = "sphere_mesh.e"
+#domain_mesh_file = '/scratch/midway2/jyli/cell_project/rigid_particle/mesh/volume_mesh/R_15/TET10/spherical_cavity_R15_Tet10_MeshSize3.e'
+
+
+boundary_id_dirichlet_poisson = '1 2'
+boundary_value_dirichlet_poisson = '555.5679 0.'
+
+#boundary_id_neumann_poisson = '1 2'
+#boundary_value_neumann_poisson = '0 0'
+
+#############################################
+#	 Force info         			
+#############################################
+force_field = 'p_constant'
+
+#############################################
+#			   GGEM info
+#############################################
+# smoothing parameter in GGEM (non-unit) #
+alpha = 0.6
+
+#############################################
+#			   Solver info
+#############################################
+# max linear iterations for the iterative solver#
+max_linear_iterations = 300
+
+# linear solver tolerence, defaultly = TOLERENCE(1E-6) #
+linear_solver_rtol = 1E-6
+linear_solver_atol = 1E-6
+
+# user defined preconditioning matrix #
+user_defined_pc = true
+
+# define the type of StokesSolver: field_split; superLU_dist #
+solver_stokes = superLU_dist
+
+# Poisson solver
+module_poisson = true
+solver_poisson = superLU_dist
+
+# user defined KSP for schur complement #
+schur_user_ksp = true
+schur_user_ksp_rtol = 1E-6
+schur_user_ksp_atol = 1E-6
+
+# schur complement preconditioning type
+# SMp: use the pressure mass matrix (***Recommended***)
+# SMp_lump:  lumped pressure mass matrix
+# S1:   Gt*Kd_inv*G
+# S2:   Diag(S1)
+# S3:   S3 = Gt*Kd_inv*G (element-wise)
+# -------------------- below are NOT implemented --------------------
+# S4:   S3_inv
+# BFBt and scaled BFBt
+# SParse Approximate Commutator(SPAC) and diag scaling SPAC
+#
+# *warning* If direct method is used to apply BC, symmetry will not be preserved
+# Therefore, S1 and S2 can not be used together with -fieldsplit_1_ksp cg.
+# In addition, we found that SMp become mesh size dependent, the # of iterations
+# decrease as the mesh becomes finer! (Try finer mesh)
+schur_pc_type = SMp
+
+
+#############################################
+#	Chebyshev info (only for brownian system)         			
+#############################################
+# compute_eigen 
+compute_eigen = true
+
+# specify eig_min and eig_max if compute_eigen=false
+# eig_min = 
+# eig_max = 
+
+# max number of chebyshev polynomial #
+max_n_cheb = 50
+
+# tolerance of chebyshev convergence #
+tol_cheb = 0.1
+
+# factor to enlarge range between eig_max and eig_min #
+eig_factor = 1.05
+
+# tolerance of eigenvalue convergence #
+tol_eigen = 0.01
+
+
+#############################################
+#			   Run info
+#############################################
+with_hi	       = false
+with_brownian  = false
+adaptive_dt    = false
+max_dr_coeff   = '0. 0.001 0.001'
+update_neighbor_list_everyStep = true
+restart        = false
+random_seed    = 123456789
+nstep          = 0
+n_relax_step   = 1
+write_interval = 1
+output_file    = 'equation_systems trajectory' 
+debug_info     = true
+print_info = true

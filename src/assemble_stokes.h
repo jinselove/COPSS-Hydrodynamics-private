@@ -25,6 +25,9 @@
 #include "assemble_system.h"
 #include "analytical_solution_stokes.h"
 #include "ggem_stokes.h"
+#include "pm_system_np.h"
+#include "pm_system_poisson.h"
+
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector when solving
@@ -72,8 +75,17 @@ public:
      @param[out] Fe Add rhs vector to system.
    */
   void assemble_global_F(const std::string& system_name,
-                         const std::string& option) override;
+                         const std::string& option,
+                         const bool is_brownian = false);
 
+  /*! \brief Assemble int_force matrix for every element,
+ * this includes Gaussian quadrature weights multiplied by shape functions.
+ * The product is calculated once and is stored in _int_force.
+
+ */
+  void assemble_int_force(const Elem* elem,
+                          const unsigned int& n_u_dofs,
+                          FEBase& fe_v);
 
   /*! \brief Assemble the element matrix K_IJ
 
@@ -122,16 +134,18 @@ public:
   void compute_element_rhs(const Elem                   *elem,
                            const unsigned int&            n_u_dofs,
                            FEBase                      & fe_v,
-                           const std::vector<std::size_t>n_list,
+                           const std::vector<dof_id_type>& n_list,
                            const bool                  & pf_flag,
                            const std::string           & option,
-                           DenseVector<Number>         & Fe);
+                           DenseVector<Number>         & Fe,
+                           const bool& couple_np);
 
 
   /*! \brief select sides on the boundary for all elements
    *
    */
-  void select_boundary_side(const Elem *elem) override;
+  void select_boundary_side(const Elem *elem,
+                            const std::string& system_name) override;
 
 
   /*! \brief Apply BCs by penalty method.
@@ -141,7 +155,7 @@ public:
                            const std::string  & matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string  & option) override;
+                           const std::string  & option);
 
 
   /*! \brief Define the pressure jump at the inlet and outlet of the channel
@@ -181,14 +195,32 @@ private:
   // ! Get a reference to GGEMStokes
   GGEMStokes *ggem_stokes = nullptr;
 
-  // vector stores dof sizes for all elems
-  std::vector<unsigned int> _n_dofs;
-  
-  // dof indices
-  std::vector<std::vector<dof_id_type> > _dof_indices;
+  // Stokes specific vectors to store element quantities
   std::vector<unsigned int> _n_u_dofs;
   std::vector<unsigned int> _n_p_dofs;
   std::vector<unsigned int> _n_uvw_dofs;
   std::vector<std::vector<dof_id_type>> _dof_indices_u;
   std::vector<std::vector<dof_id_type>> _dof_indices_p;
+  std::vector<std::vector<Real> > _int_force;
+
+  // initialize a pointer to all PMSystemNP systems; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<PMSystemNP*> np_systems;
+
+  // initialize a pointer to the dof map of Poisson system; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<DofMap*> np_dof_maps;
+
+  // initialize a pointer to Poisson systems; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  PMSystemPoisson* poisson_system = nullptr;
+
+  // initialize a pointer to the dof map of Poisson system; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  DofMap* poisson_dof_map = nullptr;
+
 };

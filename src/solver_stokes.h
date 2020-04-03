@@ -58,13 +58,7 @@ public:
    * Init the KSP solver:
    * The system matrix needs to be assembled before calling this init function!
    */
-  void init_ksp_solver();
-
-
-  /*
-   * solve the equation system Ax = b
-   */
-  void solve();
+  void init_ksp_solver(const std::string& system_name);
 
 
   /*
@@ -98,18 +92,6 @@ public:
                                  Mat *pmat);
 
 private:
-
-  // solver relative tolerance
-  PetscReal _rtol;
-
-  // solver absolute tolerance
-  PetscReal _atol;
-
-  // (iterative) solver maximum iteration
-  PetscInt _max_it;
-
-  // KSP sover
-  KSP _ksp;
 
   // IS pointers for velocity and pressure, respectively
   IS _is_v;

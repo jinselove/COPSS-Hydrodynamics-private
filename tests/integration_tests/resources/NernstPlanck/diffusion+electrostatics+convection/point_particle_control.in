@@ -1,0 +1,215 @@
+# ---------------------------------------------------------------------------------
+# ------------------------- Stokes Solver parameters ------------------------------
+# ---------------------------------------------------------------------------------
+
+#############################################
+#			   system_name         			
+#############################################
+
+simulation_name = 'np'
+
+#############################################
+#			   Physical parameters         			
+#############################################
+
+# particle_type #
+particle_type = point_particle
+
+# point_particle_model #
+point_particle_model = bead
+
+# viscosity. Here we use the unit (cP)
+# The visocity of water is
+# 1 cP = 1 mPa·s = 0.001 Pa·s = 0.001 N·s·m−2 = 1E-15 N*s/um^2
+viscosity = 1.018E-15
+
+# temperature # (K)
+temperature = 297
+
+# radius of the bead (um)
+radius = 0.01
+
+#############################################
+#			   Geometry info         			
+#############################################
+
+# Dimensions #
+dimension = 3
+ 
+# wall type #
+wall_type = slit
+
+# domain size #
+slit = '-8 8 -8 8 -8 8'
+
+# periodicity #
+periodicity = 'false false false'
+
+# inlet info #
+inlet = 'false false false'
+inlet_pressure = '0. 0. 0.'
+
+# shear info #
+shear = 'false false false'
+shear_rate = '0. 0. 0.'
+shear_direction = '0. 0. 0.'
+
+#############################################
+#			   Mesh info
+#############################################
+generate_mesh = true
+n_mesh = '16 16 16'
+
+#############################################
+#	 Force info         			
+#############################################
+force_field = 'p_constant'
+
+#############################################
+#			   GGEM info
+#############################################
+# smoothing parameter in GGEM (non-unit) #
+alpha = 0.7
+
+#############################################
+#			   Solver info
+#############################################
+# max linear iterations for the iterative solver#
+max_linear_iterations = 300
+
+# linear solver tolerence, defaultly = TOLERENCE(1E-6) #
+linear_solver_rtol = 1E-6
+linear_solver_atol = 1E-6
+
+# user defined preconditioning matrix #
+user_defined_pc = true
+
+# define the type of StokesSolver: field_split; superLU_dist #
+solver_stokes = superLU_dist
+
+# user defined KSP for schur complement #
+schur_user_ksp = true
+schur_user_ksp_rtol = 1E-6
+schur_user_ksp_atol = 1E-6
+
+# schur complement preconditioning type
+# SMp: use the pressure mass matrix (***Recommended***)
+# SMp_lump:  lumped pressure mass matrix
+# S1:   Gt*Kd_inv*G
+# S2:   Diag(S1)
+# S3:   S3 = Gt*Kd_inv*G (element-wise)
+# -------------------- below are NOT implemented --------------------
+# S4:   S3_inv
+# BFBt and scaled BFBt
+# SParse Approximate Commutator(SPAC) and diag scaling SPAC
+#
+# *warning* If direct method is used to apply BC, symmetry will not be preserved
+# Therefore, S1 and S2 can not be used together with -fieldsplit_1_ksp cg.
+# In addition, we found that SMp become mesh size dependent, the # of iterations
+# decrease as the mesh becomes finer! (Try finer mesh)
+schur_pc_type = SMp
+
+
+#############################################
+#	Chebyshev info (only for brownian system)         			
+#############################################
+# compute_eigen 
+compute_eigen = true
+
+# specify eig_min and eig_max if compute_eigen=false
+# eig_min = 
+# eig_max = 
+
+# max number of chebyshev polynomial #
+max_n_cheb = 50
+
+# tolerance of chebyshev convergence #
+tol_cheb = 0.1
+
+# factor to enlarge range between eig_max and eig_min #
+eig_factor = 1.05
+
+# tolerance of eigenvalue convergence #
+tol_eigen = 0.01
+
+############################################
+# Poisson System Specific Parameters
+############################################
+
+# module np on or off
+module_poisson = true
+
+# dielectric permittivity of fluid
+epsilon = 80
+
+# solver
+solver_poisson = superLU_dist
+
+# Boundary conditions
+boundary_id_dirichlet_poisson = '1 2 3 4 5 6'
+boundary_value_dirichlet_poisson = '0. 0. 0. 0. 0. 0.'
+
+############################################
+# Nernst Planck System Specific Parameters
+############################################
+
+# module np on or off
+module_np = true
+
+# characteristic ion concentration (unit=M=mol/dm^3)
+characteristic_ion_concentration = 0.000939466
+
+# ion names ('string, string')
+ion_name = 'ion1 ion2'
+
+# ion diffusivity (um^2/s)
+ion_diffusivity = '2136.95 2136.95'
+
+# ion valence (1)
+ion_valence = '1 -1'
+
+# initial uniform ion concentration normalized by characteristic ion concentration (unit=1)
+#debye_length = 1
+ion_concentration_bulk = '1. 1.'
+
+# solver
+solver_np = superLU_dist
+
+# ion concentration on boundaries normalized by characteristic ion concentration (unit=1)
+boundary_id_dirichlet_np = '1 2 3 4 5 6'
+boundary_value_dirichlet_np_ion1 = '1. 1. 1. 1. 1. 1.' 
+boundary_value_dirichlet_np_ion2 = '1. 1. 1. 1. 1. 1.' 
+
+# enforce charge neutrality
+check_charge_neutrality = true
+
+# time interval for all np system
+np_system_dt = 0.0001
+
+# np system relaxation time at initialization
+np_system_relaxation_time = 0.01
+
+# np system relaxation write interval
+np_system_relaxation_write_interval = 10
+
+#############################################
+#			   Run info
+#############################################
+with_hi	       = true
+with_brownian  = true
+adaptive_dt    = false
+max_dr_coeff   = '0.0 0.0001 0.0001'
+update_neighbor_list_everyStep = true
+restart        = false
+random_seed    = 123456789
+nstep          = 10
+n_relax_step   = 1
+write_interval = 1
+output_file    = 'equation_systems trajectory center_of_mass mean_square_displacement' 
+debug_info     = false
+print_info = false
+output_precision = 9
+
+
+
+

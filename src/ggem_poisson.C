@@ -102,16 +102,25 @@ void GGEMPoisson::set_ksi()
 }
 
 // ======================================================================
-Real GGEMPoisson::smoothed_charge_exp(const Real& r) const
+Real GGEMPoisson::smoothed_charge_exp(const Point& pt) const
 {
-  START_LOG("smoothed_force_exp()", "GGEMSystem");
+  START_LOG("smoothed_force_exp()", "GGEMPoisson");
 
-  const Real r2   = r * r;
-  const Real a2r2 = alpha2 * r2;
+  Real g = alpha3_pi_23 * std::exp(-alpha2 * pt.norm_sq());
 
-  Real g = alpha3_pi_23 * std::exp(-a2r2);
+  STOP_LOG("smoothed_force_exp()", "GGEMPoisson");
 
-  STOP_LOG("smoothed_force_exp()", "GGEMSystem");
+  return g;
+}
+
+// ==================================================================
+Real GGEMPoisson::regularized_charge_exp(const Point& r) const
+{
+  START_LOG("regularized_charge_exp()", "GGEMPoisson");
+
+  Real g = ksi3_pi_23 * std::exp(-ksi2 * r.norm_sq());
+
+  STOP_LOG("regularized_charge_exp()", "GGEMPoisson");
 
   return g;
 }
@@ -193,6 +202,49 @@ Real GGEMPoisson::green_tensor_unbounded_smoothed(const Point& x,
   return G;
 }
 
+//=======================================================================
+Point GGEMPoisson::green_tensor_unbounded_smoothed_grad(const Point& x,
+                                                  const Real & alpha_or_ksi) const
+{
+  START_LOG("green_tensor_unbounded_smoothed_grad()", "GGEMPoisson");
+
+  // DenseMatrix<Number> G(dim,dim);
+  Point G_grad;
+  const Real r2 = x.norm_sq();
+  const Real r = std::sqrt(r2);
+
+  // check zero limit
+  if (r < r_eps)
+  {
+    // don't need to do anything since G_grad = (0., 0., 0.) at this limit
+  }
+  else
+  {
+    const Real r3 = r2 * r;
+    Real tmp = -2 * alpha_or_ksi * std::exp(-alpha_or_ksi * alpha_or_ksi * r2) /
+      (sqrt_pi * r2) + std::erf(alpha_or_ksi * r) / r3;
+    for (int i=0; i<3; i++)
+      G_grad(i) = tmp * x(i);
+  } // end if-else
+  STOP_LOG("green_tensor_unbounded_smoothed_grad()", "GGEMPoisson");
+
+  // done
+  return G_grad;
+}
+
+//=======================================================================
+Real GGEMPoisson::green_tensor_unbounded_smoothed_laplacian(const Point& x)const
+{
+  START_LOG("green_tensor_unbounded_smoothed_laplacian()", "GGEMPoisson");
+
+  // DenseMatrix<Number> G(dim,dim);
+  Real laplacian = -4 * ksi3 * std::exp(-ksi2 * x.norm_sq()) / sqrt_pi;
+
+  STOP_LOG("green_tensor_unbounded_smoothed_laplacian()", "GGEMPoisson");
+
+  return laplacian;
+}
+
 // ======================================================================
 Real GGEMPoisson::green_tensor_local_singular(const Point& x) const
 {
@@ -221,8 +273,8 @@ Real GGEMPoisson::green_tensor_local_singular(const Point& x) const
 }
 
 // ======================================================================
-Real GGEMPoisson::green_tensor_local_regularized(const Point& x
-                                                 ) const
+Real GGEMPoisson::green_tensor_local_regularized(
+  const Point& x) const
 {
   START_LOG("green_tensor_local_regularized()", "GGEMPoisson");
 
@@ -236,7 +288,6 @@ Real GGEMPoisson::green_tensor_local_regularized(const Point& x
   }              // end if()
   else
   {
-    const Real r = x.norm();
     G = (std::erf(ksi * r) - std::erf(alpha * r)) / r;
   } // end if-else
 
@@ -247,21 +298,72 @@ Real GGEMPoisson::green_tensor_local_regularized(const Point& x
 }
 
 // ======================================================================
-Real GGEMPoisson::local_potential_field(PointMesh<3>      *point_mesh,
-                                        const Point      & ptx,
-                                        const std::string& charge_type) const
+Point GGEMPoisson::green_tensor_local_regularized_grad(
+  const Point& x) const
 {
-  START_LOG("local_potential_field()", "GGEMPoisson");
+  START_LOG("green_tensor_local_regularized_grad()", "GGEMPoisson");
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     build the particle neighbor list around the given point \p ptx
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  const bool is_sorted = false;
-  std::vector<std::pair<std::size_t, Real> > IndicesDists;
-  point_mesh->build_particle_neighbor_list(ptx, is_sorted, IndicesDists);
+  Point G_grad(0.);
 
+  // in libmesh, x.norm() is evaluated by sqrt(r.norm_sq()), thus we do
+  // this manually to avoid duplicate calculations
+  const Real r2 = x.norm_sq();
+  const Real r = std::sqrt(r2);
+
+  // check if zero limit is true.
+  if (r < r_eps)
+  {
+    // do nothing, since G_grad = (0., 0., 0.) if r->0
+  }
+  else
+  {
+    const Real r3 = r2 * r;
+    // this tmp is the same for all directions
+    const Real tmp =
+      (two_alpha_sqrt_pi * std::exp(-alpha2 * r2) - two_ksi_sqrt_pi *std::exp
+      (-ksi2 * r2)) / r2
+      + (std::erf(ksi * r) - std::erf(alpha * r)) / r3;
+
+    // calculate gradient of green's function on all directions
+    G_grad = x * tmp;
+  } // end if-else
+
+  STOP_LOG("green_tensor_local_regularized_grad()", "GGEMPoisson");
+
+  // done
+  return G_grad;
+}
+
+
+
+// ======================================================================
+Real GGEMPoisson::local_solution_field(PointMesh<3>      *point_mesh,
+                                  const Point      & ptx,
+                                  const std::string& charge_type,
+                                  const dof_id_type ptx_elem_id) const
+{
+  START_LOG("local_solution_field()", "GGEMPoisson");
+
+  // create a reference to mesh
+  const dof_id_type& n_elem = point_mesh->get_mesh().n_elem();
+
+  // if elem_id (id of the element that contains ptx) of ptx isn't
+  // given, we can build particle neighbor list using KD tree
+  if ((ptx_elem_id<0) | (ptx_elem_id >= n_elem))
+  {
+    std::cout<<"Error: invalid element id for point ("<<ptx(0)<<","<<ptx(1)
+      <<","<<ptx(2)<<"), element id = "<<ptx_elem_id<<std::endl;
+    libmesh_error();
+    //build the particle neighbor list around the given point \p ptx
+    //    const bool is_sorted = false;
+    //    std::vector<std::pair<std::size_t, Real> > IndicesDists;
+    //    point_mesh->build_particle_neighbor_list(ptx, is_sorted, IndicesDists);
+    //    for (std::size_t v=0; v<IndicesDists.size(); v++)
+    //      point_nb_list.push_back(IndicesDists[v].first);
+  }
+
+  const std::vector<dof_id_type>& point_nb_list =
+    point_mesh->get_elem_point_neighbor_list(ptx_elem_id);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     -
@@ -269,23 +371,23 @@ Real GGEMPoisson::local_potential_field(PointMesh<3>      *point_mesh,
      phi_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*q_v(j)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
        - */
-  Real phi = 0;
+  Real phi = 0.;
   Real GT;
-
-  for (std::size_t v = 0; v < IndicesDists.size(); ++v)
+  for (std::size_t v = 0; v < point_nb_list.size(); ++v)
   {
     // 0. particle id and position, vector x = ptx - pt0
-    const std::size_t p_id = IndicesDists[v].first;
-    const Point pt0        = point_mesh->particles()[p_id]->point();
-    const Point x          = point_mesh->pm_periodic_boundary()->point_vector(pt0,
-                                                                              ptx);
+    const dof_id_type& p_id = point_nb_list[v];
+    const Point& ptj = point_mesh->particles()[p_id]->point();
+    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(ptx, ptj);
 
     // 1. compute the Green function of particle-v
     if (charge_type == "regularized") {
       GT = this->green_tensor_local_regularized(x);
     }
     else {
-      libmesh_assert("GGEMPoisson::local_potential_field, wrong charge_type!");
+      std::cout<<"Error: invalid charge_type. Exiting..."<<std::endl;
+      libmesh_error();
+//      libmesh_assert("GGEMPoisson::local_potential_field, wrong charge_type!");
     } // end if-else
 
     // 2. Get the charge of particle-v
@@ -295,111 +397,196 @@ Real GGEMPoisson::local_potential_field(PointMesh<3>      *point_mesh,
     phi += GT * q;
   } // end for v-loop
 
-  STOP_LOG("local_potential_field()", "GGEMPoisson");
+  STOP_LOG("local_solution_field()", "GGEMPoisson");
 
   return phi;
 }
 
 // ======================================================================
-Real GGEMPoisson::local_potential_field(PointMesh<3>      *point_mesh,
-                                        const Elem        *elem,
-                                        const Point      & ptx,
-                                        const std::string& charge_type) const
+void GGEMPoisson::local_solution_field(PointMesh<3>*point_mesh,
+                                      const Point      & ptx, /* a pt in space */
+                                      const std::string& charge_type,
+                                      const dof_id_type ptx_elem_id,
+                                      const std::string& sol_option,
+                                      std::pair<Real, Point>& local_sol)
 {
-  START_LOG("local_potential_field()", "GGEMPoisson");
+
+  // create a reference to mesh
+  const dof_id_type& n_elem = point_mesh->get_mesh().n_elem();
+
+  // if elem_id (id of the element that contains ptx) of ptx isn't
+  // given, we can build particle neighbor list using KD tree
+  if ((ptx_elem_id<0) | (ptx_elem_id >= n_elem))
+  {
+    std::cout<<"Error: invalid element id for point ("<<ptx(0)<<","<<ptx(1)
+             <<","<<ptx(2)<<"), element id = "<<ptx_elem_id<<std::endl;
+    libmesh_error();
+    //build the particle neighbor list around the given point \p ptx
+    //    const bool is_sorted = false;
+    //    std::vector<std::pair<std::size_t, Real> > IndicesDists;
+    //    point_mesh->build_particle_neighbor_list(ptx, is_sorted, IndicesDists);
+    //    for (std::size_t v=0; v<IndicesDists.size(); v++)
+    //      point_nb_list.push_back(IndicesDists[v].first);
+  }
+
+  const std::vector<dof_id_type>& point_nb_list =
+    point_mesh->get_elem_point_neighbor_list(ptx_elem_id);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     build the particle neighbor list around the given point \p ptx
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  const bool is_sorted                    = false;
-  std::vector<std::size_t> elem_neighbors = point_mesh->elem_neighbor_list(elem);
+     Loop over all the neighbor list beads, and
+     and compute the local potential:
+        phi_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*q_v(j)
+     and the gradient of the local potential
+        phi_l_grad(i) = sum[v=1:Nl] grad(G_v(x-x_v; i,j)) * q_v(j)
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  // Initialize variables
+  Real phi = 0., GT = 0.;
+  Point phi_grad(0.), GT_grad(0.);
 
+  // loop over all neighbor points of this field point
+  for (std::size_t v = 0; v < point_nb_list.size(); ++v)
+  {
+    // 0. particle id and position, vector x = ptx - pt0
+    const dof_id_type& p_id = point_nb_list[v];
+    const Point& ptj = point_mesh->particles()[p_id]->point();
+    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(ptx, ptj);
+
+    // 1. compute the Green function of particle-v
+    if (charge_type == "regularized") {
+      if (sol_option=="phi")
+        GT = this->green_tensor_local_regularized(x);
+      else if (sol_option=="grad")
+        GT_grad = this->green_tensor_local_regularized_grad(x);
+      else if (sol_option=="phi&grad"){
+        GT = this->green_tensor_local_regularized(x);
+        GT_grad = this->green_tensor_local_regularized_grad(x);
+      }
+      else{
+        std::cout<<"Error: invalid solution option when calling "
+                   "GGEMPoisson::local_solution_field(). sol_option="
+                 <<sol_option<<std::endl;
+        libmesh_error();
+      }
+    }
+    else {
+      std::cout<<"Error: invalid charge_type. Exiting..."<<std::endl;
+      libmesh_error();
+    } // end if-else
+
+    // 2. Get the charge of particle-v
+    const Real q = point_mesh->particles()[p_id]->charge();
+
+    // 3. compute phi and phi_grad. Notice that if phi_grad is not needed,
+    // then GT_grad will always be Point(0.), it's ok to sum it up here.
+    phi += GT * q;
+    phi_grad += (GT_grad * q);
+  } // end for v-loop
+
+  // insert phi and phi_grad to local_sol.
+  local_sol=std::make_pair(phi, phi_grad);
+
+  STOP_LOG("local_solution_field()", "GGEMPoisson");
+}
+
+// ======================================================================
+Real GGEMPoisson::local_solution_bead(PointMesh<3>      *point_mesh,
+                                 const dof_id_type& bead_id,
+                                 const std::string& charge_type) const
+{
+  START_LOG("local_solution_bead()", "GGEMPoisson");
+
+  const std::vector<dof_id_type>& nb_list = point_mesh->particles()
+    [bead_id]->neighbor_list();
+  const std::vector<Point>& nb_vector = point_mesh->particles()
+    [bead_id]->neighbor_vector();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
      Loop over all the neighbor list beads, and compute the local potential:
      phi_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*q_v(j)
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
   Real phi = 0.;
   Real GT;
-
-  for (std::size_t v = 0; v < elem_neighbors.size(); ++v)
+  for (std::size_t v = 0; v < nb_list.size(); ++v)
   {
-    // 0. particle id and position, vector x = ptx - pt0
-    const std::size_t p_id = elem_neighbors[v];
-    const Point pt0        = point_mesh->particles()[p_id]->point();
-    const Point x          = point_mesh->pm_periodic_boundary()->point_vector(pt0,
-                                                                              ptx);
-
-    if (charge_type ==
-        "regularized") GT = this->green_tensor_local_regularized(x);
-    else libmesh_assert("GGEMPoisson::local_potential_field, wrong charge_type!");
+    // 1. compute the Green function of particle-v
+    if (charge_type == "regularized") {
+      GT = this->green_tensor_local_regularized(nb_vector[v]);
+    }
+    else {
+      std::cout<<"Error: invalid charge_type. Exiting..."<<std::endl;
+      libmesh_error();
+    } // end if-else
 
     // 2. Get the charge of particle-v
-    const Real q = point_mesh->particles()[p_id]->charge();
+    const Real q = point_mesh->particles()[nb_list[v]]->charge();
 
-    // 3. compute phi due to this particle
+    // 3. compute phi
     phi += GT * q;
   } // end for v-loop
 
-  STOP_LOG("local_velocity_fluid()", "GGEMPoisson");
+  STOP_LOG("local_solution_bead()", "GGEMPoisson");
 
   return phi;
 }
 
-// ======================================================================
-Real GGEMPoisson::local_potential_bead(PointMesh<3>      *point_mesh,
-                                       const std::size_t& pid0,
-                                       const std::string& charge_type) const
+// ===================================================================
+void GGEMPoisson::local_solution_bead(PointMesh<3>*point_mesh,
+                         const dof_id_type& bead_id,
+                         const std::string& charge_type,
+                         const std::string& sol_option,
+                         std::pair<Real, Point>& local_sol)
 {
-  START_LOG("local_velocity_bead()", "GGEMPoisson");
+  START_LOG("local_solution_bead()", "GGEMPoisson");
 
+  const std::vector<dof_id_type>& nb_list = point_mesh->particles()
+  [bead_id]->neighbor_list();
+  const std::vector<Point>& nb_vector = point_mesh->particles()
+  [bead_id]->neighbor_vector();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     Find the bead position ptx and its neighbor list, and its point type
-     NOTE: for a given bead/tracking pt, its neighbor list does NOT include
-       itself!
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  const Point& ptx            = point_mesh->particles()[pid0]->point();
-  const PointType point_type0 = point_mesh->particles()[pid0]->point_type();
-  std::vector<std::pair<std::size_t, Real> > IndicesDists;
-  IndicesDists = point_mesh->particles()[pid0]->neighbor_list();
-  const std::vector<Point>& neighbor_vector =
-    point_mesh->particles()[pid0]->neighbor_vector();
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
      Loop over all the neighbor list beads, and compute the local potential:
-     u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*q_v(j)
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  Real phi = 0.;
-  Real GT;
+     phi_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*q_v(j)
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+  Real phi = 0., GT = 0.;
+  Point phi_grad, GT_grad;
 
-  // const Real ksi = this->regularization_parameter(hmin, ibm_beta, br0,
-  // point_type0);
-  for (std::size_t v = 0; v < IndicesDists.size(); ++v)
+  // loop over all neighbor points of this bead. Notice that this neighbor
+  // list will not include the particle itself
+  for (std::size_t v = 0; v < nb_list.size(); ++v)
   {
-    // 0. particle id and position, vector x = ptx - pt0
-    const Point x           = neighbor_vector[v];
-    const unsigned int p_id = IndicesDists[v].first;
-
-    // 1. compute the Green function (Oseen Tensor) of particle-v
-    if (charge_type ==
-        "regularized") GT = this->green_tensor_local_regularized(x);
-    else libmesh_assert("GGEMPoisson::local_potential_bead, wrong charge_type");
+    // 1. compute the Green function of particle-v
+    if (charge_type == "regularized") {
+      if (sol_option=="phi")
+        GT = this->green_tensor_local_regularized(nb_vector[v]);
+      else if (sol_option=="grad")
+        GT_grad = this->green_tensor_local_regularized_grad(nb_vector[v]);
+      else if (sol_option=="phi&grad"){
+        GT = this->green_tensor_local_regularized(nb_vector[v]);
+        GT_grad = this->green_tensor_local_regularized_grad(nb_vector[v]);
+      }
+      else{
+        std::cout<<"Error: invalid solution option when calling "
+                   "GGEMPoisson::local_solution_bead(). sol_option="
+                 <<sol_option<<std::endl;
+        libmesh_error();
+      }
+    }
+    else {
+      std::cout<<"Error: invalid charge_type. Exiting..."<<std::endl;
+      libmesh_error();
+    } // end if-else
 
     // 2. Get the charge of particle-v
-    const Real q = point_mesh->particles()[p_id]->charge();
+    const Real q = point_mesh->particles()[nb_list[v]]->charge();
 
-    // 3. compute u due to this particle
+    // 3. compute phi and phi_grad. Notice that if phi_grad is not needed,
+    // then GT_grad will always be Point(0.), it's ok to sum it up here.
     phi += GT * q;
+    phi_grad += GT_grad * q;
   } // end for v-loop
-  STOP_LOG("local_velocity_bead()", "GGEMPoisson");
 
-  return phi;
+  // insert phi and phi_grad to local_sol.
+  local_sol=std::make_pair(phi, phi_grad);
+
+  STOP_LOG("local_solution_bead()", "GGEMPoisson");
 }
+
 } // end of namespace

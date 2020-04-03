@@ -20,6 +20,8 @@
 
 
 #pragma once
+#include <iostream>
+#include <fstream>
 
 // Local Includes -----------------------------------
 #include "assemble_stokes.h"
@@ -63,21 +65,27 @@ public:
    */
   sys_type& system() {
     return *this;
-  }
+  };
+
+  /**
+   * override get_dt function in parent class since this system needs more
+   * conditions on dt to make the system stable
+   */
+  Real get_dt();
 
   /*
    * Re-init particle mesh, including:
    * (1) reinit() reinit point particles
    *              build_particle_neighbor_list()
-   *              build_elem_neighbor_list()
    * (2) update the mesh of each finite sized particle if there are;
    * (3) compute particle force (by force field)
    *             modify the force field according to the vel_last_step.
    * only if option=="disturbed", we calculate forces
+   * if second=half is true, we don't update Poisson and NP systems
    */
-  void reinit_system(bool      & neighbor_list_update_flag,
-                     const bool& build_elem_neighbor_list,
-                     const std::string& option);
+  void reinit_system(bool& neighbor_list_update_flag,
+                     const std::string& option,
+                     const bool& second_half=false);
 
 
   /**
@@ -92,14 +100,15 @@ public:
    * option == "disturbed"   : disturbed velocity field   (with particles)
    */
   void assemble_matrix(const std::string& system_name,
-                       const std::string& option);
+                       const std::string& option) override;
 
 
   /**
    * Assemble the system rhs.
    */
   void assemble_rhs(const std::string& system_name,
-                    const std::string& option);
+                    const std::string& option,
+                    const bool is_brownian=false);
 
 
   /*
@@ -107,21 +116,11 @@ public:
    * option = "undisturbed", compute the undisturbed field of flow without
    *particles
    * option = "disturbed",   compute the disturbed field of flow with particles
+   * when is_brownian is true, we are solving Stokes system for the
+   * Chebyshev, is this case the force vector on particles are not actual
    */
-  void solve(const std::string& option);
-
-
-  /*
-   * Add the local solution to the global solution
-   */
-  void add_local_solution();
-
-
-  /*
-   * Compute the L2-error in an unbounded domain
-   * This function will change the system solution vector by add local solution.
-   */
-  void test_l2_norm(bool& neighbor_list_update_flag);
+  void solve(const std::string& option,
+             const bool is_brownian=false);
 
 
   /*
@@ -164,18 +163,9 @@ public:
    * which is computed from Green's function
    * force_type: "regularized" or "smooth"
    */
-  std::vector<Real>local_velocity_fluid(const Point      & p,
-                                        const std::string& force_type) const;
-
-
-  /**
-   * Local velocity of a fluid point in an unbounded space,
-   * which is computed from Green's function
-   * force_type: "regularized" or "smooth"
-   */
-  std::vector<Real>local_velocity_fluid(const Elem        *elem,
-                                        const Point      & p,
-                                        const std::string& force_type) const;
+  Point local_velocity_fluid(const Point      & p,
+                              const std::string& force_type,
+                              dof_id_type p_elem_id=-1) const;
 
 
   /**
@@ -198,11 +188,23 @@ public:
    */
   void test_velocity_profile();
 
-
-  /*
-   * Return the exact solution of Stokes eqn for any given
-   * point \pt0 in an unbounded domain.
+  /**
+   * Test function. Test solutions on all nodes
    */
+  void test_nodal_error();
+
+
+  /**
+    * output total solution on a list of points
+    */
+  void output_point_solution(const std::vector<Point>& pts,
+                             const std::string& output_filename);
+
+
+    /*
+     * Return the exact solution of Stokes eqn for any given
+     * point \pt0 in an unbounded domain.
+     */
 
   // const std::vector<Real> exact_solution(const Point& pt0) const;
 
@@ -216,43 +218,103 @@ public:
    */
   void write_fluid_velocity_data(const std::string& filename);
 
-  /*
+  /**
    * Couple Stokes System (HI or FD) with Poisson System by adding electrostatic
    * force to all points (Point Particles or surface nodes on Rigid Particles.) 
    * This electrostatic force includes contributions from both local and global
    * solution of the Poisson system.
-   *  
+   *
+   * If module_np is true, this coupling will couple the Nernst-Planck system
+   * to Poisson system first by adding the contribution to the charge density
+   * from ion cloud, and then couple the total electrostatic force to Stokes
+   * system.
    */  
-  void couple_poisson(); 
+  void couple_poisson(const bool& second_half);
+
+  /**
+   * Couple Stokes System with Nernst-Planck System to create a
+   * convection-diffusion system without electrostatics, i.e, Stokes + Fick's
+   * second law
+   * This function will first initialize all NP system and relax them with
+   * Poisson on but Fluid off for some time. Once all NP systems are relaxed,
+   * this function will just solve all NP systems for one step to get c(t+dt)
+   *
+   * PseudoCode:
+         void couple_np()
+         {
+            if first np sys is relax (i.e., all system are relaxed):
+              for each np_sys:
+              {
+                 real_time += dt;
+                 solve this np_sys with poisson&stokes --> gives c(t=t+dt)
+              }
+
+            else:
+            {
+                if first np sys is initialized (i.e., all system are initialized):
+                {
+
+                    real_time += dt
+
+                    for each np_sys
+                    {
+                        np_sys.solve("diffusion"+(module_poisson) ? ("electrostatics")
+                        : ("")) --> gives c(t+dt)
+
+                        if real_time > relax_t_final:
+                        {
+                            set relax = true;
+                            set real_time = 0.;
+                        }
+                    }
+
+                    poisson.solve(with ion concentration); --> gives phi(t+dt)
+                }
+
+                else:
+                    for each np_sys
+                    {
+                        initialize this np_sys, i.e, set concentration to be 0 and then
+                        is_initialized = true
+                    }
+
+                this->couple_np();
+            }
+          }
+   */
+  void couple_np(unsigned int relax_step_id=0);
   
   
    /**
     * Write out Total solution of equation systems
     * Total solution = local + global + undisturbed (if exists)
-    * 
-    * params o_step: output_step
-    * params real_time: current real simulation time
-    * params solution_name: "disturbed_global": only write the global part of
-    * the disturbed solution, i.e., only solution of the FEM system;
-    * "disturbed_total": the global and local part of the disturbed solution,
-    * i.e., solution of the FEM system + solution of the GGEM part for local;
-    * "total": solution of the disturbed system and the undisturbed system.
     */
   void write_equation_systems(const unsigned int& o_step,
-                              const Real& real_time,
-                              const std::string& solution_name = "total");
+                              const Real& real_time);
+
 
   /**
-   * update system solution for output
+   *
    */
-  void update_solution_for_output(const std::string& solution_name = "total")
-    override;
+  void update_solution_to_total() override;
+
+  /**
+   *
+   */
+  void resume_solution_to_global() override;
 
   
    /**
     * Save a pointer to undisturbed solution
     */
-    UniquePtr<NumericVector<Real>> undisturbed_solution;
+   UniquePtr<NumericVector<Number>> undisturbed_solution;
+
+   /**
+    * localized undisturbed solution
+    * this localized solution vector has the undisturbed solution on all dof
+    * indices
+    */
+   std::vector<Number> local_undisturbed_solution;
 
 private:
 
@@ -267,6 +329,15 @@ private:
 
   // Get a pointer to GGEMStokes
   GGEMStokes *ggem_stokes = nullptr;
+
+  // output precision (defined in input file, default is 6)
+  int o_precision;
+
+  // output file for potential
+  std::ofstream outfile_poisson;
+
+  // output file for ion
+  std::ofstream outfile_np;
   
 }; // end class
 } // end namespace libMesh

@@ -39,6 +39,7 @@
 #include "brownian_system.h"
 #include "pm_system_stokes.h"
 #include "pm_system_poisson.h"
+#include "pm_system_np.h"
 
 namespace libMesh {
 // ======================================================================================
@@ -73,10 +74,69 @@ void PMSystemStokes::clear()
   // AssembleStokes
 }
 
+Real PMSystemStokes::get_dt()
+{
+  START_LOG("get_dt()", "PMSystemStokes");
+
+  // get a reference to equation systems
+  EquationSystems& es = this->get_equation_systems();
+  // get other necessary parameters
+  const std::vector<Real>& max_dr_coeff = es.parameters.get<std::vector<Real>>
+    ("max_dr_coeff");
+  const bool& adaptive_dt = es.parameters.get<bool>("adaptive_dt");
+  const Real& real_time = es.parameters.get<Real>("real_time");
+
+  // calculate dt
+  // --> initialize dt as a large FLOAT number
+  Real dt = std::numeric_limits<double>::max();
+  // --> if adaptive_dt is true, update dt based on current system status
+  if (adaptive_dt)
+  {
+    Real vp_max = _point_mesh->maximum_bead_velocity();
+    Real vp_min = _point_mesh->minimum_bead_velocity();
+    if (real_time < max_dr_coeff[0])
+      dt = (vp_max <= 1.) ? (max_dr_coeff[1]) : (max_dr_coeff[1] * 1. / vp_max);
+    else
+      dt = (vp_max <= 1.) ? (max_dr_coeff[2]) : (max_dr_coeff[2] * 1. / vp_max);
+//    if (i % write_interval == 0) {
+//      ss << "       ################################################################\n"
+//         << "       # Max velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_max << "\n"
+//         << "       # Min velocity magnitude is " << std::setprecision(o_precision) << std::fixed << vp_min << "\n"
+//         << "       # minimum mesh size = " << hmin << "\n"
+//         << "       # The adaptive time increment at step " << i <<" is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
+//         << "       # (with Brownian) adapting_time_step = max_dr_coeff * bead_radius / (max_bead_velocity at t_i)\n"
+//         << "       # (without Brownian) adapting_time_step = max_dr_coeff * mesh_size_min / (max_bead_velocity at t_i)\n"
+//         << "       # Chebyshev failure steps = " << n_chebyshev_failure << "\n"
+//         << "       #################################################################\n";
+//      PMToolBox::output_message(ss, *comm_in);
+//    } // end if (i% write_interval)
+  }
+  // --> if adaptive is false, use max_dr_coeff as dt
+  else
+  {
+    dt = (real_time < max_dr_coeff[0]) ? max_dr_coeff[1] : max_dr_coeff[2];
+//    if (i % write_interval == 0) {
+//      ss << "       ##########################################################\n"
+//         << "       # The fixed time increment at step " << i << " is dt = " << std::setprecision(o_precision) << std::fixed << dt << "\n"
+//         << "       # (With Brownian) fixed_time_step = max_dr_coeff * bead_radius / 1.0\n"
+//         << "       # (Without Brownian) fixed_time_step = max_dr_coeff * mesh_size_min / 1.0\n"
+//         << "       # Chebyshev failure steps = " << n_chebyshev_failure << "\n"
+//         << "       ##########################################################\n";
+//      PMToolBox::output_message(ss, *comm_in);
+//    } // end if (i % write_interval == 0)
+  }   // end if (adaptive_dt)
+
+
+  STOP_LOG("get_dt()", "PMSystemStokes");
+
+  // return
+  return dt;
+}
+
 // ==================================================================================
-void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
-                                   const bool& build_elem_neighbor_list,
-                                   const std::string& option)
+void PMSystemStokes::reinit_system(bool & neighbor_list_update_flag,
+                                   const std::string& option,
+                                   const bool& second_half)
 {
   START_LOG("reinit_system()", "PMSystemStokes");
   this->comm().barrier(); // Is this at the beginning or the end necessary?
@@ -85,7 +145,7 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
   // (2) build the element-point neighbor list according to search radius;
   // (3) evaluate forces
   // perf_log.push("reinit point_mesh");
-  _point_mesh->reinit(neighbor_list_update_flag, build_elem_neighbor_list);
+  _point_mesh->reinit(neighbor_list_update_flag);
 
   // perf_log.pop("reinit point_mesh");
   // perf_log.push("fix compute");
@@ -128,8 +188,20 @@ void PMSystemStokes::reinit_system(bool      & neighbor_list_update_flag,
     }
   }
   // multi-Physics coupling
-  if (option == "disturbed" && this->get_equation_systems().parameters.get<bool>("module_poisson")) {
-    this->couple_poisson();  
+  if (option == "disturbed")
+  {
+    // ---> couple NP systems at time t only when module_np is true, and
+    // second_half is false, i.e., no need to update NP systems for the
+    // second half step of fixman intergrator
+    if (this->get_equation_systems().parameters.get<bool>("module_np") and
+      !second_half)
+      this->couple_np();
+
+    // --> couple Poisson system at time t. When second_half is true, we
+    // don't update the Poisson system, but we will update the electrostatic
+    // force on particles
+    if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+      this->couple_poisson(second_half);
   }
 
   // perf_log.pop("fix compute");
@@ -171,7 +243,8 @@ void PMSystemStokes::assemble_matrix(const std::string& system_name,
 
 // ==================================================================================
 void PMSystemStokes::assemble_rhs(const std::string& system_name,
-                                  const std::string& option)
+                                  const std::string& option,
+                                  const bool is_brownian)
 {
   libmesh_assert(this->rhs);
   libmesh_assert(this->rhs->initialized());
@@ -186,7 +259,7 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
   // assemble_rhs_sedimentation_ex1 (this->get_equation_systems(), system_name,
   // option);
   // perf_log.push("assemble");
-  assemble_stokes->assemble_global_F(system_name, option);
+  assemble_stokes->assemble_global_F(system_name, option, is_brownian);
 
   // perf_log.pop("assemble");
   // perf_log.push("close");
@@ -198,7 +271,7 @@ void PMSystemStokes::assemble_rhs(const std::string& system_name,
 }
 
 // ==================================================================================
-void PMSystemStokes::solve(const std::string& option)
+void PMSystemStokes::solve(const std::string& option, const bool is_brownian)
 {
   START_LOG("solve()", "PMSystemStokes");
   
@@ -212,191 +285,101 @@ void PMSystemStokes::solve(const std::string& option)
     _solver_stokes.set_solver_type(solver_type);
 
     // Assemble the global matrix, and init the KSP solver
-    this->assemble_matrix("Stokes", option);
-    _solver_stokes.init_ksp_solver();
+    this->assemble_matrix(this->name(), option);
+    _solver_stokes.init_ksp_solver(this->name());
     
     // set re_init to false once K matrix is built
     _re_init = false;
   }
   // assemble rhs 
-  this->assemble_rhs("Stokes", option);
+  this->assemble_rhs(this->name(), option, is_brownian);
 
   // solve the problem
-  _solver_stokes.solve();
+  _solver_stokes.solve(this->name());
   
   // update undisturbed solution when option="undisturbed"
   if (option == "undisturbed")
   {
       undisturbed_solution = this->solution->clone();
+      undisturbed_solution->localize(local_undisturbed_solution);
+      std::cout<<"local_undisturbed_vector.size="<<local_undisturbed_solution.size()<<std::endl;
   }
-
 
   STOP_LOG("solve()", "PMSystemStokes");
 }
 
 // ==================================================================================
-void PMSystemStokes::add_local_solution()
+void PMSystemStokes::update_solution_to_total()
 {
-  START_LOG("add_local_solution()", "PMSystemStokes");
+  START_LOG("update_solution_to_local()", "PMSystemStokes");
 
   // Check if the system solution vector is closed or not
   if ((this->solution->closed()) == false) this->solution->close();
 
-  // this->update();
+  // clone solution to global solution before make changes
+  this->_global_solution = this->solution->clone();
+
+  // add undisturbed solution to solution
+  if (this->undisturbed_solution != nullptr) {
+    this->solution->add(*this->undisturbed_solution);
+  }
+
+  // Add local_disturbed_solution for each nodes
 
   // Get the parameters and Initialize the quantities
-  const bool test_output            = false;
-  MeshBase & mesh                   = this->get_mesh();
-  const std::size_t   dim           = mesh.mesh_dimension();
-  const std::size_t   n_local_nodes = mesh.n_local_nodes();
-  std::vector<Number> local_solution(dim * n_local_nodes);
-  std::vector<numeric_index_type> dof_indices(dim * n_local_nodes);
+  MeshBase& mesh = this->get_mesh();
+  const unsigned int& dim = mesh.mesh_dimension();
 
-  // printf("--->test in add_local_solution() n_local_nodes = %lu on the
-  // processor %u\n",
-  //       n_local_nodes,this->comm().rank());
-
-  // Update the system solution by adding the local solution (from Green's
-  // function)
+  // loop over local nodes and update local solution vector according to the
+  // dof_indices of each node
   MeshBase::node_iterator nd           = mesh.local_nodes_begin();
   const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
-  std::size_t local_count              = 0;
 
-  for (; nd != end_nd; ++nd)
-  {
+  for (; nd != end_nd; ++nd) {
     // Store a pointer to the current node, and extract a point
     Node *node = *nd;
     Point pt;
+    for (unsigned int i = 0; i < dim; ++i) pt(i) = (*node)(i);
 
-    for (unsigned int i = 0; i < dim; ++i) pt(i) =  (*node)(i);
+    // get the element id of this node from stored mapping
+    const dof_id_type &elem_id = _point_mesh->get_node_elem_id(node->id());
 
-    // this is a test for dof_number at each node
-    if (test_output)
-    {
-      const unsigned int node_id = node->id();
-      std::ostringstream oss;
-      oss << "          NODE " << node_id;
-      PMToolBox::output_message(oss, this->comm());
-      node->print_info();
-
-      if (this->comm().rank() == 0) printf("--->test: nodal dof number :");
-
-      for (unsigned int i = 0; i < dim; ++i)
-      {
-        dof_id_type dof_num = node->dof_number(this->number(), i, 0);
-
-        if (this->comm().rank() == 0) printf(" %u", dof_num);
-      }
-
-      if (this->comm().rank() == 0) printf(" \n");
-    }
-
-    // get the dof numbers at this node (only for velocity)
-    std::vector<dof_id_type> dof_nums(dim);
+    // get the global dof numbers of this node for u, v, w three directions
+    std::vector<dof_id_type> dof_indices(dim);
     for (unsigned int i = 0; i < dim; ++i) { // var = 0, 1, 2 = i
-      dof_nums[i] = node->dof_number(this->number(), i, 0);
+      dof_indices[i] = node->dof_number(this->number(), i, 0);
     }
 
-    // compute the local velocity of fluid at the current node
-    const std::vector<Real> Ulocal =
-      this->local_velocity_fluid(pt, "regularized");
+    // get the local velocity on this node calling GGEM
+    std::vector<Real> Ulocal(dim);
+    const Point& Ulocal_tmp = this->local_velocity_fluid(pt,"regularized",
+      elem_id);
+    for(int i=0; i<dim; i++)
+      Ulocal[i] = Ulocal_tmp(i);
 
-    // store the local velocity and dof indices
-    for (unsigned int i = 0; i < dim; ++i)
-    {
-      local_solution[local_count * dim + i] =  Ulocal[i];
-      dof_indices[local_count * dim + i]    =  dof_nums[i];
-    }
-    local_count++;
-  } // end for
+    // add local solution to system solution
+    this->solution->add_vector(Ulocal, dof_indices);
+  } // end loop over local nodes
 
-  // printf("--->test in add_local_solution() local_count = %lu on the processor
-  // %u\n",
-  //       n_local_nodes,this->comm().rank());
-
-  // add the local to the global
-  // this->solution->zero();
-  this->solution->add_vector(local_solution, dof_indices);
   this->solution->close();
+
+  // update the local values in current_local_solution to reflect the
+  // solution on neighboring processors since we make changes to this->solution
   this->update();
-  
-  STOP_LOG("add_local_solution()", "PMSystemStokes");
+
+//  PMToolBox::output_message(">>>> Adding local solution Done!!!", this->comm());
+  STOP_LOG("update_solution_to_local()", "PMSystemStokes");
 }
 
-// ==================================================================================
-void PMSystemStokes::test_l2_norm(bool& neighbor_list_update_flag)
+// ===========================================================================
+void PMSystemStokes::resume_solution_to_global()
 {
-  START_LOG("test_l2_norm()", "PMSystemStokes");
-  std::ostringstream ss;
-  ss << "--->test in PMSystemStokes::test_l2_norm(): \n";
-  PMToolBox::output_message(ss, this->comm());
-  bool build_elem_neighbor_list = true;
+  START_LOG("resume_solution_to_global()", "PMSystemStokes");
 
-  // Numerical solution: Global(FEM) + Local(Analytical)
-  this->reinit_system(neighbor_list_update_flag, build_elem_neighbor_list, "disturbed");
-  _re_init = true;
-  this->solve("disturbed");
-  this->add_local_solution();
+  *(this->solution) = *(this->_global_solution);
+  this->update();
 
-  // Theoretical solution(only velocity)
-  const unsigned int dim = 3;
-  MeshBase& mesh = this->get_mesh();
-  const unsigned int n_nodes = mesh.n_nodes();
-  Real val0_norm = 0., val1_norm = 0.;
-  Real val2_norm = 0., val3_norm = 0.;
-
-  // AnalyticalSolution analytical_solution(*this);
-
-  // Loop over each node and compute the nodal velocity value
-  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
-  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
-
-  for (; nd != end_nd; ++nd)
-  {
-    // Store a pointer to the current node, and extract a point
-    Node *node = *nd;
-    Point pt;
-
-    for (unsigned int i = 0; i < dim; ++i) pt(i) =  (*node)(i);
-
-    // get the dof numbers at this node (only for velocity)
-    std::vector<dof_id_type> dof_nums(dim);
-
-    for (unsigned int i = 0; i < dim; ++i) { // var = 0, 1, 2 = i
-      dof_nums[i] = node->dof_number(this->number(), i, 0);
-    }
-
-    // Get the numerical solution
-    std::vector<Real> Unum;
-    this->solution->get(dof_nums, Unum);
-
-    // compute the local velocity of fluid at the current node
-    const std::vector<Real> Uexact =
-      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-
-    // compute the errors
-    for (unsigned int i = 0; i < dim; ++i) {
-      Real tmpt = std::abs(Unum[i] - Uexact[i]);
-      val0_norm += tmpt;
-      val1_norm += std::abs(Uexact[i]);
-
-      val2_norm += tmpt * tmpt;
-      val3_norm += Uexact[i] * Uexact[i];
-    }
-  } // end for nd-loop
-
-  // Compute the error: l1 and l2-norm of errors
-  this->comm().sum(val0_norm);
-  this->comm().sum(val1_norm);
-  this->comm().sum(val2_norm);
-  this->comm().sum(val3_norm);
-
-  const Real l1_norm = val0_norm / val1_norm;
-  const Real l2_norm = std::sqrt(val2_norm) / std::sqrt(val3_norm);
-  ss << "--->test in test_l1_norm: l1_norm = " << l1_norm
-     << "; l2_norm = " << l2_norm << "\n";
-  PMToolBox::output_message(ss, this->comm());
-  STOP_LOG("test_l2_norm()", "PMSystemStokes");
+  STOP_LOG("resume_solution_to_global()", "PMSystemStokes");
 }
 
 // ==================================================================================
@@ -409,7 +392,7 @@ void PMSystemStokes::compute_point_velocity(const std::string& option,
   const MeshBase  & mesh   = this->get_mesh();
   const std::size_t NP     =  _point_mesh->num_particles();
   const std::size_t dim    = mesh.mesh_dimension();
-  const dof_id_type n_elem = mesh.n_elem();
+  const dof_id_type& n_elem = mesh.n_elem();
 
   // std::vector<Real> pvlocal(dim*NP,0.);  // declared on each processor
   std::vector<Real> _pv_send_list;                            // point velocity
@@ -586,33 +569,23 @@ std::vector<Real>PMSystemStokes::point_velocity(
 }
 
 // ==================================================================================
-std::vector<Number>PMSystemStokes::local_velocity_fluid(const Point      & p,
-                                                        const std::string& force_type)
-const
+Point PMSystemStokes::local_velocity_fluid(const Point      & p,
+                                          const std::string&force_type,
+                                          dof_id_type p_elem_id) const
 {
   START_LOG("local_velocity_fluid()", "PMSystemStokes");
+  // if p_elem_id is not given, i.e, equals to the default value -1, we first
+  // need to update this value
+  if (p_elem_id==-1)
+  {
+    const MeshBase& mesh = this->get_mesh();
+    p_elem_id = mesh.point_locator().operator()(p)->id();
+  }
 
-  std::vector<Real> Ulocal = ggem_stokes->local_velocity_fluid(_point_mesh,
-                                                               p,
-                                                               force_type);
-
-  STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
-
-  return Ulocal;
-}
-
-// ==================================================================================
-std::vector<Number>PMSystemStokes::local_velocity_fluid(const Elem        *elem,
-                                                        const Point      & p,
-                                                        const std::string& force_type)
-const
-{
-  START_LOG("local_velocity_fluid()", "PMSystemStokes");
-
-  std::vector<Real> Ulocal = ggem_stokes->local_velocity_fluid(_point_mesh,
-                                                               elem,
-                                                               p,
-                                                               force_type);
+  Point Ulocal = ggem_stokes->local_solution_field(_point_mesh,
+                                                   p,
+                                                   force_type,
+                                                   p_elem_id);
 
   STOP_LOG("local_velocity_fluid()", "PMSystemStokes");
 
@@ -626,7 +599,7 @@ Point PMSystemStokes::local_velocity_bead(const std::size_t& bead_id,
   START_LOG("local_velocity_bead()", "PMSystemStokes");
 
   Point Ulocal =
-    ggem_stokes->local_velocity_bead(_point_mesh, bead_id, force_type);
+    ggem_stokes->local_solution_bead(_point_mesh, bead_id, force_type);
 
   STOP_LOG("local_velocity_bead()", "PMSystemStokes");
   return Ulocal;
@@ -643,215 +616,275 @@ Point PMSystemStokes::global_self_exclusion(const std::size_t p_id) const
   return self_v;
 }
 
-// ==================================================================================
+// =========================================================================
 void PMSystemStokes::test_velocity_profile()
 {
   START_LOG("test_velocity_profile()", "PMSystemStokes");
-  bool neighbor_list_update_flag = true;
-  std::ostringstream ss;
-  // solve the disturbed velocity field: global solution(FEM solution)
-  // In this test, we assume that undisturbed velocity is zero!
-  ss <<"========>2. Test in PMSystemStokes:: test_velocity_profile()";
-  PMToolBox::output_message(ss, this->comm());
-  // build both particle-particle and particle-elem neighbor list
-  _re_init = true;
+  PMToolBox::output_message("========>2. Test in PMSystemStokes::"
+                            "test_velocity_profile(): \n", this->comm());
+
+  // neighbor list is already updated before calling this function
+
+  // Solve the disturbed velocity field: global solution by FEM
+  _re_init = true; // assemble global matrix and init ksp_solver
   this->solve("disturbed");
-  // output the velocity profiles along xyz directions, global + local
-  // solutions.
+
+  // get system dimension
+  MeshBase& mesh = this->get_mesh();
+  const std::size_t dim = mesh.mesh_dimension();
+  // Output electrical potential profiles along xyz directions, global + local
+  // solutions
   const Point& box_min = _point_mesh->pm_periodic_boundary()->box_min();
   const Point& box_len = _point_mesh->pm_periodic_boundary()->box_length();
-  const Real   xn = 200, yn = 80, zn = 80;
-  const Real   dx = box_len(0) / xn, dy = box_len(1) / yn, dz = box_len(2) / zn;
+  // nn: number of spacial points to check
+  const unsigned int ns = 200;
+  // NP: number of point particles (beads) in the system
   const unsigned int NP = _point_mesh->num_particles();
 
-  // AnalyticalSolution analytical_solution(*this);
-
+  // define output file format parameters
   std::ofstream outfile;
-  int o_width = 12, o_precision = 9;
+  o_precision = this->get_equation_systems().parameters.get<int>
+    ("o_precision");
+  // define output filename for x, y, z directions
+  std::vector<std::string> filenames;
+  filenames.push_back("x");
+  filenames.push_back("y");
+  if (dim==3) filenames.push_back("z");
 
-  // 1. write out the velocity profile along x-direction.
-  std::ostringstream filenamex;
-  filenamex << "output_velocity_profile_x_" << NP << "P.txt";
-  outfile.open(filenamex.str(), std::ios_base::out);
-
-  for (std::size_t i = 0; i < xn + 1; ++i)
+  // loop over all [dim_i] directions and write the output
+  for (int dim_i=0; dim_i<dim; dim_i++)
   {
-    Point pt(box_min(0) + Real(i) * dx, 0., 0.);
-
-    // global velocity from FEM
-    std::vector<Real>  Uglobal(3), Utotal(3);
-    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-    Uglobal[0] = this->point_value(u_var, pt);             // this is slow, but
-                                                           // only for test.
-    Uglobal[1] = this->point_value(v_var, pt);
-    Uglobal[2] = this->point_value(w_var, pt);
-
-    // local velocity from analytical function
-    const std::vector<Real> Ulocal =
-      this->local_velocity_fluid(pt, "regularized");
-
-    for (std::size_t j = 0; j < 3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
-
-    // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact =
-      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-
-    // write the velocity, x vx vy vz
-    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-    outfile.precision(o_precision);   outfile.width(o_width);
-
+    // create output file
+    std::ostringstream oss;
+    oss << "output_velocity_profile_" << filenames[dim_i] << "_" << NP <<
+        "P.csv";
+    // open output file
+    PMToolBox::output_message("writing output to " + oss.str() + "\n",
+                              this->comm());
+    outfile.open(oss.str(), std::ios_base::out);
+    // set output file format (fixed + precision)
+    outfile.setf(std::ios::fixed);
+    outfile.precision(o_precision);
+    // write column header
     if (this->comm().rank() == 0)
-      outfile << pt(0) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-        Utotal[2]
-              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " << Ulocal[2]
-              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-        "\n";
-  } // end for i-loop
-  outfile.close();
+      outfile << filenames[dim_i]<<","
+              << "u_total,v_total,w_total,"
+              << "u_global,v_global,w_global,"
+              << "u_local,v_local,w_local,"
+              << "u_exact,v_exact,w_exact\n";
+    // separation between spacial points in this direction
+    const Real ds = box_len(dim_i) / Real(ns);
+    // create helper vector
+    std::vector<int> helper_vec(dim, 0);
+    helper_vec[dim_i] = 1;
+    // loop over all [ns] space points along this direction, the coordinate of
+    // other two directions are set to be zero
+    for (std::size_t i = 0; i < ns + 1; ++i)
+    {
+      // create the i-th spacial point
+      Point pt((box_min(0) + Real(i) * ds) * helper_vec[0],
+               (box_min(1) + Real(i) * ds) * helper_vec[1],
+               (box_min(2) + Real(i) * ds) * helper_vec[2]);
 
-  // 2. write out the velocity profile along y-direction.
-  std::ostringstream filenamey;
-  filenamey << "output_velocity_profile_y_" << NP << "P.txt";
-  outfile.open(filenamey.str(), std::ios_base::out);
+      // get global solution from FEM
+      std::vector<Real> Uglobal(dim);
+      const unsigned int u_var = this->variable_number("u"); // u_var = 0
+      const unsigned int v_var = this->variable_number("v"); // v_var = 1
+      const unsigned int w_var = this->variable_number("w"); // w_var = 2
+      // point_value function is slow, but we only do this for test
+      Uglobal[0] = this->point_value(u_var, pt);
+      Uglobal[1] = this->point_value(v_var, pt);
+      Uglobal[2] = this->point_value(w_var, pt);
 
-  for (std::size_t i = 0; i < yn + 1; ++i)
-  {
-    Point pt(0., box_min(1) + Real(i) * dy, 0.);
+      // compute local solution from GGEM
+      const Point& Ulocal = this->local_velocity_fluid(pt, "regularized");
 
-    // global velocity from FEM
-    std::vector<Real>  Uglobal(3), Utotal(3);
-    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-    Uglobal[0] = this->point_value(u_var, pt);             // this is slow, but
-                                                           // only for test.
-    Uglobal[1] = this->point_value(v_var, pt);
-    Uglobal[2] = this->point_value(w_var, pt);
+      // compute total solution
+      std::vector<Real> Utotal(dim);
+      for (int i=0; i<dim; i++)
+        Utotal[i] = Uglobal[i] + Ulocal(i);
 
-    // local velocity from analytical function
-    const std::vector<Real> Ulocal =
-      this->local_velocity_fluid(pt, "regularized");
+      // get exact solution for an unbounded domain from analytical solution
+      const std::vector<Real> Uexact =
+        analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
 
-    for (std::size_t j = 0; j < 3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
+      // write the result to output file
+      if (this->comm().rank() == 0)
+        outfile <<pt(dim_i) <<","
+                <<Utotal[0] <<"," <<Utotal[1] <<"," << Utotal[2]<<","
+                <<Uglobal[0] <<"," <<Uglobal[1]<<"," <<Uglobal[2]<<","
+                <<Ulocal(0) <<"," <<Ulocal(1)<<"," <<Ulocal(2)<<","
+                <<Uexact[0] <<"," <<Uexact[1]<<"," <<Uexact[2]<<"\n";
+    } // end for i-loop
+    outfile.close();
+  } // end loop dim_i
 
-    // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact =
-      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-
-    // write the velocity, y vx vy vz
-    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-    outfile.precision(o_precision);   outfile.width(o_width);
-
-    if (this->comm().rank() == 0)
-      outfile << pt(1) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-        Utotal[2]
-              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " << Ulocal[2]
-              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-        "\n";
-  } // end for i-loop
-  outfile.close();
-
-  // 3. write out the velocity profile along z-direction.
-  std::ostringstream filenamez;
-  filenamez << "output_velocity_profile_z_" << NP << "P.txt";
-  outfile.open(filenamez.str(), std::ios_base::out);
-
-  for (std::size_t i = 0; i < zn + 1; ++i)
-  {
-    Point pt(0., 0., box_min(2) + Real(i) * dz);
-
-    // global velocity from FEM
-    std::vector<Real>  Uglobal(3), Utotal(3);
-    const unsigned int u_var = this->variable_number("u"); // u_var = 0
-    const unsigned int v_var = this->variable_number("v"); // v_var = 1
-    const unsigned int w_var = this->variable_number("w"); // w_var = 2
-    Uglobal[0] = this->point_value(u_var, pt);             // this is slow, but
-                                                           // only for test.
-    Uglobal[1] = this->point_value(v_var, pt);
-    Uglobal[2] = this->point_value(w_var, pt);
-
-    // local velocity from analytical function
-    const std::vector<Real> Ulocal =
-      this->local_velocity_fluid(pt, "regularized");
-
-    for (std::size_t j = 0; j < 3; ++j) Utotal[j] = Uglobal[j] + Ulocal[j];
-
-    // Exact solution for an unbounded domain
-    const std::vector<Real> Uexact =
-      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
-
-    // write the velocity, z vx vy vz
-    outfile.setf(std::ios::right);    outfile.setf(std::ios::fixed);
-    outfile.precision(o_precision);   outfile.width(o_width);
-
-    if (this->comm().rank() == 0)
-      outfile << pt(2) << "  " << Utotal[0] << "  " << Utotal[1] << "  " <<
-        Utotal[2]
-              << "  " << Uglobal[0] << "  " << Uglobal[1] << "  " << Uglobal[2]
-              << "  " << Ulocal[0] << "  " << Ulocal[1] << "  " <<  Ulocal[2]
-              << "  " << Uexact[0] << "  " << Uexact[1] << "  " << Uexact[2] <<
-        "\n";
-  } // end for i-loop
-  outfile.close();
-  // done and write out the results
-  std::ostringstream output_filename;
-  output_filename << "output_velocity_profile_" << NP << "P.e";
+  // write equation system to output file
 #ifdef LIBMESH_HAVE_EXODUS_API
-  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename.str(),
+  PMToolBox::output_message("writing global solution to global_solution.e",
+    this->comm());
+  std::string output_filename = "global_solution.e";
+  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename,
                                                        this->get_equation_systems());
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
+
+  // write points value (for test only)
+//  const int n_pts = 200;
+//  std::vector<Point> pts(n_pts);
+//  for (int i=0; i<pts.size(); i++)
+//    pts[i]=Point(box_min(0) + i*box_len(0)/Real(n_pts), 0., 0.);
+//  this->output_point_solution(pts, "test_point_solution.csv");
+
+
   STOP_LOG("test_velocity_profile()", "PMSystemStokes");
 }
 
-// ==================================================================================
-// const std::vector<Real> PMSystemStokes::exact_solution(const Point& pt0)
-// const
-// {
-//  START_LOG("exact_solution()", "PMSystemStokes");
-//
-//  // ksi's value should be consistent with that in
-// GGEMStokes::regularization_parameter()
-//  const Real ksi = std::sqrt(libMesh::pi)/3.0;  // = 0.591
-//  const Real muc = 1.0/(6*libMesh::pi);
-//  const unsigned int dim = 3;
-//  std::vector<Real> UA(dim,0.);
-//  DenseMatrix<Number> GT;
-//
-//  // GGEM object and number of points in the system
-//  GGEMStokes ggem_stokes;
-//  const std::size_t n_points = _point_mesh->num_particles();
-//
-//  // loop over each point
-//  for(std::size_t i=0; i<n_points; ++i)
-//  {
-//    const Point pti = _point_mesh->particles()[i]->point();
-//    const Point x   = pt0 - pti;
-//
-//    bool  zero_limit  = false;
-//    if(x.size()<1E-6) zero_limit  = true;
-//
-//    // use ksi instead of alpha
-//    GT = ggem_stokes.green_tensor_exp(x,ksi,muc,dim,zero_limit);
-//    const std::vector<Real> fv =
-// _point_mesh->particles()[i]->particle_force();
-//    //printf("--->test in exact_solution(): i = %lu, fv = (%f,%f,%f)\n",
-// i,fv[0],fv[1],fv[2]);
-//
-//    // 3. compute u due to this particle
-//    for (std::size_t k=0; k<dim; ++k){
-//      for (std::size_t l=0; l<dim; ++l){
-//        UA[k] += GT(k,l)*fv[l];
-//      } // end for l
-//    } // end for k
-//  } // end for i
-//
-//  STOP_LOG("exact_solution()", "PMSystemStokes");
-//  return UA;
-// }
+// =========================================================================
+void PMSystemStokes::test_nodal_error()
+{
+  START_LOG("test_nodal_error()", "PMSystemStokes");
+  std::ostringstream ss;
+  ss << "===> test in PMSystemStokes::test_nodal_error(): \n";
+  PMToolBox::output_message(ss, this->comm());
+
+  // neighbor list is already updated before calling this function
+
+  // solve the disturbed test system to get global solution
+  _re_init = true;
+  this->solve("disturbed");
+
+  // evaluate the total solution
+  this->update_solution_to_total();
+
+  // Theoretical solution(only velocity)
+  const unsigned int dim = 3;
+  MeshBase& mesh = this->get_mesh();
+  const unsigned int n_nodes = mesh.n_nodes();
+  Real val0_norm = 0., val1_norm = 0.;
+  Real val2_norm = 0., val3_norm = 0.;
+  Real max_abs_error = 0.;
+
+  // Loop over each node and compute the nodal velocity value
+  MeshBase::node_iterator nd           = mesh.local_nodes_begin();
+  const MeshBase::node_iterator end_nd = mesh.local_nodes_end();
+
+  for (; nd != end_nd; ++nd)
+  {
+    // Store a pointer to the current node, and extract a point
+    Node *node = *nd;
+    Point pt;
+
+    for (unsigned int i = 0; i < dim; ++i) pt(i) =  (*node)(i);
+
+    // get the dof numbers at this node (only for velocity)
+    std::vector<dof_id_type> dof_nums(dim);
+
+    for (unsigned int i = 0; i < dim; ++i) { // var = 0, 1, 2 = i
+      dof_nums[i] = node->dof_number(this->number(), i, 0);
+    }
+
+    // Get the numerical total solution
+    std::vector<Real> Utotal;
+    this->solution->get(dof_nums, Utotal);
+
+    // compute the local velocity of fluid at the current node
+    const std::vector<Real> Uexact =
+      analytical_solution->exact_solution_infinite_domain(*ggem_stokes, pt);
+
+    // compute the errors
+    for (unsigned int i = 0; i < dim; ++i) {
+      Real tmpt = std::abs(Utotal[i] - Uexact[i]);
+      max_abs_error = std::max(tmpt, max_abs_error);
+      val0_norm += tmpt;
+      val1_norm += std::abs(Uexact[i]);
+      val2_norm += tmpt * tmpt;
+      val3_norm += Uexact[i] * Uexact[i];
+    }
+  } // end for nd-loop
+
+  // Compute the error: l1 and l2-norm of errors
+  this->comm().sum(val0_norm);
+  this->comm().sum(val1_norm);
+  this->comm().sum(val2_norm);
+  this->comm().sum(val3_norm);
+  this->comm().max(max_abs_error);
+
+  const Real l1_norm = val0_norm / val1_norm;
+  const Real l2_norm = std::sqrt(val2_norm) / std::sqrt(val3_norm);
+  ss << ">>> sum(|vel_total-vel_exact|) / sum(|vel_exact|) = " << l1_norm
+     << "; sum(|vel_total-vel_exact|^2) / sum(|vel_exact|^2) = " << l2_norm
+     << "; max(|vel_total-vel_exact|) = "<<max_abs_error<<"\n";
+  PMToolBox::output_message(ss, this->comm());
+
+  // write equation system to output file
+#ifdef LIBMESH_HAVE_EXODUS_API
+  PMToolBox::output_message("writing total solution to total_solution.e",
+    this->comm());
+  std::string output_filename = "total_solution.e";
+  ExodusII_IO(this->get_mesh()).write_equation_systems(output_filename,
+                                                   this->get_equation_systems());
+#endif // #ifdef LIBMESH_HAVE_EXODUS_API
+
+  // resume solution to global
+  this->resume_solution_to_global();
+
+  STOP_LOG("test_nodal_error()", "PMSystemStokes");
+}
+
+// ===========================================================================
+void PMSystemStokes::output_point_solution(const std::vector<Point>& pts,
+                                            const std::string& filename)
+{
+  START_LOG("output_point_solution()", "PMSystemStokes");
+
+  // get system dimension
+  MeshBase& mesh = this->get_mesh();
+  const std::size_t dim = mesh.mesh_dimension();
+
+  // define output file format parameters
+  o_precision = this->get_equation_systems().parameters.get<int>
+    ("o_precision");
+  std::ofstream outfile;
+  outfile.open(filename, std::ios_base::out);
+  // set output file format (fixed + precision)
+  outfile.setf(std::ios::fixed);
+  outfile.precision(o_precision);
+
+  if (this->comm().rank() == 0)
+    outfile << "x,y,z,u_local,v_local,w_local,u_global,v_global,w_global,"
+               "u_total,v_total,w_total\n";
+
+  for (std::size_t i = 0; i < pts.size(); i++)
+  {
+    // get global solution from FEM
+    std::vector<Real> Uglobal(dim);
+    const unsigned int u_var = this->variable_number("u"); // u_var = 0
+    const unsigned int v_var = this->variable_number("v"); // v_var = 1
+    const unsigned int w_var = this->variable_number("w"); // w_var = 2
+    // point_value function is slow, but we only do this for test
+    Uglobal[0] = this->point_value(u_var, pts[i]);
+    Uglobal[1] = this->point_value(v_var, pts[i]);
+    Uglobal[2] = this->point_value(w_var, pts[i]);
+
+    // compute local solution from GGEM
+    const Point& Ulocal = this->local_velocity_fluid(pts[i], "regularized");
+
+    // compute total solution
+    std::vector<Real> Utotal(dim);
+    for (int i=0; i<dim; i++)
+      Utotal[i] = Uglobal[i] + Ulocal(i);
+
+    // write the result to output file
+    if (this->comm().rank() == 0)
+      outfile << pts[i](0)<<","<<pts[i](1)<<","<<pts[i](2)<<","
+              << Ulocal(0)<<","<<Ulocal(1)<<","<<Ulocal(2)<<","
+              << Uglobal[0]<<","<<Uglobal[1]<<","<<Uglobal[2]<<","
+              << Utotal[0]<<","<<Utotal[1]<<","<<Utotal[2]<<"\n";
+  } // end for i-loop
+  outfile.close();
+
+  STOP_LOG("output_point_solution()", "PMSystemPoisson");
+}
 
 
 // ==================================================================================
@@ -906,107 +939,297 @@ void PMSystemStokes::write_fluid_velocity_data(const std::string& filename)
 }
 
 // ============================================================================
-void PMSystemStokes::couple_poisson()
+void PMSystemStokes::couple_poisson(const bool& second_half)
 {
   START_LOG("couple_poisson()", "PMSystemStokes");
 
-  this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").solve(
-    "unused");
+  if (!second_half){
+    PMToolBox::output_message(">>>>>>>> Solving Poisson systems...",
+        this->comm());
+    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
+        solve("unused");
+  }
   this->get_equation_systems().get_system<PMSystemPoisson>("Poisson").
     add_electrostatic_forces();
+
+  // for test purpose, we output Poisson system solution along x, y=0, z=0
+  if ((this->get_equation_systems().parameters.get<std::string>
+    ("simulation_name") =="poisson_validation_dirichlet_bc") |
+    (this->get_equation_systems().parameters.get<std::string>
+      ("simulation_name") =="poisson_validation_dbc_with_pbc")) {
+    const Point &box_min = _point_mesh->pm_periodic_boundary()->box_min();
+    const Point &box_len = _point_mesh->pm_periodic_boundary()->box_length();
+    const std::vector<std::string> directions{"x", "y", "z"};
+    for (int dim_i=0; dim_i<3; dim_i++) {
+      std::ostringstream oss;
+      oss << "potential_along_"<<directions[dim_i]<<"_alpha_"
+          << this->get_equation_systems().parameters
+            .get<Real>("alpha") << ".csv";
+      const int n_pts = 200;
+      std::vector <Point> pts(n_pts);
+      for (int i = 0; i < pts.size(); i++)
+        pts[i] = Point(
+          (dim_i==0) * (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+          (dim_i==1) * (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts)),
+          (dim_i==2) * (box_min(dim_i) + i * box_len(dim_i) / Real(n_pts))
+          );
+      this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+        .output_point_solution(pts, oss.str());
+    }
+  }
 
   STOP_LOG("couple_poisson()", "PMSystemStokes");
 }
 
-// ===========================================================================
-void PMSystemStokes::update_solution_for_output(
-  const std::string &solution_name)
+//===========================================================================
+void PMSystemStokes::couple_np(unsigned int relax_step_id)
 {
-  START_LOG("update_solution_for_output()", "PMSystemStokes");
+  Parameters& params = this->get_equation_systems().parameters;
+  const bool& module_poisson = params.get<bool>("module_poisson");
+  const bool& with_hi = params.get<bool>("with_hi");
+  const Real& dt = params.get<Real>("dt");
+  const Real& relax_t_final = params.get<Real>("np_system_relaxation_time");
+  const unsigned int output_interval = params.get<unsigned int>
+    ("np_system_relaxation_write_interval");
+  std::ostringstream oss;
 
-  // update Stokes system solution if with_hi is true
-  if (this->get_equation_systems().parameters.get<bool>("with_hi"))
+  // store all np system names to a vector
+  std::vector<std::string> np_sys_names;
+  unsigned int n_sys = this->get_equation_systems().n_systems();
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
   {
-    // clone Stokes FEM solution to solution_backup
-    this->solution_backup = this->solution->clone();
-    // update this->solution depends on solution_name
-    if (solution_name == "disturbed_global")
-    {
-      // do nothing
+    const std::string& s_name = this->get_equation_systems().get_system(s_id)
+      .name();
+    if (s_name.rfind("NP:", 0)==0) {
+      np_sys_names.push_back(s_name);
     }
-    else if (solution_name == "disturbed_total")
-    {
-      this->add_local_solution();
+  }
+
+  // check if np systems are relaxed (we only need to check the first one
+  // since all np systems have the same relaxed status). If np systems are
+  // already relaxed, we just need to solve them for one step with poisson
+  // and stokes ------> this will give us c(t+dt)
+  if (this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[0])
+    .relaxed)
+  {
+    // update real_time since we are solve concentration for t = t+dt
+    params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
+    oss <<">>>>>> All NP systems are relaxed, updating systems for c(t=t+dt="
+        <<params.get<Real>("real_time")<<"):";
+    PMToolBox::output_message(oss, this->comm());
+
+    // set solve options for NP solver
+    const std::string option = std::string("diffusion")
+                               + ((module_poisson) ? ("&electrostatics") : (""))
+                               + ((with_hi) ? ("&convection") : (""));
+
+    // solve all NP system for t = t+dt
+    oss <<">>>>>>>> Solving all NP systems with option = '"<<option<<"'...";
+    PMToolBox::output_message(oss, this->comm());
+    for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++) {
+      this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
+        .solve(option);
     }
-    else if (solution_name == "total")
-    {
-      this->add_local_solution();
-      this->solution->add(*this->undisturbed_solution);
+  }
+  // if NP system are not relaxed, we relax them; this will be done recursively
+  else
+  {
+    // if NP system are not initialized, we initialized them, otherwise we
+    // relax them for one step. Notice that all
+    // NP systems have the same init_cd_set status
+    if (! this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[0])
+      .init_cd_set) {
+      // Initialize all NP system
+      PMToolBox::output_message("----> Initializing all NP systems",
+                                this->comm());
+      for (unsigned int s_id = 0; s_id < np_sys_names.size(); s_id++) {
+        this->get_equation_systems().get_system<PMSystemNP>
+          (np_sys_names[s_id]).init_cd();
+
+        // print max and min solution for debug purpose (comment this chunk
+        // out if unnecessary)
+        oss << "* system '" << np_sys_names[s_id] << "' max_solution = "
+            << this->get_equation_systems().get_system<PMSystemNP>(
+              np_sys_names[s_id]).solution->max()<<"; "
+            <<"min_solution = "<<this->get_equation_systems().get_system<PMSystemNP>(
+          np_sys_names[s_id]).solution->min();
+        PMToolBox::output_message(oss, this->comm());
+
+        // output concentration along lines (comment this chunk if necessary)
+        this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
+          .write_point_solution(std::string("relax_c_") + np_sys_names[s_id]
+            +"_along_", 0, 200);
+      } // end loop over all np systems
+
+      // Initialize Poisson system solution if existed
+      if (module_poisson) {
+        // we need to solve the Poisson system to initialized all the
+        // parameters and the solution
+        oss << "----> Initializing Poisson system";
+        PMToolBox::output_message(oss, this->comm());
+        this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+          .solve("unused");
+
+        // write min and max solution to screen for debug purpose only
+        // (comment this chunk if unnecessary)
+        oss << "* system 'Poisson' max_solution = "
+            << this->get_equation_systems().get_system<PMSystemPoisson>
+              ("Poisson").solution->max() <<"; "
+            <<"min_solution = "<<this->get_equation_systems().get_system<PMSystemPoisson>
+          ("Poisson").solution->min();
+        PMToolBox::output_message(oss, this->comm());
+
+        // output potential along lines (comment this chunk if necessary)
+        this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+          .write_point_solution(std::string("relax_potential_along_"), 0, 200);
+
+        // jump out couple_np if relax_t_final is 0. (typically for debug purpose)
+        if (relax_t_final == 0.) {
+          return;
+        }
+      }
+#ifdef LIBMESH_HAVE_EXODUS_API
+      PMToolBox::output_message("--> Writing initial field "
+                                  "solution to init_cd.e", this->comm());
+        ExodusII_IO(this->get_mesh()).write_equation_systems("init_cd.e",
+          this->get_equation_systems());
+#endif
     }
+    // else NP and Poisson systems have been initialized
     else
     {
-      std::ostringstream ss;
-      ss << "Error: invalid solution_name: " << solution_name
-         << "; Suggested options are: " << "'disturbed_global', 'disturbed_total'"
-         << ", 'undisturbed', 'total'. Exiting ...";
-      PMToolBox::output_message(ss.str(), this->comm());
-    }
-  }// end if with_hi
+      std::ostringstream oss;
+      // update real_time since we are solving concentration for t = t+dt
+      params.set<Real>("real_time") = params.get<Real>("real_time") + dt;
+      if (relax_step_id%output_interval==0) {
+        oss << "----> relaxing real_time = " << params.get<Real>("real_time");
+        PMToolBox::output_message(oss, this->comm());
+      }
+      // solve all NP systems for one step with Electrostatics on but Fluid
+      // off --> this gives us c(t+dt)
+      const std::string option = std::string("diffusion")
+        + ((module_poisson) ? ("&electrostatics") : (""));
+      for (unsigned int s_id=0; s_id<np_sys_names.size(); s_id++)
+      {
+        // solve this NP system for one step
+        this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
+          .solve(option);
+        if (relax_step_id%output_interval==0) {
+          // print max and min solution to screen for debug purpose
+          oss << "* system '" << np_sys_names[s_id] << "' max_solution = "
+              << this->get_equation_systems().get_system<PMSystemNP>(
+                  np_sys_names[s_id]).solution->max()<<"; "
+              <<"min_solution = "<<this->get_equation_systems().get_system<PMSystemNP>(
+            np_sys_names[s_id]).solution->min();
+          PMToolBox::output_message(oss, this->comm());
 
-  STOP_LOG("update_solution_for_output()", "PMSystemStokes");
+          // output concentration along lines (comment this chunk if necessary)
+          this->get_equation_systems().get_system<PMSystemNP>(np_sys_names[s_id])
+            .write_point_solution(std::string("relax_c_") +
+            np_sys_names[s_id]+"_along_", int(relax_step_id/output_interval)+1, 200);
+        }
+
+        // set system relaxed status if real_time > relax_t_final
+        if (params.get<Real>("real_time") >= relax_t_final)
+        {
+          this->get_equation_systems().get_system<PMSystemNP>
+            (np_sys_names[s_id]).relaxed = true;
+        }
+      }
+
+      // update poisson system to get phi(t+dt)
+      if (module_poisson) {
+        this->get_equation_systems().get_system<PMSystemPoisson>
+          ("Poisson").solve("unused");
+
+        if (relax_step_id%output_interval==0) {
+          // output max, min solution for debug purpose
+          oss << "* system 'Poisson' max_solution = "
+              << this->get_equation_systems().get_system<PMSystemPoisson>
+                ("Poisson").solution->max() <<"; "
+              <<"min_solution = "<<this->get_equation_systems().get_system<PMSystemPoisson>
+            ("Poisson").solution->min();
+          PMToolBox::output_message(oss, this->comm());
+          // output Poisson solution on points
+          this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
+            .write_point_solution(std::string("relax_potential_along_"), int
+            (relax_step_id/output_interval)+1, 200);
+        } // end if relax_step_id % output_interval
+      }// end if module_poisson
+
+      // output solution to ExodusII file
+      #ifdef LIBMESH_HAVE_EXODUS_API
+        if(relax_step_id%output_interval==0)
+        {
+            PMToolBox::output_message("--> appending field solution "
+                                      "to init_cd.e", this->comm());
+            ExodusII_IO exo(this->get_mesh());
+            exo.append(true);
+            exo.write_timestep("init_cd.e", this->get_equation_systems(),
+              relax_step_id+1, params.get<Real>("real_time"));
+        } // end if relax_id//interval == 0
+      #endif
+
+      // set real time to 0. if relax time > relax_t_final
+      if (params.get<Real>("real_time") >= relax_t_final)
+        params.set<Real>("real_time") = 0.;
+    } // end else init_cd == true
+
+    // recursively call couple_np. Recursion will stop once all systems are
+    // relaxed
+    this->couple_np(relax_step_id+1);
+  } // end else relaxed
 }
 
- 
 // ===========================================================================
 void PMSystemStokes::write_equation_systems(const unsigned int& o_step,
-                                            const Real&  real_time,
-                                            const std::string& solution_name)
+                                            const Real&  real_time)
 {
   START_LOG("write_equation_systems()", "PMSystemStokes");
 
-  // update Stokes system solution
-  this->update_solution_for_output(solution_name);
-  // update Poisson system solution
-  if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+  // Get number of systems in equation_systems
+  unsigned int n_sys = this->get_equation_systems().n_systems();
+
+  // Update solutions to total for all systems before writing the output
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
   {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-      .update_solution_for_output(solution_name);
+    this->get_equation_systems().get_system<PMLinearImplicitSystem>
+      (s_id).update_solution_to_total();
   }
+
   // get a reference to the mesh object
   MeshBase& mesh = this->get_mesh();
   std::ostringstream output_filename;
-  output_filename << "output_equation_systems_" << solution_name;
+  output_filename << "output_equation_systems_total.e";
   // write equation systems to Exodus file
 #ifdef LIBMESH_HAVE_EXODUS_API
-      output_filename << ".e";
-      if (o_step == 0)
-      {
-        ExodusII_IO(mesh).write_equation_systems(output_filename.str(),
-          this->get_equation_systems());
-      }
-      else
-      {
-        ExodusII_IO exo(mesh);
-        exo.append(true);
-        exo.write_timestep(output_filename.str(),
-                           this->get_equation_systems(),
-                           o_step+1,
-                           real_time);
-      } // end if-else
-#endif
-  // resume Stokes system solution
-  if (this->get_equation_systems().parameters.get<bool>("with_hi")) 
-  { 
-    this->resume_solution_after_output();
-  }
-  // resume Poisson system solution
-  if (this->get_equation_systems().parameters.get<bool>("module_poisson"))
+  if (o_step == 0)
   {
-    this->get_equation_systems().get_system<PMSystemPoisson>("Poisson")
-      .resume_solution_after_output();
+    ExodusII_IO(mesh).write_equation_systems(output_filename.str(),
+      this->get_equation_systems());
   }
-   
+  else
+  {
+    ExodusII_IO exo(mesh);
+    exo.append(true);
+    exo.write_timestep(output_filename.str(),
+                       this->get_equation_systems(),
+                       o_step+1,
+                       real_time);
+  } // end if-else
+#endif
+
+  // resume solutions of all systems
+  // the 'resume_solution_after_output' can be different for different systems
+  for (unsigned int s_id=0; s_id<n_sys; s_id++)
+  {
+    this->get_equation_systems().get_system<PMLinearImplicitSystem>
+      (s_id).resume_solution_to_global();
+  }
+
   STOP_LOG("write_equation_systems()", "PMSystemStokes");
 }
+
+
 
 } // end namespace libMesh

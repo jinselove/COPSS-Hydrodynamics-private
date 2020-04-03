@@ -114,11 +114,11 @@ void GGEMStokes::set_ksi()
 }
 
 // ======================================================================
-Real GGEMStokes::smoothed_force_exp(const Real& r) const
+Real GGEMStokes::smoothed_force_exp(const Point& r) const
 {
   START_LOG("smoothed_force_exp()", "GGEMSystem");
 
-  const Real r2   = r * r;
+  const Real r2   = r.norm_sq();
   const Real a2r2 = alpha2 * r2;
   Real g          = alpha3_pi_23 * std::exp(-a2r2) * (2.5 - a2r2);
 
@@ -357,53 +357,57 @@ const
 }
 
 // ======================================================================
-std::vector<Real>GGEMStokes::local_velocity_fluid(PointMesh<3>      *point_mesh,
-                                                  const Point      & ptx,
-                                                  const std::string& force_type)
-const
+Point GGEMStokes::local_solution_field(PointMesh<3>      *point_mesh,
+                                       const Point      & ptx,
+                                        const std::string&force_type,
+                                const dof_id_type& ptx_elem_id) const
 {
-  START_LOG("local_velocity_fluid()", "GGEMStokes");
+  START_LOG("local_solution_field()", "GGEMStokes");
+
+  // if elem_id (id of the element that contains ptx) of ptx isn't
+  // given, we can build particle neighbor list using KD tree
+  if ((ptx_elem_id<0) | (ptx_elem_id >= point_mesh->get_mesh().n_elem()))
+  {
+    std::cout<<"Error: invalid element id for point ("<<ptx(0)<<","<<ptx(1)
+             <<","<<ptx(2)<<"), element id = "<<ptx_elem_id<<std::endl;
+    libmesh_error();
+    //build the particle neighbor list around the given point \p ptx
+    //    const bool is_sorted = false;
+    //    std::vector<std::pair<std::size_t, Real> > IndicesDists;
+    //    point_mesh->build_particle_neighbor_list(ptx, is_sorted, IndicesDists);
+    //    for (std::size_t v=0; v<IndicesDists.size(); v++)
+    //      point_nb_list.push_back(IndicesDists[v].first);
+  }
+  const std::vector<dof_id_type>& point_nb_list =
+    point_mesh->get_elem_point_neighbor_list(ptx_elem_id);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     build the particle neighbor list around the given point \p ptx
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  const bool is_sorted = false;
-  std::vector<std::pair<std::size_t, Real> > IndicesDists;
-  point_mesh->build_particle_neighbor_list(ptx, is_sorted, IndicesDists);
-
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
      Loop over all the neighbor list beads, and compute the local velocity:
      u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*f_v(j)
      zero_limit = false, if the given point is 'fluid' (not a bead/tracking pt.)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
+  */
 
   // const Real br0    = 1.0;    // normalized bead radius.
   //  const bool  zero_limit  = false;  // for fluid, we let it be false, and
   // allow singularity
-  std::vector<Real> u(dim, 0.0);
-
-  for (std::size_t v = 0; v < IndicesDists.size(); ++v)
+  Point u;
+  DenseMatrix<Number> GT;
+  for (std::size_t v = 0; v < point_nb_list.size(); ++v)
   {
     // 0. particle id and position, vector x = ptx - pt0
-    const std::size_t p_id = IndicesDists[v].first;
-    const Point pt0        = point_mesh->particles()[p_id]->point();
-    const Point x          = point_mesh->pm_periodic_boundary()->point_vector(pt0,
-                                                                              ptx);
+    const std::size_t& p_id = point_nb_list[v];
+    const Point& ptj = point_mesh->particles()[p_id]->point();
+    const Point& x = point_mesh->pm_periodic_boundary()->point_vector(ptx, ptj);
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 1. compute the Green function (Oseen Tensor) of particle-v
-    DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
-
     if (force_type == "regularized") {
       GT = this->green_tensor_local_regularized(x);
     }
     else {
-      libmesh_assert("GGEMStokes::local_velocity_fluid, wrong force_type!");
+      std::cout<<"Error: invalid force_type:"<<force_type<<std::endl;
+      libmesh_error();
     } // end if-else
 
     // 2. compute the force vector of particle-v
@@ -411,175 +415,90 @@ const
 
     // 3. compute u due to this particle
     for (int i = 0; i < dim; ++i)
-      for (int j = 0; j < dim; ++j) u[i] += GT(i, j) * fv(j);
-
-    // ================ test output of GT, fv, and u ===========
-    //    printf("--------------------------- output matrix GT
-    // ---------------------------\n");
-    //    for(unsigned int i=0; i<GT.m(); ++i)
-    //    {
-    //      for(unsigned int j=0; j<GT.n(); ++j)    printf("%f  ", GT(i,j) );
-    //      printf(", %f  \n", fv[i]);
-    //    }
-    //    printf("--->test: local velocity vector u = (%f %f %f)\n",
-    // u[0],u[1],u[2]);
-    //    printf("--------------------------- end of matrix GT
-    // ---------------------------\n");
-    // ==============================================
+      for (int j = 0; j < dim; ++j)
+        u(i) += GT(i, j) * fv(j);
   } // end for v-loop
 
-  STOP_LOG("local_velocity_fluid()", "GGEMStokes");
-
+  STOP_LOG("local_solution_field()", "GGEMStokes");
   return u;
 }
 
-// ======================================================================
-std::vector<Real>GGEMStokes::local_velocity_fluid(PointMesh<3>      *point_mesh,
-                                                  const Elem        *elem,
-                                                  const Point      & ptx,
-                                                  const std::string& force_type)
-const
+// =======================================================================
+Point GGEMStokes::local_solution_bead(PointMesh<3>      *point_mesh,
+                                      const std::size_t& bead_id,
+                                      const std::string&force_type) const
 {
-  START_LOG("local_velocity_fluid()", "GGEMStokes");
+  START_LOG("local_solution_bead()", "GGEMStokes");
 
+  const std::vector<dof_id_type>& nb_list = point_mesh->particles()
+    [bead_id]->neighbor_list();
+  const std::vector<Point>& nb_vector = point_mesh->particles()
+    [bead_id]->neighbor_vector();
+  const PointType& point_type = point_mesh->particles()[bead_id]->point_type();
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     build the particle neighbor list around the given point \p ptx
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  const bool is_sorted                    = false;
-  std::vector<std::size_t> elem_neighbors = point_mesh->elem_neighbor_list(elem);
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
      Loop over all the neighbor list beads, and compute the local velocity:
      u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*f_v(j)
      zero_limit = false, if the given point is 'fluid' (not a bead/tracking pt.)
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  std::vector<Real> u(dim, 0.0);
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
-  for (std::size_t v = 0; v < elem_neighbors.size(); ++v)
-  {
-    // 0. particle id and position, vector x = ptx - pt0
-    const std::size_t p_id = elem_neighbors[v];
-    const Point pt0        = point_mesh->particles()[p_id]->point();
-    const Point x          = point_mesh->pm_periodic_boundary()->point_vector(pt0,
-                                                                              ptx);
-
-    // 1. compute the Green function (Oseen Tensor) of particle-v
-    DenseMatrix<Number> GT; // Green function Tensor has the size: dimxdim
-
-    if (force_type == "regularized") GT = this->green_tensor_local_regularized(x);
-    else libmesh_assert("GGEMStokes::local_velocity_fluid, wrong force_type!");
-
-    // 2. compute the force vector of particle-v
-    const Point fv = point_mesh->particles()[p_id]->particle_force();
-
-    // 3. compute u due to this particle
-    for (int i = 0; i < dim; ++i)
-      for (int j = 0; j < dim; ++j) u[i] += GT(i, j) * fv(j);
-
-    // ================ test output of GT, fv, and u ===========
-    //    printf("--------------------------- output matrix GT
-    // ---------------------------\n");
-    //    for(unsigned int i=0; i<GT.m(); ++i)
-    //    {
-    //      for(unsigned int j=0; j<GT.n(); ++j)    printf("%f  ", GT(i,j) );
-    //      printf(", %f  \n", fv[i]);
-    //    }
-    //    printf("--->test: local velocity vector u = (%f %f %f)\n",
-    // u[0],u[1],u[2]);
-    //    printf("--------------------------- end of matrix GT
-    // ---------------------------\n");
-    // ==============================================
-  } // end for v-loop
-
-  STOP_LOG("local_velocity_fluid()", "GGEMStokes");
-
-  return u;
-}
-
-// ======================================================================
-Point GGEMStokes::local_velocity_bead(PointMesh<3>      *point_mesh,
-                                      const std::size_t& pid0,
-                                      const std::string& force_type) const
-{
-  START_LOG("local_velocity_bead()", "GGEMStokes");
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     Find the bead position ptx and its neighbor list, and its point type
-     NOTE: for a given bead/tracking pt, its neighbor list does NOT include
-       itself!
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  const Point& ptx            = point_mesh->particles()[pid0]->point();
-  const PointType point_type0 = point_mesh->particles()[pid0]->point_type();
-  std::vector<std::pair<std::size_t, Real> > IndicesDists;
-  IndicesDists = point_mesh->particles()[pid0]->neighbor_list();
-  const std::vector<Point>& neighbor_vector =
-    point_mesh->particles()[pid0]->neighbor_vector();
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     Loop over all the neighbor list beads, and compute the local velocity:
-     u_l(i) = sum[v=1:Nl] G_v(x-x_v; i,j)*f_v(j)
-     zero_limit = false, because the neighbor list does NOT include itself.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
+  // const Real br0    = 1.0;    // normalized bead radius.
+  //  const bool  zero_limit  = false;  // for fluid, we let it be false, and
+  // allow singularity
   Point u;
-  DenseMatrix<Number> GT; // Green function Tesnosr has the size: dim x dim
-
-  // const Real ksi = this->regularization_parameter(hmin, ibm_beta, br0,
-  // point_type0);
-  for (std::size_t v = 0; v < IndicesDists.size(); ++v)
+  DenseMatrix<Number> GT;
+  for (std::size_t v = 0; v < nb_vector.size(); ++v)
   {
     // 0. particle id and position, vector x = ptx - pt0
-    const Point x           = neighbor_vector[v];
-    const unsigned int p_id = IndicesDists[v].first;
+    const dof_id_type& p_id = nb_list[v];
+    const Point& x = nb_vector[v];
 
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 1. compute the Green function (Oseen Tensor) of particle-v
-    if (force_type == "regularized") GT = this->green_tensor_local_regularized(x);
-    else libmesh_assert("GGEMStokes::local_velocity_bead, wrong force_type");
+    if (force_type == "regularized") {
+      GT = this->green_tensor_local_regularized(x);
+    }
+    else {
+      std::cout<<"Error: invalid force_type:"<<force_type<<std::endl;
+      libmesh_error();
+    } // end if-else
 
     // 2. compute the force vector of particle-v
-    const Point fv = point_mesh->particles()[p_id]->particle_force();
+    const Point& fv = point_mesh->particles()[p_id]->particle_force();
 
     // 3. compute u due to this particle
     for (int i = 0; i < dim; ++i)
-      for (int j = 0; j < dim; ++j) u(i) += GT(i, j) * fv(j);
+      for (int j = 0; j < dim; ++j)
+        u(i) += GT(i, j) * fv(j);
   } // end for v-loop
 
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    -
-     The above velocity does NOT include the contribution from the bead itself,
-       since
-     it is not in its own neighbor list. This is true for a polymer bead.
-       However,
-     if this point is a tracking point of an immersed body in Immersed Boundary
-       Method,
-     this contribution should be included by letting x-->0
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       - */
-  if (point_type0 == LAGRANGIAN_POINT) // for Lagrangian tracking point type
-                                       // only
+  -
+   The above velocity does NOT include the contribution from the bead itself,
+     since
+   it is not in its own neighbor list. This is true for a polymer bead.
+     However,
+   if this point is a tracking point of an immersed body in Immersed Boundary
+     Method,
+   this contribution should be included by letting x-->0
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     - */
+  if (point_type == LAGRANGIAN_POINT) // for Lagrangian tracking point type
+    // only
   {
     // 1. compute the Green function (Oseen Tensor) when x-->0
     Point self_vector(0.);
     GT = this->green_tensor_local_regularized(self_vector);
 
     // 2. compute the force vector of this particle
-    const Point fv = point_mesh->particles()[pid0]->particle_force();
+    const Point& fv = point_mesh->particles()[bead_id]->particle_force();
 
     // 3. compute u due to this particle
     for (int i = 0; i < dim; ++i)
-      for (int j = 0; j < dim; ++j) u(i) += GT(i, j) * fv(j);
+      for (int j = 0; j < dim; ++j)
+        u(i) += GT(i, j) * fv(j);
   }
 
-  STOP_LOG("local_velocity_bead()", "GGEMStokes");
-
+  STOP_LOG("local_solution_bead()", "GGEMStokes");
   return u;
 }
 
@@ -591,7 +510,7 @@ Point GGEMStokes::global_self_exclusion(PointMesh<3>      *point_mesh,
   START_LOG("self_exclusion()", "GGEMStokes");
 
   // 1. compute the force vector of the particle
-  const Point fv = point_mesh->particles()[pid0]->particle_force();
+  const Point& fv = point_mesh->particles()[pid0]->particle_force();
 
   // 2. compute the self exclusion term at the position of the i-th bead
   Point self_v;

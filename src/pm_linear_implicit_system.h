@@ -81,6 +81,10 @@ public:
    */
   virtual void clear() = 0;
 
+  /**
+   * get the time interval to guarantee numerical stability for a system
+   */
+  virtual Real get_dt() {return std::numeric_limits<double>::max();};
 
   /**
    * Assemble the system matrix.
@@ -92,37 +96,33 @@ public:
   /**
    * Assemble the system rhs.
    */
-  virtual void assemble_rhs(const std::string& system_name,
-                            const std::string& option) = 0;
+//  virtual void assemble_rhs(const std::string& system_name,
+//                            const std::string& option);
 
 
   /**
    * Solve the system.
    */
-  virtual void solve(const std::string& option) = 0;
+//  virtual void solve(const std::string& option) = 0;
 
 
   /**
-   * update system solution for output
+   * Update solution to total solution, this function will also backup
+   * solution to global solution
    */
-  virtual void update_solution_for_output(const std::string& solution_name =
-    "total") = 0;
+  virtual void update_solution_to_total() = 0;
 
   /**
-   * resume system solution after writing the solution to output
+   * Resume solution to global solution of the system. This function often
+   * gets called after update_solution_to_total()
    */
-  void resume_solution_after_output();
-
-  /**
-   * Add the local solution to the global solution
-   */
-  virtual void add_local_solution() = 0;
+  virtual void resume_solution_to_global() = 0;
 
 
-  /**
+    /**
    * Compute the L2-error by comparing numerical and analytical solutions
    */
-  virtual void test_l2_norm(bool& neighbor_list_update_flag) = 0;
+  void test_nodal_error(bool& neighbor_list_update_flag);
 
 
   /*
@@ -208,11 +208,7 @@ public:
                                  Vec               *petsc_vector,
                                  const bool         write_velocity) const;
 
-  /**
-   * A Clone the current solution to the solution backup
-   */
-  UniquePtr<NumericVector<Real>> solution_backup;
-                                      
+
 protected:
 
   // particle mesh pointer
@@ -227,7 +223,9 @@ protected:
   // bool _re_init: If true, global_matrix will be rebuilt. It's only true
   // at the beginining of the simulation.
   bool _re_init;
-  
+
+  // A Pointer to the global_solution
+  UniquePtr<NumericVector<Number>> _global_solution;
 
 };
 } // end namespace libMesh

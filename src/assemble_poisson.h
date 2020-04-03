@@ -25,6 +25,7 @@
 #include "assemble_system.h"
 #include "ggem_poisson.h"
 #include "analytical_solution_poisson.h"
+#include "pm_system_np.h"
 
 /*! \brief This class provides the basic components
  * for assembling the matrix and vector for solving
@@ -75,7 +76,7 @@ public:
      @param[out] Fe Add rhs vector to global vector F
    */
   void assemble_global_F(const std::string& system_name,
-                         const std::string& option) override;
+                         const std::string& option);
 
 
   /*! \brief Assemble function on each element for the right-hand-side in
@@ -87,8 +88,8 @@ public:
                           const unsigned int&            n_dofs,
                           const std::vector<Real>& JxW,
                           const std::vector<std::vector<Real>>& phi,
-                          const std::vector<Point> q_xyz,
-                          const std::vector<std::size_t>n_list,
+                          const std::vector<Point>& q_xyz,
+                          const std::vector<dof_id_type>& n_list,
                           const bool                  & pf_flag,
                           const std::string           & option,
                           DenseVector<Number>         & Fe);
@@ -97,7 +98,8 @@ public:
   /*! \brief Select sides on Dirichlet and Neumann boundaries for all elements
    *
    */
-  void select_boundary_side(const Elem *elem) override;
+  void select_boundary_side(const Elem *elem,
+                            const std::string& system_name) override;
 
 
   /*! \brief Apply Dirichlet BC by penalty method to impose electrical potential
@@ -108,7 +110,7 @@ public:
                            const std::string  & matrix_or_vector,
                            DenseMatrix<Number>& Ke,
                            DenseVector<Number>& Fe,
-                           const std::string  & option) override;
+                           const std::string  & option);
 
 
   /*! \brief Apply Neumann BC to impose surface charge density on relevant
@@ -118,7 +120,11 @@ public:
   void apply_bc_neumann(const Elem          *elem,
                         FEBase             & fe_phi,
                         FEBase             & fe_face,
-                        DenseVector<Number>& Fe);
+                        DenseVector<Number>& Fe,
+                        DenseVector<Number>& sigma_e,
+                        DenseVector<Number>& sigma_e_global,
+                        DenseVector<Number>& sigma_e_local
+                      );
 
 
   /*! \brief Initialize ggem_poisson for local field calcualtions
@@ -143,12 +149,29 @@ public:
 private:
 
   // Boundary sides that Dirichlet and Neumann BCs are applied.
-  std::vector<std::vector<unsigned int> >_boundary_sides_dirichlet_poisson,
-                                         _boundary_sides_neumann_poisson;
+  // for each tuple, the first element is the side id, the second element is the 
+  // associated boundary id of this side, the third element is the corresponding
+  // Dirichlet(Neumann) BC values associated with this side
+  std::vector<std::vector<std::tuple<unsigned int, unsigned int, Real>>> _boundary_sides_dirichlet_poisson; 
+  
+  std::vector<std::vector<std::tuple<unsigned int, unsigned int, Real>>> _boundary_sides_neumann_poisson;
+                                         
 
   // Get a reference to GGEMPoisson
   GGEMPoisson *ggem_poisson = nullptr;
 
   // Get a reference to AnalyticalSolutionPoisson
   AnalyticalSolutionPoisson *analytical_solution = nullptr;
+
+  // initialize a pointer to all PMSystemNP systems; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<PMSystemNP*> np_systems;
+
+  // initialize a pointer to the dof map of NP system; no need to clean these
+  // pointers afterwards since we will only attach the reference here and the
+  // actual object will be destroyed somewhere else.
+  std::vector<DofMap*> np_dof_maps;
+  
+  
 };

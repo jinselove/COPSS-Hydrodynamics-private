@@ -70,7 +70,13 @@ public:
    * Modified smoothed Dirac delta function with exponent form
    * Reference: equation (13) in JCP, 143. 014108 (2015)
    */
-  Real smoothed_charge_exp(const Real& r) const;
+  Real smoothed_charge_exp(const Point& pt) const;
+
+  /**
+   * Regularized charge density kernel for GGEM system,
+   * this is to calculate the total charge density
+   */
+  Real regularized_charge_exp(const Point& r) const;
 
 
   /*
@@ -125,6 +131,22 @@ public:
                                        ) const;
 
 
+  /**
+   * Calculate the gradient of unbounded smoothed green tensor. Notice that
+   * the point x is the point from x0 to xi, i.e, xi - x0. And we calculate
+   * the gradient at x0.
+   */
+  Point green_tensor_unbounded_smoothed_grad(const Point& x,
+    const Real& alpha_or_ksi) const;
+
+  /**
+   * Calculate the gradient of unbounded smoothed green tensor. Notice that
+   * the point x is the point from x0 to xi, i.e, xi - x0. And we calculate
+   * the gradient at x0.
+   */
+  Real green_tensor_unbounded_smoothed_laplacian(const Point& x) const;
+
+
   /*
    * Green tensor for the local charge density. The charge density is written as
    *a singular
@@ -150,9 +172,20 @@ public:
   Real green_tensor_local_regularized(const Point& x /* vector x = pt1 - pt0 */
                                       ) const;
 
+  /**
+   * Calculate the gradient over three directions for
+   * green_tensor_local_regularized. This function uses the derivation from
+   * Mathematica and hand-work, should be valid.
+   * Notice that the point x is the point from x0 to xi, i.e, xi - x0. And we
+   * calculate the gradient at x0.
+   */
+   Point green_tensor_local_regularized_grad(const Point& x /* vector x = pt1 - pt0 */
+                                            ) const;
 
-  /* Compute the local electrostatic potential field at a given point ptx
-   * due to smoothed/regularized point charges.
+
+  /* Compute the local electrostatic potential field and the local potential
+   * gradient at a given point ptx
+   * due to smoothed/regularized point charges. This point cannot be a particle.
    * charge_type: regularized
    *
    * NOTE: due to the fast convergence of gaussian function, only a small group
@@ -167,47 +200,49 @@ public:
    *
    * Eqn (16) in Membrane paper, Jarol E Molina, J de Pablo, J.Hernandez-Ortiz
    */
-  Real local_potential_field(PointMesh<3>      *point_mesh,
-                             const Point      & ptx, /* a pt in space */
-                             const std::string& charge_type) const;
+  Real local_solution_field(PointMesh<3>*point_mesh,
+                            const Point      & ptx, /* a pt in space */
+                            const std::string& charge_type,
+                            const dof_id_type ptx_elem_id) const;
 
-  /* Compute the local electrostatic potential field at a given point ptx
+  /**
+   * Similar to the function above, but used for the case that local solution
+   * gradient is also needed. One can specify whether phi or grad(phi) or both
+   * should be passed to a placeholder, local_sol. For example, if
+   * sol_option="phi", then local_sol->second will just be Point(0.).
+  */
+  void local_solution_field(PointMesh<3>*point_mesh,
+                            const Point      & ptx, /* a pt in space */
+                            const std::string& charge_type,
+                            const dof_id_type ptx_elem_id,
+                            const std::string& sol_option, //"phi" or
+                            // "grad" or "phi&grad"
+                            std::pair<Real, Point>& local_sol
+                            );
+
+  /* Compute the local electrostatic potential field and the local
+   * potential gradient at a given bead
    * due to smoothed/regularized point charges.
    * charge_type: regularized
-   *
-   * NOTE: due to the fast convergence of gaussian function, only a small group
-   *of
-   * particles within the neighbor list are considered. There are two ways
-   * to construct this neighbor list:
-   * (1) element independent: directly search particles near the given point
-   *using KDTree;
-   * (2) element dependent: directly use the neighbor list of the parent
-   *element;
-   * this function implement method (2), which contains a short neighbor list
-   *
-   * Eqn (16) in Membrane paper, Jarol E Molina, J de Pablo, J.Hernandez-Ortiz
    */
-  Real local_potential_field(PointMesh<3>      *point_mesh,
-                             const Elem        *elem,
-                             const Point      & ptx, /* a pt in space */
-                             const std::string& charge_type) const;
-
-
-  /*
-   * Compute the local electrostatic potential at a point/bead with point_id =
-   *pid0.
-   * charge_type: regularized
-   *
-   * Eqn (16) in Membrane paper, Jarol E Molina, J de Pablo, J.Hernandez-Ortiz
-   * This potential should be include the potential field induced by the bead
-   *itself.
-   */
-  Real local_potential_bead(PointMesh<3>      *point_mesh,
-                            const std::size_t& pid0, /* point id */
+  Real local_solution_bead(PointMesh<3>*point_mesh,
+                            const dof_id_type& bead_id,
                             const std::string& charge_type) const;
 
+  /**
+   * Similar to the function above, but used for the case that local solution
+   * gradient is also needed. One can specify whether phi or grad(phi) or both
+   * should be passed to a placeholder, local_sol. For example, if
+   * sol_option="phi", then local_sol->second will just be Point(0.).
+  */
+  void local_solution_bead(PointMesh<3>*point_mesh,
+                           const dof_id_type& bead_id,
+                           const std::string& charge_type,
+                           const std::string& sol_option, //"phi" or
+    // "grad" or "phi&grad"
+                           std::pair<Real, Point>& local_sol);
 
-  // ! set PointType
+    // ! set PointType
   void set_point_type(const PointType& _point_type) {
     point_type = _point_type;
   }

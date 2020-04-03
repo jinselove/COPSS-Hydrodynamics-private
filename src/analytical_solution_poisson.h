@@ -62,6 +62,20 @@ public:
                                       const Point& pt0) const;
 
 
+  /**
+   * calculate the gradient of the exact solution at pt0
+   */
+  Point exact_solution_infinite_domain_grad(GGEMPoisson& ggem_poisson,
+                                            const Point& pt0) const;
+
+
+  /**
+ * calculate the laplacian of the exact solution at pt0
+ */
+  Real exact_solution_infinite_domain_laplacian(GGEMPoisson& ggem_poisson,
+                                            const Point& pt0) const;
+
+
   /*! \brief Attach point mesh to the class
    *
    */
